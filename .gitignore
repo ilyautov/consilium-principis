@@ -1,0 +1,14 @@
+# Легальная граница: НЕ коммитить чужие тексты (книги пользователя) и производные
+advisors/*/sources/
+advisors/*/corpus.jsonl
+data/embeddings*.npy
+
+# Питон
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Системное
+.DS_Store
+*.log

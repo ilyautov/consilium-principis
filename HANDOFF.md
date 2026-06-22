@@ -63,12 +63,17 @@ DP-5 аудитория · DP-6 первый режим (Pre-Mortem). Ставк
 `.gitignore` исключает `sources/` и `corpus.jsonl` — НЕ коммитить чужие тексты.
 
 ## Запуск
+Раскладка консолидирована: скилл самодостаточен под `personal-board/` (scripts/ advisors/
+council/ data/ board_config.json рядом со SKILL.md). Запуск из этой директории:
 ```bash
+cd personal-board
 python3 scripts/board_init.py advisors --semantic-available true   # выбор tier
 python3 scripts/build_advisor.py advisors/{name} --name "{Имя}"    # ingest
 python3 scripts/diversity_check.py advisors/a advisors/b ...        # состав
-python3 scripts/eval.py advisors/a advisors/b ...                  # точность
+python3 scripts/eval.py advisors/a advisors/b ...                  # точность (FIDELITY+RETRIEVAL+ABSTENTION+CHALLENGE)
 ```
+tier-FULL: движок Гефеста подключается как зависимость через `scripts/tier_full.py`
+(env `HEPHAESTUS_ENGINE`, дефолт `~/personal/pilots/rag-sds/engine`); эмбеддинги в `personal-board/data/`.
 
 ## Честные ограничения (Evidence Gate)
 - Ценность совета vs baseline не доказана числом (заблуждение #2, ARCHITECTURE р.15). Нужен слепой A/B.

@@ -1,8 +1,9 @@
 # Легальная граница: НЕ коммитить чужие тексты (книги пользователя) и производные
-advisors/*/sources/
-advisors/*/corpus.jsonl
-data/embeddings*.npy
-data/embeddings*.meta.json
+# (раскладка консолидирована: всё под personal-board/; якоря обновлены)
+personal-board/advisors/*/sources/
+personal-board/advisors/*/corpus.jsonl
+personal-board/data/embeddings*.npy
+personal-board/data/embeddings*.meta.json
 
 # Питон
 __pycache__/

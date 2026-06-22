@@ -54,7 +54,11 @@ def main():
     ap.add_argument("advisors_root")
     ap.add_argument("--semantic-available", default="false")
     ap.add_argument("--threshold", type=int, default=150000)  # токенов
-    ap.add_argument("--abstain-threshold", type=float, default=0.62)  # перенос из Гефеста
+    # 0.50 — калибровано на корпусе советника (eval.py: вне-корпуса max 0.402, в-корпусе min 0.532;
+    # чистый зазор → 0% галлюцинаций И 0% ложных отказов). Гефестовы 0.62 давали 50% over-abstention.
+    # PROVISIONAL: N=12 на одном советнике (marcus-aurelius), привязано к chunk-size (TIER_CHUNK_CHARS);
+    # пересчитать на большом корпусе. Safety-биас вверх: галлюцинация опаснее ложного отказа.
+    ap.add_argument("--abstain-threshold", type=float, default=0.50)
     args = ap.parse_args()
 
     sem = str(args.semantic_available).lower() in ("1", "true", "yes")

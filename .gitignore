@@ -2,6 +2,7 @@
 advisors/*/sources/
 advisors/*/corpus.jsonl
 data/embeddings*.npy
+data/embeddings*.meta.json
 
 # Питон
 __pycache__/

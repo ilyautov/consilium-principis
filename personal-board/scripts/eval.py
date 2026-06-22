@@ -347,6 +347,28 @@ def challenge_rate_eval():
     return {"total": total, "challenged": challenged, "sessions": sessions}
 
 
+def track_record_eval(adv_dir):
+    """U1 (слой 1): парсит advisors/{name}/relationship.md → записи совета и статус ИСХОДА.
+    Запись = заголовок '### '. Исход 'resolved', если строка с 'ИСХОД' не содержит ⏳/pending."""
+    name = os.path.basename(adv_dir.rstrip("/"))
+    rp = os.path.join(adv_dir, "relationship.md")
+    if not os.path.isfile(rp):
+        return {"name": name, "exists": False, "records": 0, "resolved": 0, "pending": 0}
+    t = open(rp, encoding="utf-8").read()
+    records = re.findall(r"(?m)^###\s+(.*)$", t)
+    resolved = pending = 0
+    for blk in re.split(r"(?m)^###\s+", t)[1:]:
+        m = re.search(r"(?im)^\s*[-*]?\s*\**\s*ИСХОД.*$", blk)
+        if not m:
+            continue
+        if re.search(r"⏳|pending", m.group(0), re.I):
+            pending += 1
+        else:
+            resolved += 1
+    return {"name": name, "exists": True, "records": len(records),
+            "resolved": resolved, "pending": pending, "titles": records}
+
+
 def main():
     paths = sys.argv[1:] or []
     if not paths:
@@ -405,6 +427,23 @@ def main():
             print(f"       секция явного несогласия: {'есть' if s['has_dissent_section'] else 'нет'}"
                   f"  ·  маркеры: {', '.join(s['markers'][:6]) if s['markers'] else '—'}")
         print("  (операционализация SYCON Bench, arXiv 2505.23840: Turn-of-Flip + удержание несогласия)")
+
+    # ── 1b) TRACK-RECORD (U1, слой 1) ───────────────────────────────────────────────────────
+    print("\n=== TRACK-RECORD (U1) — relationship.md: совет дан → ИСХОД зафиксирован? ===")
+    tr_any = False
+    for p in paths:
+        tr = track_record_eval(p)
+        if not tr["exists"]:
+            continue
+        tr_any = True
+        cov = (tr["resolved"] / tr["records"] * 100) if tr["records"] else 0
+        print(f"  {tr['name']}: записей {tr['records']} · ИСХОД зафиксирован {tr['resolved']} "
+              f"· pending {tr['pending']} (outcome-coverage {cov:.0f}%)")
+    if not tr_any:
+        print("  relationship.md ни у кого нет — слой 1 пуст (U1 не накапливается).")
+    else:
+        print("  Петля U1: совет пишется на шаге 5 заседания, ИСХОД дописывается ПО ФАКТУ →")
+        print("  outcome-coverage>0 нужен для калибровки (полезность совета, вес голоса, Brier).")
 
     # ── 2) RETRIEVAL ────────────────────────────────────────────────────────────────────────
     print("\n=== RETRIEVAL — golden {вопрос → якорь из корпуса}: top-1 / top-3 ===")

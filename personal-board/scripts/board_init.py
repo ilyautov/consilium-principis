@@ -69,7 +69,12 @@ def main():
     print(f"Семантический бэкенд (bge-m3): {'ДОСТУПЕН' if sem else 'нет'}")
     print(f"Порог tier: {args.threshold} токенов · abstain_threshold: {args.abstain_threshold}\n")
 
-    config = {"semantic_available": sem, "abstain_threshold": args.abstain_threshold,
+    config = {"semantic_available": sem,
+              "abstain_threshold": {
+                  "semantic": args.abstain_threshold,   # калиброван при chunk_chars ниже
+                  "lexical": 0.04,                       # лексический пол (best-effort)
+              },
+              "chunk_chars": int(os.getenv("TIER_CHUNK_CHARS", "500")),
               "token_threshold": args.threshold, "advisors": {}}
 
     print(f"{'советник':<22}{'токены':>9}{'чанки':>7}  tier   причина")

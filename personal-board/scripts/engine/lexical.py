@@ -10,6 +10,7 @@ from typing import List
 from . import Engine, Passage   # relative — пакетный стиль
 
 
+# intentional copy of _norm (floor isolation: lexical depends on stdlib only, not on fidelity/eval)
 def _norm(s: str) -> str:
     s = re.sub(r"[^\w\s]", " ", (s or "").lower())
     return re.sub(r"\s+", " ", s).strip()
@@ -31,7 +32,7 @@ def _split_units(advisor_dir: str) -> List[str]:
             if not line:
                 continue
             try:
-                txt = json.loads(line).get("text", "")
+                txt = json.loads(line).get("text") or ""
             except Exception:
                 continue
             for sent in re.split(r"(?<=[.!?])\s+", txt):
@@ -47,9 +48,9 @@ class LexicalEngine(Engine):
 
     def retrieve(self, question, advisor_dir, top_k=3):
         units = _split_units(advisor_dir)
-        qg = _char_ngrams(question)
-        if not units or not qg:
+        if not units or not _norm(question):
             return []
+        qg = _char_ngrams(question)
         scored = []
         for u in units:
             ug = _char_ngrams(u)

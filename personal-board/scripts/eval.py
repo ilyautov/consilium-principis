@@ -17,7 +17,8 @@ eval.py — харнесс точности и безопасности сове
              Принцип verifiable-by-design (arXiv 2404.03862): 🔵 = дословно из доверенного корпуса.
   [РАБОТАЕТ] RETRIEVAL — golden {вопрос → якорь корпуса}: top-1/top-3 через tier_full.retrieve,
              иначе лексический fallback (char-3gram, tier=SIMPLE). golden в scripts/golden/.
-  [РАБОТАЕТ] ABSTENTION — вопросы вне корпуса → max(score)<abstain_threshold(0.62) = честный отказ;
+  [РАБОТАЕТ] ABSTENTION — вопросы вне корпуса → max(score)<abstain_threshold (per-backend из движка:
+             semantic 0.50 / lexical 0.04) = честный отказ;
              % честных отказов / галлюцинаций (цель 0%) + ложные отказы на in-corpus (fail-closed).
   [РАБОТАЕТ] CHALLENGE-RATE — парсинг council/sessions/*.md → доля заседаний, где совет реально
              оспорил юзера (анти-эхо) + Turn-of-Flip и удержание несогласия до вердикта.
@@ -46,7 +47,9 @@ try:
 except Exception:
     ENGINE_OK = False
 
-ABSTAIN_THRESHOLD_DEFAULT = 0.62
+# Fallback-дефолт ТОЛЬКО для случая, когда engine-пакет недоступен И в board_config нет порога.
+# Живой путь берёт порог per-backend из движка (semantic 0.50 / lexical 0.04). Калибровка 0.50.
+ABSTAIN_THRESHOLD_DEFAULT = 0.50
 
 # Маркеры, ЗАЯВЛЯЮЩИЕ дословность (должны быть verbatim в корпусе):
 GROUNDED_MARKERS = ("🔵", "T1", "T2")

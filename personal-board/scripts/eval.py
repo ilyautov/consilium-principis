@@ -250,8 +250,14 @@ def retrieval_eval(adv_dir):
         })
     # degenerate-детектор: на SIMPLE-fallback кросс-язык (рус вопрос ↔ англ корпус) даёт ≈0 overlap.
     degenerate = (not TIER_FULL) and all(d["top_score"] < 0.05 for d in details)
+    # тематически-смежный-промах: anchor не найден, НО скоры приличные (>0.45) → ретрив достаёт
+    # тематически близкое, но не точный пассаж. Типично для большого однородного кросс-язычного
+    # корпуса (вся «Размышления» англ., вопросы рус.). Exact-anchor тут слишком жёсткая метрика.
+    mean_top = (sum(d["top_score"] for d in details) / len(details)) if details else 0.0
+    thematic_inexact = TIER_FULL and top3 == 0 and mean_top >= 0.45
     return {"name": name, "n": len(golden), "top1": top1, "top3": top3,
-            "details": details, "golden_path": path, "degenerate": degenerate}
+            "details": details, "golden_path": path, "degenerate": degenerate,
+            "mean_top": round(mean_top, 3), "thematic_inexact": thematic_inexact}
 
 
 def abstention_eval(adv_dir, threshold):
@@ -461,6 +467,12 @@ def main():
             print("      ⚠ DEGENERATE: SIMPLE char-ngram даёт ≈0 overlap (рус вопрос ↔ англ корпус) →")
             print("        числа НЕДОСТОВЕРНЫ; ретрив требует tier-FULL (семантика кросс-язык) или")
             print("        рускоязычного корпуса. На tier-FULL эта метрика валидна.")
+        if r.get("thematic_inexact"):
+            print(f"      ⚠ THEMATIC-INEXACT: anchor не найден, но скоры приличные (mean top "
+                  f"{r['mean_top']}) → ретрив достаёт ТЕМАТИЧЕСКИ близкие, но не ТОЧНЫЕ пассажи.")
+            print("        Типично для большого однородного кросс-язычного корпуса (вся «Размышления»")
+            print("        англ., вопросы рус., много похожих мест). Exact-anchor — слишком жёсткая")
+            print("        метрика здесь; для большого корпуса нужен relevance-judge, не дословный якорь.")
         for d in r["details"]:
             mark = "✓" if d["hit1"] else ("~" if d["hit3"] else "✗")
             rank = f"rank={d['rank']}" if d["rank"] else "MISS"

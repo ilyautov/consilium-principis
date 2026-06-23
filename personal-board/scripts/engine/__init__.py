@@ -87,3 +87,51 @@ def load_backend_threshold(advisor_dir, backend, default):
     except Exception:
         return default
     return _pick_threshold(at, backend, default)
+
+
+# --- резолвер: детект → кэш per advisor → деградация ---
+_ENGINE_CACHE = {}  # advisor_dir -> Engine
+
+
+def reset_engine_cache():
+    _ENGINE_CACHE.clear()
+
+
+def _advisor_key(advisor_dir):
+    import os
+    return os.path.abspath(advisor_dir)
+
+
+def resolve_engine(advisor_dir, prefer: Optional[str] = None) -> Engine:
+    """Возвращает лучший доступный бэкенд: semantic(ollama) → lexical.
+    Кэширует per advisor. prefer='lexical'|'semantic' форсит бэкенд (для eval --engine)."""
+    from .lexical import LexicalEngine
+    from .semantic import SemanticEngine
+    key = _advisor_key(advisor_dir)
+    if key in _ENGINE_CACHE and not prefer:
+        return _ENGINE_CACHE[key]
+    if prefer == "lexical":
+        eng = LexicalEngine()
+    elif prefer == "semantic" or SemanticEngine.available():
+        eng = SemanticEngine()
+    else:
+        eng = LexicalEngine()
+    _ENGINE_CACHE[key] = eng
+    return eng
+
+
+def _degrade(advisor_dir):
+    """Сбросить semantic→lexical для advisor (после runtime-падения)."""
+    from .lexical import LexicalEngine
+    _ENGINE_CACHE[_advisor_key(advisor_dir)] = LexicalEngine()
+
+
+def safe_retrieve(question, advisor_dir, top_k=3) -> List[Passage]:
+    """retrieve с graceful-деградацией: при падении бэкенда инвалидирует кэш вниз и
+    повторяет на lexical. «never crash» mid-session."""
+    eng = resolve_engine(advisor_dir)
+    try:
+        return eng.retrieve(question, advisor_dir, top_k=top_k)
+    except Exception:
+        _degrade(advisor_dir)
+        return resolve_engine(advisor_dir).retrieve(question, advisor_dir, top_k=top_k)

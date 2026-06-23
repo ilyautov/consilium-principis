@@ -40,6 +40,12 @@ except Exception:
     tier_full = None
     TIER_FULL = False
 
+try:
+    import engine as _engine
+    ENGINE_OK = True
+except Exception:
+    ENGINE_OK = False
+
 ABSTAIN_THRESHOLD_DEFAULT = 0.62
 
 # Маркеры, ЗАЯВЛЯЮЩИЕ дословность (должны быть verbatim в корпусе):
@@ -148,8 +154,10 @@ def fidelity_eval(adv_dir):
 def load_abstain_threshold():
     cfg = os.path.join(os.path.dirname(HERE), "board_config.json")
     try:
-        return float(json.load(open(cfg, encoding="utf-8")).get("abstain_threshold",
-                                                                 ABSTAIN_THRESHOLD_DEFAULT))
+        at = json.load(open(cfg, encoding="utf-8")).get("abstain_threshold", ABSTAIN_THRESHOLD_DEFAULT)
+        if isinstance(at, dict):
+            return float(at.get("semantic", ABSTAIN_THRESHOLD_DEFAULT))
+        return float(at)
     except Exception:
         return ABSTAIN_THRESHOLD_DEFAULT
 
@@ -202,12 +210,14 @@ def lexical_retrieve(question, adv_dir, top_k=3):
 
 
 def retrieve(question, adv_dir, top_k=3):
-    """Единая точка: tier-FULL если доступен, иначе лексический fallback."""
-    if TIER_FULL:
+    """Единая точка: через Engine-контракт (resolve_engine), с graceful-деградацией.
+    Fallback на старый лексический путь, если engine-пакет недоступен."""
+    if ENGINE_OK:
+        prefer = os.getenv("EVAL_ENGINE")  # 'lexical'|'semantic'|None
+        eng = _engine.resolve_engine(adv_dir, prefer=prefer)
         try:
-            res = tier_full.retrieve(question, adv_dir, top_k=top_k)
-            if res:
-                return res
+            return [{"text": p.text, "score": p.score, "source": p.source}
+                    for p in eng.retrieve(question, adv_dir, top_k=top_k)]
         except Exception:
             pass
     return lexical_retrieve(question, adv_dir, top_k=top_k)
@@ -376,7 +386,15 @@ def track_record_eval(adv_dir):
 
 
 def main():
-    paths = sys.argv[1:] or []
+    import argparse
+    ap = argparse.ArgumentParser(description="eval.py — харнесс точности и безопасности совета")
+    ap.add_argument("advisors", nargs="*", help="папки советников (advisors/munger …)")
+    ap.add_argument("--engine", choices=["lexical", "semantic"], default=None,
+                    help="форсить бэкенд (иначе resolved). Прокидывается в EVAL_ENGINE.")
+    args = ap.parse_args()
+    if args.engine:
+        os.environ["EVAL_ENGINE"] = args.engine
+    paths = args.advisors or []
     if not paths:
         print("Дай папки советников: python eval.py advisors/munger ...", file=sys.stderr)
         sys.exit(1)
@@ -407,9 +425,13 @@ def main():
     print("             (Correctness ≠ Faithfulness, arXiv 2412.18004; до 57% цитат не faithful).")
     print("             Полная проверка — на трассах генерации tier-FULL (validation-агент, CiteGuard).")
 
-    tier_label = "FULL (bge-m3)" if TIER_FULL else "SIMPLE (лексич. char-3gram fallback)"
+    if ENGINE_OK:
+        _eng_name = _engine.resolve_engine(paths[0], prefer=os.getenv("EVAL_ENGINE")).name if paths else "?"
+        tier_label = f"ENGINE:{_eng_name}"
+    else:
+        tier_label = "FULL (bge-m3)" if TIER_FULL else "SIMPLE (лексич. char-3gram fallback)"
     print(f"\n  tier движка ретрива: {tier_label}")
-    if not TIER_FULL:
+    if not ENGINE_OK and not TIER_FULL:
         print("  NB: tier_full недоступен → RETRIEVAL/ABSTENTION на лексическом fallback; абсолютные")
         print("      числа переснять на tier-FULL (семантика даст другие score). CHALLENGE-RATE от tier")
         print("      не зависит — парсинг сессий.")
@@ -481,10 +503,14 @@ def main():
         print("  golden-наборы не найдены (scripts/golden/<advisor>.retrieval.jsonl).")
 
     # ── 3) ABSTENTION (fail-closed) ─────────────────────────────────────────────────────────
-    thr = load_abstain_threshold()
-    print(f"\n=== ABSTENTION — fail-closed, порог abstain_threshold={thr} (board_config.json) ===")
+    print(f"\n=== ABSTENTION — fail-closed (порог per-advisor из board_config.json) ===")
     any_abs = False
     for p in paths:
+        if ENGINE_OK:
+            thr = _engine.resolve_engine(p, prefer=os.getenv("EVAL_ENGINE")).abstain_threshold(p)
+        else:
+            thr = load_abstain_threshold()
+        print(f"  порог abstain_threshold={thr} (board_config.json, backend={os.getenv('EVAL_ENGINE') or 'auto'})")
         a = abstention_eval(p, thr)
         if a is None:
             continue

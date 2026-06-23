@@ -74,6 +74,17 @@ def _pick_threshold(at, backend, default):
     return default
 
 
+def load_config_value(key, default):
+    """Прочитать произвольный ключ из board_config.json (напр. hybrid_alpha). default если нет."""
+    import os, json
+    root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    try:
+        with open(os.path.join(root, "board_config.json"), encoding="utf-8") as f:
+            return json.load(f).get(key, default)
+    except Exception:
+        return default
+
+
 def load_backend_threshold(advisor_dir, backend, default):
     """Порог abstain per backend из board_config.json. Возврат default, если не найдено.
     advisor_dir пока не влияет на выбор (single-repo); зарезервирован под per-advisor конфиг."""

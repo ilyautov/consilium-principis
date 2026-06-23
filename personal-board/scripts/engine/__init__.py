@@ -75,14 +75,15 @@ def _pick_threshold(at, backend, default):
 
 
 def load_backend_threshold(advisor_dir, backend, default):
-    """Порог abstain per backend из board_config.json. Возврат default, если не найдено."""
+    """Порог abstain per backend из board_config.json. Возврат default, если не найдено.
+    advisor_dir пока не влияет на выбор (single-repo); зарезервирован под per-advisor конфиг."""
     import os, json
-    # __file__ = .../personal-board/scripts/engine/__init__.py → три dirname до personal-board,
-    # где лежит board_config.json (engine на уровень глубже, чем tier_full.py).
+    # __file__ = .../personal-board/scripts/engine/__init__.py → три dirname до personal-board.
     root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     cfg_path = os.path.join(root, "board_config.json")
     try:
-        at = json.load(open(cfg_path, encoding="utf-8")).get("abstain_threshold")
+        with open(cfg_path, encoding="utf-8") as f:
+            at = json.load(f).get("abstain_threshold")
     except Exception:
         return default
     return _pick_threshold(at, backend, default)

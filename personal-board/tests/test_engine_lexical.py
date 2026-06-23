@@ -31,3 +31,22 @@ def test_fidelity_works_on_floor():
         adv = _mk(t, "teach them better or bear with them.")
         r = LexicalEngine().fidelity_check("bear with them", adv)
         assert r.verbatim is True and r.status == "🔵"
+
+def test_empty_question_returns_empty():
+    with tempfile.TemporaryDirectory() as t:
+        adv = _mk(t, "retire into thyself and be at rest.")
+        assert LexicalEngine().retrieve("   ", adv) == []
+        assert LexicalEngine().retrieve("", adv) == []
+
+def test_retrieve_no_corpus_returns_empty():
+    with tempfile.TemporaryDirectory() as t:
+        assert LexicalEngine().retrieve("anything", os.path.join(t, "nope")) == []
+
+def test_null_text_chunk_does_not_crash():
+    with tempfile.TemporaryDirectory() as t:
+        adv = os.path.join(t, "adv"); os.makedirs(adv)
+        with open(os.path.join(adv, "corpus.jsonl"), "w", encoding="utf-8") as f:
+            f.write(json.dumps({"source": "s", "text": None}) + "\n")
+            f.write(json.dumps({"source": "s", "text": "retire into thyself now."}) + "\n")
+        hits = LexicalEngine().retrieve("retire into thyself", adv, top_k=1)
+        assert hits and "retire into thyself" in hits[0].text.lower()

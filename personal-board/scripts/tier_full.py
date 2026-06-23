@@ -70,12 +70,9 @@ def _read_corpus_chunks(advisor_dir: str):
     осмысленного top-3 и дискриминативного score режем длинный text по предложениям
     в пассажи. Каждый пассаж сохраняет source (citation) из исходного чанка.
 
-    Размер пассажа держим маленьким (CHUNK_CHARS≈100, ~ предложение): bge-m3-косинус
-    релевантного запроса к сфокусированному предложению ~0.69, а к смешанному 300+ симв.
-    пассажу падает до ~0.54 (тематическое размытие). Мелкая нарезка нужна, чтобы порог
-    abstain_threshold=0.62 из board_config.json РЕАЛЬНО различал «в корпусе есть ответ»
-    (релевантный top≈0.69 ≥ 0.62) vs «нет» (нерелевантный top≈0.32 < 0.62) — см. отчёт."""
-    chunk_chars = int(os.getenv("TIER_CHUNK_CHARS", "100"))
+    Дефолт chunk_chars=500 — согласован с калибровкой abstain_threshold (semantic 0.50)
+    в board_config.json на реальном корпусе. Меньший чанк требует пере-калибровки порога."""
+    chunk_chars = int(os.getenv("TIER_CHUNK_CHARS", "500"))
     path = os.path.join(advisor_dir, "corpus.jsonl")
     if not os.path.isfile(path):
         raise FileNotFoundError(f"нет корпуса: {path}")

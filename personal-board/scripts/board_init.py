@@ -17,6 +17,9 @@ TIER FULL    — bge-m3 эмбеддинги (ollama) + abstention threshold + �
 """
 import sys, os, json, argparse, re
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from engine.lexical import LexicalEngine
+
 def est_tokens_corpus(adv_dir):
     cj = os.path.join(adv_dir, "corpus.jsonl")
     if not os.path.isfile(cj):
@@ -40,7 +43,8 @@ def has_quote_bank(adv_dir):
     if not os.path.isfile(pm):
         return False
     with open(pm, encoding="utf-8") as f:
-        return "quote_bank" in f.read().lower() or "quote bank" in f.read().lower()
+        content = f.read().lower()
+    return "quote_bank" in content or "quote bank" in content
 
 def decide(tokens, semantic_available, threshold):
     if tokens >= threshold and semantic_available:
@@ -72,7 +76,7 @@ def main():
     config = {"semantic_available": sem,
               "abstain_threshold": {
                   "semantic": args.abstain_threshold,   # калиброван при chunk_chars ниже
-                  "lexical": 0.04,                       # лексический пол (best-effort)
+                  "lexical": LexicalEngine.DEFAULT_THRESHOLD,  # лексический пол (best-effort)
               },
               "chunk_chars": int(os.getenv("TIER_CHUNK_CHARS", "500")),
               "token_threshold": args.threshold, "advisors": {}}

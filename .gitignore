@@ -1,7 +1,11 @@
-# Легальная граница: НЕ коммитить чужие тексты (книги пользователя) и производные
-# (раскладка консолидирована: всё под personal-board/; якоря обновлены)
-personal-board/advisors/*/sources/
-personal-board/advisors/*/corpus.jsonl
+# ЛИЧНАЯ ДОСКА = instance user-data, НЕ часть скилла. Репо везёт только машинерию
+# (scripts/engine, collectors, eval, SKILL.md). Твой состав советников, корпуса, ПРИВАТНЫЕ
+# треки решений (relationship.md), сгенерированный конфиг и golden-наборы — живут локально.
+# Это закрывает и легальную границу (чужие тексты), и приватность решений, и задел «под других».
+personal-board/advisors/*
+!personal-board/advisors/README.md
+personal-board/board_config.json
+personal-board/scripts/golden/
 personal-board/data/embeddings*.npy
 personal-board/data/embeddings*.meta.json
 

@@ -62,3 +62,27 @@ class Engine(ABC):
         if src:
             return FidelityResult(status="🔵", verbatim=True, source=src)
         return FidelityResult(status="🟡", verbatim=False, source="")
+
+
+def _pick_threshold(at, backend, default):
+    """Чистая логика выбора порога из значения board_config["abstain_threshold"].
+    `at` может быть: dict {backend: value} (новое), число (старый плоский = semantic), None."""
+    if isinstance(at, dict):
+        return float(at.get(backend, default))
+    if isinstance(at, (int, float)) and backend == "semantic":
+        return float(at)  # старый плоский порог относился к semantic
+    return default
+
+
+def load_backend_threshold(advisor_dir, backend, default):
+    """Порог abstain per backend из board_config.json. Возврат default, если не найдено."""
+    import os, json
+    # __file__ = .../personal-board/scripts/engine/__init__.py → три dirname до personal-board,
+    # где лежит board_config.json (engine на уровень глубже, чем tier_full.py).
+    root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    cfg_path = os.path.join(root, "board_config.json")
+    try:
+        at = json.load(open(cfg_path, encoding="utf-8")).get("abstain_threshold")
+    except Exception:
+        return default
+    return _pick_threshold(at, backend, default)

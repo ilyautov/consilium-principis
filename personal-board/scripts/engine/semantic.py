@@ -1,8 +1,6 @@
 """SemanticEngine — обёртка существующего tier_full.py (ollama bge-m3 + Гефест) под
 контракт Engine. Логику ретрива НЕ дублирует. Гибридный ретрив — отдельная фаза (Task 9).
 tier_full лежит в scripts/ (на уровень выше пакета engine) → импортится top-level."""
-from typing import List
-
 from . import Engine, Passage   # relative — пакетный стиль
 
 

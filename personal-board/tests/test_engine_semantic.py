@@ -24,3 +24,16 @@ def test_available_reflects_tier_full(monkeypatch):
     monkeypatch.setitem(sys.modules, "tier_full", _fake_tier_full())
     from engine.semantic import SemanticEngine
     assert SemanticEngine.available() is True
+
+def test_available_false_when_tier_full_missing(monkeypatch):
+    # имитируем отсутствие tier_full → available() должен вернуть False, не падать
+    monkeypatch.setitem(sys.modules, "tier_full", None)  # import даст ошибку → except → False
+    from engine.semantic import SemanticEngine
+    assert SemanticEngine.available() is False
+
+def test_build_index_returns_chunk_chars(monkeypatch):
+    monkeypatch.setitem(sys.modules, "tier_full", _fake_tier_full())
+    monkeypatch.setenv("TIER_CHUNK_CHARS", "500")
+    from engine.semantic import SemanticEngine
+    meta = SemanticEngine().build_index("/tmp/adv")
+    assert meta == {"chunk_chars": 500}

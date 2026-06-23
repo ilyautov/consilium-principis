@@ -222,39 +222,44 @@ def _norm(s: str) -> str:
 
 
 def _corpus_norm_text(advisor_dir: str):
-    """Склеивает ВЕСЬ corpus.jsonl в один нормализованный текст + карту source.
-    Возвращает (joined_norm, list[(source, norm_chunk)])."""
+    """Читает corpus.jsonl → список (source, norm_chunk). Терпит отсутствие файла и битые
+    JSON-строки. БЕЗ склейки чанков (склейка дала бы кросс-чанковые ложные 🔵 — см. ниже)."""
     path = os.path.join(advisor_dir, "corpus.jsonl")
     chunks = []
     if not os.path.isfile(path):
-        return "", chunks
-    for line in open(path, encoding="utf-8"):
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            rec = json.loads(line)
-        except Exception:
-            continue
-        text = rec.get("text") or ""
-        src = rec.get("source") or rec.get("citation") or "corpus.jsonl"
-        chunks.append((str(src), _norm(text)))
-    return " ".join(c for _, c in chunks), chunks
+        return chunks
+    with open(path, encoding="utf-8") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                rec = json.loads(line)
+            except Exception:
+                continue
+            text = rec.get("text") or ""
+            src = rec.get("source") or rec.get("citation") or "corpus.jsonl"
+            chunks.append((str(src), _norm(text)))
+    return chunks
 
 
 def verbatim_in_corpus(quote: str, advisor_dir: str) -> Optional[str]:
-    """Возвращает source чанка, где цитата встречается дословно (после нормализации),
-    иначе None. Сначала ищет в отдельных чанках (даёт точный source), затем в склейке."""
+    """Возвращает source ОТДЕЛЬНОГО чанка, где цитата встречается дословно (после
+    нормализации), иначе None. Матч — normalized-substring по каждому чанку по отдельности;
+    цитата, не найденная ни в одном чанке, → None (caller ставит 🟡). НЕТ склейки чанков:
+    она давала бы ложный 🔵 на фразе, случайно совпавшей через границу чанков (худшая ошибка
+    для защитного контура). Ошибаемся в безопасную сторону (🟡), не в ложный 🔵."""
     q = _norm(quote)
     if not q:
         return None
-    _, chunks = _corpus_norm_text(advisor_dir)
-    for src, ctext in chunks:
+    for src, ctext in _corpus_norm_text(advisor_dir):
         if q in ctext:
             return src
-    joined = " ".join(c for _, c in chunks)
-    return "corpus.jsonl" if q in joined else None
+    return None
 ```
+
+> ⚠ Эта версия — ИСПРАВЛЕННАЯ (код-ревью поймал кросс-чанковый ложный 🔵 в первоначальном
+> joined-fallback). Регресс-тест `test_no_cross_chunk_false_positive` обязателен.
 
 - [ ] **Step 4: Run fidelity + contract tests (оба зелёные)**
 

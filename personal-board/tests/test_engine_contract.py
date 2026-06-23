@@ -30,3 +30,25 @@ def test_abstain_when_below_threshold(monkeypatch):
     monkeypatch.setattr(e, "retrieve", lambda *a, **k: [Passage("t", 0.2, "s")])
     r = e.abstain_check("q", "/tmp/adv")
     assert r.abstain is True and r.max_score == 0.2
+
+
+def test_fidelity_check_hit_and_miss():
+    import tempfile, os, json
+    from engine import Passage
+    class E(FakeEngine):
+        pass
+    with tempfile.TemporaryDirectory() as t:
+        adv = os.path.join(t, "adv"); os.makedirs(adv)
+        with open(os.path.join(adv, "corpus.jsonl"), "w", encoding="utf-8") as f:
+            f.write(json.dumps({"source": "src", "text": "bear with them or teach them"}) + "\n")
+        e = E()
+        hit = e.fidelity_check("bear with them", adv)
+        assert hit.status == "🔵" and hit.verbatim is True and hit.source == "src"
+        miss = e.fidelity_check("you have power over your mind", adv)
+        assert miss.status == "🟡" and miss.verbatim is False and miss.source == ""
+
+def test_abstain_check_empty_retrieve_abstains(monkeypatch):
+    e = FakeEngine()
+    monkeypatch.setattr(e, "retrieve", lambda *a, **k: [])
+    r = e.abstain_check("q", "/tmp/adv")
+    assert r.abstain is True and r.max_score == 0.0

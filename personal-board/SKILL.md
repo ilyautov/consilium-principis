@@ -74,12 +74,18 @@ description: >
 через гейт с пометкой «по мнению {фигуры}». На дебатах слой 1 советников ИЗОЛИРОВАН.
 
 ## Сборка советника (`/board add`)
-1. Спросить источник: легальные файлы (PDF/EPUB/txt в `advisors/{name}/sources/`) /
-   дип-ресёрч публичного / ручной ввод. ЛЕГАЛЬНАЯ ГРАНИЦА: скилл книги не качает; защищённое
-   приходит только от пользователя; свободно тянуть только public-domain и публичное (твиты,
-   речи).
+1. Собрать источник в `advisors/{name}/sources/`. ЛЕГАЛЬНАЯ ГРАНИЦА: защищённое приходит только
+   от пользователя; свободно тянуть только public-domain и публичное (твиты, речи). Сборщики
+   (каждый с provenance-заголовком + легальным гейтом):
+   - `collect_pd.py --url ...` — public-domain (Gutenberg/Wikisource). Напр. Аврелий: Long-1862
+     (Gutenberg #2680). PD-хост авто, иначе `--license public-domain`.
+   - `collect_web.py --type essay|blog|telegram --url ... --personal-use` — публичные эссе/блоги/
+     Telegram-каналы (копирайтные → только personal-use + дисклеймер + атрибуция).
+   - `collect_transcript.py --youtube ID|--url ... --personal-use` — транскрипты выступлений.
+   - Локальные PDF/EPUB/txt — просто положить в `sources/`.
 2. Прогнать `python scripts/build_advisor.py advisors/{name} --name "{Имя}"` →
-   corpus.jsonl + quote_candidates.md.
+   corpus.jsonl + quote_candidates.md. Кандидаты ШУМНЫЕ (могут включать вступления редактора) —
+   брать в quote_bank только verbatim из ТЕЛА, сверяя `grep -nF "…" sources/...`.
 3. Верифицировать кандидаты-цитаты, проставить tier, перенести в persona.md quote_bank.
 4. Заполнить persona.md: конституция ~10 фраз от первого лица, mes_example (реальные цитаты),
    how_they_argue, never_do, lenses, domains, consent_status.

@@ -38,6 +38,7 @@ if ENGINE_DIR not in sys.path:
 import build_semantic_index as bsi  # noqa: E402  — embed_batch (батч bge-m3 /api/embed)
 
 from corpus.paths import corpus_path
+from engine import provenance
 
 OLLAMA = os.getenv("OLLAMA_HOST", "http://127.0.0.1:11434")
 EMBED_MODEL = os.getenv("EMBED_MODEL", "bge-m3")
@@ -89,6 +90,7 @@ def _read_corpus_chunks(advisor_dir: str):
         if not text:
             continue
         source = rec.get("source") or rec.get("citation") or os.path.basename(advisor_dir)
+        tier = rec.get("tier") or provenance.tier_for(rec.get("source", ""), 0, advisor_dir)
         # режем на предложения и группируем в пассажи ~ до chunk_chars символов
         sents = re.split(r"(?<=[.!?])\s+", text)
         buf = ""
@@ -97,12 +99,12 @@ def _read_corpus_chunks(advisor_dir: str):
             if not s:
                 continue
             if buf and len(buf) + len(s) + 1 > chunk_chars:
-                passages.append({"text": buf.strip(), "source": str(source)})
+                passages.append({"text": buf.strip(), "source": str(source), "tier": tier})
                 buf = s
             else:
                 buf = (buf + " " + s).strip()
         if buf:
-            passages.append({"text": buf.strip(), "source": str(source)})
+            passages.append({"text": buf.strip(), "source": str(source), "tier": tier})
     if not passages:
         raise ValueError(f"корпус пуст после чанкинга: {path}")
     return passages

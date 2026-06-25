@@ -43,7 +43,13 @@ def main():
     corpus = ids.load_corpus(ADV)
     p1 = [c for c in corpus if c["tier"] in ("P1", "P2") and len(c["text"]) > 300]
     s1 = [c for c in corpus if c["tier"] in ("S1", "S2")]
-    gold = random.sample(p1, min(N, len(p1)))
+    # СТРАТИФИЦИРОВАННЫЙ gold: links Тарасова покрывают только Prince → берём ~поровну Prince/Discourses,
+    # чтобы на Prince-подвыборке (домен моста) была статистическая мощность.
+    prince = [c for c in p1 if "prince" in c["source"]]
+    disc = [c for c in p1 if "discourses" in c["source"]]
+    n_pr = min(N // 2, len(prince))
+    n_di = min(N - n_pr, len(disc))
+    gold = random.sample(prince, n_pr) + random.sample(disc, n_di)
     train_p1 = [c for c in p1]
     p1vec = embed.embed_texts([c["text"] for c in train_p1])
     p1ids = [c["id"] for c in train_p1]
@@ -54,6 +60,7 @@ def main():
         for line in f:
             if line.strip():
                 l = json.loads(line); links.setdefault(l["src"], []).append(l["dst"])
+    covered = {dst for dsts in links.values() for dst in dsts}   # потолок моста: достижимые P1-чанки
 
     def rank_p1(qvec):
         scored = sorted(zip(p1ids, (embed.cosine(qvec, v) for v in p1vec)), key=lambda t: -t[1])
@@ -69,35 +76,59 @@ def main():
                     out.append(pid)
         return out
 
-    agg = {c: {1: 0, 5: 0, 10: 0} for c in ("B0", "B1", "T", "T+B1")}
-    paired = {1: [], 5: [], 10: []}
+    def rrf(rankings, c0=60):
+        """Reciprocal Rank Fusion — честное слияние: ни один список не «хоронит» другой.
+        score(d) = Σ 1/(c0 + rank_d). Стандартное score-agnostic слияние ранжирований."""
+        score = {}
+        for r in rankings:
+            for rank, pid in enumerate(r):
+                score[pid] = score.get(pid, 0.0) + 1.0 / (c0 + rank)
+        return [pid for pid, _ in sorted(score.items(), key=lambda t: -t[1])]
+
+    def dom(g):
+        return "prince" if "prince" in g["source"] else "disc"
+
+    conds = ("B0", "B1", "T", "T+B1")
+    scopes = ("all", "prince", "disc")
+    agg = {sc: {c: {1: 0, 5: 0, 10: 0} for c in conds} for sc in scopes}
+    cnt = {sc: 0 for sc in scopes}
+    paired = {sc: [] for sc in scopes}   # (B1@5 hit, T+B1@5 hit) — для McNemar
     for g in gold:
         q_ru = make_query_ru(g["text"])
         q_en = translate_to_en(q_ru)
         v_ru = embed.embed_texts([q_ru])[0]
         v_en = embed.embed_texts([q_en])[0]
-        r_b0 = rank_p1(v_ru)
-        r_b1 = rank_p1(v_en)
-        r_t = rank_via_bridge(v_ru)
-        r_tb1 = r_t + [pid for pid in r_b1 if pid not in r_t]
-        for cond, r in (("B0", r_b0), ("B1", r_b1), ("T", r_t), ("T+B1", r_tb1)):
-            for k, hit in recall_at(r, g["id"]).items():
-                agg[cond][k] += hit
-        for k in (1, 5, 10):
-            paired[k].append((int(g["id"] in r_b1[:k]), int(g["id"] in r_tb1[:k])))
+        ranks = {"B0": rank_p1(v_ru), "B1": rank_p1(v_en), "T": rank_via_bridge(v_ru)}
+        ranks["T+B1"] = rrf([ranks["T"], ranks["B1"]])   # честное слияние (RRF, не concat)
+        for sc in ("all", dom(g)):
+            cnt[sc] += 1
+            for cond in conds:
+                for k, hit in recall_at(ranks[cond], g["id"]).items():
+                    agg[sc][cond][k] += hit
+            paired[sc].append((int(g["id"] in ranks["B1"][:5]), int(g["id"] in ranks["T+B1"][:5])))
 
-    n = len(gold)
-    print(f"\n=== Exp A: {ADV}, N={n}, сид={SEED} ===")
-    for cond in ("B0", "B1", "T", "T+B1"):
-        print(f"{cond:5} recall@1={agg[cond][1]/n:.2%}  @5={agg[cond][5]/n:.2%}  @10={agg[cond][10]/n:.2%}")
-    b, c = 0, 0
-    for hb1, htb1 in paired[5]:
-        b += (hb1 and not htb1); c += (htb1 and not hb1)
-    import math
-    chi = ((abs(b - c) - 1) ** 2) / (b + c) if (b + c) else 0.0
-    sig = "✓ значимо (p<0.05)" if chi > 3.84 else "✗ не значимо"
-    print(f"\nMcNemar T+B1 vs B1 @5: discordant b={b} c={c}  χ²={chi:.2f}  {sig}")
-    print("ВЫВОД: мост полезен, если T+B1 > B1 и McNemar значим; иначе — театр, энричмент не оправдан.")
+    def mcnemar(pairs):
+        b = sum(1 for hb1, htb1 in pairs if hb1 and not htb1)
+        c = sum(1 for hb1, htb1 in pairs if htb1 and not hb1)
+        chi = ((abs(b - c) - 1) ** 2) / (b + c) if (b + c) else 0.0
+        return b, c, chi, ("✓ значимо (p<0.05)" if chi > 3.84 else "✗ не значимо")
+
+    n_pr_cov = sum(1 for g in gold if dom(g) == "prince" and g["id"] in covered)
+    n_pr_tot = sum(1 for g in gold if dom(g) == "prince")
+    print(f"\n=== Exp A: {ADV}, сид={SEED} (links Тарасова покрывают только Prince) ===")
+    print(f"потолок моста: {len(covered)} уникальных P1-чанков достижимо через links "
+          f"({len(covered)}/{len(prince)} Prince-чанков); из Prince-gold покрыто {n_pr_cov}/{n_pr_tot}")
+    for sc in scopes:
+        ns = cnt[sc]
+        if not ns:
+            continue
+        print(f"\n— {sc} (N={ns}) —")
+        for cond in conds:
+            print(f"  {cond:5} r@1={agg[sc][cond][1]/ns:.0%}  r@5={agg[sc][cond][5]/ns:.0%}  r@10={agg[sc][cond][10]/ns:.0%}")
+        b, c, chi, sig = mcnemar(paired[sc])
+        print(f"  McNemar T+B1 vs B1 @5: b={b} c={c} χ²={chi:.2f} {sig}")
+    print("\nHEADLINE = строка 'prince' (домен покрытия моста): мост реален, если там T+B1>B1 значимо. "
+          "На 'all' эффект разбавлен Discourses, где у моста нет покрытия.")
 
 
 if __name__ == "__main__":

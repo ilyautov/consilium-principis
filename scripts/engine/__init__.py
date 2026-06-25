@@ -123,8 +123,12 @@ def resolve_engine(advisor_dir, prefer: Optional[str] = None) -> Engine:
     key = _advisor_key(advisor_dir)
     if key in _ENGINE_CACHE and not prefer:
         return _ENGINE_CACHE[key]
+    mode = load_config_value("retrieval_mode", "auto")  # "hybrid" включает Левер 1 по-умолчанию
     if prefer == "lexical":
         eng = LexicalEngine()
+    elif prefer == "hybrid" or (not prefer and mode == "hybrid" and SemanticEngine.available()):
+        from .hybrid import HybridEngine
+        eng = HybridEngine()
     elif prefer == "semantic" or SemanticEngine.available():
         eng = SemanticEngine()
     else:

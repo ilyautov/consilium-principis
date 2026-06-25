@@ -2,7 +2,7 @@
 """CLI сборщика корпуса. build по умолчанию; --report — только доктор."""
 import sys, os, argparse, datetime
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__))))
-from corpus import pipeline
+from corpusbuild import pipeline
 
 
 def main():
@@ -10,7 +10,7 @@ def main():
     ap.add_argument("advisor_dir")
     ap.add_argument("--report", action="store_true", help="только валидационный доктор")
     args = ap.parse_args()
-    from corpus import doctor  # ленивый импорт: модуль доктора появляется в Task 10
+    from corpusbuild import doctor  # ленивый импорт: модуль доктора появляется в Task 10
     if args.report:
         doctor.report(args.advisor_dir); return
     built_at = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")

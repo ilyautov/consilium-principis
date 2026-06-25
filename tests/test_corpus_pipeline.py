@@ -1,6 +1,6 @@
 import os, sys, json
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
-from corpus import pipeline, paths
+from corpusbuild import pipeline, paths
 
 def test_build_writes_tiered_corpus(tmp_path):
     adv = tmp_path / "adv"; (adv / "sources").mkdir(parents=True)

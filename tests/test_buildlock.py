@@ -1,6 +1,6 @@
 import os, sys, json
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
-from corpus import buildlock
+from corpusbuild import buildlock
 
 def test_lock_records_hashes_and_counts(tmp_path):
     adv = tmp_path / "adv"; (adv / "sources").mkdir(parents=True); (adv / "build").mkdir()

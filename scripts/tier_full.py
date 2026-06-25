@@ -37,7 +37,7 @@ if ENGINE_DIR not in sys.path:
 
 import build_semantic_index as bsi  # noqa: E402  — embed_batch (батч bge-m3 /api/embed)
 
-from corpus.paths import corpus_path
+from corpusbuild.paths import corpus_path
 from engine import provenance
 
 OLLAMA = os.getenv("OLLAMA_HOST", "http://127.0.0.1:11434")

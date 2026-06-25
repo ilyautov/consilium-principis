@@ -19,7 +19,7 @@ import sys, os, json, argparse, re
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from engine.lexical import LexicalEngine
-from corpus.paths import corpus_path
+from corpusbuild.paths import corpus_path
 
 def est_tokens_corpus(adv_dir):
     cj = corpus_path(adv_dir)

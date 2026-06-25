@@ -1,6 +1,5 @@
 import os, sys, json
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
-import corpus.paths  # cache corpus package before tier_full inserts ENGINE_DIR at front
 import tier_full
 
 def test_read_chunks_carries_tier(tmp_path, monkeypatch):

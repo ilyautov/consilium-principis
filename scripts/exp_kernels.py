@@ -17,7 +17,7 @@
 import os, sys, json, re, urllib.request, math
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from corpus.paths import corpus_path
+from corpusbuild.paths import corpus_path
 
 OLLAMA = os.getenv("OLLAMA_HOST", "http://127.0.0.1:11434")
 KERNEL_MODEL = os.getenv("KERNEL_MODEL", "gemma3:27b")

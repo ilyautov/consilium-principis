@@ -7,30 +7,28 @@ def chunk_records(tagged, source: str, config=None):
     target = int(config.get("target", 900))
     overlap = int(config.get("overlap", 180))
     chunks = []
-    buf, start_loc, last_loc, cur_tier, cur = [], None, None, None, 0
+    buf, cur_tier, cur = [], None, 0   # buf = [(text, loc), ...] — loc держим рядом с текстом,
+    #                                    чтобы overlap-хвост сохранял ВЕРНУЮ стартовую позицию
 
     def flush():
-        nonlocal buf, start_loc, last_loc, cur
-        body = " ".join(buf).strip()
-        if body:
+        body = " ".join(t for t, _ in buf).strip()
+        if body and buf:
             chunks.append({"source": source, "tier": cur_tier,
-                           "start": list(start_loc), "end": list(last_loc), "text": body})
+                           "start": list(buf[0][1]), "end": list(buf[-1][1]), "text": body})
 
     for rec in tagged:
         if cur_tier is not None and rec["tier"] != cur_tier:
-            flush(); buf, start_loc, cur = [], None, 0      # граница тира
+            flush(); buf, cur = [], 0      # граница тира
         cur_tier = rec["tier"]
-        if start_loc is None:
-            start_loc = rec["loc"]
-        buf.append(rec["text"]); last_loc = rec["loc"]; cur += len(rec["text"]) + 1
+        buf.append((rec["text"], rec["loc"])); cur += len(rec["text"]) + 1
         if cur >= target:
             flush()
             tail, tlen = [], 0
-            for t in reversed(buf):
-                tail.insert(0, t); tlen += len(t) + 1
+            for item in reversed(buf):
+                tail.insert(0, item); tlen += len(item[0]) + 1
                 if tlen >= overlap:
                     break
-            buf = tail; start_loc = last_loc; cur = sum(len(t) + 1 for t in buf)
+            buf = tail; cur = sum(len(t) + 1 for t, _ in buf)
     if buf:
         flush()
     return chunks

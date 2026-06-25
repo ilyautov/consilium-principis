@@ -16,6 +16,9 @@
 """
 import os, sys, json, re, urllib.request, math
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from corpus.paths import corpus_path
+
 OLLAMA = os.getenv("OLLAMA_HOST", "http://127.0.0.1:11434")
 KERNEL_MODEL = os.getenv("KERNEL_MODEL", "gemma3:27b")
 EMBED_MODEL = os.getenv("EMBED_MODEL", "bge-m3")
@@ -31,7 +34,7 @@ def p1_body(slug):
     """P1-чанки тела: исключаем не-P1 (Тарасов) по манифесту и фронт-маттер переводчика."""
     adv = f"advisors/{slug}"
     man = load_manifest(adv)
-    chunks = [json.loads(l) for l in open(f"{adv}/corpus.jsonl", encoding="utf-8") if l.strip()]
+    chunks = [json.loads(l) for l in open(corpus_path(adv), encoding="utf-8") if l.strip()]
     # тир по источнику: с манифестом — берём только P1; без — всё P1 (бэк-компат)
     chunks = [c for c in chunks if (man.get(c["source"], {}).get("tier", "P1") == "P1")]
     # отрезать фронт-маттер: с первого вхождения маркера начала тела

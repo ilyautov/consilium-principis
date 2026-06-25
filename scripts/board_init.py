@@ -19,9 +19,10 @@ import sys, os, json, argparse, re
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from engine.lexical import LexicalEngine
+from corpus.paths import corpus_path
 
 def est_tokens_corpus(adv_dir):
-    cj = os.path.join(adv_dir, "corpus.jsonl")
+    cj = corpus_path(adv_dir)
     if not os.path.isfile(cj):
         return 0, 0
     chars, chunks = 0, 0

@@ -37,6 +37,8 @@ if ENGINE_DIR not in sys.path:
 
 import build_semantic_index as bsi  # noqa: E402  — embed_batch (батч bge-m3 /api/embed)
 
+from corpus.paths import corpus_path
+
 OLLAMA = os.getenv("OLLAMA_HOST", "http://127.0.0.1:11434")
 EMBED_MODEL = os.getenv("EMBED_MODEL", "bge-m3")
 
@@ -73,7 +75,7 @@ def _read_corpus_chunks(advisor_dir: str):
     Дефолт chunk_chars=500 — согласован с калибровкой abstain_threshold (semantic 0.50)
     в board_config.json на реальном корпусе. Меньший чанк требует пере-калибровки порога."""
     chunk_chars = int(os.getenv("TIER_CHUNK_CHARS", "500"))
-    path = os.path.join(advisor_dir, "corpus.jsonl")
+    path = corpus_path(advisor_dir)
     if not os.path.isfile(path):
         raise FileNotFoundError(f"нет корпуса: {path}")
 

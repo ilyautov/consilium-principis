@@ -5,6 +5,10 @@ fidelity (наследуется из базового Engine)."""
 import os
 import re
 import json
+import sys as _sys
+import os as _os
+_sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
+from corpus.paths import corpus_path
 from typing import List
 
 from . import Engine, Passage   # relative — пакетный стиль
@@ -22,7 +26,7 @@ def _char_ngrams(s: str, n: int = 3):
 
 
 def _split_units(advisor_dir: str) -> List[str]:
-    cj = os.path.join(advisor_dir, "corpus.jsonl")
+    cj = corpus_path(advisor_dir)
     if not os.path.isfile(cj):
         return []
     units = []

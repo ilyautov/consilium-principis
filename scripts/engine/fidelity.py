@@ -86,3 +86,10 @@ def verbatim_in_corpus(quote: str, advisor_dir: str) -> Optional[str]:
         if q in ctext:
             return src
     return None
+
+
+def marker_for_path(path, advisor_dir: str = None) -> str:
+    """Маркер составного ответа = слабейшее звено на его трассе по графу (L2.2).
+    Нижний слой 🔵 остаётся вербатим-гейтом (is_blue_eligible)."""
+    from corpusbuild import graph
+    return graph.weakest_link(path)

@@ -3,6 +3,10 @@
 import os
 import re
 import json
+import sys as _sys
+import os as _os
+_sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
+from corpus.paths import corpus_path
 from typing import Optional
 
 
@@ -13,7 +17,7 @@ def _norm(s: str) -> str:
 
 def _corpus_norm_text(advisor_dir: str):
     """Читает corpus.jsonl и возвращает список (source, norm_chunk) для каждого чанка."""
-    path = os.path.join(advisor_dir, "corpus.jsonl")
+    path = corpus_path(advisor_dir)
     chunks = []
     if not os.path.isfile(path):
         return chunks

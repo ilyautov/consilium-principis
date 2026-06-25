@@ -12,13 +12,16 @@ self-bias (генерим LLM, ретрив — bge-m3, разные систе�
 """
 import sys, os, json, re, urllib.request
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from corpus.paths import corpus_path
+
 OLLAMA = os.getenv("OLLAMA_HOST", "http://127.0.0.1:11434")
 GOLDEN_MODEL = os.getenv("GOLDEN_MODEL", "qwen2.5:7b")
 AUTHORS = {"machiavelli": "Niccolò Machiavelli", "marcus-aurelius": "Marcus Aurelius"}
 
 
 def load_chunks(adv):
-    return [json.loads(l) for l in open(f"{adv}/corpus.jsonl", encoding="utf-8") if l.strip()]
+    return [json.loads(l) for l in open(corpus_path(adv), encoding="utf-8") if l.strip()]
 
 
 def stratified(chunks, k):

@@ -34,6 +34,7 @@ GOLDEN_DIR = os.path.join(HERE, "golden")
 # Defensive import: если нет/сломан — деградируем в лексический fallback (tier=SIMPLE).
 if HERE not in sys.path:
     sys.path.insert(0, HERE)
+from corpus.paths import corpus_path
 try:
     import tier_full            # tier_full.retrieve(q, advisor_dir, top_k) / tier_full.available()
     TIER_FULL = bool(tier_full.available())
@@ -94,7 +95,7 @@ def parse_quote_bank(persona_path):
 
 
 def load_corpus_text(adv_dir):
-    cj = os.path.join(adv_dir, "corpus.jsonl")
+    cj = corpus_path(adv_dir)
     if not os.path.isfile(cj):
         return None
     chunks = []
@@ -168,7 +169,7 @@ def load_abstain_threshold():
 def split_corpus_units(adv_dir):
     """Корпус → юниты-кандидаты для ретрива. Один чанк corpus.jsonl бьём по предложениям,
     чтобы top-1/top-3 имели нетривиальный выбор (иначе ретрив бессмыслен на 1 чанке)."""
-    cj = os.path.join(adv_dir, "corpus.jsonl")
+    cj = corpus_path(adv_dir)
     if not os.path.isfile(cj):
         return []
     units = []

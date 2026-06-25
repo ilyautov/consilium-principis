@@ -16,18 +16,22 @@ def _key(text: str) -> str:
     return re.sub(r"\s+", " ", re.sub(r"[^\w\s]", " ", (text or "").lower())).strip()
 
 
-def rrf_fuse(ranked_lists, k: int = 60, top_k=None):
+def rrf_fuse(ranked_lists, k: int = 60, top_k=None, weights=None):
     """ranked_lists: список списков Passage (каждый уже отсортирован по убыванию релевантности).
+    weights: опц. вес на список (по умолчанию 1.0 у всех). Выше вес у оригинального запроса →
+    multi-query ДОПОЛНЯЕТ, а не топит single (лечит структурную дилюцию).
     Возвращает один список Passage со слитым RRF-score, по убыванию. Дедуп по нормализованному тексту."""
+    if weights is None:
+        weights = [1.0] * len(ranked_lists)
     agg = {}  # key -> [fused_score, Passage]
-    for lst in ranked_lists:
+    for lst, w in zip(ranked_lists, weights):
         for rank, p in enumerate(lst, 1):
             kk = _key(p.text)
             if not kk:
                 continue
             if kk not in agg:
                 agg[kk] = [0.0, p]
-            agg[kk][0] += 1.0 / (k + rank)
+            agg[kk][0] += w / (k + rank)
     fused = [Passage(text=p.text, score=score, source=p.source) for score, p in agg.values()]
     fused.sort(key=lambda x: x.score, reverse=True)
     return fused[:top_k] if top_k else fused

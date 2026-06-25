@@ -10,7 +10,8 @@ def _mk(tmp, *sentences):
     os.makedirs(adv, exist_ok=True)
     with open(os.path.join(adv, "corpus.jsonl"), "w", encoding="utf-8") as f:
         for s in sentences:
-            f.write(json.dumps({"source": "src", "text": s}, ensure_ascii=False) + "\n")
+            # tier P1 = слова автора: пол по умолчанию тестирует 🔵-путь нового tier-aware гейта
+            f.write(json.dumps({"source": "src", "tier": "P1", "text": s}, ensure_ascii=False) + "\n")
     return adv
 
 

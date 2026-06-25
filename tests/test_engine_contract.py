@@ -40,9 +40,9 @@ def test_fidelity_check_hit_and_miss():
     with tempfile.TemporaryDirectory() as t:
         adv = os.path.join(t, "adv"); os.makedirs(adv)
         with open(os.path.join(adv, "corpus.jsonl"), "w", encoding="utf-8") as f:
-            f.write(json.dumps({"source": "src", "text": "bear with them or teach them"}) + "\n")
+            f.write(json.dumps({"source": "src", "tier": "P1", "text": "bear with them or teach them"}) + "\n")
         e = E()
-        hit = e.fidelity_check("bear with them", adv)
+        hit = e.fidelity_check("bear with them", adv)  # tier P1 → 🔵
         assert hit.status == "🔵" and hit.verbatim is True and hit.source == "src"
         miss = e.fidelity_check("you have power over your mind", adv)
         assert miss.status == "🟡" and miss.verbatim is False and miss.source == ""

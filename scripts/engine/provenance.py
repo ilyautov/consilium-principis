@@ -9,7 +9,11 @@ def load_manifest(advisor_dir: str) -> dict:
     path = os.path.join(advisor_dir, "sources", "manifest.json")
     key = (path, os.path.getmtime(path)) if os.path.isfile(path) else (path, 0)
     if key not in _CACHE:
-        _CACHE[key] = json.load(open(path, encoding="utf-8")) if os.path.isfile(path) else None
+        if os.path.isfile(path):
+            with open(path, encoding="utf-8") as f:
+                _CACHE[key] = json.load(f)
+        else:
+            _CACHE[key] = None
     return _CACHE[key]
 
 
@@ -39,6 +43,7 @@ def tier_for_line(source: str, line_no: int, lines, advisor_dir: str) -> str:
     seen = regions[0]["tier"] if "from" not in regions[0] else cur
     for i in range(line_no + 1):
         ln = lines[i]
+        # инвариант: until региона N == from региона N+1 (закрытие = открытие следующего)
         for r in regions:
             mk = r.get("from") or r.get("until")
             if mk and mk in ln:

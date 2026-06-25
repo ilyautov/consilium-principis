@@ -50,9 +50,10 @@ def main():
     n_pr = min(N // 2, len(prince))
     n_di = min(N - n_pr, len(disc))
     gold = random.sample(prince, n_pr) + random.sample(disc, n_di)
-    train_p1 = [c for c in p1]
-    p1vec = embed.embed_texts([c["text"] for c in train_p1])
-    p1ids = [c["id"] for c in train_p1]
+    # ретрив-пул = ВЕСЬ P1 (gold внутри пула — по дизайну: меряем recall документа, ПОРОДИВШЕГО
+    # запрос; смещение одинаково для всех условий, McNemar B1 vs T+B1 остаётся валидным)
+    p1vec = embed.embed_texts([c["text"] for c in p1])
+    p1ids = [c["id"] for c in p1]
     s1vec = embed.embed_texts([c["text"] for c in s1])
     links = {}
     lp = os.path.join(paths.build_dir(ADV), "links.jsonl")

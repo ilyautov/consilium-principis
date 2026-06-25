@@ -23,9 +23,9 @@ def main():
     random.seed(SEED)
     corpus = ids.load_corpus(ADV)
     p1 = [c for c in corpus if c["tier"] in ("P1", "P2") and len(c["text"]) > 250]
-    byid = {c["id"]: c for c in p1}
     kp = os.path.join(paths.build_dir(ADV), "kernels.json")
-    kernels = json.load(open(kp, encoding="utf-8"))
+    with open(kp, encoding="utf-8") as f:
+        kernels = json.load(f)
     vecs = {c["id"]: v for c, v in zip(p1, embed.embed_texts([c["text"] for c in p1]))}
     allids = list(vecs)
     wins = total = 0

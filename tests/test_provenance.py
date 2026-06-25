@@ -43,3 +43,15 @@ def test_toc_forward_reference_does_not_switch_region(tmp_path):
              "real body", "APPENDIX CORRESPONDENCE", "editor notes"]
     tiers = [prov.tier_for_line("med.txt", i, lines, adv) for i in range(len(lines))]
     assert tiers == ["B", "B", "P1", "P1", "S1", "S1"]  # TOC-APPENDIX в строке 0 НЕ прыгнул в S1
+
+def test_two_markers_on_one_line_advances_to_furthest(tmp_path):
+    # одна строка несёт маркеры двух регионов сразу → строка принадлежит ДАЛЬНЕМУ
+    # (секвенциально: «последний регион, чей from встретился по порядку»), средний пуст.
+    adv = str(tmp_path)
+    _write_manifest(adv, {"m.txt": {"tier": "P1", "regions": [
+        {"tier": "B", "until": "BODY"},
+        {"tier": "P1", "from": "BODY", "until": "NOTES"},
+        {"tier": "S1", "from": "NOTES"}]}})
+    lines = ["intro", "BODY ... NOTES", "after"]
+    tiers = [prov.tier_for_line("m.txt", i, lines, adv) for i in range(len(lines))]
+    assert tiers == ["B", "S1", "S1"]  # строка с обоими маркерами → дальний регион S1

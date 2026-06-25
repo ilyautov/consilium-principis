@@ -30,3 +30,16 @@ def test_regions_assign_by_marker(tmp_path):
              "APPENDIX", "Editor notes."]
     tiers = [prov.tier_for_line("med.txt", i, lines, adv) for i in range(len(lines))]
     assert tiers == ["B", "B", "P1", "P1", "S1", "S1"]
+
+def test_toc_forward_reference_does_not_switch_region(tmp_path):
+    # оглавление в интро упоминает APPENDIX/GLOSSARY ДО начала тела — это не должно
+    # преждевременно переключить регион (секвенциальное продвижение по порядку).
+    adv = str(tmp_path)
+    _write_manifest(adv, {"med.txt": {"tier": "P1", "regions": [
+        {"tier": "B", "until": "THE FIRST BOOK"},
+        {"tier": "P1", "from": "THE FIRST BOOK", "until": "APPENDIX"},
+        {"tier": "S1", "from": "APPENDIX"}]}})
+    lines = ["CONTENTS  APPENDIX  GLOSSARY", "translator prose", "THE FIRST BOOK",
+             "real body", "APPENDIX CORRESPONDENCE", "editor notes"]
+    tiers = [prov.tier_for_line("med.txt", i, lines, adv) for i in range(len(lines))]
+    assert tiers == ["B", "B", "P1", "P1", "S1", "S1"]  # TOC-APPENDIX в строке 0 НЕ прыгнул в S1

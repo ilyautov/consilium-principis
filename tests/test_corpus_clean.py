@@ -1,6 +1,6 @@
 import os, sys, json
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
-from corpus import clean
+from corpusbuild import clean
 
 def _manifest(adv, data):
     os.makedirs(os.path.join(adv, "sources"), exist_ok=True)

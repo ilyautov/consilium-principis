@@ -6,7 +6,7 @@ import json
 import sys as _sys
 import os as _os
 _sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
-from corpus.paths import corpus_path
+from corpusbuild.paths import corpus_path
 from typing import Optional
 
 

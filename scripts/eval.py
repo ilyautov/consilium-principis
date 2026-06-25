@@ -34,7 +34,7 @@ GOLDEN_DIR = os.path.join(HERE, "golden")
 # Defensive import: если нет/сломан — деградируем в лексический fallback (tier=SIMPLE).
 if HERE not in sys.path:
     sys.path.insert(0, HERE)
-from corpus.paths import corpus_path
+from corpusbuild.paths import corpus_path
 try:
     import tier_full            # tier_full.retrieve(q, advisor_dir, top_k) / tier_full.available()
     TIER_FULL = bool(tier_full.available())

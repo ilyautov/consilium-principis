@@ -1,6 +1,6 @@
 import os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
-from corpus import chunk
+from corpusbuild import chunk
 
 def test_chunk_carries_tier_and_source():
     tagged = [{"loc": ("line", 1), "text": "a" * 200, "tier": "P1"},

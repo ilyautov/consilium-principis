@@ -13,7 +13,7 @@ self-bias (генерим LLM, ретрив — bge-m3, разные систе�
 import sys, os, json, re, urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from corpus.paths import corpus_path
+from corpusbuild.paths import corpus_path
 
 OLLAMA = os.getenv("OLLAMA_HOST", "http://127.0.0.1:11434")
 GOLDEN_MODEL = os.getenv("GOLDEN_MODEL", "qwen2.5:7b")

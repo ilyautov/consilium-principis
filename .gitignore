@@ -4,6 +4,9 @@
 # Это закрывает и легальную границу (чужие тексты), и приватность решений, и задел «под других».
 advisors/*
 !advisors/README.md
+# модель Принцепса (кто ПЕРЕД советом) + приватные треки решений = личные данные юзера
+principis.md
+relationship.md
 board_config.json
 scripts/golden/
 data/embeddings*.npy

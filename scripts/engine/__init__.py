@@ -89,7 +89,7 @@ def load_backend_threshold(advisor_dir, backend, default):
     """Порог abstain per backend из board_config.json. Возврат default, если не найдено.
     advisor_dir пока не влияет на выбор (single-repo); зарезервирован под per-advisor конфиг."""
     import os, json
-    # __file__ = .../personal-board/scripts/engine/__init__.py → три dirname до personal-board.
+    # __file__ = .../personal-board/scripts/engine/__init__.py → три dirname до корня скилла.
     root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     cfg_path = os.path.join(root, "board_config.json")
     try:

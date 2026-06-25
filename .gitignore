@@ -2,12 +2,12 @@
 # (scripts/engine, collectors, eval, SKILL.md). Твой состав советников, корпуса, ПРИВАТНЫЕ
 # треки решений (relationship.md), сгенерированный конфиг и golden-наборы — живут локально.
 # Это закрывает и легальную границу (чужие тексты), и приватность решений, и задел «под других».
-personal-board/advisors/*
-!personal-board/advisors/README.md
-personal-board/board_config.json
-personal-board/scripts/golden/
-personal-board/data/embeddings*.npy
-personal-board/data/embeddings*.meta.json
+advisors/*
+!advisors/README.md
+board_config.json
+scripts/golden/
+data/embeddings*.npy
+data/embeddings*.meta.json
 
 # Питон
 __pycache__/

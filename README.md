@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="personal-board/assets/logo-consilium-principis.svg" width="300" alt="Consilium Principis" />
+<img src="assets/logo-consilium-principis.png" width="300" alt="Consilium Principis" />
 
 # Consilium Principis
 
@@ -39,20 +39,20 @@
 
 ## Быстрый старт
 
-Три пути — в [`personal-board/QUICKSTART.md`](personal-board/QUICKSTART.md). Самый простой —
+Три пути — в [`QUICKSTART.md`](QUICKSTART.md). Самый простой —
 открыть Claude и сказать:
 
 > «Собери мне доску советников.»
 
 Ассистент проведёт установку и **сборку первого советника** за руку. Либо — клик-установщик
-([`install.command`](personal-board/install.command) / `.bat` / `.sh`), либо команды вручную.
+([`install.command`](install.command) / `.bat` / `.sh`), либо команды вручную.
 
 ## Собери свой совет
 
 **Доска пустая из коробки — это норма.** Совет личный; кого посадить — выбираешь ты.
 Рецепт сборки советника (найти источник → построить корпус → написать профиль →
-**проверить каждую цитату контуром** → eval) — в [`personal-board/install-skill/SKILL.md`](personal-board/install-skill/SKILL.md)
-и [`personal-board/advisors/README.md`](personal-board/advisors/README.md).
+**проверить каждую цитату контуром** → eval) — в [`install-skill/SKILL.md`](install-skill/SKILL.md)
+и [`advisors/README.md`](advisors/README.md).
 
 > ⚖️ **Граница.** Навык не качает копирайтные книги. Public-domain тексты тянутся свободно;
 > копирайт — только твои легальные копии. Твоя доска (`advisors/`) — личные данные, не уходят в репозиторий.
@@ -61,11 +61,11 @@
 
 Движок — адаптер с тремя сменными бэкендами под единым контрактом (лексический пол →
 семантический → удалённый), с мягкой деградацией. Защитный контур (verbatim-гейт цитат)
-не зависит от бэкенда. Подробности — `personal-board/SKILL.md` и
+не зависит от бэкенда. Подробности — `SKILL.md` и
 [`docs/`](docs/superpowers/specs/).
 
 ---
 
 <div align="center">
-<sub>Consilium Principis · ранний доступ · MIT (планируется)</sub>
+<sub>Consilium Principis · ранний доступ · <a href="LICENSE">MIT</a></sub>
 </div>

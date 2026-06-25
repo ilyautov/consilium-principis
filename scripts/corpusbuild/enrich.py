@@ -4,6 +4,9 @@ make_enrichment_record — чистая, юнит-гейт инварианто�
 import json
 from . import ids, paths
 
+# ВНИМАНИЕ: "кросс-домен" требует traces_to_kernel (L2.3.2) → генерится ОТДЕЛЬНЫМ проходом с
+# привязкой к кернелу, НЕ через build_enrichment (его дефолт — пример/ситуация). Не вызывать
+# build_enrichment(kinds=["кросс-домен"]) без kernel-trace — make_enrichment_record бросит ValueError.
 KINDS = ["пример", "ситуация", "кросс-домен", "осовременивание"]
 
 

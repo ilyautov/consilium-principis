@@ -27,7 +27,8 @@ def calibration(advisor_dir: str) -> dict:
     groundless = 0
     kp = os.path.join(bd, "kernels.json")
     if os.path.isfile(kp):
-        groundless = sum(1 for k in json.load(open(kp, encoding="utf-8")) if not k.get("grounded_in"))
+        with open(kp, encoding="utf-8") as f:
+            groundless = sum(1 for k in json.load(f) if not k.get("grounded_in"))
     untraced = 0
     ep = os.path.join(bd, "enrichment.jsonl")
     if os.path.isfile(ep):

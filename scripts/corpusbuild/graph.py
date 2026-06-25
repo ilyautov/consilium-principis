@@ -40,7 +40,9 @@ def assemble_graph(advisor_dir: str) -> list:
                                   "type": "толкует", "weight": l.get("weight", 0.0)})
     kp = os.path.join(bd, "kernels.json")
     if os.path.isfile(kp):
-        for k in json.load(open(kp, encoding="utf-8")):
+        with open(kp, encoding="utf-8") as f:
+            kj = json.load(f)
+        for k in kj:
             for pid in k.get("grounded_in", []):
                 edges.append({"src_id": k["name"], "dst_id": pid, "type": "заземляет", "weight": 1.0})
     ep = os.path.join(bd, "enrichment.jsonl")

@@ -33,6 +33,7 @@ def build_kernels(advisor_dir: str, author: str, k: int = 6, ground_n: int = 5, 
              for n, kv in zip(names, kvecs)]
     items = drop_groundless(items)
     out = f"{paths.build_dir(advisor_dir)}/kernels.json"
-    json.dump(items, open(out, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+    with open(out, "w", encoding="utf-8") as f:
+        json.dump(items, f, ensure_ascii=False, indent=2)
     print(f"[kernels] {advisor_dir}: {len(items)} заземлённых кернелов → {out}")
     return items

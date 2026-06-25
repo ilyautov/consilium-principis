@@ -50,20 +50,35 @@ def _iter_chunks(advisor_dir):
                     continue
 
 
-def tier_of_match(quote: str, advisor_dir: str):
-    """Тир чанка, где дословно (по нормализации) найдена цитата; None если нигде.
-    Приоритет P1/P2 — если матч в нескольких тирах, возвращаем самый авторитетный."""
+_TIER_ORDER = {"P1": 0, "P2": 1, "S1": 2, "S2": 3, "B": 4, "A": 5}
+
+
+def best_match(quote: str, advisor_dir: str):
+    """Самый авторитетный дословный матч цитаты: (tier, source) или None.
+
+    Если цитата встречается в нескольких чанках разных тиров (напр. Тарасов-S1
+    дословно цитирует Макиавелли, и та же фраза есть в Prince-P1), возвращаем
+    пару из ЛУЧШЕГО (самого авторитетного) тира — чтобы source соответствовал
+    тиру, который определит маркер. Чанк без поля tier → "A" (fail-closed)."""
     q = _norm(quote)
     if not q:
         return None
-    order = {"P1": 0, "P2": 1, "S1": 2, "S2": 3, "B": 4, "A": 5}
-    best = None
+    best = None  # (rank, tier, source)
     for ch in _iter_chunks(advisor_dir):
         if q in _norm(ch.get("text", "")):
             t = ch.get("tier", "A")
-            if best is None or order.get(t, 9) < order.get(best, 9):
-                best = t
-    return best
+            rank = _TIER_ORDER.get(t, 9)
+            if best is None or rank < best[0]:
+                src = ch.get("source") or ch.get("citation") or "corpus.jsonl"
+                best = (rank, t, str(src))
+    return (best[1], best[2]) if best else None
+
+
+def tier_of_match(quote: str, advisor_dir: str):
+    """Тир чанка, где дословно (по нормализации) найдена цитата; None если нигде.
+    Приоритет P1/P2 — если матч в нескольких тирах, возвращаем самый авторитетный."""
+    m = best_match(quote, advisor_dir)
+    return m[0] if m else None
 
 
 def is_blue_eligible(quote: str, advisor_dir: str) -> bool:

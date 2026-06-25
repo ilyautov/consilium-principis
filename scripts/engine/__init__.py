@@ -10,7 +10,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import List, Optional
 
-from .fidelity import verbatim_in_corpus  # backend-независимый чек (relative — пакетный стиль)
+from .fidelity import verbatim_in_corpus, best_match  # backend-независимый чек (relative — пакетный стиль)
 
 
 @dataclass
@@ -29,7 +29,7 @@ class AbstainResult:
 
 @dataclass
 class FidelityResult:
-    status: str       # "🔵" verbatim | "🟡" extrapolation
+    status: str       # "🔵" verbatim P1/P2 | "🟢" verbatim S1/S2 (комментарий) | "🟡" экстраполяция
     verbatim: bool
     source: str
 
@@ -58,9 +58,18 @@ class Engine(ABC):
                              max_score=max_score, threshold=threshold)
 
     def fidelity_check(self, quote: str, advisor_dir: str) -> FidelityResult:
-        src = verbatim_in_corpus(quote, advisor_dir)
-        if src:
+        """Tier-aware гейт маркера. Дословный матч сам по себе НЕ даёт 🔵 — решает ТИР:
+          P1/P2 → 🔵 (слова автора)
+          S1/S2 → 🟢 (дословно, но комментарий — source = комментатор, не голос автора)
+          B/A/нет матча/без tier → 🟡 (fail-closed: без провенанса не сертифицируем)."""
+        m = best_match(quote, advisor_dir)
+        if m is None:
+            return FidelityResult(status="🟡", verbatim=False, source="")
+        tier, src = m
+        if tier in ("P1", "P2"):
             return FidelityResult(status="🔵", verbatim=True, source=src)
+        if tier in ("S1", "S2"):
+            return FidelityResult(status="🟢", verbatim=True, source=src)
         return FidelityResult(status="🟡", verbatim=False, source="")
 
 

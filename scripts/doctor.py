@@ -6,8 +6,13 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # scripts/ — e
 
 def report():
     from engine.semantic import SemanticEngine
+    from engine import load_config_value
     sem = SemanticEngine.available()
-    tier = "FULL (semantic, bge-m3)" if sem else "SIMPLE (lexical floor)"
+    mode = load_config_value("retrieval_mode", "auto")
+    if sem:
+        tier = "FULL — hybrid (semantic ∪ lexical, RRF)" if mode == "hybrid" else "FULL (semantic, bge-m3)"
+    else:
+        tier = "SIMPLE (lexical floor)"
     print("Consilium-Principis — диагностика движка")
     print(f"  ollama/bge-m3 (semantic): {'✓ доступен' if sem else '✗ нет'}")
     print(f"  → активный tier: {tier}")

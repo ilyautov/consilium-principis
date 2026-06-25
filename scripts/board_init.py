@@ -74,6 +74,9 @@ def main():
     print(f"Порог tier: {args.threshold} токенов · abstain_threshold: {args.abstain_threshold}\n")
 
     config = {"semantic_available": sem,
+              # Левер 1: FULL зовёт HybridEngine (semantic ∪ lexical через RRF). На поле, где
+              # semantic недоступен, resolve_engine сам падает в lexical — флаг безвреден.
+              "retrieval_mode": "hybrid",
               "abstain_threshold": {
                   "semantic": args.abstain_threshold,   # калиброван при chunk_chars ниже
                   "lexical": LexicalEngine.DEFAULT_THRESHOLD,  # лексический пол (best-effort)

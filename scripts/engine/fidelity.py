@@ -36,6 +36,41 @@ def _corpus_norm_text(advisor_dir: str):
     return chunks
 
 
+def _iter_chunks(advisor_dir):
+    path = corpus_path(advisor_dir)
+    if not os.path.isfile(path):
+        return
+    with open(path, encoding="utf-8") as fh:
+        for line in fh:
+            line = line.strip()
+            if line:
+                try:
+                    yield json.loads(line)
+                except Exception:
+                    continue
+
+
+def tier_of_match(quote: str, advisor_dir: str):
+    """Тир чанка, где дословно (по нормализации) найдена цитата; None если нигде.
+    Приоритет P1/P2 — если матч в нескольких тирах, возвращаем самый авторитетный."""
+    q = _norm(quote)
+    if not q:
+        return None
+    order = {"P1": 0, "P2": 1, "S1": 2, "S2": 3, "B": 4, "A": 5}
+    best = None
+    for ch in _iter_chunks(advisor_dir):
+        if q in _norm(ch.get("text", "")):
+            t = ch.get("tier", "A")
+            if best is None or order.get(t, 9) < order.get(best, 9):
+                best = t
+    return best
+
+
+def is_blue_eligible(quote: str, advisor_dir: str) -> bool:
+    """🔵 (голосом советника) допустимо только при дословном матче в P1/P2."""
+    return tier_of_match(quote, advisor_dir) in ("P1", "P2")
+
+
 def verbatim_in_corpus(quote: str, advisor_dir: str) -> Optional[str]:
     """Возвращает source чанка, где цитата встречается дословно (после нормализации),
     иначе None.

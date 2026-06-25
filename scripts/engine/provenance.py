@@ -29,7 +29,9 @@ def tier_for(source: str, line_no: int, advisor_dir: str) -> str:
 
 
 def tier_for_line(source: str, line_no: int, lines, advisor_dir: str) -> str:
-    """Пер-регионный тир: идёт по lines[0..line_no], переключая регион на маркерах from/until."""
+    """Пер-регионный тир. СЕКВЕНЦИАЛЬНО: продвигаемся к региону k+1 только встретив его
+    'from'-маркер ПО ПОРЯДКУ (находясь в регионе k). Так форвард-ссылка в оглавлении
+    (напр. 'APPENDIX' в TOC ДО тела) не переключает регион преждевременно."""
     man = load_manifest(advisor_dir)
     if man is None:
         return "P1"
@@ -39,13 +41,13 @@ def tier_for_line(source: str, line_no: int, lines, advisor_dir: str) -> str:
     regions = entry.get("regions")
     if not regions:
         return entry.get("tier", "A")
-    cur = entry.get("tier", "A")
-    seen = regions[0]["tier"] if "from" not in regions[0] else cur
+    ridx = 0
     for i in range(line_no + 1):
         ln = lines[i]
-        # инвариант: until региона N == from региона N+1 (закрытие = открытие следующего)
-        for r in regions:
-            mk = r.get("from") or r.get("until")
+        while ridx + 1 < len(regions):
+            mk = regions[ridx + 1].get("from")
             if mk and mk in ln:
-                seen = r["tier"]
-    return seen
+                ridx += 1
+            else:
+                break
+    return regions[ridx]["tier"]

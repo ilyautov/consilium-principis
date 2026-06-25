@@ -23,3 +23,11 @@ def test_quote_absent_returns_none(tmp_path):
     adv = str(tmp_path)
     _corpus(adv, [{"source": "p.txt", "tier": "P1", "text": "something else entirely"}])
     assert fidelity.tier_of_match("nonexistent phrase", adv) is None
+
+def test_p1_beats_s1_when_both_match(tmp_path):
+    # тот же текст и у автора (P1), и у комментатора (S1) → отдаём авторитетный P1, ответ 🔵-eligible
+    adv = str(tmp_path)
+    _corpus(adv, [{"source": "tarasov.txt", "tier": "S1", "text": "the end justifies the means says Tarasov"},
+                  {"source": "prince.txt", "tier": "P1", "text": "the end justifies the means"}])
+    assert fidelity.tier_of_match("end justifies the means", adv) == "P1"
+    assert fidelity.is_blue_eligible("end justifies the means", adv) is True

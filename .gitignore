@@ -7,6 +7,7 @@ advisors/*
 # модель Принцепса (кто ПЕРЕД советом) + приватные треки решений = личные данные юзера
 principis.md
 relationship.md
+principis_corpus/
 board_config.json
 scripts/golden/
 data/embeddings*.npy

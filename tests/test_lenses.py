@@ -40,3 +40,14 @@ def test_dishonest_frame_lens_is_caught():
 
 def test_missing_lens_returns_none():
     assert load_lens(os.path.join(LENSES_DIR, "nope.md")) is None
+
+
+def test_kernel_regex_requires_colon_inside_bold():
+    # жирный буллет БЕЗ двоеточия (эмфаза/заметка) не должен попасть в кернелы
+    with tempfile.TemporaryDirectory() as t:
+        p = os.path.join(t, "x.md")
+        with open(p, "w", encoding="utf-8") as f:
+            f.write("---\nname: X\ngrade: frame-lens\nmarker_ceiling: 🟡\n---\n## Кернелы\n"
+                    "- **Настоящий кернел:** описание\n- **просто жирная заметка** не кернел\n")
+        ks = load_lens(p)["kernels"]
+        assert ks == ["Настоящий кернел"]

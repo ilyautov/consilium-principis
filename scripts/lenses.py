@@ -22,9 +22,11 @@ def _extract_kernels(sections):
         if title.startswith("Кернелы"):
             ks = []
             for line in body.splitlines():
-                m = re.match(r"^-\s+\*\*(.+?)\*\*", line.strip())
+                # требуем двоеточие ВНУТРИ жирного: `- **Имя:** …` — иначе любой жирный буллет
+                # (эмфаза/заметка) ложно попал бы в кернелы (ревью 2026-06-26).
+                m = re.match(r"^-\s+\*\*(.+?):\*\*", line.strip())
                 if m:
-                    ks.append(m.group(1).rstrip(":").strip())
+                    ks.append(m.group(1).strip())
             return ks
     return []
 
@@ -59,4 +61,4 @@ def list_lenses(lenses_dir):
 def is_frame_lens_honest(lens):
     """Инвариант: frame-lens НЕ может претендовать на 🔵 — её потолок обязан быть 🟡.
     Ловит нечестную конфигурацию (кто-то поставил marker_ceiling: 🔵 линзе без корпуса)."""
-    return lens.get("grade") != "frame-lens" or lens.get("marker_ceiling") == "🟡"
+    return lens.get("grade") != "frame-lens" or lens.get("marker_ceiling") not in ("🔵", "🟢")

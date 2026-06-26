@@ -12,7 +12,7 @@ import os as _os
 _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
 from principis import load_principis
 from lenses import list_lenses
-from corpusbuild.paths import corpus_path
+from corpusbuild.paths import corpus_path, build_dir
 
 
 def _advisor_status(adv_dir):
@@ -30,7 +30,8 @@ def _advisor_status(adv_dir):
                     continue
                 tiers[t] = tiers.get(t, 0) + 1
                 chunks += 1
-    has_kernels = os.path.isfile(os.path.join(os.path.dirname(cp), "kernels.json"))
+    # кернелы всегда в build/ (не рядом с легаси-корпусом в корне) — ревью 2026-06-26
+    has_kernels = os.path.isfile(os.path.join(build_dir(adv_dir), "kernels.json"))
     blue = tiers.get("P1", 0) + tiers.get("P2", 0) > 0
     return {"name": os.path.basename(adv_dir.rstrip("/")), "chunks": chunks, "tiers": tiers,
             "has_corpus": chunks > 0, "blue_eligible": blue, "has_kernels": has_kernels}

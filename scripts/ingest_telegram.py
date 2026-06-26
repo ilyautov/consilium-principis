@@ -1,0 +1,75 @@
+#!/usr/bin/env python3
+"""Ингест публичного Telegram-канала → корпус Принцепса (твои слова = P1 твоей персоны).
+
+Симметрия с советниками: их персону строим из их текстов, тебя — из твоих. Посты публичного
+канала берём через web-превью t.me/s/<handle> (stdlib, без зависимостей). Запись — в приватный
+principis_corpus/ (gitignored, личные данные). Тир = P1 (это ТВОИ слова, не комментарий).
+
+ОГРАНИЧЕНИЯ v0 (чинить осознанно):
+- t.me/s/ отдаёт только ПОСТЫ, не комменты (комменты — в связанном discussion-чате, нужен др. путь).
+- Без пагинации берёт только последнюю страницу (свежие посты). Полная история — через ?before=<id> (TODO).
+- Работает только для ПУБЛИЧНОГО канала.
+
+Использование:  python scripts/ingest_telegram.py <@handle|handle> [out.jsonl]
+"""
+import os
+import re
+import sys
+import json
+import html as _html
+
+MSG_RE = re.compile(r'<div class="tgme_widget_message_text[^"]*"[^>]*>(.*?)</div>', re.S)
+
+
+def parse_telegram_html(page_html):
+    """HTML страницы t.me/s/<handle> → список текстов постов (теги сняты, <br>→\\n, entity раскрыты)."""
+    posts = []
+    for raw in MSG_RE.findall(page_html):
+        t = re.sub(r"<br\s*/?>", "\n", raw, flags=re.I)   # переносы строк
+        t = re.sub(r"<[^>]+>", "", t)                       # снять прочие теги
+        t = _html.unescape(t)                               # &amp; &quot; &#128512; …
+        t = re.sub(r"[ \t]+\n", "\n", t).strip()            # хвостовые пробелы
+        if len(t) >= 12:                                    # отсечь пустые/служебные
+            posts.append(t)
+    return posts
+
+
+def posts_to_records(posts, handle):
+    """Посты → corpus-записи (тир P1 — ТВОИ слова; источник = telegram:<handle>)."""
+    h = handle.lstrip("@")
+    return [{"source": f"telegram:{h}", "tier": "P1", "text": p} for p in posts]
+
+
+def write_corpus(records, out_path):
+    os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
+    with open(out_path, "w", encoding="utf-8") as f:
+        for r in records:
+            f.write(json.dumps(r, ensure_ascii=False) + "\n")
+    return len(records)
+
+
+def fetch_channel_html(handle, timeout=20):
+    """Скачать web-превью публичного канала. Сеть нужна (sandbox может блокировать — тогда
+    агент отдаёт HTML через WebFetch в parse_telegram_html напрямую)."""
+    import urllib.request
+    h = handle.lstrip("@")
+    req = urllib.request.Request(f"https://t.me/s/{h}", headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return r.read().decode("utf-8", "replace")
+
+
+def ingest(handle, out_path=None):
+    out_path = out_path or os.path.join("principis_corpus", "telegram.jsonl")
+    posts = parse_telegram_html(fetch_channel_html(handle))
+    n = write_corpus(posts_to_records(posts, handle), out_path)
+    return {"handle": handle.lstrip("@"), "posts": len(posts), "out": out_path, "written": n}
+
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print(__doc__)
+        sys.exit(1)
+    res = ingest(sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else None)
+    print(f"[telegram] @{res['handle']}: {res['posts']} постов → {res['out']}")
+    if res["posts"] == 0:
+        print("0 постов — канал приватный/пуст, неверный handle, или сеть заблокирована sandbox.")

@@ -63,6 +63,11 @@ def _situation_analyze(tree, opponent="person", stance="competitive"):
     return res
 
 
+def _situation_stress_test(tree, perturbations, stance="competitive"):
+    from perturbation import stress_test
+    return stress_test(_build_tree(tree), perturbations, stance=stance)
+
+
 def _governance_verify(path):
     cj = path if path.endswith(".jsonl") else corpus_path(path)
     res = _verify_corpus(cj)
@@ -108,6 +113,17 @@ TOOLS = {
                                         "stance": {"type": "string"}},
                          "required": ["tree"]},
         "handler": _situation_analyze,
+    },
+    "situation_stress_test": {
+        "description": "Adversarial-стресс-тест карты: держится ли линия под возмущениями мира "
+                       "(invalidate/weaken/inject_counter). Даёт robustness и fragile_under. "
+                       "Возмущает мир/позицию, НЕ уста советников.",
+        "input_schema": {"type": "object",
+                         "properties": {"tree": {"type": "object"},
+                                        "perturbations": {"type": "array"},
+                                        "stance": {"type": "string"}},
+                         "required": ["tree", "perturbations"]},
+        "handler": _situation_stress_test,
     },
     "governance_verify": {
         "description": "Целостность корпуса (Барсик hash-chain): подмена рвёт цепь. Даёт отпечаток-хеш "

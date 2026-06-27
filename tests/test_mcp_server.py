@@ -53,6 +53,18 @@ def test_situation_analyze_fabrication_does_not_win():
     assert r["value"] == 0.0 and r["verdict"] == "no_winning_line"
 
 
+def test_situation_stress_test_reports_fragility():
+    tree = {"move": None, "children": [
+        {"move": {"by": "you", "claim": "довод", "grounded": True, "strength": 0.8},
+         "children": [{"move": {"by": "opponent", "claim": "слабый",
+                                "grounded": True, "strength": 0.2}}]}]}
+    r = dispatch("situation_stress_test", {"tree": tree, "perturbations": [
+        {"kind": "invalidate", "claim": "довод"},
+        {"kind": "inject_counter", "claim": "killer", "strength": 0.99}]})
+    assert r["baseline_verdict"] == "winnable"
+    assert r["robustness"] == 0.0 and len(r["fragile_under"]) == 2
+
+
 def test_governance_verify_intact_corpus():
     r = dispatch("governance_verify", {"path": STRAT})
     assert r["ok"] is True

@@ -307,6 +307,38 @@ def abstention_eval(adv_dir, threshold):
             "ooc_path": ooc_path}
 
 
+def collect_abstention_scores(adv_dir):
+    """Сырьё для кривой: max-скор ретрива по каждому golden-вопросу, раздельно для
+    OOC (должны отказать) и answerable (должны ответить). Ретрив зовём по разу на вопрос."""
+    ooc, _ = load_golden(os.path.basename(adv_dir.rstrip("/")), "abstention")
+    answerable, _ = load_golden(os.path.basename(adv_dir.rstrip("/")), "retrieval")
+    def _max_scores(rows):
+        out = []
+        for row in rows or []:
+            hits = retrieve(row["q"], adv_dir, top_k=3)
+            out.append(hits[0]["score"] if hits else 0.0)
+        return out
+    return _max_scores(ooc), _max_scores(answerable)
+
+
+def abstention_curve_eval(adv_dir, n_points=21):
+    """Кривая trade-off (honest_abstain ↔ false_abstain) по порогу + рабочая точка + AUC.
+    Заменяет вводящий-в-заблуждение headline-%: один порог не виден без цены ложных отказов."""
+    from abstention_curve import (curve_from_scores, best_operating_point,
+                                   thresholds_from_scores, curve_auc)
+    ooc_scores, ans_scores = collect_abstention_scores(adv_dir)
+    if not ooc_scores or not ans_scores:
+        return None
+    thr = thresholds_from_scores(ooc_scores + ans_scores, n=n_points)
+    points = curve_from_scores(ooc_scores, ans_scores, thr)
+    return {
+        "name": os.path.basename(adv_dir.rstrip("/")),
+        "n_ooc": len(ooc_scores), "n_ans": len(ans_scores),
+        "auc": curve_auc(ooc_scores, ans_scores),
+        "best": best_operating_point(points), "points": points,
+    }
+
+
 # ───────────────────────── CHALLENGE-RATE (парсинг council/sessions/*.md) ────────────────────
 
 # Маркеры реального несогласия совета с пользователем (анти-sycophancy).
@@ -533,6 +565,33 @@ def main():
             print(f"      {ok} [max_score={d['max_score']}] «{d['q'][:50]}»")
     if not any_abs:
         print("  golden-наборы abstention не найдены (scripts/golden/<advisor>.abstention.jsonl).")
+
+    # ── 3b) ABSTENTION-CURVE (честная замена headline-%) ────────────────────────────────────
+    print("\n=== ABSTENTION-CURVE — trade-off (честный отказ ↔ ложный отказ) по порогу ===")
+    print("  Один % завышает безопасность: не виден ценой ложных отказов. Кривая + рабочая точка.")
+    any_curve = False
+    for p in paths:
+        c = abstention_curve_eval(p)
+        if c is None:
+            continue
+        any_curve = True
+        b = c["best"]
+        print(f"  {c['name']}: AUC-разделимость {c['auc']:.2f} (1.0 идеал, 0.5 — порог бесполезен) "
+              f"· OOC={c['n_ooc']} answerable={c['n_ans']}")
+        print(f"      рабочая точка (Youden-knee): порог≈{b['threshold']:.3f} → "
+              f"честных отказов {b['honest_abstain']*100:.0f}% · ложных отказов "
+              f"{b['false_abstain']*100:.0f}% (J={b['youden']:.2f})")
+        # компактная кривая: 5 опорных порогов
+        step = max(1, len(c["points"]) // 5)
+        sparse = c["points"][::step]
+        cells = " ".join(f"[{pt['threshold']:.2f}→{pt['honest_abstain']*100:.0f}/"
+                         f"{pt['false_abstain']*100:.0f}]" for pt in sparse)
+        print(f"      порог→честн%/ложн%: {cells}")
+        if c["auc"] < 0.7:
+            print("      ⚠ AUC<0.7 — порог плохо разводит OOC и answerable (вероятно, движок/корпус,")
+            print("        а не порог: на SIMPLE-fallback кросс-язык скоры схлопнуты). Переснять на tier-FULL.")
+    if not any_curve:
+        print("  нет пары golden abstention+retrieval — кривую не построить.")
 
 
 if __name__ == "__main__":

@@ -78,6 +78,11 @@ def _calibrate(log_text):
     return _calibrate_fn(parse_decision_log(log_text))
 
 
+def _capture_situation(text):
+    from extractor import capture_situation
+    return capture_situation(text)
+
+
 # ───────────────────────── реестр тулов ─────────────────────────
 
 def _obj(props, required):
@@ -102,6 +107,12 @@ TOOLS = {
                                         "top_k": {"type": "integer"}},
                          "required": ["query", "advisor_dir"]},
         "handler": _retrieve,
+    },
+    "capture_situation": {
+        "description": "Захват контекста: сырой дамп (чат-лог конфликта/описание решения) → "
+                       "структура (акторы, реплики, явные вопросы). Вход для карты и рейм-чека.",
+        "input_schema": _obj({"text": "string"}, ["text"]),
+        "handler": _capture_situation,
     },
     "situation_analyze": {
         "description": "Ситуационная карта: оценить дерево ходов (ты+оппонент). Возвращает оценку, "

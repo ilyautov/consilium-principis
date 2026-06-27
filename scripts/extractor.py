@@ -12,21 +12,32 @@
 import re
 from situation import Move, node
 
-_SPEAKER = re.compile(r"^(?P<spk>[^:\n]{1,40}):\s+(?P<txt>.+)$")
+_TIMESTAMP = re.compile(r"^\[[^\]]*\]\s*")                   # ведущий [25.06.2026 22:04]
+_SPEAKER = re.compile(r"^(?P<spk>[^:\n]{1,60}):\s+(?P<txt>.+)$")
 
 
-def _looks_like_speaker(spk):
-    return bool(re.search(r"[^\W\d_]", spk)) and len(spk.split()) <= 4 and "://" not in spk
+def _clean_speaker(spk):
+    """'Дарья Балковская | Бизнес-трекер' → 'Дарья Балковская' (отбросить роль после '|')."""
+    return spk.split("|")[0].strip()
+
+
+def _looks_like_speaker(name):
+    return bool(re.search(r"[^\W\d_]", name)) and len(name.split()) <= 5 and "://" not in name
 
 
 def parse_dialogue(text):
-    """Текст → [{speaker, text}]. Многострочные реплики группируются по спикеру."""
+    """Текст → [{speaker, text}]. Берёт и 'Имя: текст', и '[таймстамп] Имя | роль: текст'
+    (формат логов мессенджеров). Время 10:30 и https:// ложных спикеров не дают."""
     turns = []
     for line in text.splitlines():
-        m = _SPEAKER.match(line.strip())
-        if m and _looks_like_speaker(m.group("spk")):
-            turns.append({"speaker": m.group("spk").strip(), "text": m.group("txt").strip()})
-        elif turns and line.strip():
+        s = _TIMESTAMP.sub("", line.strip())                # снять ведущий [таймстамп]
+        m = _SPEAKER.match(s)
+        if m:
+            name = _clean_speaker(m.group("spk"))
+            if _looks_like_speaker(name):
+                turns.append({"speaker": name, "text": m.group("txt").strip()})
+                continue
+        if turns and line.strip():
             turns[-1]["text"] += "\n" + line.strip()        # продолжение текущей реплики
     return turns
 

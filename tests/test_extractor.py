@@ -35,6 +35,19 @@ def test_parse_dialogue_ignores_timestamps_and_urls():
     assert "10:30" in t[0]["text"]
 
 
+REAL = ("[25.06.2026 22:04] Дарья Балковская | Бизнес-трекер: Утвердили ежедневные отчёты.\n"
+        "[25.06.2026 22:26] Илья Утов: Культ шлагбаума. Куда мы вообще гребём?\n"
+        "[25.06.2026 22:33] Андрей Панин: Если все гребут, а один любуется закатом — плохо\n")
+
+
+def test_parse_dialogue_handles_messenger_timestamp_role_format():
+    turns = parse_dialogue(REAL)
+    assert [t["speaker"] for t in turns] == ["Дарья Балковская", "Илья Утов", "Андрей Панин"]
+    assert "Культ шлагбаума" in turns[1]["text"]      # роль '| Бизнес-трекер' и [таймстамп] сняты
+    qs = collect_questions(REAL)
+    assert any("гребём" in q for q in qs)
+
+
 def test_extract_actors_unique_ordered_with_counts():
     actors = extract_actors(parse_dialogue(CHAT + "Дарья: Ещё раз про отчёты.\n"))
     names = [a["name"] for a in actors]

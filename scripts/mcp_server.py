@@ -83,6 +83,21 @@ def _capture_situation(text):
     return capture_situation(text)
 
 
+def _mirror_report(stated, decisions):
+    from mirror import mirror_report
+    return mirror_report(stated, decisions)
+
+
+def _premortem(scenarios, ledger=None):
+    from premortem import premortem
+    return premortem(scenarios, ledger=ledger)
+
+
+def _atomic_grounding(text, advisor_dir):
+    from atomic import inflation_gap
+    return inflation_gap(text, advisor_dir)
+
+
 # ───────────────────────── реестр тулов ─────────────────────────
 
 def _obj(props, required):
@@ -147,6 +162,28 @@ TOOLS = {
                        "Метрика — одобрено-задним-числом, не послушался-ли.",
         "input_schema": _obj({"log_text": "string"}, ["log_text"]),
         "handler": _calibrate,
+    },
+    "mirror_report": {
+        "description": "Зеркало дрейфа: заявленные векторы (во времени) vs одобренные выборы → "
+                       "разрыв «говоришь X, выбираешь Y» + дрейф вектора. Не советует, отражает.",
+        "input_schema": {"type": "object",
+                         "properties": {"stated": {"type": "array"}, "decisions": {"type": "array"}},
+                         "required": ["stated", "decisions"]},
+        "handler": _mirror_report,
+    },
+    "premortem": {
+        "description": "Пре-мортем исхода: сценарии [{label,value,prob}] → ожидаемый исход + "
+                       "крайние случаи. trustworthy=False без истории попаданий (анти-театр).",
+        "input_schema": {"type": "object",
+                         "properties": {"scenarios": {"type": "array"}, "ledger": {"type": "array"}},
+                         "required": ["scenarios"]},
+        "handler": _premortem,
+    },
+    "atomic_grounding": {
+        "description": "Атомарная верность: разбить заявление на атомы, сверить каждый гейтом, "
+                       "дать inflation gap (насколько единый score завышает обоснованность).",
+        "input_schema": _obj({"text": "string", "advisor_dir": "string"}, ["text", "advisor_dir"]),
+        "handler": _atomic_grounding,
     },
 }
 

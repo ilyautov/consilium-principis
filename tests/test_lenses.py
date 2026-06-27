@@ -7,13 +7,16 @@ from lenses import load_lens, list_lenses, is_frame_lens_honest
 LENSES_DIR = os.path.join(HERE, "..", "lenses")
 
 
-def test_ships_four_frame_lenses():
+def test_ships_three_frame_lenses_and_grounded_strategist():
     ls = list_lenses(LENSES_DIR)
-    names = {l["name"] for l in ls}
-    assert {"Финансист (CFO)", "Маркетолог", "Продажник", "Стратег"} <= names
-    for l in ls:
-        assert l["grade"] == "frame-lens"
-        assert l["marker_ceiling"] == "🟡"      # 🔵 невозможен — нет корпуса
+    by_name = {l["name"]: l for l in ls}
+    for nm in ("Финансист (CFO)", "Маркетолог", "Продажник"):
+        assert by_name[nm]["grade"] == "frame-lens"
+        assert by_name[nm]["marker_ceiling"] == "🟡"   # 🔵 невозможен — нет корпуса
+    # Стратег апгрейднут до grounded (канон Сунь-цзы PD → 🔵)
+    strat = by_name["Стратег (Сунь-цзы)"]
+    assert strat["grade"] == "grounded-lens"
+    assert strat["marker_ceiling"] == "🔵"
 
 
 def test_cfo_kernels_loaded():

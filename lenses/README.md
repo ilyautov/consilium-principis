@@ -19,7 +19,16 @@
 углы, которых Макиавелли с Аврелием не трогают. Ортогональная ось к `diversity_check`.
 
 ## Грейды честности
-- **frame-lens** (сейчас): кернелы без корпуса → чистый 🟡, явно помечено.
-- **grounded** (v0.2): добавить канон-корпус функции (Огилви, Котлер…) → 🔵 с именем автора.
+- **frame-lens**: кернелы без корпуса → чистый 🟡, явно помечено. Flat-файл `lenses/<x>.md`.
+- **grounded-lens** (внедрено): канон-корпус из public-domain → потолок 🔵. Каталог `lenses/<x>/`
+  с `lens.md` + `corpus.jsonl` + `sources/manifest.json`. Первая: **Стратег** (`strategist/`,
+  31 дословная максима Сунь-цзы, Giles 1910, PD). Дословная максима проходит гейт как P1 → 🔵.
 
-Добавить линзу = новый `.md` с frontmatter (`grade: frame-lens`, `marker_ceiling: 🟡`) + `## Кернелы`.
+**Инвариант честности (`lenses.is_lens_honest`):** 🔵/🟢 разрешён ⟺ есть корпус. Frame-линза без
+корпуса, претендующая на 🔵 → нечестна (ловится). Grounded с корпусом, но потолком 🟡 → честна
+(недо-претензия). Целостность канон-корпуса проверяется `governance.py verify <lens-dir>`.
+
+Добавить:
+- **frame-линзу** = новый `lenses/<x>.md` (`grade: frame-lens`, `marker_ceiling: 🟡`) + `## Кернелы`.
+- **grounded-линзу** = каталог `lenses/<x>/` с `lens.md` (`grade: grounded-lens`, `marker_ceiling: 🔵`),
+  `corpus.jsonl` (тир P1/S1) и `sources/manifest.json`. Канон — ТОЛЬКО public-domain (легальная граница).

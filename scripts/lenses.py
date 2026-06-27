@@ -12,6 +12,7 @@ import sys as _sys
 import os as _os
 _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
 from mdmeta import parse_frontmatter, parse_sections
+from corpusbuild.paths import corpus_path
 
 MARKER_CEILING = "🟡"
 
@@ -31,11 +32,29 @@ def _extract_kernels(sections):
     return []
 
 
+def _lens_md_path(path):
+    """Путь к .md линзы. Flat frame-линза = сам файл `lenses/x.md`. Grounded-линза =
+    каталог `lenses/x/` с `lens.md` внутри (рядом corpus.jsonl + sources/manifest.json)."""
+    if os.path.isdir(path):
+        return os.path.join(path, "lens.md")
+    return path
+
+
+def lens_has_corpus(path):
+    """True ⟺ у линзы есть канон-корпус (grounded). Flat .md → нет. Каталог с корпусом → да.
+    Путь корпуса резолвим через corpus_path (build/ → legacy lens-dir), не литералом."""
+    if not os.path.isdir(path):
+        return False
+    return os.path.isfile(corpus_path(path))
+
+
 def load_lens(path):
-    """{name, grade, marker_ceiling, axis, kernels, fields, sections} или None если нет файла."""
-    if not os.path.isfile(path):
+    """{name, grade, marker_ceiling, axis, kernels, fields, sections} или None если нет файла.
+    path — flat-файл `x.md` ИЛИ каталог `x/` (grounded, с lens.md+corpus.jsonl)."""
+    md = _lens_md_path(path)
+    if not os.path.isfile(md):
         return None
-    with open(path, encoding="utf-8") as f:
+    with open(md, encoding="utf-8") as f:
         text = f.read()
     fields, body = parse_frontmatter(text)
     sections = parse_sections(body)
@@ -51,14 +70,28 @@ def list_lenses(lenses_dir):
     if not os.path.isdir(lenses_dir):
         return out
     for fn in sorted(os.listdir(lenses_dir)):
-        if fn.endswith(".md") and fn != "README.md":
-            lens = load_lens(os.path.join(lenses_dir, fn))
+        full = os.path.join(lenses_dir, fn)
+        if fn == "README.md":
+            continue
+        if fn.endswith(".md") or (os.path.isdir(full) and os.path.isfile(os.path.join(full, "lens.md"))):
+            lens = load_lens(full)
             if lens:
                 out.append(lens)
     return out
 
 
+def is_lens_honest(lens, has_corpus):
+    """Обобщённый инвариант честности маркер-потолка:
+    🔵/🟢 (претензия на дословный/комментирующий авторитет) разрешён ⟺ есть канон-корпус.
+    Нет корпуса, но потолок 🔵/🟢 → нечестно (авторитет без слов). Недо-претензия (есть
+    корпус, потолок 🟡) — честна. Покрывает и frame-lens (нет корпуса → обязан 🟡), и
+    grounded-lens (есть корпус → 🔵 законен)."""
+    claims_authority = lens.get("marker_ceiling") in ("🔵", "🟢")
+    if claims_authority and not has_corpus:
+        return False
+    return True
+
+
 def is_frame_lens_honest(lens):
-    """Инвариант: frame-lens НЕ может претендовать на 🔵 — её потолок обязан быть 🟡.
-    Ловит нечестную конфигурацию (кто-то поставил marker_ceiling: 🔵 линзе без корпуса)."""
-    return lens.get("grade") != "frame-lens" or lens.get("marker_ceiling") not in ("🔵", "🟢")
+    """Back-compat: frame-lens (по определению без корпуса) не может претендовать на 🔵/🟢."""
+    return is_lens_honest(lens, has_corpus=False) if lens.get("grade") == "frame-lens" else True

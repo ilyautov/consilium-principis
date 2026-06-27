@@ -107,10 +107,12 @@ def _verify_corpus(corpus_jsonl):
 if __name__ == "__main__":
     import sys, os
     if len(sys.argv) < 3 or sys.argv[1] != "verify":
-        print("Использование: python governance.py verify <dir-с-corpus.jsonl | corpus.jsonl>")
+        print("Использование: python governance.py verify <dir | путь.jsonl>")
         sys.exit(1)
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from corpusbuild.paths import corpus_path        # резолвер (build/ → legacy), не литерал
     target = sys.argv[2]
-    cj = target if target.endswith(".jsonl") else os.path.join(target, "corpus.jsonl")
+    cj = target if target.endswith(".jsonl") else corpus_path(target)
     res = _verify_corpus(cj)
     if res is None:
         print(f"[governance] нет corpus.jsonl: {cj}")

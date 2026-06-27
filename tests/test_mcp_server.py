@@ -79,6 +79,24 @@ def test_calibrate_recommends_framing():
     assert "capture_flag" in r
 
 
+def test_atomic_grounding_exposes_inflation():
+    text = "All warfare is based on deception. Сунь-цзы обожал мороженое по воскресеньям."
+    r = dispatch("atomic_grounding", {"text": text, "advisor_dir": STRAT})
+    assert r["atom_level"] == 0.5 and abs(r["inflation"] - 0.5) < 1e-9
+
+
+def test_mirror_report_via_dispatch():
+    r = dispatch("mirror_report", {
+        "stated": [{"when": "x", "vector": "хочу роста бизнеса"}],
+        "decisions": [{"theme": "люди", "endorsed": True}]})
+    assert r["aligned"] is False and r["sufficient"] is True
+
+
+def test_premortem_via_dispatch_untrusted_without_history():
+    r = dispatch("premortem", {"scenarios": [{"label": "a", "value": 0.5, "prob": 1.0}]})
+    assert r["trustworthy"] is False
+
+
 def test_unknown_tool_raises():
     with pytest.raises(KeyError):
         dispatch("nonexistent_tool", {})

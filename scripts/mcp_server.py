@@ -131,6 +131,16 @@ def _scaffold_principis(answers):
     return {"markdown": scaffold_principis(answers)}
 
 
+def _validate_manifest(advisor_dir):
+    from manifest_builder import validate_manifest
+    import json as _json
+    sd = os.path.join(advisor_dir, "sources")
+    mp = os.path.join(sd, "manifest.json")
+    if not os.path.isfile(mp):
+        return {"ok": True, "problems": [], "note": "нет манифеста → всё P1 (бэк-компат)"}
+    return validate_manifest(_json.load(open(mp, encoding="utf-8")), sd)
+
+
 # ───────────────────────── реестр тулов ─────────────────────────
 
 def _obj(props, required):
@@ -257,6 +267,13 @@ TOOLS = {
         "input_schema": {"type": "object", "properties": {"answers": {"type": "object"}},
                          "required": ["answers"]},
         "handler": _scaffold_principis,
+    },
+    "validate_manifest": {
+        "description": "МОАТ-гейт сборки: проверить тир-манифест советника — region-маркеры реально "
+                       "есть в источнике (иначе тиры съедут, 🔵 не на тех словах), тиры валидны, файлы "
+                       "на месте. Зови ПЕРЕД build-advisor. advisor_dir = advisors/{имя}.",
+        "input_schema": _obj({"advisor_dir": "string"}, ["advisor_dir"]),
+        "handler": _validate_manifest,
     },
 }
 

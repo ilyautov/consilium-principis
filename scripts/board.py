@@ -4,6 +4,8 @@
   status                 — что готово + один приоритетный следующий шаг (онбординг за руку)
   principis <ans.json>   — собрать principis.md из ответов (не перезатирает без --force)
   ingest-telegram <@h>   — выкачать публичный канал в корпус-Принцепса (твои слова = P1)
+  validate-manifest <d>  — проверить тир-манифест советника (маркеры реально в тексте? ров цел?)
+  build-advisor <d>      — собрать советника в один шаг: манифест-гейт → corpus → kernels → отчёт
 
 Логика тонкая — оборачивает preflight/scaffold/ingest_telegram. Реальные вопросы юзеру
 задаёт скилл разговором (см. SKILL.md «Онбординг»), сюда приходят уже структурные ответы.
@@ -57,7 +59,48 @@ def cmd_ingest_telegram(args):
     return 0
 
 
-CMDS = {"status": cmd_status, "principis": cmd_principis, "ingest-telegram": cmd_ingest_telegram}
+def cmd_validate_manifest(args):
+    from manifest_builder import validate_manifest
+    if not args:
+        print("дай advisors/{имя}")
+        return 1
+    adv = args[0]
+    sd = os.path.join(adv, "sources")
+    mp = os.path.join(sd, "manifest.json")
+    if not os.path.isfile(mp):
+        print(f"нет манифеста {mp} (без него всё P1 — бэк-компат)")
+        return 0
+    res = validate_manifest(json.load(open(mp, encoding="utf-8")), sd)
+    if res["ok"]:
+        print("✓ манифест валиден — тиры не съедут")
+        return 0
+    print(f"✗ {len(res['problems'])} проблем (ров под угрозой):")
+    for p in res["problems"]:
+        print("   ", p)
+    return 1
+
+
+def cmd_build_advisor(args):
+    from build_orchestrator import build_advisor_full
+    if not args:
+        print("дай advisors/{имя}")
+        return 1
+    res = build_advisor_full(args[0], run_kernels="--no-kernels" not in args)
+    if not res["ok"]:
+        print(f"✗ остановлено на {res['stopped_at']}: {len(res['problems'])} проблем манифеста")
+        for p in res["problems"]:
+            print("   ", p)
+        return 1
+    for s in res["steps"]:
+        print(f"  • {s['step']}: {'✓' if s['ok'] else '⚠'} {s.get('note', '') or s.get('chunks', s.get('count',''))}")
+    st = res["status"]
+    print(f"→ {st['name']}: {st['chunks']} чанков, {'🔵-готов' if st['blue_eligible'] else 'нет P1/P2'}, "
+          f"{'+кернелы' if st['has_kernels'] else 'без кернелов'}")
+    return 0
+
+
+CMDS = {"status": cmd_status, "principis": cmd_principis, "ingest-telegram": cmd_ingest_telegram,
+        "validate-manifest": cmd_validate_manifest, "build-advisor": cmd_build_advisor}
 
 if __name__ == "__main__":
     if len(sys.argv) < 2 or sys.argv[1] not in CMDS:

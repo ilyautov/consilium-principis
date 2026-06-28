@@ -115,6 +115,18 @@ def test_stability_via_dispatch():
     assert r["label"] == "robust"
 
 
+def test_board_status_reports_next_step():
+    r = dispatch("board_status", {})
+    assert "next_step" in r and "action" in r["next_step"]
+    assert "advisors" in r["preflight"]
+
+
+def test_scaffold_principis_via_dispatch():
+    r = dispatch("scaffold_principis", {"answers": {"who": "Илья", "interface_mode": "rigor"}})
+    assert "interface_mode: rigor" in r["markdown"]
+    assert "ПРОБЕЛ" in r["markdown"]            # вектор не дан → держим живым
+
+
 def test_unknown_tool_raises():
     with pytest.raises(KeyError):
         dispatch("nonexistent_tool", {})

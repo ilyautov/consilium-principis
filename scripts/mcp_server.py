@@ -118,6 +118,19 @@ def _loop_status(ledger):
     return loop_status(ledger)
 
 
+def _board_status():
+    from preflight import preflight
+    from scaffold import next_step
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    pf = preflight(root)
+    return {"preflight": pf, "next_step": next_step(pf)}
+
+
+def _scaffold_principis(answers):
+    from scaffold import scaffold_principis
+    return {"markdown": scaffold_principis(answers)}
+
+
 # ───────────────────────── реестр тулов ─────────────────────────
 
 def _obj(props, required):
@@ -231,6 +244,19 @@ TOOLS = {
         "input_schema": {"type": "object", "properties": {"ledger": {"type": "array"}},
                          "required": ["ledger"]},
         "handler": _loop_status,
+    },
+    "board_status": {
+        "description": "Шасси-онбординг: что на доске готово (Принцепс/советники/линзы) + ОДИН "
+                       "приоритетный следующий шаг сборки. Зови в начале, чтобы вести юзера за руку.",
+        "input_schema": {"type": "object", "properties": {}, "required": []},
+        "handler": _board_status,
+    },
+    "scaffold_principis": {
+        "description": "Собрать principis.md из ответов юзера (who/vector/interface_mode/temperament/"
+                       "not_known). Вектор не дан → пробел держим живым. Возвращает markdown — запиши его.",
+        "input_schema": {"type": "object", "properties": {"answers": {"type": "object"}},
+                         "required": ["answers"]},
+        "handler": _scaffold_principis,
     },
 }
 

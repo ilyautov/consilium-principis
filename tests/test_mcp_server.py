@@ -97,6 +97,24 @@ def test_premortem_via_dispatch_untrusted_without_history():
     assert r["trustworthy"] is False
 
 
+def test_advisor_weights_via_dispatch():
+    r = dispatch("advisor_weights", {"records": [
+        {"advisor": "a", "outcome": "good", "endorsed": True},
+        {"advisor": "b", "outcome": "bad", "endorsed": False}]})
+    assert r["weights"]["a"] > r["weights"]["b"]
+
+
+def test_pending_outcomes_via_dispatch():
+    r = dispatch("pending_outcomes", {"journal_text":
+                 "### A\n- **ИСХОД: ⏳ pending**\n### B\n- **ИСХОД: ✅**\n"})
+    assert r["pending"] == ["A"]
+
+
+def test_stability_via_dispatch():
+    r = dispatch("stability", {"verdicts": ["winnable", "winnable", "winnable"]})
+    assert r["label"] == "robust"
+
+
 def test_unknown_tool_raises():
     with pytest.raises(KeyError):
         dispatch("nonexistent_tool", {})

@@ -98,6 +98,26 @@ def _atomic_grounding(text, advisor_dir):
     return inflation_gap(text, advisor_dir)
 
 
+def _advisor_weights(records):
+    from advisor_calibration import advisor_scores, vote_weights
+    return {"scores": advisor_scores(records), "weights": vote_weights(records)}
+
+
+def _stability(verdicts):
+    from stability import stability
+    return stability(verdicts)
+
+
+def _pending_outcomes(journal_text):
+    from outcome_loop import pending_from_journal
+    return {"pending": pending_from_journal(journal_text)}
+
+
+def _loop_status(ledger):
+    from outcome_loop import loop_status
+    return loop_status(ledger)
+
+
 # ───────────────────────── реестр тулов ─────────────────────────
 
 def _obj(props, required):
@@ -184,6 +204,33 @@ TOOLS = {
                        "дать inflation gap (насколько единый score завышает обоснованность).",
         "input_schema": _obj({"text": "string", "advisor_dir": "string"}, ["text", "advisor_dir"]),
         "handler": _atomic_grounding,
+    },
+    "advisor_weights": {
+        "description": "Калибровка совета по ИСХОДУ (петля U1): кто был прав ДЛЯ ТЕБЯ → вес голоса. "
+                       "records=[{advisor,outcome,endorsed}]. Laplace: без данных вес нейтрален.",
+        "input_schema": {"type": "object", "properties": {"records": {"type": "array"}},
+                         "required": ["records"]},
+        "handler": _advisor_weights,
+    },
+    "stability": {
+        "description": "Доверие через стабильность: вердикты N прогонов → robust/leaning/coin-flip. "
+                       "Отличает устойчивый вывод от монетки в обёртке мудрости.",
+        "input_schema": {"type": "object", "properties": {"verdicts": {"type": "array"}},
+                         "required": ["verdicts"]},
+        "handler": _stability,
+    },
+    "pending_outcomes": {
+        "description": "Сёрфейсер петли U1: незакрытые решения (⏳) из журнала — «вернись и закрой». "
+                       "Без этого исходы висят вечно и петля не накапливается.",
+        "input_schema": _obj({"journal_text": "string"}, ["journal_text"]),
+        "handler": _pending_outcomes,
+    },
+    "loop_status": {
+        "description": "Сводка петли исхода: открыто/закрыто + точность прогнозов + доля одобренных. "
+                       "ledger=[{decision_id,predicted,actual,endorsed}].",
+        "input_schema": {"type": "object", "properties": {"ledger": {"type": "array"}},
+                         "required": ["ledger"]},
+        "handler": _loop_status,
     },
 }
 

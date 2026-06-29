@@ -155,20 +155,22 @@ def _list_recipes(surface="data"):
     return {"recipes": rs}       # сырые данные (дефолт) — хост рендерит сам
 
 
-def _render_session(session, surface="md", depth="plain"):
-    """Canon-объект заседания → строка под surface. Контур/гейт 🔵 проходят ДО рендера;
-    тут чистая презентация. widget = HTML для show_widget (Cowork), md/html — портативные.
-    depth: plain (дефолт, эстетика) | expert (вся машинерия). Поддержан только в widget."""
+def _render_session(session, surface="md", depth="plain", kind="session"):
+    """Ход заседания → строка под surface. Контур/гейт 🔵 проходят ДО рендера; тут чистая презентация.
+    kind: session (любой ход — реакции+вопросы ИЛИ синтез, авто по наличию synthesis) | opening
+    (занавес: роспись советников + приглашение + уточняющие вопросы; объект {advisors:[{name,domain?,
+    grounded?}], invitation?, questions?, chips?}). widget = show_widget (Cowork), md/html — портативны.
+    depth: plain (дефолт) | expert. Любой ход совета в Cowork рендерь виджетом, не прозой."""
     import session_render as SR
-    fn = {"widget": SR.render_widget, "html": SR.render_html, "md": SR.render_md}.get(surface)
+    if surface == "widget":
+        content = SR.render_opening(session) if kind == "opening" else SR.render_widget(session, depth=depth)
+        return {"surface": "widget", "content": content,
+                "next_action": ("ОТОБРАЗИ СЕЙЧАС: вызови mcp__visualize__show_widget с этим `content`. "
+                                "НЕ пересказывай этот ход совета прозой — виджет И ЕСТЬ ответ.")}
+    fn = {"html": SR.render_html, "md": SR.render_md}.get(surface)
     if fn is None:
         return {"error": f"неизвестный surface: {surface} (md|widget|html)"}
-    content = SR.render_widget(session, depth=depth) if surface == "widget" else fn(session)
-    out = {"surface": surface, "content": content}
-    if surface == "widget":      # директива в point-of-use: салиентнее, чем правило в SKILL.md
-        out["next_action"] = ("ОТОБРАЗИ СЕЙЧАС: вызови mcp__visualize__show_widget с этим `content`. "
-                              "НЕ пересказывай вердикт прозой — виджет и ЕСТЬ ответ заседания.")
-    return out
+    return {"surface": surface, "content": fn(session)}
 
 
 def _validate_manifest(advisor_dir):
@@ -410,7 +412,8 @@ TOOLS = {
                        "пройдены ризонингом ДО рендера. depth=plain по умолчанию. См. session_render.py.",
         "input_schema": {"type": "object",
                          "properties": {"session": {"type": "object"}, "surface": {"type": "string"},
-                                        "depth": {"type": "string", "enum": ["plain", "expert"]}},
+                                        "depth": {"type": "string", "enum": ["plain", "expert"]},
+                                        "kind": {"type": "string", "enum": ["session", "opening"]}},
                          "required": ["session"]},
         "handler": _render_session,
     },
@@ -518,6 +521,13 @@ Consilium-Principis — личный совет AI-персон реальных
    советников (не «техническая кухня» — это и есть ценность). Синтез-ВИДЖЕТ (правило 2) рендеришь
    КОГДА контекст собран или юзер просит «давай синтез». Для уже чёткого вопроса можно сразу к
    виджету. Главная ценность совета — допрос и challenge ДО ответа, а не быстрый оракул.
+
+6. ЛЮБОЙ ХОД СОВЕТА = ВИДЖЕТ (оформление везде, не только финал). Каждая реплика совета юзеру
+   рендерится виджетом через render_session→show_widget, прозой — никогда: (а) ОПЕНИНГ (занавес) —
+   `render_session(obj, surface=widget, kind=opening)`, obj={advisors:[{name, domain, grounded}],
+   invitation, questions?, chips?}; (б) ХОД КРУГЛОГО СТОЛА (реакции советников + уточняющие вопросы,
+   ещё без вердикта) — обычный canon-объект БЕЗ `synthesis`, но с `questions:[...]` (совет спрашивает);
+   (в) СИНТЕЗ — объект С `synthesis`. Один и тот же `render_session(surface=widget)` рендерит все три.
 
 2. РЕНДЕР СИНТЕЗА = ВИДЖЕТ, НЕ ПРОЗА (обязательно). Когда заседание дошло до синтеза (см. правило 5),
    ты ОБЯЗАН отдать его виджетом через `mcp__visualize__show_widget`, а НЕ текстом. Конвейер:

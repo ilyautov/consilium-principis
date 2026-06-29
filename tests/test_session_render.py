@@ -5,7 +5,7 @@ graceful-опускание необязательных полей."""
 import os, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "scripts"))
-from session_render import render_md, render_widget, render_html, _e
+from session_render import render_md, render_widget, render_html, render_opening, _e
 
 S = {
     "question": "Партнёр хочет 50%, но без инициативы",
@@ -75,6 +75,32 @@ def test_widget_marker_pill_rides_on_quote():
     with_q = {"question": "q", "synthesis": "s", "advisors": [{"name": "X", "opinions": [
         {"marker": "blue", "argument": "a", "quote": {"text": "t", "source": "Prince"}}]}]}
     assert "дословно" in render_widget(with_q) and "Prince" in render_widget(with_q)
+
+
+def test_opening_renders_roster_invitation_chips():
+    o = {"advisors": [{"name": "Макиавелли", "domain": "власть", "grounded": True},
+                      {"name": "CFO-линза", "domain": "деньги", "grounded": False}],
+         "invitation": "Что приносишь на стол?",
+         "questions": ["Конкретное решение или открытая ситуация?"],
+         "chips": [("конкретное решение", "это конкретное решение"),
+                   ("открытая ситуация", "это открытая ситуация")]}
+    w = render_opening(o)
+    assert "Совет в сборе" in w and "Что приносишь" in w
+    assert "власть" in w and "Макиавелли" in w          # роспись с доменами
+    assert "sendPrompt(" in w and "конкретное решение" in w   # чипы быстрых ответов
+    assert "<script" not in w.lower()
+
+
+def test_roundtable_turn_no_synthesis_asks_questions():
+    # ход круглого стола: реакции советников + вопросы, БЕЗ вердикта; кнопка «давай синтез»
+    s = {"question": "как быть?", "advisors": [{"name": "Макиавелли",
+         "opinions": [{"marker": "yellow", "argument": "реакция без сочувствия"}]}],
+         "questions": ["На чём ты зарабатываешь?", "Что значит «быстро» в цифрах?"]}
+    w = render_widget(s)
+    assert "Совет спрашивает" in w and "На чём ты зарабатываешь" in w
+    assert "Вердикт" not in w                            # синтеза ещё нет
+    assert "давай синтез" in w                           # кнопка продвинуть к вердикту
+    assert "реакция без сочувствия" in w                 # голос советника на сцене
 
 
 def test_malformed_disagreement_never_crashes_render():

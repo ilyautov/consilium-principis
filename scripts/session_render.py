@@ -204,16 +204,22 @@ def render_widget(s, actions=None, depth="plain"):
 
     d = s.get("disagreement")
     if d:
-        sides = "; ".join(_e(x) for x in d.get("sides", []))
-        res = (f'<br><b style="font-weight:500">Снимается:</b> {_e(d["resolver"])}'
-               if d.get("resolver") else "")
-        parts.append('<div style="background:var(--color-background-secondary,rgba(127,127,127,.08));'
-                     'border-radius:var(--border-radius-lg,12px);padding:12px 16px;margin:18px 0 0">'
-                     '<div style="font-size:13px;font-weight:500;color:var(--color-text-secondary,#777);'
-                     'margin-bottom:4px"><i class="ti ti-arrows-split" aria-hidden="true" '
-                     'style="font-size:15px;vertical-align:-2px;margin-right:5px"></i>Где расходятся</div>'
+        sides = "".join(
+            '<span style="display:block;margin-top:5px;padding-left:15px;text-indent:-15px">'
+            f'<span style="opacity:.45">—&nbsp;</span>{_e(x)}</span>'
+            for x in d.get("sides", []))
+        res = (f'<div style="margin-top:10px;padding-top:9px;border-top:.5px solid '
+               'var(--color-border-secondary,rgba(127,127,127,.25))">'
+               '<b style="font-weight:500;color:var(--color-text-info,#185FA5)">Снимается:</b> '
+               f'{_e(d["resolver"])}</div>' if d.get("resolver") else "")
+        parts.append('<div style="background:var(--color-background-secondary,rgba(127,127,127,.07));'
+                     'border-radius:var(--border-radius-lg,12px);padding:13px 16px 14px;margin:18px 0 0">'
+                     '<div style="font-size:11px;font-weight:500;letter-spacing:.04em;'
+                     'text-transform:uppercase;color:var(--color-text-tertiary,#999);margin-bottom:8px">'
+                     '<i class="ti ti-arrows-split" aria-hidden="true" style="font-size:14px;'
+                     'vertical-align:-2px;margin-right:5px"></i>Где расходятся</div>'
                      '<p style="margin:0;font-size:13.5px;line-height:1.6">'
-                     f'<b style="font-weight:500">Ось:</b> {_e(d["axis"])}<br>{sides}{res}</p></div>')
+                     f'<b style="font-weight:500">Ось:</b> {_e(d["axis"])}{sides}</p>{res}</div>')
 
     syn = ('<div style="border:1.5px solid var(--color-border-info,rgba(55,138,221,.4));'
            'border-radius:var(--border-radius-lg,12px);padding:14px 16px;margin:14px 0 0">'

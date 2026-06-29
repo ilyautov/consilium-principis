@@ -10,19 +10,24 @@
 """
 VALID_MODES = ("rigor", "support")
 VALID_DEPTH = ("plain", "expert")
+VALID_CONTEXT = ("ask", "allow", "deny")
 
 
 def scaffold_principis(answers):
     """Структурированные ответы юзера → текст principis.md. interface_mode fail-safe к rigor.
-    depth: plain (чистый ответ на языке юзера, без чисел/разбора — дефолт для большинства) |
-    expert (полная машинерия: вероятности, robustness, тиры). language: язык ответов
-    ('auto' = подстраиваться под язык реплики юзера)."""
+    depth: plain (чистый ответ на языке юзера, без чисел/разбора — дефолт) | expert (полная машинерия).
+    language: язык ответов ('auto' = под язык реплики). context_expansion: ГЛОБАЛЬНОЕ согласие на
+    подтягивание контекста СВЕРХ корпусов советника + заданного вопроса (память, другие проекты,
+    внешние источники): ask (дефолт — спросить) | allow | deny. Non-capture: молча не вплетаем."""
     mode = answers.get("interface_mode", "rigor")
     if mode not in VALID_MODES:
         mode = "rigor"
     depth = answers.get("depth", "plain")
     if depth not in VALID_DEPTH:
         depth = "plain"
+    context_expansion = answers.get("context_expansion", "ask")
+    if context_expansion not in VALID_CONTEXT:
+        context_expansion = "ask"
     language = (answers.get("language") or "auto").strip()
     who = (answers.get("who") or "—").strip()
     vector = (answers.get("vector") or "").strip()
@@ -31,12 +36,15 @@ def scaffold_principis(answers):
     vec = vector or "ПРОБЕЛ — совет допрашивает (вектор держим живым, не фиксируем как цель)"
     return (
         f"---\ninterface_mode: {mode}\ndepth: {depth}\nlanguage: {language}\n"
-        f"owner: principis\nstatus: draft\n---\n"
+        f"context_expansion: {context_expansion}\nowner: principis\nstatus: draft\n---\n"
         f"\n## Кто ты\n{who}\n"
         f"\n## Вектор (Олимп — куда идёшь)\n{vec}\n"
         f"\n## Интерфейс-нужда\n{mode}\n"
         f"\n## Подача\nЯзык: {language} · Глубина: {depth} "
         f"(plain — чистый ответ; expert — с вероятностями и разбором)\n"
+        f"\n## Согласие на контекст\n{context_expansion} — можно ли подтягивать контекст СВЕРХ "
+        f"корпусов советника и заданного вопроса (твоя память, другие проекты, внешнее). "
+        f"ask = спросить перед этим · allow = можно молча · deny = строго в рамках вопроса+корпусов.\n"
         f"\n## Темперамент\n{temperament}\n"
         f"\n## Журнал решений\n"
         f"_(пусто — первое консеквенциальное решение запишется сюда; ИСХОД ⏳ дописывается по факту)_\n"

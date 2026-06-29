@@ -208,9 +208,20 @@ def test_initialize_exposes_instructions_to_host():
     assert "show_widget" in instr and "render_session" in instr   # рендер-контракт дошёл до хоста
     assert "fidelity_check" in instr and "🔵" in instr            # протокол-гейт верности
     assert "согласие" in instr.lower() or "захват" in instr.lower()  # non-capture
-    assert "retrieve" in instr and "перефразируй" in instr.lower()  # как вернуть 🔵 (дословный текст)
+    assert "retrieve" in instr and "буква в букву" in instr.lower()  # как вернуть 🔵 (дословный текст)
     assert "молча" in instr.lower()                                # тихая оркестрация (без тех-преамбулы)
     assert "уточняющих" in instr.lower() and "круглый стол" in instr.lower()  # живой интерактив до синтеза
+    assert "первый" in instr.lower() and "kind=opening" in instr   # опенинг-виджет с первого кадра
+    assert "не выдумывай дефекты" in instr.lower()                 # запрет конфабуляции дефекта гейта
+
+
+def test_retrieve_attaches_verbatim_quoting_hint():
+    # point-of-use: выдача retrieve несёт директиву «цитируй text дословно», гасит конфабуляцию 🟡
+    import os
+    adv = os.path.join(ROOT, "lenses", "strategist")
+    r = dispatch("retrieve", {"query": "deception in war", "advisor_dir": adv})
+    assert "passages" in r and isinstance(r["passages"], list)
+    assert "дословно" in r["how_to_quote"].lower() and "🟡" in r["how_to_quote"]
 
 
 def test_unknown_tool_raises():

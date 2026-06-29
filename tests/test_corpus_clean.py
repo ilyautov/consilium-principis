@@ -1,6 +1,17 @@
 import os, sys, json
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
-from corpusbuild import clean
+from corpusbuild import clean, ingest
+
+
+def test_provenance_header_span_strips_only_our_block():
+    # реальный provenance-заголовок (# SOURCE … # ------) → срезается целиком
+    hdr = ["# SOURCE: http://x", "# FETCHED: 2026", "# LICENSE: PD", "# " + "-" * 60, "Body line."]
+    assert ingest._provenance_header_span(hdr) == 4
+    # markdown-заголовок `# Heading` первой строкой → НЕ трогаем (0)
+    assert ingest._provenance_header_span(["# Введение", "текст"]) == 0
+    # «# SOURCE:» без разделителя → формат чужой, не режем
+    assert ingest._provenance_header_span(["# SOURCE: x", "no separator", "body"]) == 0
+    assert ingest._provenance_header_span([]) == 0
 
 def _manifest(adv, data):
     os.makedirs(os.path.join(adv, "sources"), exist_ok=True)

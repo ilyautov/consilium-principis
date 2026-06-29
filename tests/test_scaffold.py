@@ -36,6 +36,22 @@ def test_invalid_mode_falls_back_to_rigor():
     assert "interface_mode: rigor" in md        # fail-safe к rigor
 
 
+def test_depth_defaults_to_plain_and_language_auto():
+    md = scaffold_principis({"who": "X"})
+    assert "depth: plain" in md                  # дефолт для большинства — чистый ответ
+    assert "language: auto" in md                # подстраиваться под язык юзера
+
+
+def test_expert_depth_and_explicit_language_persisted():
+    md = scaffold_principis({"who": "X", "depth": "expert", "language": "ru"})
+    assert "depth: expert" in md and "language: ru" in md
+
+
+def test_invalid_depth_falls_back_to_plain():
+    md = scaffold_principis({"who": "X", "depth": "сверхглубоко"})
+    assert "depth: plain" in md
+
+
 def test_next_step_principis_first_when_missing():
     pf = {"principis": {"ok": False, "interface_mode": "rigor"}, "advisors": [], "lenses": []}
     ns = next_step(pf)

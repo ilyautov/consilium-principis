@@ -23,6 +23,19 @@ def test_list_tools_exposes_core_set():
         assert "input_schema" in t and t["input_schema"]["type"] == "object"
 
 
+def test_lifecycle_tools_exposed_for_shell_free_hosts():
+    # весь цикл сборки доступен как MCP-тулы → чистый MCP-хост (Cowork) не выходит в шелл
+    names = {t["name"] for t in list_tools()}
+    assert {"doctor", "build_advisor", "seed_council",
+            "ingest_telegram", "setup_full"} <= names
+
+
+def test_doctor_tool_runs_readonly():
+    r = dispatch("doctor", {})
+    assert "healthy" in r and isinstance(r["checks"], list)
+    assert any(c["name"] == "python" for c in r["checks"])
+
+
 def test_render_session_tool_emits_surfaces():
     s = {"question": "q", "synthesis": "s",
          "advisors": [{"name": "Макиавелли",

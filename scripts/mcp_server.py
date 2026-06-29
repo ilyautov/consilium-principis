@@ -163,6 +163,46 @@ def _validate_manifest(advisor_dir):
     return validate_manifest(_json.load(open(mp, encoding="utf-8")), sd)
 
 
+def _root():
+    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+# ── lifecycle: весь цикл сборки через MCP, чтобы юзер не выходил из своего агента ──
+# (раньше жили только в board.py CLI → в чистом MCP-хосте без шелла были недоступны)
+
+def _doctor():
+    from doctor import run_doctor
+    return run_doctor(_root())
+
+
+def _build_advisor(advisor_dir, author=None, run_kernels=True, run_index=True):
+    """Советник под ключ: МАНИФЕСТ-ГЕЙТ → corpus → kernels → индекс. Долгая операция;
+    без ollama kernels/индекс деградируют graceful. Сломанный манифест → stopped_at, корпус не родится."""
+    from build_orchestrator import build_advisor_full
+    return build_advisor_full(advisor_dir, author=author,
+                              run_kernels=run_kernels, run_index=run_index)
+
+
+def _seed_council():
+    """Стартовый совет PD-мудрецов (Аврелий+Эпиктет) с нуля: fetch→манифест→гейт→build.
+    Долгая операция + сеть (Gutenberg). Идемпотентно по уже собранным."""
+    from seed import run_seed_council
+    return {"results": run_seed_council(_root())}
+
+
+def _ingest_telegram(handle, out_path=None):
+    """Публичный канал → корпус Принцепса (твои слова = P1). Сеть. 0 постов = приват/неверный handle/sandbox."""
+    from ingest_telegram import ingest
+    return ingest(handle, out_path or os.path.join(_root(), "principis_corpus", "telegram.jsonl"))
+
+
+def _setup_full(consent=True):
+    """Поднять FULL-тир: системный ollama НИКОГДА не ставим молча (вернём инструкцию),
+    pull модели bge-m3 — авто при consent. Возвращает шаги + финальный probe()."""
+    from setup_full import run_setup
+    return run_setup(consent=consent)
+
+
 # ───────────────────────── реестр тулов ─────────────────────────
 
 def _obj(props, required):
@@ -315,6 +355,45 @@ TOOLS = {
                        "на месте. Зови ПЕРЕД build-advisor. advisor_dir = advisors/{имя}.",
         "input_schema": _obj({"advisor_dir": "string"}, ["advisor_dir"]),
         "handler": _validate_manifest,
+    },
+    "doctor": {
+        "description": "Health-check машины БЕЗ выхода из агента: Python, скилл установлен, какой тир "
+                       "(ollama?), самотест рва (P1→🔵, фейк→None). Read-only. Зови, чтобы понять, "
+                       "готова ли эта машина собирать.",
+        "input_schema": {"type": "object", "properties": {}, "required": []},
+        "handler": _doctor,
+    },
+    "build_advisor": {
+        "description": "Собрать советника под ключ ИЗ АГЕНТА: манифест-гейт → corpus → kernels → индекс. "
+                       "advisor_dir = advisors/{имя}. Долгая; без ollama деградирует graceful; сломанный "
+                       "манифест → не соберёт (сначала validate_manifest).",
+        "input_schema": {"type": "object",
+                         "properties": {"advisor_dir": {"type": "string"}, "author": {"type": "string"},
+                                        "run_kernels": {"type": "boolean"}, "run_index": {"type": "boolean"}},
+                         "required": ["advisor_dir"]},
+        "handler": _build_advisor,
+    },
+    "seed_council": {
+        "description": "Собрать стартовый совет PD-мудрецов (Аврелий+Эпиктет) с нуля одним вызовом — "
+                       "холодный старт без шелла. Долгая операция + сеть (Gutenberg). Идемпотентно.",
+        "input_schema": {"type": "object", "properties": {}, "required": []},
+        "handler": _seed_council,
+    },
+    "ingest_telegram": {
+        "description": "Публичный Telegram-канал → корпус Принцепса (твои слова = P1). Сеть. handle = "
+                       "@name или name. 0 постов = приватный/неверный/sandbox-блок сети.",
+        "input_schema": {"type": "object",
+                         "properties": {"handle": {"type": "string"}, "out_path": {"type": "string"}},
+                         "required": ["handle"]},
+        "handler": _ingest_telegram,
+    },
+    "setup_full": {
+        "description": "Поднять FULL-тир (семантика) ИЗ АГЕНТА: системный ollama НЕ ставим молча "
+                       "(вернём инструкцию под ОС), модель bge-m3 — авто-pull при consent. Возвращает "
+                       "шаги + финальный статус. consent=false → только план, без выполнения.",
+        "input_schema": {"type": "object",
+                         "properties": {"consent": {"type": "boolean"}}, "required": []},
+        "handler": _setup_full,
     },
 }
 

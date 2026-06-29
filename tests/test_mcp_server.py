@@ -32,11 +32,43 @@ def test_relative_advisor_dir_resolves_regardless_of_cwd(tmp_path, monkeypatch):
     assert r["status"] == "🔵"                         # нашёл корпус несмотря на чужой cwd
 
 
+def test_long_tool_returns_job_and_completes(monkeypatch):
+    # долгие тулы рвали таймаут MCP → теперь фоновый джоб: job_id сразу, job_status опрашивается
+    import mcp_server, time
+    monkeypatch.setattr(mcp_server, "_do_seed", lambda: {"results": ["ok"]})
+    started = dispatch("seed_council", {})
+    assert started["status"] == "running" and started["job_id"]
+    deadline = time.time() + 5
+    st = dispatch("job_status", {"job_id": started["job_id"]})
+    while st["status"] == "running" and time.time() < deadline:
+        time.sleep(0.02)
+        st = dispatch("job_status", {"job_id": started["job_id"]})
+    assert st["status"] == "done" and st["result"] == {"results": ["ok"]}
+
+
+def test_job_error_is_captured(monkeypatch):
+    import mcp_server, time
+    def boom():
+        raise RuntimeError("сеть упала")
+    monkeypatch.setattr(mcp_server, "_do_seed", boom)
+    jid = dispatch("seed_council", {})["job_id"]
+    deadline = time.time() + 5
+    st = dispatch("job_status", {"job_id": jid})
+    while st["status"] == "running" and time.time() < deadline:
+        time.sleep(0.02)
+        st = dispatch("job_status", {"job_id": jid})
+    assert st["status"] == "error" and "сеть упала" in st["error"]
+
+
+def test_job_status_unknown_id():
+    assert "error" in dispatch("job_status", {"job_id": "job-999999"})
+
+
 def test_lifecycle_tools_exposed_for_shell_free_hosts():
     # весь цикл сборки доступен как MCP-тулы → чистый MCP-хост (Cowork) не выходит в шелл
     names = {t["name"] for t in list_tools()}
     assert {"doctor", "build_advisor", "seed_council",
-            "ingest_telegram", "setup_full"} <= names
+            "ingest_telegram", "setup_full", "job_status"} <= names
 
 
 def test_doctor_tool_runs_readonly():

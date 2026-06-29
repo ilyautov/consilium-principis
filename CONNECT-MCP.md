@@ -21,7 +21,18 @@ git clone https://github.com/ilyautov/consilium-principis ~/consilium-principis
 **Важно:** Cowork/Code должны жить на **этой же машине** — тогда личный корпус Принцепса
 остаётся локально (инвариант рва), а сборка идёт как обычно.
 
-## Шаг 1 — получить готовый конфиг (путь подставится сам)
+## Самое простое — одной командой (Claude Desktop / Cowork)
+
+Скрипт сам впишет сервер в `claude_desktop_config.json`, **сохранив соседние серверы**, с бэкапом:
+```bash
+python3 ~/consilium-principis/scripts/board.py mcp-install --dry-run   # показать, что изменится
+python3 ~/consilium-principis/scripts/board.py mcp-install             # применить (+бэкап)
+```
+Затем **полностью перезапусти Claude Desktop**. Путь к серверу и интерпретатор подставляются
+автоматически (от `__file__`). Свой путь к конфигу — `--config <файл>`. Ниже — ручной вариант и
+`claude mcp add` для Claude Code.
+
+## Шаг 1 (ручной вариант) — получить готовый конфиг (путь подставится сам)
 
 ```bash
 python3 ~/consilium-principis/scripts/board.py mcp-config        # гайд под все хосты

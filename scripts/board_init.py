@@ -75,9 +75,12 @@ def main():
     print(f"Порог tier: {args.threshold} токенов · abstain_threshold: {args.abstain_threshold}\n")
 
     config = {"semantic_available": sem,
-              # Левер 1: FULL зовёт HybridEngine (semantic ∪ lexical через RRF). На поле, где
-              # semantic недоступен, resolve_engine сам падает в lexical — флаг безвреден.
-              "retrieval_mode": "hybrid",
+              # auto = semantic при доступном bge-m3, иначе lexical (graceful).
+              # НЕ hybrid по умолчанию: живой замер 2026-06-29 показал, что RRF-гибрид СТРОГО ХУЖЕ
+              # чистой семантики — кросс-язычный лексический шум равным рангом топит сигнал
+              # (semantic 0.61 на верном пассаже → hybrid 0.03 с биографией наверху). Совпадает с
+              # bridge-retrieval-falsified (Exp A N=100, McNemar c=0). hybrid остался opt-in (prefer).
+              "retrieval_mode": "auto",
               "abstain_threshold": {
                   "semantic": args.abstain_threshold,   # калиброван при chunk_chars ниже
                   "lexical": LexicalEngine.DEFAULT_THRESHOLD,  # лексический пол (best-effort)

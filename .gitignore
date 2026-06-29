@@ -19,6 +19,9 @@ __pycache__/
 .venv/
 venv/
 
+# Личный MCP-конфиг (абсолютный путь машины); пример — mcp.example.json (в репо)
+mcp.json
+
 # Системное
 .DS_Store
 *.log

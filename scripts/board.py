@@ -11,6 +11,7 @@
   setup-full             — поднять FULL-тир: инструкция по ollama + авто-pull модели bge-m3
   recipes [--surface S]  — меню «что умеет совет» (S = text|widget|html; дефолт text)
   render-session <j> [--surface S] — отрисовать canon-объект заседания (S = md|widget|html)
+  mcp-config [--json]    — готовый конфиг подключения как MCP-сервера (путь подставится сам)
 
 Логика тонкая — оборачивает preflight/scaffold/ingest_telegram. Реальные вопросы юзеру
 задаёт скилл разговором (см. SKILL.md «Онбординг»), сюда приходят уже структурные ответы.
@@ -149,6 +150,25 @@ def cmd_setup_full(args):
     return 0 if ok else 1
 
 
+def cmd_mcp_config(args):
+    """Готовый конфиг для подключения Consilium как MCP-сервера (путь подставляется сам).
+    --json → только JSON-сниппет (для mcp.json / claude_desktop_config.json); иначе — гайд."""
+    server = os.path.join(os.path.dirname(os.path.abspath(__file__)), "mcp_server.py")
+    snippet = {"mcpServers": {"consilium-principis": {
+        "command": sys.executable, "args": [server]}}}
+    pretty = json.dumps(snippet, ensure_ascii=False, indent=2)
+    if "--json" in args:
+        print(pretty)
+        return 0
+    print("Подключение Consilium как MCP-сервера (stdio). Путь подставлен под эту машину.\n")
+    print("• Claude Desktop / большинство хостов — добавь в конфиг (mcpServers):\n")
+    print(pretty)
+    print(f"\n• Claude Code (CLI):\n    claude mcp add consilium-principis -- {sys.executable} {server}")
+    print("\n• Cowork — зарегистрируй stdio-сервер тем же command+args (точный UI см. в Cowork).")
+    print("\nПосле подключения вызови тул doctor — проверит готовность машины.")
+    return 0
+
+
 def _surface(args, default):
     if "--surface" in args:
         i = args.index("--surface")
@@ -188,7 +208,8 @@ def cmd_render_session(args):
 CMDS = {"status": cmd_status, "principis": cmd_principis, "ingest-telegram": cmd_ingest_telegram,
         "validate-manifest": cmd_validate_manifest, "build-advisor": cmd_build_advisor,
         "doctor": cmd_doctor, "seed-council": cmd_seed_council, "setup-full": cmd_setup_full,
-        "recipes": cmd_recipes, "render-session": cmd_render_session}
+        "recipes": cmd_recipes, "render-session": cmd_render_session,
+        "mcp-config": cmd_mcp_config}
 
 if __name__ == "__main__":
     if len(sys.argv) < 2 or sys.argv[1] not in CMDS:

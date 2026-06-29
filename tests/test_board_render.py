@@ -37,3 +37,13 @@ def test_recipes_widget_surface():
 def test_recipes_default_is_text():
     r = _run(["recipes"])
     assert r.returncode == 0 and "<button" not in r.stdout    # текст, не HTML
+
+
+def test_mcp_config_json_resolves_server_path():
+    r = _run(["mcp-config", "--json"])
+    assert r.returncode == 0
+    cfg = json.loads(r.stdout)
+    args = cfg["mcpServers"]["consilium-principis"]["args"]
+    assert args[0].endswith("scripts/mcp_server.py")        # путь подставлен, не плейсхолдер
+    assert "/ABSOLUTE/PATH" not in r.stdout
+    assert os.path.isfile(args[0])                          # путь реально существует

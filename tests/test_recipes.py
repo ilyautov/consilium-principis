@@ -8,7 +8,7 @@ recipes.json, без pyyaml. load → render_menu (показать) → match_r
 import os, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "scripts"))
-from recipes import load_recipes, render_menu, match_recipe
+from recipes import load_recipes, render_menu, render_html, match_recipe
 
 
 def test_recipes_well_formed():
@@ -30,6 +30,15 @@ def test_menu_is_human_readable():
     menu = render_menu(load_recipes())
     assert "Что может пойти не так" in menu        # премортем-триггер виден
     assert "совет" in menu.lower()
+
+
+def test_render_html_shows_all_recipes_and_is_safe():
+    rs = load_recipes()
+    h = render_html(rs)
+    assert h.startswith("<!doctype html>") and "</html>" in h
+    assert h.count('class="card"') == len(rs)      # визуализация показывает ВСЕ, не лимит 4
+    assert "🔵" in h and "🟡" in h                  # контур-легенда не теряется
+    assert "<script" not in h.lower()              # без скриптов — безопасный артефакт
 
 
 def test_match_finds_premortem():

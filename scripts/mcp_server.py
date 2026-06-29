@@ -164,7 +164,11 @@ def _render_session(session, surface="md", depth="plain"):
     if fn is None:
         return {"error": f"неизвестный surface: {surface} (md|widget|html)"}
     content = SR.render_widget(session, depth=depth) if surface == "widget" else fn(session)
-    return {"surface": surface, "content": content}
+    out = {"surface": surface, "content": content}
+    if surface == "widget":      # директива в point-of-use: салиентнее, чем правило в SKILL.md
+        out["next_action"] = ("ОТОБРАЗИ СЕЙЧАС: вызови mcp__visualize__show_widget с этим `content`. "
+                              "НЕ пересказывай вердикт прозой — виджет и ЕСТЬ ответ заседания.")
+    return out
 
 
 def _validate_manifest(advisor_dir):

@@ -85,6 +85,8 @@ def test_render_session_tool_emits_surfaces():
     assert md["surface"] == "md" and "Макиавелли" in md["content"]
     w = dispatch("render_session", {"session": s, "surface": "widget"})
     assert "sendPrompt(" in w["content"] and "--color-text-info" in w["content"]
+    assert "show_widget" in w["next_action"]        # директива в point-of-use тянет хост к рендеру
+    assert "next_action" not in dispatch("render_session", {"session": s, "surface": "md"})
     assert "render_session" in {t["name"] for t in list_tools()}
 
 

@@ -12,6 +12,7 @@
   recipes [--surface S]  — меню «что умеет совет» (S = text|widget|html; дефолт text)
   render-session <j> [--surface S] — отрисовать canon-объект заседания (S = md|widget|html)
   mcp-config [--json]    — готовый конфиг подключения как MCP-сервера (путь подставится сам)
+  mcp-install [--dry-run] — подключить скриптом: мердж в claude_desktop_config.json (+бэкап)
 
 Логика тонкая — оборачивает preflight/scaffold/ingest_telegram. Реальные вопросы юзеру
 задаёт скилл разговором (см. SKILL.md «Онбординг»), сюда приходят уже структурные ответы.
@@ -169,6 +170,31 @@ def cmd_mcp_config(args):
     return 0
 
 
+def cmd_mcp_install(args):
+    """Подключить как MCP-сервер скриптом: мердж в claude_desktop_config.json (соседей не трогает),
+    с бэкапом. --dry-run — показать без записи; --config <файл> — свой путь."""
+    from mcp_install import install, config_path
+    cfg = None
+    if "--config" in args:
+        i = args.index("--config")
+        cfg = args[i + 1] if i + 1 < len(args) else None
+    r = install(config_file=cfg, dry_run="--dry-run" in args)
+    if not r["ok"]:
+        print(f"✗ {r.get('reason')}: {r.get('hint') or r.get('error')}\n  путь: {r['path']}")
+        return 1
+    if r.get("dry_run"):
+        print(f"DRY-RUN (записи нет). Стало бы в {r['path']}:\n\n{r['preview']}")
+        print("\nПрименить: убери --dry-run.")
+    elif not r["changed"]:
+        print(f"✓ {r['note']} — {r['path']}")
+    else:
+        print(f"✓ подключено → {r['path']}")
+        if r.get("backup"):
+            print(f"  бэкап: {r['backup']}")
+        print(f"  {r['restart']}")
+    return 0
+
+
 def _surface(args, default):
     if "--surface" in args:
         i = args.index("--surface")
@@ -209,7 +235,7 @@ CMDS = {"status": cmd_status, "principis": cmd_principis, "ingest-telegram": cmd
         "validate-manifest": cmd_validate_manifest, "build-advisor": cmd_build_advisor,
         "doctor": cmd_doctor, "seed-council": cmd_seed_council, "setup-full": cmd_setup_full,
         "recipes": cmd_recipes, "render-session": cmd_render_session,
-        "mcp-config": cmd_mcp_config}
+        "mcp-config": cmd_mcp_config, "mcp-install": cmd_mcp_install}
 
 if __name__ == "__main__":
     if len(sys.argv) < 2 or sys.argv[1] not in CMDS:

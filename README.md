@@ -75,6 +75,10 @@ cd ~/consilium-principis && python3 install.py
 Любишь кнопки или терминал — [`QUICKSTART.md`](QUICKSTART.md): клик-установщик
 ([`install.command`](install.command) / `.bat`) и ручной путь.
 
+**Cowork / Claude Desktop / любой MCP-хост** — подключи как MCP-сервер и получи весь цикл
+(сборка, заседания, виджеты) тулами, не выходя из агента: [`CONNECT-MCP.md`](CONNECT-MCP.md)
+(`python3 scripts/board.py mcp-config` подставит путь сам).
+
 **Нужно только:** Python 3.10+. Для умного кросс-язычного поиска — опционально
 [ollama](https://ollama.com) + `bge-m3` (совет сам подскажет, как поднять). Контур работает и без него.
 

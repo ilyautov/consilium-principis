@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "consilium-principis": {
+      "command": "python3",
+      "args": ["/ABSOLUTE/PATH/TO/consilium-principis/scripts/mcp_server.py"]
+    }
+  }
+}

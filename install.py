@@ -28,7 +28,7 @@ HERE = Path(__file__).resolve().parent
 SKILLS_HOME = Path.home() / ".claude" / "skills"
 
 # Машинерия — копируется/обновляется. (scripts/golden и advisors-доска сохраняются, см. ниже.)
-RUNTIME = ["SKILL.md", "QUICKSTART.md", "scripts", "install-skill", "council", "assets"]
+RUNTIME = ["SKILL.md", "QUICKSTART.md", "recipes.json", "scripts", "install-skill", "council", "assets"]
 IGNORE = shutil.ignore_patterns("__pycache__", "*.pyc", "golden")  # golden = per-advisor user-data
 
 

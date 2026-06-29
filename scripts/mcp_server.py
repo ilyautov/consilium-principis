@@ -131,6 +131,11 @@ def _scaffold_principis(answers):
     return {"markdown": scaffold_principis(answers)}
 
 
+def _list_recipes():
+    from recipes import load_recipes
+    return {"recipes": load_recipes()}
+
+
 def _validate_manifest(advisor_dir):
     from manifest_builder import validate_manifest
     import json as _json
@@ -267,6 +272,13 @@ TOOLS = {
         "input_schema": {"type": "object", "properties": {"answers": {"type": "object"}},
                          "required": ["answers"]},
         "handler": _scaffold_principis,
+    },
+    "list_recipes": {
+        "description": "Меню «что умеет совет» простыми фразами — покажи юзеру, когда он не знает, "
+                       "что спросить, или просит «что ты умеешь / с чего начать». Каждый рецепт: "
+                       "title, triggers (фразы), does, reads (как читать результат).",
+        "input_schema": {"type": "object", "properties": {}, "required": []},
+        "handler": _list_recipes,
     },
     "validate_manifest": {
         "description": "МОАТ-гейт сборки: проверить тир-манифест советника — region-маркеры реально "

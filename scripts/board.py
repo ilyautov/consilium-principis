@@ -9,6 +9,7 @@
   seed-council           — собрать стартовый совет PD-мудрецов с нуля (Аврелий + Эпиктет)
   doctor                 — health-check: Python, скилл установлен, тир, самотест рва
   setup-full             — поднять FULL-тир: инструкция по ollama + авто-pull модели bge-m3
+  recipes                — меню «что умеет совет» простыми фразами (для нетехнического юзера)
 
 Логика тонкая — оборачивает preflight/scaffold/ingest_telegram. Реальные вопросы юзеру
 задаёт скилл разговором (см. SKILL.md «Онбординг»), сюда приходят уже структурные ответы.
@@ -144,9 +145,16 @@ def cmd_setup_full(args):
     return 0 if ok else 1
 
 
+def cmd_recipes(args):
+    from recipes import load_recipes, render_menu
+    print(render_menu(load_recipes()))
+    return 0
+
+
 CMDS = {"status": cmd_status, "principis": cmd_principis, "ingest-telegram": cmd_ingest_telegram,
         "validate-manifest": cmd_validate_manifest, "build-advisor": cmd_build_advisor,
-        "doctor": cmd_doctor, "seed-council": cmd_seed_council, "setup-full": cmd_setup_full}
+        "doctor": cmd_doctor, "seed-council": cmd_seed_council, "setup-full": cmd_setup_full,
+        "recipes": cmd_recipes}
 
 if __name__ == "__main__":
     if len(sys.argv) < 2 or sys.argv[1] not in CMDS:

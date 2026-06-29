@@ -6,6 +6,8 @@
   ingest-telegram <@h>   — выкачать публичный канал в корпус-Принцепса (твои слова = P1)
   validate-manifest <d>  — проверить тир-манифест советника (маркеры реально в тексте? ров цел?)
   build-advisor <d>      — собрать советника в один шаг: манифест-гейт → corpus → kernels → отчёт
+  seed-council           — собрать стартовый совет PD-мудрецов с нуля (Аврелий + Эпиктет)
+  doctor                 — health-check: Python, скилл установлен, тир, самотест рва
 
 Логика тонкая — оборачивает preflight/scaffold/ingest_telegram. Реальные вопросы юзеру
 задаёт скилл разговором (см. SKILL.md «Онбординг»), сюда приходят уже структурные ответы.
@@ -99,8 +101,37 @@ def cmd_build_advisor(args):
     return 0
 
 
+def cmd_doctor(args):
+    from doctor import run_doctor
+    r = run_doctor(_root())
+    print(f"Consilium-Principis — health-check: {'✓ ЗДОРОВ' if r['healthy'] else '✗ ЕСТЬ ПРОБЛЕМЫ'}")
+    for c in r["checks"]:
+        print(f"  {'✓' if c['ok'] else '✗'} {c['name']:<16} {c['detail']}")
+    return 0 if r["healthy"] else 1
+
+
+def cmd_seed_council(args):
+    from seed import run_seed_council, SEED_ADVISORS
+    print(f"Собираю стартовый совет ({len(SEED_ADVISORS)} PD-мудрецов): "
+          f"{', '.join(s['display'] for s in SEED_ADVISORS)}")
+    print("Fetch → манифест → валидация-гейт → corpus → kernels. Минуты (kernels нужен ollama).")
+    results = run_seed_council(_root())
+    ok = 0
+    for r in results:
+        if r["ok"]:
+            ok += 1
+            st = (r.get("build") or {}).get("status", {})
+            print(f"  ✓ {r['name']}: {st.get('chunks', '?')} чанков, "
+                  f"{'🔵-готов' if st.get('blue_eligible') else 'нет P1'}")
+        else:
+            print(f"  ✗ {r['name']}: упал на {r.get('stage')} — {r.get('detail') or r.get('problems')}")
+    print(f"→ Собрано {ok}/{len(results)}. Дальше: /board council: <твой вопрос>")
+    return 0 if ok else 1
+
+
 CMDS = {"status": cmd_status, "principis": cmd_principis, "ingest-telegram": cmd_ingest_telegram,
-        "validate-manifest": cmd_validate_manifest, "build-advisor": cmd_build_advisor}
+        "validate-manifest": cmd_validate_manifest, "build-advisor": cmd_build_advisor,
+        "doctor": cmd_doctor, "seed-council": cmd_seed_council}
 
 if __name__ == "__main__":
     if len(sys.argv) < 2 or sys.argv[1] not in CMDS:

@@ -11,7 +11,9 @@ collect_common.py — общая база для сборщиков корпус
     только с явным подтверждением personal-use + дисклеймер «персона = симуляция».
   - большие тексты пишутся В ФАЙЛ, наружу печатается только сводка.
 """
-import os, re, sys, json, urllib.request, datetime
+import os, re, sys, json, urllib.request, urllib.error, datetime
+import socket, ipaddress
+from urllib.parse import urlparse
 
 UA = "Mozilla/5.0 (Consilium-Principis corpus collector; personal use)"
 
@@ -34,10 +36,47 @@ def is_pd_host(url):
     return any(h == d or h.endswith("." + d) for d in PD_HOSTS)
 
 
-def fetch(url, timeout=30):
-    """GET → текст. Бросает понятное исключение при сетевой ошибке."""
+def ssrf_check(url):
+    """SSRF-гард: возвращает строку-ошибку или None. Тул дёргается хостом (возможна инъекция из
+    веб-контента) → фетч во внутренние сервисы/метадату облака недопустим. Схема только http(s);
+    host обязан резолвиться ТОЛЬКО в публичные IP (нет loopback/private/link-local/reserved)."""
+    p = urlparse(url or "")
+    if p.scheme not in ("http", "https"):
+        return f"схема '{p.scheme or '—'}' запрещена — только http/https"
+    host = p.hostname
+    if not host:
+        return "не разобрал host из url"
+    try:
+        infos = socket.getaddrinfo(host, p.port or (443 if p.scheme == "https" else 80),
+                                   proto=socket.IPPROTO_TCP)
+    except Exception as e:
+        return f"host не резолвится: {e}"
+    for info in infos:
+        ip = ipaddress.ip_address(info[4][0])
+        if (ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved
+                or ip.is_multicast or ip.is_unspecified):
+            return f"host резолвится в непубличный IP ({ip}) — заблокировано (SSRF)"
+    return None
+
+
+class _ValidatingRedirect(urllib.request.HTTPRedirectHandler):
+    """Редирект следуем ТОЛЬКО если новый хоп тоже публичный (иначе PD-хост увёл бы на 169.254…)."""
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        err = ssrf_check(newurl)
+        if err:
+            raise urllib.error.URLError(f"redirect заблокирован: {err}")
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+def fetch(url, timeout=30, public_only=True):
+    """GET → текст. public_only (дефолт) включает SSRF-гард + ре-валидацию редиректов."""
+    if public_only:
+        err = ssrf_check(url)
+        if err:
+            raise ValueError(f"SSRF-гард: {err}")
+    opener = urllib.request.build_opener(_ValidatingRedirect())
     req = urllib.request.Request(url, headers={"User-Agent": UA})
-    with urllib.request.urlopen(req, timeout=timeout) as r:
+    with opener.open(req, timeout=timeout) as r:
         raw = r.read()
     for enc in ("utf-8", "cp1251", "latin-1"):
         try:

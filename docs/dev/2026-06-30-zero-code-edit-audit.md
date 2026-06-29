@@ -35,10 +35,19 @@ localhost:11434). Хосту не нужен мост — сервер сам х
 
 ## Неустранимо-ручные шаги (и это правильно)
 
-1. **Первая установка бинаря ollama** (`brew install ollama`) — системный софт молча не ставим
-   (outward-facing/hard-to-reverse). `ollama_ensure` возвращает точную команду в `manual`. Всё
-   после (старт демона → pull модели → сборка → тюнинг) — тулами.
+1. **Первая установка бинаря ollama** — системный софт молча не ставим (outward-facing/hard-to-
+   reverse). `ollama_ensure` возвращает точную команду под ТЕКУЩУЮ ОС (darwin/linux/windows из
+   `setup_full.INSTALL_HINTS`, не только Mac); старт демона `ollama serve` — кросс-платформенно
+   (POSIX setsid / Windows detached). Всё после (pull → сборка → тюнинг) — тулами.
 2. **Регистрация самого MCP** (`mcp.json` в Cowork) — до-MCP, курица-яйцо. Разовый шаг / инсталлер.
+
+## Безопасность add_source (тул дёргается хостом → возможна инъекция из веб-контента)
+
+- **SSRF**: `collect_common.fetch` (public_only) — схема только http/https, host обязан резолвиться
+  в ПУБЛИЧНЫЙ IP (нет loopback/private/link-local/reserved/metadata); редиректы ре-валидируются.
+  `license` НЕ открывает egress (гард безусловен). Защищает и `collect_pd`.
+- **Path traversal**: `path=` разрешён только ВНУТРИ корня репо (`realpath` под `_root()`); внешний
+  файл — через `text=` или копию в репо.
 
 ## Замечание (вне скоупа)
 

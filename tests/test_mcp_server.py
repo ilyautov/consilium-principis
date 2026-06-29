@@ -257,6 +257,27 @@ def test_cite_registered_and_in_instructions():
     assert "cite" in INSTRUCTIONS
 
 
+def test_build_lens_tool_grounds_and_is_citable(tmp_path):
+    # сквозной: build_lens → корпус → cite отдаёт 🔵 из текста-основы, прочтение остаётся 🟡
+    dest = str(tmp_path / "test-lens")
+    r = dispatch("build_lens", {
+        "name": "Тест-линза", "dest": dest, "kind": "personality",
+        "ground_text": "All warfare is based on deception, says the canon of strategy.",
+        "reading_notes": "Я читаю это как разрешение на асимметрию, а не на ложь людям."})
+    assert r["tiers"].get("P1", 0) >= 1 and r["tiers"].get("U1", 0) >= 1
+    assert "build_lens" in {t["name"] for t in list_tools()}
+    c = dispatch("cite", {"advisor_dir": dest, "query": "warfare deception"})
+    assert c["quotes"] and c["best"]["marker"] == "🔵"        # слова источника цитируются дословно
+    # фраза из прочтения — НЕ дословный авторский тир
+    fc = dispatch("fidelity_check", {"quote": "разрешение на асимметрию", "advisor_dir": dest})
+    assert fc["status"] != "🔵"
+
+
+def test_build_lens_in_instructions():
+    from mcp_server import INSTRUCTIONS
+    assert "build_lens" in INSTRUCTIONS and "выспрашивается" in INSTRUCTIONS.lower()
+
+
 def test_unknown_tool_raises():
     with pytest.raises(KeyError):
         dispatch("nonexistent_tool", {})

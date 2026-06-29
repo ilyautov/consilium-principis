@@ -120,15 +120,20 @@ def main() -> None:
         else:
             print("   FULL-тир (умный кросс-язычный поиск) — по желанию: `python3 scripts/board.py setup-full`")
             print("   (контур 🔵 и совет работают и без него, на полу)")
+    sys.stdout.flush()
     subprocess.run([sys.executable, "scripts/board_init.py", "advisors",
                     "--semantic-available", "true" if semantic else "false"], cwd=dest)
     write_breadcrumb(dest, semantic)
 
+    print("\n🔎 Самопроверка:")
+    sys.stdout.flush()  # иначе вывод субпроцесса перемешается с буфером print
+    subprocess.run([sys.executable, "scripts/board.py", "doctor"], cwd=dest)
+
     print("\n✅ Готово.")
     print(f"   Скилл: {dest}")
-    print("   Доска пустая — собери первого советника: скажи ассистенту")
-    print("     «добавь советника — Марк Аврелий»  (или пройди install-skill/SKILL.md, Шаг 3)")
-    print("   Проверка: python3 scripts/doctor.py")
+    print("   Доска пустая — два простых старта:")
+    print("     • «с чего начать» → соберу стартовый совет (Аврелий + Эпиктет)")
+    print("     • «что умеешь?»   → меню рецептов простыми фразами")
     if not args.in_place:
         print("   Перезапусти Claude Code, чтобы он увидел новый скилл.")
 

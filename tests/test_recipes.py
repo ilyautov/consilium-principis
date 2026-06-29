@@ -8,7 +8,7 @@ recipes.json, без pyyaml. load → render_menu (показать) → match_r
 import os, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "scripts"))
-from recipes import load_recipes, render_menu, render_html, match_recipe
+from recipes import load_recipes, render_menu, render_html, render_widget, match_recipe
 
 
 def test_recipes_well_formed():
@@ -39,6 +39,16 @@ def test_render_html_shows_all_recipes_and_is_safe():
     assert h.count('class="card"') == len(rs)      # визуализация показывает ВСЕ, не лимит 4
     assert "🔵" in h and "🟡" in h                  # контур-легенда не теряется
     assert "<script" not in h.lower()              # без скриптов — безопасный артефакт
+
+
+def test_render_widget_clickable_all_recipes():
+    rs = load_recipes()
+    w = render_widget(rs)
+    assert w.count("sendPrompt(") == len(rs)        # каждая карточка кликабельна (все, не 4)
+    assert "var(--font-sans" in w                    # тема Cowork
+    assert "<script" not in w.lower()                # без тега script
+    # фраза-триггер первого рецепта уходит в чат
+    assert rs[0]["triggers"][0] in w
 
 
 def test_match_finds_premortem():

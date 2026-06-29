@@ -75,6 +75,34 @@ def render_html(recipes, title="Что умеет твой совет"):
     )
 
 
+def render_widget(recipes, title="Что умеет твой совет"):
+    """Меню как HTML для mcp__visualize__show_widget (нативный Cowork): сетка карточек, клик по
+    карточке шлёт фразу-триггер в чат через sendPrompt. AskUserQuestion тут не годится (потолок 4)."""
+    e = _html.escape
+    def onclick(p):
+        return e("sendPrompt('" + p.replace("\\", "\\\\").replace("'", "\\'") + "')", quote=True)
+    cards = []
+    for r in recipes:
+        trig = r["triggers"][0]
+        cards.append(
+            f'<button onclick="{onclick(trig)}" style="text-align:left;cursor:pointer;font:inherit;'
+            'border:1px solid var(--color-border-primary,rgba(127,127,127,.3));border-radius:12px;'
+            'padding:14px 16px;background:var(--color-background-secondary,transparent);'
+            'color:var(--color-text-primary,CanvasText)">'
+            f'<div style="font-weight:600;margin-bottom:6px">{e(r["short"])}</div>'
+            f'<div style="font-size:.9rem;opacity:.8">{e(r["does"])}</div></button>')
+    return (
+        '<div style="font-family:var(--font-sans,system-ui,sans-serif);'
+        'color:var(--color-text-primary,CanvasText);max-width:760px">'
+        f'<h2 style="font-size:1.25rem;margin:0 0 4px">{e(title)}</h2>'
+        '<p style="opacity:.7;margin:0 0 16px;font-size:.9rem">Нажми карточку — спрошу за тебя.</p>'
+        '<div style="display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">'
+        + "".join(cards) + "</div>"
+        '<p style="margin-top:18px;font-size:.82rem;opacity:.7">🔵 дословная цитата (с источником) · '
+        '🟡 экстраполяция · отказ вместо выдумки.</p></div>'
+    )
+
+
 def _words(s):
     return {w for w in re.findall(r"[а-яёa-z]+", s.lower()) if len(w) >= 4}
 

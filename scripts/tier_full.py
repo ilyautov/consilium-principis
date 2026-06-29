@@ -30,18 +30,35 @@ import urllib.request
 
 import numpy as np
 
-# --- подключаем движок Гефеста как внешнюю зависимость (read-only reuse) ---
-ENGINE_DIR = os.getenv("HEPHAESTUS_ENGINE", "/Users/USER/personal/pilots/rag-sds/engine")
-if ENGINE_DIR not in sys.path:
-    sys.path.insert(0, ENGINE_DIR)
-
-import build_semantic_index as bsi  # noqa: E402  — embed_batch (батч bge-m3 /api/embed)
-
 from corpusbuild.paths import corpus_path
 from engine import provenance
 
 OLLAMA = os.getenv("OLLAMA_HOST", "http://127.0.0.1:11434")
 EMBED_MODEL = os.getenv("EMBED_MODEL", "bge-m3")
+
+# Опциональный кросс-энкодер (rerank=True) живёт во внешнем движке Гефеста. FULL-тир его НЕ
+# требует — только ollama+bge-m3 (см. embed_batch ниже). sys.path к движку подключается ЛЕНИВО
+# в rerank-ветке, поэтому `import tier_full` никогда не зависит от наличия чужого репо.
+ENGINE_DIR = os.getenv("HEPHAESTUS_ENGINE", "/Users/USER/personal/pilots/rag-sds/engine")
+
+
+def embed_batch(texts):
+    """Батч-эмбеддинг через ollama /api/embed (bge-m3) — ВШИТЫЙ примитив (тот же эндпоинт и
+    нормировка, что прежде брались из движка Гефеста). FULL-тиру достаточно ollama, внешний
+    репо не нужен. Возвращает list[list[float]]; нормировку |v|=1 делает вызывающий."""
+    texts = list(texts)
+    if not texts:
+        return []
+    req = urllib.request.Request(
+        f"{OLLAMA}/api/embed",
+        data=json.dumps({"model": EMBED_MODEL, "input": texts}).encode(),
+        headers={"Content-Type": "application/json"},
+    )
+    with urllib.request.urlopen(req, timeout=int(os.getenv("EMBED_TIMEOUT", "120"))) as r:
+        embs = json.loads(r.read()).get("embeddings")
+    if not embs or len(embs) != len(texts):
+        raise RuntimeError(f"ollama /api/embed: {len(embs or [])} векторов на {len(texts)} входов")
+    return embs
 
 # Корень проекта и каталог эмбеддингов (имя матчит .gitignore: data/embeddings*.npy).
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -120,18 +137,18 @@ def _paths(advisor_dir: str):
 
 # --------------------------------------------------------------- build_index
 def build_index(advisor_dir: str) -> None:
-    """Строит семантический индекс для advisors/<name>/corpus.jsonl, переиспользуя
-    build_semantic_index.embed_batch (батч bge-m3). Сохраняет нормированную матрицу в
-    data/embeddings_<name>.npy и пассажи (text/source) в .meta.json."""
+    """Строит семантический индекс для advisors/<name>/corpus.jsonl вшитым embed_batch
+    (батч bge-m3 через ollama). Сохраняет нормированную матрицу в data/embeddings_<name>.npy
+    и пассажи (text/source) в .meta.json."""
     passages = _read_corpus_chunks(advisor_dir)
     emb_path, meta_path = _paths(advisor_dir)
 
-    # реюз эмбеддинг-примитива Гефеста: батчи через /api/embed (вектора нормированные).
+    # вшитый эмбеддинг-примитив: батчи через ollama /api/embed (вектора нормируем ниже).
     batch = int(os.getenv("EMBED_BATCH", "64"))
     vecs = []
     for i in range(0, len(passages), batch):
         chunk_texts = [p["text"] for p in passages[i:i + batch]]
-        vecs.extend(bsi.embed_batch(chunk_texts))  # ← движок Гефеста, не наша реализация
+        vecs.extend(embed_batch(chunk_texts))
     M = np.asarray(vecs, dtype=np.float32)
     # на всякий случай нормируем (embed_batch уже отдаёт |v|=1, но не зависим от этого).
     M = M / (np.linalg.norm(M, axis=1, keepdims=True) + 1e-9)
@@ -146,9 +163,9 @@ def build_index(advisor_dir: str) -> None:
 
 # ------------------------------------------------------------------ retrieve
 def _embed_query(question: str) -> np.ndarray:
-    """Эмбеддинг вопроса тем же примитивом Гефеста (embed_batch), нормированный —
-    чтобы Mn @ qv был чистым косинусом и порог abstain_threshold=0.62 был осмыслен."""
-    qv = np.asarray(bsi.embed_batch([question])[0], dtype=np.float32)
+    """Эмбеддинг вопроса тем же вшитым embed_batch, нормированный — чтобы Mn @ qv был
+    чистым косинусом и порог abstain_threshold был осмыслен."""
+    qv = np.asarray(embed_batch([question])[0], dtype=np.float32)
     return qv / (np.linalg.norm(qv) + 1e-9)
 
 
@@ -178,6 +195,9 @@ def retrieve(question: str, advisor_dir: str, top_k: int = 3, rerank: bool = Fal
         ]
 
     # rerank=True: пул top-N по косинусу -> кросс-энкодер bge-reranker-v2-m3 (движок Гефеста).
+    # Опциональная зависимость: подключаем sys.path к движку ЛЕНИВО, только здесь.
+    if ENGINE_DIR not in sys.path:
+        sys.path.insert(0, ENGINE_DIR)
     from reranker_model import CrossEncoderReranker  # ленивый импорт: тянет torch/transformers
     rerank_n = int(os.getenv("RERANK_N", "20"))
     pool = sims.argsort()[::-1][:rerank_n]

@@ -257,8 +257,10 @@ def test_cite_registered_and_in_instructions():
     assert "cite" in INSTRUCTIONS
 
 
-def test_build_lens_tool_grounds_and_is_citable(tmp_path):
+def test_build_lens_tool_grounds_and_is_citable(monkeypatch, tmp_path):
     # сквозной: build_lens → корпус → cite отдаёт 🔵 из текста-основы, прочтение остаётся 🟡
+    import mcp_server
+    monkeypatch.setattr(mcp_server, "_root", lambda: str(tmp_path))   # write-гард: корень=tmp
     dest = str(tmp_path / "test-lens")
     r = dispatch("build_lens", {
         "name": "Тест-линза", "dest": dest, "kind": "personality",
@@ -276,6 +278,8 @@ def test_build_lens_tool_grounds_and_is_citable(tmp_path):
 def test_build_lens_grounds_from_url(monkeypatch, tmp_path):
     # основа линзы — целый PD-том по URL (фетч+strip), без вставки текста
     import collect_common as cc
+    import mcp_server
+    monkeypatch.setattr(mcp_server, "_root", lambda: str(tmp_path))   # write-гард: корень=tmp
     monkeypatch.setattr(cc, "fetch", lambda url, timeout=30:
                         "*** START OF THE PROJECT GUTENBERG EBOOK ***\n"
                         "He who is feared is safer than he who is loved, in the council of princes.\n"

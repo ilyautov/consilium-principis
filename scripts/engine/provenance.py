@@ -1,5 +1,6 @@
 """Провенанс: тир происхождения по источнику (+ региону внутри файла) из sources/manifest.json.
-Нет манифеста → всё P1 (бэк-компат). Источник вне манифеста → A (fail-closed, см. спеку §1)."""
+FAIL-CLOSED: нет манифеста ИЛИ источник вне манифеста → A (🟡). 🔵 требует ЯВНОГО объявления
+провенанса (P1/P2 в манифесте) — некурированный/вставленный текст синим не становится."""
 import os, json
 
 _CACHE = {}
@@ -21,7 +22,7 @@ def tier_for(source: str, line_no: int, advisor_dir: str) -> str:
     """Тир без знания текста (плоский). Для пер-регионного — tier_for_line."""
     man = load_manifest(advisor_dir)
     if man is None:
-        return "P1"
+        return "A"
     entry = man.get(source)
     if entry is None:
         return "A"
@@ -37,7 +38,7 @@ def tier_for_line(source: str, line_no: int, lines, advisor_dir: str) -> str:
     различимыми строками на разных строках источника."""
     man = load_manifest(advisor_dir)
     if man is None:
-        return "P1"
+        return "A"
     entry = man.get(source)
     if entry is None:
         return "A"

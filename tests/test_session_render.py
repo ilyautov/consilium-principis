@@ -5,7 +5,7 @@ graceful-опускание необязательных полей."""
 import os, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "scripts"))
-from session_render import render_md, render_widget, render_html
+from session_render import render_md, render_widget, render_html, _e
 
 S = {
     "question": "Партнёр хочет 50%, но без инициативы",
@@ -91,12 +91,26 @@ def test_optional_fields_omitted():
         assert "Где расходятся" not in out and "Шаг" not in out
 
 
-def test_widget_plain_hides_machinery_expert_shows_it():
-    # эстетика: plain (дефолт) прячет «цену» и вопрос-форсаж; expert выкатывает всё
+def test_theater_default_engineering_under_toggle():
+    # ТЕАТР по умолчанию: машинерия не вырезана, а под .eng (CSS-скрыта), раскрывается тумблером.
     plain = render_widget(S)
-    assert "Чем платишь" not in plain and "Вопрос-форсаж" not in plain
-    assert "немного скорости" not in plain          # what_you_lose скрыт
+    assert 'class="cp-stage"' in plain                 # корень БЕЗ show-eng → театр
+    assert "cp-stage show-eng" not in plain
+    assert 'class="cost eng"' in plain                 # «цена» присутствует, но под капотом (.eng)
+    assert "показать инженерию" in plain               # тумблер на месте
+    assert "<script" not in plain.lower()              # тумблер — inline classList, не скрипт
+    # синтез и голоса видны ВСЕГДА (это суть, не шум)
+    assert _e(S["synthesis"]) in plain and "sendPrompt(" in plain
+
+def test_theater_expert_reveals_engineering_by_default():
     expert = render_widget(S, depth="expert")
-    assert "Чем платишь" in expert and "Вопрос-форсаж" in expert
-    # синтез и голоса видны в ОБОИХ — прячем шум, не суть
-    assert "sendPrompt(" in plain and 'class="ti ' in plain
+    assert "cp-stage show-eng" in expert               # инженерия раскрыта сразу
+    assert "Чем платишь" in expert                     # та же разметка, просто видима
+
+def test_theater_never_shows_fake_quote_but_keeps_source():
+    # ров в театре: верифицированная цитата + источник видны; пилюля достоверности — под .eng
+    s = {"question": "q", "synthesis": "s", "advisors": [{"name": "Макиавелли", "opinions": [
+        {"marker": "blue", "argument": "довод", "quote": {"text": "verbatim", "source": "Prince"}}]}]}
+    w = render_widget(s)
+    assert "verbatim" in w and "Prince" in w           # слова + источник-шёпот видны в театре
+    assert 'class="eng"' in w                           # пилюля достоверности спрятана под капот

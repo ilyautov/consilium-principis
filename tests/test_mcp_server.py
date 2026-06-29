@@ -200,6 +200,16 @@ def test_scaffold_principis_via_dispatch():
     assert "ПРОБЕЛ" in r["markdown"]            # вектор не дан → держим живым
 
 
+def test_initialize_exposes_instructions_to_host():
+    # ЕДИНСТВЕННЫЙ канал правил для MCP-хоста (Cowork НЕ читает SKILL.md): server instructions.
+    from mcp_server import _handle_rpc
+    r = _handle_rpc({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}})
+    instr = r["result"]["instructions"]
+    assert "show_widget" in instr and "render_session" in instr   # рендер-контракт дошёл до хоста
+    assert "fidelity_check" in instr and "🔵" in instr            # протокол-гейт верности
+    assert "согласие" in instr.lower() or "захват" in instr.lower()  # non-capture
+
+
 def test_unknown_tool_raises():
     with pytest.raises(KeyError):
         dispatch("nonexistent_tool", {})

@@ -178,31 +178,78 @@ def _validate_manifest(advisor_dir):
 # ── lifecycle: весь цикл сборки через MCP, чтобы юзер не выходил из своего агента ──
 # (раньше жили только в board.py CLI → в чистом MCP-хосте без шелла были недоступны)
 
+# Долгие тулы (seed/build/ingest) рвут таймаут MCP-транспорта (живой прогон в Cowork это
+# подтвердил). Фикс: фоновый ДЖОБ — тул стартует поток, сразу отдаёт job_id, хост опрашивает
+# job_status. Реестр в памяти процесса (живёт, пока жив сервер); потоки daemon.
+import threading
+
+_JOBS = {}
+_JOBS_LOCK = threading.Lock()
+_JOB_SEQ = [0]
+
+
+def _start_job(fn, label):
+    with _JOBS_LOCK:
+        _JOB_SEQ[0] += 1
+        jid = "job-%d" % _JOB_SEQ[0]
+        _JOBS[jid] = {"status": "running", "label": label, "result": None, "error": None}
+
+    def _run():
+        try:
+            r = fn()
+            with _JOBS_LOCK:
+                _JOBS[jid].update(status="done", result=r)
+        except Exception as e:
+            with _JOBS_LOCK:
+                _JOBS[jid].update(status="error", error=str(e))
+    threading.Thread(target=_run, daemon=True).start()
+    return {"job_id": jid, "status": "running", "label": label,
+            "note": "долгая операция в фоне — опрашивай job_status(job_id), не жди в этом вызове"}
+
+
+def _job_status(job_id):
+    with _JOBS_LOCK:
+        j = _JOBS.get(job_id)
+        return dict(j) if j else {"error": "нет такого job_id: %s" % job_id}
+
+
 def _doctor():
     from doctor import run_doctor
     return run_doctor(_root())
 
 
-def _build_advisor(advisor_dir, author=None, run_kernels=True, run_index=True):
-    """Советник под ключ: МАНИФЕСТ-ГЕЙТ → corpus → kernels → индекс. Долгая операция;
-    без ollama kernels/индекс деградируют graceful. Сломанный манифест → stopped_at, корпус не родится."""
+# do-функции синхронны (их и зовёт board.py CLI без таймаута); тул-обёртки — фоновые джобы.
+def _do_build(advisor_dir, author=None, run_kernels=True, run_index=True):
     from build_orchestrator import build_advisor_full
     return build_advisor_full(_resolve(advisor_dir), author=author,
                               run_kernels=run_kernels, run_index=run_index)
 
 
-def _seed_council():
-    """Стартовый совет PD-мудрецов (Аврелий+Эпиктет) с нуля: fetch→манифест→гейт→build.
-    Долгая операция + сеть (Gutenberg). Идемпотентно по уже собранным."""
+def _do_seed():
     from seed import run_seed_council
     return {"results": run_seed_council(_root())}
 
 
-def _ingest_telegram(handle, out_path=None):
-    """Публичный канал → корпус Принцепса (твои слова = P1). Сеть. 0 постов = приват/неверный handle/sandbox."""
+def _do_ingest(handle, out_path=None):
     from ingest_telegram import ingest
     return ingest(handle, _resolve(out_path) if out_path
                   else os.path.join(_root(), "principis_corpus", "telegram.jsonl"))
+
+
+def _build_advisor(advisor_dir, author=None, run_kernels=True, run_index=True):
+    """Советник под ключ (МАНИФЕСТ-ГЕЙТ→corpus→kernels→индекс) — ФОНОВЫЙ ДЖОБ (долго)."""
+    return _start_job(lambda: _do_build(advisor_dir, author, run_kernels, run_index),
+                      "build_advisor:%s" % advisor_dir)
+
+
+def _seed_council():
+    """Стартовый совет PD-мудрецов с нуля — ФОНОВЫЙ ДЖОБ (долго + сеть Gutenberg)."""
+    return _start_job(_do_seed, "seed_council")
+
+
+def _ingest_telegram(handle, out_path=None):
+    """Канал → корпус Принцепса — ФОНОВЫЙ ДЖОБ (сеть)."""
+    return _start_job(lambda: _do_ingest(handle, out_path), "ingest_telegram:%s" % handle)
 
 
 def _setup_full(consent=True):
@@ -374,8 +421,8 @@ TOOLS = {
     },
     "build_advisor": {
         "description": "Собрать советника под ключ ИЗ АГЕНТА: манифест-гейт → corpus → kernels → индекс. "
-                       "advisor_dir = advisors/{имя}. Долгая; без ollama деградирует graceful; сломанный "
-                       "манифест → не соберёт (сначала validate_manifest).",
+                       "advisor_dir = advisors/{имя}. ФОНОВЫЙ ДЖОБ (долго): вернёт {job_id} сразу — "
+                       "опрашивай job_status(job_id), не жди здесь. Сначала validate_manifest.",
         "input_schema": {"type": "object",
                          "properties": {"advisor_dir": {"type": "string"}, "author": {"type": "string"},
                                         "run_kernels": {"type": "boolean"}, "run_index": {"type": "boolean"}},
@@ -383,18 +430,27 @@ TOOLS = {
         "handler": _build_advisor,
     },
     "seed_council": {
-        "description": "Собрать стартовый совет PD-мудрецов (Аврелий+Эпиктет) с нуля одним вызовом — "
-                       "холодный старт без шелла. Долгая операция + сеть (Gutenberg). Идемпотентно.",
+        "description": "Собрать стартовый совет PD-мудрецов (Аврелий+Эпиктет) с нуля — холодный старт "
+                       "без шелла. ФОНОВЫЙ ДЖОБ (долго + сеть Gutenberg): вернёт {job_id} сразу, "
+                       "опрашивай job_status. Идемпотентно по уже собранным.",
         "input_schema": {"type": "object", "properties": {}, "required": []},
         "handler": _seed_council,
     },
     "ingest_telegram": {
-        "description": "Публичный Telegram-канал → корпус Принцепса (твои слова = P1). Сеть. handle = "
-                       "@name или name. 0 постов = приватный/неверный/sandbox-блок сети.",
+        "description": "Публичный Telegram-канал → корпус Принцепса (твои слова = P1). ФОНОВЫЙ ДЖОБ "
+                       "(сеть): вернёт {job_id}, опрашивай job_status. handle = @name или name. "
+                       "0 постов = приватный/неверный/sandbox-блок сети.",
         "input_schema": {"type": "object",
                          "properties": {"handle": {"type": "string"}, "out_path": {"type": "string"}},
                          "required": ["handle"]},
         "handler": _ingest_telegram,
+    },
+    "job_status": {
+        "description": "Статус фонового джоба по job_id (от build_advisor/seed_council/ingest_telegram): "
+                       "status = running | done (с result) | error (с error). Опрашивай, пока не done.",
+        "input_schema": {"type": "object",
+                         "properties": {"job_id": {"type": "string"}}, "required": ["job_id"]},
+        "handler": _job_status,
     },
     "setup_full": {
         "description": "Поднять FULL-тир (семантика) ИЗ АГЕНТА: системный ollama НЕ ставим молча "

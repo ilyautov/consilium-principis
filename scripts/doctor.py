@@ -31,7 +31,7 @@ def check_skill_installed(skills_home=None):
             if os.path.isfile(os.path.join(home, d, "SKILL.md")) and \
                any(k in d.lower() for k in _SKILL_KEYS):
                 found.append(d)
-    return {"name": "skill-installed", "ok": bool(found),
+    return {"name": "skill-installed", "ok": bool(found), "advisory": True,
             "detail": ", ".join(found) if found
                       else f"Consilium не найден в {home} (запусти install.py, либо работаешь in-place из репо)"}
 
@@ -76,7 +76,11 @@ def check_contour(advisor_dir):
 
 
 def summarize(checks):
-    return {"healthy": all(c["ok"] for c in checks), "checks": checks}
+    # healthy = по СОДЕРЖАТЕЛЬНЫМ чекам; advisory (skill-installed) не роняет здоровье —
+    # in-place из репо / MCP-режим работают без глобальной установки. Чек виден, но не блокирует.
+    substantive = [c for c in checks if not c.get("advisory")]
+    return {"healthy": all(c["ok"] for c in substantive), "checks": checks,
+            "advisories": [c for c in checks if c.get("advisory") and not c["ok"]]}
 
 
 def run_doctor(root="."):

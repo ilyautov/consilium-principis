@@ -60,3 +60,15 @@ def test_contour_skipped_without_corpus():
 def test_summarize_healthy_iff_all_ok():
     assert summarize([{"name": "a", "ok": True}, {"name": "b", "ok": True}])["healthy"] is True
     assert summarize([{"name": "a", "ok": True}, {"name": "b", "ok": False}])["healthy"] is False
+
+
+def test_advisory_failure_does_not_drop_healthy():
+    # MCP/in-place: skill-installed=False (advisory) НЕ роняет healthy — лишь предупреждение
+    r = summarize([{"name": "python", "ok": True},
+                   {"name": "skill-installed", "ok": False, "advisory": True}])
+    assert r["healthy"] is True
+    assert r["advisories"] and r["advisories"][0]["name"] == "skill-installed"
+
+
+def test_check_skill_installed_is_advisory():
+    assert check_skill_installed(skills_home="/nonexistent").get("advisory") is True

@@ -152,115 +152,158 @@ def _quote_widget(q, marker):
             f'«{_e(q["text"])}»{tr}{metarow}</blockquote>')
 
 
+# Сценический стиль (scoped под .cp-stage). Тумблер инженерии = .show-eng (inline classList.toggle,
+# без <script>). По умолчанию театр: .eng скрыт. CSS, не JS — CSP-safe.
+_STAGE_STYLE = (
+ '<style>'
+ '.cp-stage{font-family:var(--font-serif,Georgia,"Times New Roman",serif);'
+ 'color:var(--color-text-primary,CanvasText);max-width:600px;margin:0 auto;padding:6px 6px 4px;line-height:1.6}'
+ '.cp-stage .eyebrow{font-family:var(--font-sans,system-ui,sans-serif);font-size:11px;letter-spacing:.24em;'
+ 'text-transform:uppercase;color:var(--color-text-tertiary,#999);text-align:center;margin:2px 0 12px}'
+ '.cp-stage .eyebrow i{font-style:normal;margin-right:8px;font-size:15px;vertical-align:-3px}'
+ '.cp-stage .matter{font-size:20px;line-height:1.4;text-align:center;font-weight:400;margin:0 auto;max-width:30ch}'
+ '.cp-stage .rule{display:flex;align-items:center;justify-content:center;gap:11px;margin:15px auto 4px;'
+ 'color:var(--color-text-tertiary,#aaa);max-width:280px}'
+ '.cp-stage .rule::before,.cp-stage .rule::after{content:"";height:1px;flex:1;background:currentColor;opacity:.35}'
+ '.cp-stage .rule i{font-style:normal;font-size:12px;opacity:.7}'
+ '.cp-stage .aside{text-align:center;font-style:italic;font-size:14.5px;color:var(--color-text-secondary,#888);'
+ 'margin:6px 18px 4px;line-height:1.55}'
+ '.cp-stage .char{margin:24px 0 0;display:flex;gap:15px}'
+ '.cp-stage .med{flex:none;width:46px;height:46px;border-radius:50%;display:flex;align-items:center;'
+ 'justify-content:center;font-size:15px;font-weight:500;font-family:var(--font-serif,Georgia,serif)}'
+ '.cp-stage .col{flex:1;min-width:0;padding-top:1px}'
+ '.cp-stage .nm{font-family:var(--font-sans,system-ui,sans-serif);font-size:12px;letter-spacing:.13em;'
+ 'text-transform:uppercase;font-weight:500;margin:5px 0 9px}'
+ '.cp-stage .stage{padding-left:15px;border-left:2px solid}'
+ '.cp-stage .speech{font-size:15px;line-height:1.62;margin:0 0 11px}'
+ '.cp-stage .pull{margin:2px 0 13px;font-size:16px;line-height:1.5;font-style:italic}'
+ '.cp-stage .pull .qm{font-family:Georgia,serif;font-style:normal;font-size:26px;line-height:0;'
+ 'opacity:.4;margin-right:3px;vertical-align:-6px}'
+ '.cp-stage .pull .tr{display:block;font-style:normal;font-size:12.5px;opacity:.65;margin-top:5px}'
+ '.cp-stage .pull cite{display:block;font-style:normal;font-family:var(--font-sans,system-ui,sans-serif);'
+ 'font-size:11px;letter-spacing:.05em;text-transform:uppercase;opacity:.5;margin-top:7px}'
+ '.cp-stage .rift{margin:24px auto 0;max-width:520px;text-align:center;font-size:14px;line-height:1.6}'
+ '.cp-stage .rift .rl{font-family:var(--font-sans,system-ui,sans-serif);font-size:11px;letter-spacing:.18em;'
+ 'text-transform:uppercase;color:var(--color-text-tertiary,#999);margin-bottom:9px}'
+ '.cp-stage .rift .sd{display:block;margin:3px 0;opacity:.92}'
+ '.cp-stage .rift .rs{display:block;margin-top:9px;font-style:italic;color:var(--color-text-secondary,#888)}'
+ '.cp-stage .verdict{margin:28px auto 2px;text-align:center}'
+ '.cp-stage .vlabel{display:flex;align-items:center;justify-content:center;gap:11px;'
+ 'font-family:var(--font-sans,system-ui,sans-serif);font-size:11.5px;letter-spacing:.24em;text-transform:uppercase;'
+ 'color:var(--color-text-info,#185FA5);margin-bottom:11px}'
+ '.cp-stage .vlabel::before,.cp-stage .vlabel::after{content:"";height:1px;width:34px;'
+ 'background:currentColor;opacity:.4}'
+ '.cp-stage .vtext{font-size:17px;line-height:1.52;max-width:40ch;margin:0 auto;font-weight:400}'
+ '.cp-stage .cost{font-family:var(--font-sans,system-ui,sans-serif);font-size:12.5px;font-style:normal;'
+ 'color:var(--color-text-secondary,#888);margin:11px auto 0;max-width:34ch;line-height:1.5}'
+ '.cp-stage .step{font-family:var(--font-sans,system-ui,sans-serif);font-size:14px;text-align:center;'
+ 'margin:18px 16px 0;line-height:1.55;color:var(--color-text-primary,CanvasText)}'
+ '.cp-stage .step i{font-style:normal;color:var(--color-text-info,#185FA5);margin-right:6px}'
+ '.cp-stage .forcing{font-family:var(--font-sans,system-ui,sans-serif);font-size:12.5px;font-style:italic;'
+ 'text-align:center;color:var(--color-text-tertiary,#999);margin:13px 20px 0;line-height:1.5}'
+ '.cp-stage .eng{display:none}'
+ '.cp-stage.show-eng .eng{display:revert}'
+ '.cp-stage .pill{display:inline-flex;align-items:center;gap:4px;font-family:var(--font-sans,system-ui,sans-serif);'
+ 'font-style:normal;font-size:10.5px;font-weight:500;padding:1px 7px;border-radius:var(--border-radius-md,7px);'
+ 'margin-top:6px;vertical-align:middle}'
+ '.cp-stage .pill i{font-style:normal}'
+ '.cp-stage .toggle{text-align:center;margin:22px 0 0}'
+ '.cp-stage .toggle button{font-family:var(--font-sans,system-ui,sans-serif);font-size:12px;letter-spacing:.03em;'
+ 'cursor:pointer;background:transparent;border:none;color:var(--color-text-info,#6BA9E8);padding:6px 10px}'
+ '.cp-stage .toggle i{font-style:normal;margin-right:5px;vertical-align:-2px}'
+ '.cp-stage .lbl-hide{display:none}.cp-stage.show-eng .lbl-show{display:none}.cp-stage.show-eng .lbl-hide{display:inline}'
+ '.cp-stage .legend{font-family:var(--font-sans,system-ui,sans-serif);font-size:11px;text-align:center;'
+ 'color:var(--color-text-tertiary,#999);margin:10px 16px 0;line-height:1.5}'
+ '.cp-stage .acts{display:flex;gap:9px;flex-wrap:wrap;justify-content:center;margin:20px 0 2px}'
+ '.cp-stage .acts button{font-family:var(--font-sans,system-ui,sans-serif);font-size:12.5px;cursor:pointer;'
+ 'padding:7px 15px;border-radius:999px;border:.5px solid var(--color-border-secondary,rgba(127,127,127,.4));'
+ 'background:transparent;color:var(--color-text-primary,CanvasText)}'
+ '.cp-stage .acts i{margin-right:5px}'
+ '</style>')
+
+
+def _pull_quote(q, marker):
+    """Сценическая pull-цитата: дословные слова + источник-шёпот (виден всегда, честно). Пилюля
+    достоверности — только .eng (под капотом). Перевод-глосса рядом."""
+    if not q:
+        return ""
+    tr = (f'<span class="tr">{_e(q["translation"])}</span>' if q.get("translation") else "")
+    cite = f'<cite>{_e(q["source"])}</cite>' if q.get("source") else ""
+    pill = (f'<span class="eng">{_pill(marker)}</span>' if _pill(marker) else "")
+    return f'<div class="pull"><span class="qm">«</span>{_e(q["text"])}»{tr}{cite}{pill}</div>'
+
+
 def render_widget(s, actions=None, depth="plain"):
-    """Диалоговый HTML для mcp__visualize__show_widget: советники = чат-баблы с аватарами.
-    actions = [(label, prompt[, icon]), ...] → кнопки sendPrompt. Цвета через --color-*.
-    depth: plain (дефолт, эстетика — без what_you_lose/forcing_question и прочего шума) |
-    expert (всё). Эстетика: меньше элементов наружу, машинерия остаётся внутри."""
-    expert = depth == "expert"
+    """show_widget (Cowork): заседание как СЦЕНА (театр по умолчанию), инженерия — под тумблером.
+    actions = [(label, prompt[, icon]), ...] → кнопки sendPrompt. depth: plain (театр, .eng скрыт) |
+    expert (инженерия раскрыта сразу, .show-eng). Ров цел: верифицированная цитата + источник видны,
+    фейк-цитат нет; пилюли/цена/форсаж/легенда — .eng, один клик «показать инженерию»."""
     if actions is None:
         actions = [("занести в журнал", "занеси это решение совета в журнал", "ti-notebook"),
                    ("оспорить синтез", "оспорь синтез совета как адвокат дьявола", "ti-swords")]
     norm = [(a[0], a[1], a[2] if len(a) == 3 else "ti-arrow-right") for a in actions]
+    root_cls = "cp-stage show-eng" if depth == "expert" else "cp-stage"
 
-    parts = ['<h2 class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;'
-             f'clip:rect(0 0 0 0)">Заседание совета (диалог): {_e(s["question"][:160])}</h2>',
-             '<div style="font-family:var(--font-sans,system-ui,sans-serif);'
-             'color:var(--color-text-primary,CanvasText);max-width:720px;padding:1rem 0">',
-             '<div style="font-size:13px;color:var(--color-text-secondary,#777);margin:0 0 12px">'
-             '<i class="ti ti-users-group" aria-hidden="true" style="font-size:15px;vertical-align:-2px;'
-             'margin-right:5px"></i>Заседание совета · цитаты сверены с корпусом</div>']
-
-    # реплика юзера
-    parts.append('<div style="display:flex;justify-content:flex-end;margin:0 0 4px">'
-                 '<div style="max-width:86%;background:var(--color-background-info,rgba(55,138,221,.14));'
-                 'border-radius:var(--border-radius-lg,12px);padding:10px 14px">'
-                 '<div style="font-size:12px;font-weight:500;color:var(--color-text-info,#185FA5);'
-                 'margin-bottom:3px">ты</div>'
-                 f'<div style="font-size:14px;line-height:1.6">{_e(s["question"])}</div></div></div>')
+    parts = [_STAGE_STYLE,
+             f'<div class="{root_cls}">',
+             '<h2 style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">'
+             f'Заседание совета: {_e(s["question"][:160])}</h2>',
+             '<div class="eyebrow"><i class="ti ti-masks-theater" aria-hidden="true"></i>Заседание совета</div>',
+             f'<div class="matter">{_e(s["question"])}</div>',
+             '<div class="rule"><i class="ti ti-diamond" aria-hidden="true"></i></div>']
 
     if s.get("reframe"):
-        parts.append('<p style="text-align:center;font-size:12.5px;font-style:italic;'
-                     'color:var(--color-text-tertiary,#999);margin:10px 24px 18px;line-height:1.55">'
-                     f'Совет переформулирует: {_e(s["reframe"])}</p>')
+        parts.append(f'<p class="aside">Совет видит иначе: {_e(s["reframe"])}</p>')
 
     for i, a in enumerate(s.get("advisors", [])):
         accent = _AVATAR[i % len(_AVATAR)]
-        ops = []
+        lines = []
         for op in a.get("opinions", []):
-            ops.append(f'<p style="margin:0 0 8px;font-size:14px;line-height:1.6">{_e(op["argument"])}</p>')
-            ops.append(_quote_widget(op.get("quote"), op.get("marker")))
-        bubble = ("".join(ops)).rstrip()
+            lines.append(f'<p class="speech">{_e(op["argument"])}</p>')
+            lines.append(_pull_quote(op.get("quote"), op.get("marker")))
+        body = "".join(lines).rstrip()
+        med_style = (f'background:color-mix(in srgb,{accent} 18%,transparent);color:{accent};'
+                     f'box-shadow:0 0 0 1px color-mix(in srgb,{accent} 40%,transparent),'
+                     f'0 3px 16px color-mix(in srgb,{accent} 22%,transparent)')
         parts.append(
-            '<div style="display:flex;gap:10px;margin:0 0 16px">'
-            f'<div style="flex:none;width:40px;height:40px;border-radius:50%;'
-            f'background:color-mix(in srgb,{accent} 16%,transparent);color:{accent};'
-            'display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500">'
-            f'{_e(_initials(a["name"]))}</div>'
-            '<div style="flex:1;min-width:0">'
-            f'<div style="font-size:14px;font-weight:500;margin:2px 0 6px">{_e(a["name"])}</div>'
-            f'<div style="background:color-mix(in srgb,{accent} 7%,transparent);'
-            f'border-radius:var(--border-radius-lg,12px);padding:12px 14px">{bubble}</div></div></div>')
+            f'<div class="char"><div class="med" style="{med_style}">{_e(_initials(a["name"]))}</div>'
+            f'<div class="col"><div class="nm">{_e(a["name"])}</div>'
+            f'<div class="stage" style="border-color:color-mix(in srgb,{accent} 55%,transparent)">'
+            f'{body}</div></div></div>')
 
     d = s.get("disagreement")
     if d:
-        sides = "".join(
-            '<span style="display:block;margin-top:5px;padding-left:15px;text-indent:-15px">'
-            f'<span style="opacity:.45">—&nbsp;</span>{_e(x)}</span>'
-            for x in d.get("sides", []))
-        res = (f'<div style="margin-top:10px;padding-top:9px;border-top:.5px solid '
-               'var(--color-border-secondary,rgba(127,127,127,.25))">'
-               '<b style="font-weight:500;color:var(--color-text-info,#185FA5)">Снимается:</b> '
-               f'{_e(d["resolver"])}</div>' if d.get("resolver") else "")
-        parts.append('<div style="background:var(--color-background-secondary,rgba(127,127,127,.07));'
-                     'border-radius:var(--border-radius-lg,12px);padding:13px 16px 14px;margin:18px 0 0">'
-                     '<div style="font-size:11px;font-weight:500;letter-spacing:.04em;'
-                     'text-transform:uppercase;color:var(--color-text-tertiary,#999);margin-bottom:8px">'
-                     '<i class="ti ti-arrows-split" aria-hidden="true" style="font-size:14px;'
-                     'vertical-align:-2px;margin-right:5px"></i>Где расходятся</div>'
-                     '<p style="margin:0;font-size:13.5px;line-height:1.6">'
-                     f'<b style="font-weight:500">Ось:</b> {_e(d["axis"])}{sides}</p>{res}</div>')
+        sd = "".join(f'<span class="sd">{_e(x)}</span>' for x in d.get("sides", []))
+        rs = (f'<span class="rs">{_e(d["resolver"])}</span>' if d.get("resolver") else "")
+        parts.append('<div class="rift"><div class="rl">где расходятся</div>'
+                     f'<b style="font-weight:500">{_e(d["axis"])}</b>{sd}{rs}</div>')
 
-    syn = ('<div style="border:1.5px solid var(--color-border-info,rgba(55,138,221,.4));'
-           'border-radius:var(--border-radius-lg,12px);padding:14px 16px;margin:14px 0 0">'
-           '<div style="font-size:13px;font-weight:500;color:var(--color-text-info,#185FA5);'
-           'margin-bottom:5px"><i class="ti ti-gavel" aria-hidden="true" style="font-size:15px;'
-           'vertical-align:-2px;margin-right:5px"></i>Синтез совета</div>'
-           f'<p style="margin:0;font-size:14px;line-height:1.65">{_e(s["synthesis"])}</p>')
-    if expert and s.get("what_you_lose"):           # plain прячет «цену» — машинерия внутри
-        syn += ('<p style="margin:8px 0 0;font-size:12.5px;line-height:1.55;'
-                'color:var(--color-text-secondary,#777)"><i class="ti ti-coin" aria-hidden="true" '
-                'style="font-size:14px;vertical-align:-2px;margin-right:4px"></i>Чем платишь: '
-                f'{_e(s["what_you_lose"])}</p>')
-    parts.append(syn + "</div>")
+    cost = (f'<p class="cost eng">Чем платишь: {_e(s["what_you_lose"])}</p>'
+            if s.get("what_you_lose") else "")
+    parts.append('<div class="verdict"><div class="vlabel">Вердикт</div>'
+                 f'<p class="vtext">{_e(s["synthesis"])}</p>{cost}</div>')
 
     if s.get("step"):
-        parts.append('<div style="display:flex;align-items:flex-start;gap:8px;margin:14px 0 0;'
-                     'font-size:14px;line-height:1.6"><i class="ti ti-arrow-right" aria-hidden="true" '
-                     'style="font-size:17px;color:var(--color-text-info,#185FA5);margin-top:2px"></i>'
-                     f'<div><b style="font-weight:500">Шаг:</b> {_e(s["step"])}</div></div>')
+        parts.append('<p class="step"><i class="ti ti-arrow-right" aria-hidden="true"></i>'
+                     f'{_e(s["step"])}</p>')
 
-    if expert and s.get("forcing_question"):        # plain прячет вопрос-форсаж (expert-деталь)
-        parts.append('<p style="margin:12px 0 0;font-size:13px;font-style:italic;'
-                     'color:var(--color-text-tertiary,#999);line-height:1.55">'
-                     '<i class="ti ti-help-circle" aria-hidden="true" style="font-style:normal;'
-                     'vertical-align:-2px;margin-right:4px"></i>Вопрос-форсаж: '
-                     f'{_e(s["forcing_question"])}</p>')
+    if s.get("forcing_question"):
+        parts.append(f'<p class="forcing eng">Прежде чем примешь: {_e(s["forcing_question"])}</p>')
+
+    parts.append('<div class="toggle"><button onclick="this.closest(\'.cp-stage\')'
+                 '.classList.toggle(\'show-eng\')"><i class="ti ti-adjustments-alt" aria-hidden="true"></i>'
+                 '<span class="lbl-show">показать инженерию</span>'
+                 '<span class="lbl-hide">скрыть инженерию</span></button></div>')
+
+    parts.append('<p class="legend eng"><span style="color:var(--color-text-info,#185FA5)">'
+                 'дословно</span> — сверено с корпусом первоисточника · '
+                 '<span style="color:var(--color-text-warning,#854F0B)">в духе автора</span> — '
+                 'экстраполяция · отказ вместо выдумки, если совпадения нет.</p>')
 
     btns = "".join(
-        f'<button onclick="{_onclick(p)}" style="font:inherit;cursor:pointer;padding:8px 14px;'
-        'border-radius:999px;border:.5px solid var(--color-border-secondary,rgba(127,127,127,.4));'
-        'background:transparent;color:var(--color-text-primary,CanvasText)">'
-        f'<i class="ti {icon}" aria-hidden="true" style="margin-right:5px"></i>{_e(label)}</button>'
+        f'<button onclick="{_onclick(p)}"><i class="ti {icon}" aria-hidden="true"></i>{_e(label)}</button>'
         for label, p, icon in norm)
-    parts.append(f'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:18px">{btns}</div>')
-
-    parts.append('<p style="margin-top:16px;font-size:11.5px;color:var(--color-text-tertiary,#999);'
-                 'line-height:1.5"><span style="display:inline-flex;align-items:center;gap:3px;'
-                 'color:var(--color-text-info,#185FA5)"><i class="ti ti-quote" aria-hidden="true"></i>'
-                 'дословно</span> — сверено с корпусом первоисточника · отказ вместо выдумки, если '
-                 'совпадения нет.</p>')
-    parts.append("</div>")
+    parts.append(f'<div class="acts">{btns}</div></div>')
     return "".join(parts)
 
 

@@ -210,6 +210,7 @@ def test_initialize_exposes_instructions_to_host():
     assert "согласие" in instr.lower() or "захват" in instr.lower()  # non-capture
     assert "retrieve" in instr and "перефразируй" in instr.lower()  # как вернуть 🔵 (дословный текст)
     assert "молча" in instr.lower()                                # тихая оркестрация (без тех-преамбулы)
+    assert "уточняющих" in instr.lower() and "круглый стол" in instr.lower()  # живой интерактив до синтеза
 
 
 def test_unknown_tool_raises():

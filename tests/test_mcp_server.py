@@ -23,6 +23,23 @@ def test_list_tools_exposes_core_set():
         assert "input_schema" in t and t["input_schema"]["type"] == "object"
 
 
+def test_render_session_tool_emits_surfaces():
+    s = {"question": "q", "synthesis": "s",
+         "advisors": [{"name": "Макиавелли",
+                       "opinions": [{"marker": "blue", "argument": "a"}]}]}
+    md = dispatch("render_session", {"session": s, "surface": "md"})
+    assert md["surface"] == "md" and "Макиавелли" in md["content"]
+    w = dispatch("render_session", {"session": s, "surface": "widget"})
+    assert "sendPrompt(" in w["content"] and "--color-text-info" in w["content"]
+    assert "render_session" in {t["name"] for t in list_tools()}
+
+
+def test_list_recipes_widget_surface_is_clickable():
+    r = dispatch("list_recipes", {"surface": "widget"})
+    assert r["surface"] == "widget" and "sendPrompt(" in r["content"]
+    assert "recipes" in dispatch("list_recipes", {})        # дефолт = сырые данные
+
+
 def test_fidelity_check_passes_canon_quote_as_blue():
     r = dispatch("fidelity_check", {"quote": "All warfare is based on deception.",
                                     "advisor_dir": STRAT})

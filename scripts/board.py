@@ -9,10 +9,14 @@
   seed-council           — собрать стартовый совет PD-мудрецов с нуля (Аврелий + Эпиктет)
   doctor                 — health-check: Python, скилл установлен, тир, самотест рва
   setup-full             — поднять FULL-тир: инструкция по ollama + авто-pull модели bge-m3
-  recipes                — меню «что умеет совет» простыми фразами (для нетехнического юзера)
+  recipes [--surface S]  — меню «что умеет совет» (S = text|widget|html; дефолт text)
+  render-session <j> [--surface S] — отрисовать canon-объект заседания (S = md|widget|html)
 
 Логика тонкая — оборачивает preflight/scaffold/ingest_telegram. Реальные вопросы юзеру
 задаёт скилл разговором (см. SKILL.md «Онбординг»), сюда приходят уже структурные ответы.
+Рендер: ризонинг (скилл/хост) строит canon-объект заседания, СКРИПТ детерминированно рендерит
+под surface; контур/гейт 🔵 проходят до рендера. Хост сам решает, в какой surface отдать
+(Cowork → widget в show_widget; голый Claude Code → md/html). См. scripts/session_render.py.
 """
 import os
 import sys
@@ -145,16 +149,46 @@ def cmd_setup_full(args):
     return 0 if ok else 1
 
 
+def _surface(args, default):
+    if "--surface" in args:
+        i = args.index("--surface")
+        if i + 1 < len(args):
+            return args[i + 1]
+    return default
+
+
 def cmd_recipes(args):
-    from recipes import load_recipes, render_menu
-    print(render_menu(load_recipes()))
+    import recipes as R
+    rs = R.load_recipes()
+    surface = _surface(args, "text")
+    if surface == "widget":
+        print(R.render_widget(rs))          # для mcp__visualize__show_widget (Cowork)
+    elif surface == "html":
+        print(R.render_html(rs))            # самодостаточный фолбэк
+    else:
+        print(R.render_menu(rs))            # текст (универсально)
+    return 0
+
+
+def cmd_render_session(args):
+    """Отрисовать canon-объект заседания (JSON-файл или '-' = stdin) под surface."""
+    import session_render as SR
+    src = args[0] if args and not args[0].startswith("--") else "-"
+    raw = sys.stdin.read() if src == "-" else open(src, encoding="utf-8").read()
+    session = json.loads(raw)
+    surface = _surface(args, "md")
+    fn = {"widget": SR.render_widget, "html": SR.render_html, "md": SR.render_md}.get(surface)
+    if fn is None:
+        print(f"неизвестный surface: {surface} (md|widget|html)")
+        return 2
+    print(fn(session))
     return 0
 
 
 CMDS = {"status": cmd_status, "principis": cmd_principis, "ingest-telegram": cmd_ingest_telegram,
         "validate-manifest": cmd_validate_manifest, "build-advisor": cmd_build_advisor,
         "doctor": cmd_doctor, "seed-council": cmd_seed_council, "setup-full": cmd_setup_full,
-        "recipes": cmd_recipes}
+        "recipes": cmd_recipes, "render-session": cmd_render_session}
 
 if __name__ == "__main__":
     if len(sys.argv) < 2 or sys.argv[1] not in CMDS:

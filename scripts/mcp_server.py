@@ -402,10 +402,12 @@ TOOLS = {
         "handler": _list_recipes,
     },
     "render_session": {
-        "description": "Отрисовать ГОТОВЫЙ canon-объект заседания под surface (контур/гейт 🔵 уже "
-                       "пройдены ризонингом). surface: md (портативный, голый Claude Code) | widget "
-                       "(HTML для mcp__visualize__show_widget в Cowork, кликабельный sendPrompt) | "
-                       "html (самодостаточный фолбэк). Один объект → нужный surface; см. session_render.py.",
+        "description": "ОБЯЗАТЕЛЬНЫЙ финал заседания совета в Cowork: отрисовать canon-объект "
+                       "заседания виджетом. Зови этот тул ПОСЛЕДНИМ действием, потом скорми "
+                       "вернувшийся `content` в mcp__visualize__show_widget — вердикт прозой НЕ пиши. "
+                       "surface: widget (Cowork, дефолт-выбор, кликабельный sendPrompt) | md "
+                       "(только если show_widget недоступен) | html (фолбэк). Контур/гейт 🔵 "
+                       "пройдены ризонингом ДО рендера. depth=plain по умолчанию. См. session_render.py.",
         "input_schema": {"type": "object",
                          "properties": {"session": {"type": "object"}, "surface": {"type": "string"},
                                         "depth": {"type": "string", "enum": ["plain", "expert"]}},
@@ -491,6 +493,33 @@ def _rpc_error(req_id, code, message):
     return {"jsonrpc": "2.0", "id": req_id, "error": {"code": code, "message": message}}
 
 
+# Server-level instructions: ЕДИНСТВЕННЫЙ канал, которым правила доходят до MCP-хоста (Cowork/
+# Desktop). Хост НЕ читает SKILL.md — он видит только тулы + это. Держать кратко и императивно.
+INSTRUCTIONS = """\
+Consilium-Principis — личный совет AI-персон реальных мыслителей, заземлённый на их тексты, с
+защитным контуром верности. Ты (хост) арендуешь ризонинг; сервер даёт контекст + гейт. Правила:
+
+1. КОНТУР ВЕРНОСТИ (протокол-гейт, НЕ нарушай). Маркер 🔵 (дословная цитата) ставь ТОЛЬКО если
+   `fidelity_check` подтвердил (status 🔵). Иначе — 🟡 (экстраполяция). НИКОГДА не выдумывай цитаты
+   и не приписывай 🔵 без подтверждения. Совет с пустым корпусом не цитирует — воздержись.
+
+2. РЕНДЕР ЗАСЕДАНИЯ = ВИДЖЕТ, НЕ ПРОЗА (обязательно). Если доступен `mcp__visualize__show_widget`,
+   финал заседания совета ты ОБЯЗАН отдать виджетом, а НЕ текстом. Конвейер ПОСЛЕДНИМ действием:
+   (а) собери canon-объект `{question, reframe?, advisors:[{name, opinions:[{marker, argument,
+   quote?}]}], disagreement?, synthesis, step}`; (б) вызови `render_session(session,
+   surface="widget", depth="plain")`; (в) скорми вернувшийся `content` в `show_widget`. Вердикт
+   прозой НЕ пиши и НЕ «предлагай отрисовать» — рендер виджетом И ЕСТЬ ответ. В чат — 1-2 строки
+   подводки максимум. Markdown (`surface="md"`) — только если `show_widget` недоступен.
+
+3. СОГЛАСИЕ НА КОНТЕКСТ (non-capture). Базовый контекст = корпуса советников + заданный вопрос.
+   Контекст СВЕРХ этого (память юзера, другие проекты, внешнее) — спрашивай разрешение, прежде
+   чем вплетать (если в Принцепсе не стоит allow). Молча тянуть профиль юзера = захват, нельзя.
+
+4. Подача: отвечай на языке юзера; 🔵-цитата остаётся дословной в оригинале + перевод-глосса.
+   depth=plain по умолчанию (без вероятностей/разбора); expert — по запросу.
+"""
+
+
 def _handle_rpc(msg):
     """JSON-RPC запрос → ответ (или None для нотификаций). Реализует initialize/tools.*"""
     import json
@@ -500,6 +529,7 @@ def _handle_rpc(msg):
             "protocolVersion": "2024-11-05",
             "capabilities": {"tools": {}},
             "serverInfo": {"name": "consilium-principis", "version": "0.1.0"},
+            "instructions": INSTRUCTIONS,
         })
     if method in ("notifications/initialized", "initialized"):
         return None

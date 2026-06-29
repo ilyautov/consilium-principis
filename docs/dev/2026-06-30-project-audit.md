@@ -8,9 +8,24 @@
 
 ---
 
-## СТАТУС: P0 ЗАКРЫТЫ (2026-06-30, коммит см. git) + FULL-тир развязан
+## СТАТУС: P0 + P1 + P2 ЗАКРЫТЫ (2026-06-30, коммиты см. git) + FULL-тир развязан
 
-Все пять P0 исправлены с тестами; 329 проходят **и с отсутствующим движком Гефеста** (репродьюсибилити восстановлена). Сверх P0 — выбранное решение по FULL-тиру (вшить embed-примитив): `tier_full.embed_batch` теперь инлайн через ollama `/api/embed`, внешний движок нужен только для опционального `rerank=True` (ленивый импорт). Это одновременно убило P0-1 (тест-коллекцию) и CRITICAL-2 (FULL-тир переобещан) — доки «ollama+bge-m3 = FULL» стали правдой. P1/P2 — следующий раунд.
+**P0** (5/5) + FULL-тир: `tier_full.embed_batch` инлайн через ollama `/api/embed` (внешний движок —
+только для опц. `rerank=True`) → убило и P0-1 (тест-коллекция), и CRITICAL-2 (переобещание).
+
+**P1** (7/7): governance_verify теперь НЕ тавтологичен — `gov_head` пишется в build.lock при сборке,
+verify сверяет (подмена corpus.jsonl постфактум → `tampered`); `ollama_pull` валидирует имя модели
+(нет `/` → чужой реестр); мин-длина 8 норм-символов для 🔵 (одиночное слово → 🟡); `extract_kernels`
+вынесен в стабильный `corpusbuild/kernel_extract.py` (продакшн не зависит от `exp_*`); CI-воркфлоу
+(`.github/workflows/ci.yml`, py3.10–3.12, без ollama/движка); `lenses/*/build`+`sources` в gitignore
+(кроме manifest.json); число тулов в CONNECT-MCP 24→33; eval-деградация FULL→SIMPLE логируется в stderr.
+
+**P2**: мёртвый `corpus_build.py` удалён; резолв корня/конфига централизован в `corpusbuild/paths.py`
+(`project_root`/`config_path`, eval+engine routed); `board.py` write через `with`; лишние локальные
+`import json` убраны. (`board_config.json` уже gitignored — LOW-находка моот. `multi_query.py`
+оставлен: используется диагностикой.)
+
+332 теста проходят И без движка, И без ollama (CI-инвариант: SIMPLE-тир работает у любого склонировавшего).
 
 ---
 

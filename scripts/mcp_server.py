@@ -206,7 +206,11 @@ def _ollama_status():
 
 def _ollama_pull(model="bge-m3"):
     """Скачать модель в уже запущенный ollama (идемпотентно, безопасно)."""
-    import subprocess
+    import subprocess, re
+    # без '/' — он включил бы чужой реестр (host/namespace/model), вектор отравления эмбеддера
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:\-]{0,100}", model or ""):
+        return {"ok": False, "model": model,
+                "error": "недопустимое имя модели (ожидается напр. bge-m3 или gemma3:27b)"}
     try:
         subprocess.run(["ollama", "pull", model], check=True, timeout=900)
         return {"ok": True, "model": model, "status": _ollama_status()}
@@ -354,7 +358,12 @@ def _situation_stress_test(tree, perturbations, stance="competitive"):
 def _governance_verify(path):
     path = _resolve(path)
     cj = path if path.endswith(".jsonl") else corpus_path(path)
-    res = _verify_corpus(cj)
+    expected = None
+    if not path.endswith(".jsonl"):                  # сверка с эталонной головой из build.lock
+        from corpusbuild.paths import lock_path
+        from governance import _lock_head
+        expected = _lock_head(lock_path(path))
+    res = _verify_corpus(cj, expected_head=expected)
     return res if res is not None else {"ok": False, "error": f"нет corpus.jsonl: {cj}"}
 
 
@@ -928,7 +937,6 @@ Consilium-Principis — личный совет AI-персон реальных
 
 def _handle_rpc(msg):
     """JSON-RPC запрос → ответ (или None для нотификаций). Реализует initialize/tools.*"""
-    import json
     method, req_id = msg.get("method"), msg.get("id")
     if method == "initialize":
         return _rpc_result(req_id, {
@@ -960,7 +968,6 @@ def _handle_rpc(msg):
 
 def _serve_stdio():
     """Минимальный построчный JSON-RPC по stdio. Замена — официальный MCP SDK на тот же dispatch."""
-    import json
     for line in sys.stdin:
         line = line.strip()
         if not line:

@@ -161,6 +161,23 @@ def test_instructions_have_antiinjection_rule0():
     assert "БЕЗОПАСНОСТЬ ВЫШЕ ВСЕГО" in ins and "ЯВНОЙ просьбе" in ins  # Rule 0 анти-инъекция
 
 
+def test_short_quote_not_blue(tmp_path):
+    # P1: одиночное общее слово дословно совпадёт, но 🔵 для него бессмысленно → 🟡 (порог длины)
+    adv = str(tmp_path / "adv-short")
+    dispatch("add_source", {"advisor_dir": adv, "basename": "c", "tier": "P1",
+             "text": "The discipline of strategy rewards patience."})
+    from corpusbuild import pipeline
+    pipeline.build(adv)
+    assert dispatch("fidelity_check", {"quote": "the", "advisor_dir": adv})["status"] != "🔵"
+    assert dispatch("fidelity_check", {"quote": "discipline of strategy",
+                                       "advisor_dir": adv})["status"] == "🔵"   # осмысленная — 🔵
+
+
+def test_ollama_pull_rejects_bad_model_name():
+    r = dispatch("ollama_pull", {"model": "evil.com/malware:latest"})   # '/' = чужой реестр
+    assert r["ok"] is False and "недопустим" in r["error"]
+
+
 def test_lifecycle_tools_registered():
     names = {t["name"] for t in list_tools()}
     assert {"config_get", "config_set", "ollama_status", "ollama_ensure", "ollama_pull",

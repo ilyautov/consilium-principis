@@ -10,7 +10,8 @@
 Через MCP доступен **полный жизненный цикл без терминала**: `doctor` (готовность машины),
 `seed_council` (стартовый совет), `build_advisor` (советник под ключ), `ingest_telegram`
 (корпус Принцепса), `setup_full` (FULL-тир), `render_session`/`list_recipes` (виджеты для Cowork),
-плюс контур-тулы (`fidelity_check`/`retrieve`/…). Всего 24 тула.
+плюс тулы линз/жизненного цикла (`build_lens`/`add_source`/`cite`/`config_*`/`ollama_*`) и контур-тулы
+(`fidelity_check`/`retrieve`/…). Всего 33 тула.
 
 ## Шаг 0 — репозиторий на машине (единственный внешний шаг)
 

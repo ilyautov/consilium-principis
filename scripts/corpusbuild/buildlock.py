@@ -1,8 +1,18 @@
-"""build.lock.json — воспроизводимость: хеши источников + config + счётчики тиров.
+"""build.lock.json — воспроизводимость: хеши источников + config + счётчики тиров + gov_head.
 built_at передаётся аргументом (в скриптах нет argless-времени для детерминизма)."""
-import os, json, hashlib
+import os, sys, json, hashlib
 from collections import Counter
 from . import paths
+
+
+def _gov_head(chunks):
+    """Governance-голова: отпечаток корпуса (hash-chain) на момент сборки. Сохраняется в lock,
+    чтобы governance.verify ловил ПОДМЕНУ corpus.jsonl ПОСЛЕ факта (раньше цепь сверялась сама
+    с собой = тавтология). chunks здесь — те же записи, что пишутся в corpus.jsonl."""
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # scripts/
+    from governance import build_chain, GENESIS
+    chain = build_chain(list(chunks))
+    return chain[-1]["hash"] if chain else GENESIS
 
 
 def _hash_file(path: str) -> str:
@@ -21,7 +31,8 @@ def write_lock(advisor_dir: str, config: dict, chunks, built_at: str) -> dict:
                 sources[fn] = _hash_file(fp)
     counts = dict(Counter(c["tier"] for c in chunks))
     counts["chunks"] = len(chunks)
-    lock = {"built_at": built_at, "config": config, "sources": sources, "counts": counts}
+    lock = {"built_at": built_at, "config": config, "sources": sources, "counts": counts,
+            "gov_head": _gov_head(chunks)}
     os.makedirs(paths.build_dir(advisor_dir), exist_ok=True)
     with open(paths.lock_path(advisor_dir), "w", encoding="utf-8") as f:
         json.dump(lock, f, ensure_ascii=False, indent=2)

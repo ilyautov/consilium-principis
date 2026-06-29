@@ -80,9 +80,22 @@ def promote_gate(current_tier, requested_tier, evidence=None):
     return requested_tier                                # понижение или то же — ок
 
 
-def _verify_corpus(corpus_jsonl):
-    """CLI: построить цепочку над corpus.jsonl, проверить целостность, дать голову-хеш +
-    гистограмму тиров. Голова-хеш = «отпечаток» корпуса: меняется при любой подмене."""
+def _lock_head(lock_json):
+    """gov_head из build.lock.json (эталонный отпечаток корпуса), или None если нет."""
+    import os
+    if not os.path.isfile(lock_json):
+        return None
+    try:
+        return json.load(open(lock_json, encoding="utf-8")).get("gov_head")
+    except Exception:
+        return None
+
+
+def _verify_corpus(corpus_jsonl, expected_head=None):
+    """Построить цепочку над corpus.jsonl, проверить целостность, дать голову-хеш + гистограмму
+    тиров. Если передан expected_head (сохранённый в build.lock при сборке) — СВЕРИТЬ с ним:
+    несовпадение = подмена corpus.jsonl ПОСЛЕ сборки (раньше цепь сверялась сама с собой —
+    тавтология, ничего не ловила). head_match=None, если эталонной головы нет."""
     import os
     if not os.path.isfile(corpus_jsonl):
         return None
@@ -100,8 +113,10 @@ def _verify_corpus(corpus_jsonl):
     chain = build_chain(records)
     ok, broken = verify_chain(chain)
     head = chain[-1]["hash"] if chain else GENESIS
-    return {"n": len(records), "ok": ok, "broken": broken,
-            "head": head, "tiers": tiers}
+    head_match = None if expected_head is None else (head == expected_head)
+    return {"n": len(records), "ok": ok and head_match is not False, "broken": broken,
+            "head": head, "expected_head": expected_head, "head_match": head_match,
+            "tampered": head_match is False, "tiers": tiers}
 
 
 if __name__ == "__main__":
@@ -110,15 +125,23 @@ if __name__ == "__main__":
         print("Использование: python governance.py verify <dir | путь.jsonl>")
         sys.exit(1)
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-    from corpusbuild.paths import corpus_path        # резолвер (build/ → legacy), не литерал
+    from corpusbuild.paths import corpus_path, lock_path  # резолверы, не литералы
     target = sys.argv[2]
     cj = target if target.endswith(".jsonl") else corpus_path(target)
-    res = _verify_corpus(cj)
+    expected = _lock_head(lock_path(target)) if not target.endswith(".jsonl") else None
+    res = _verify_corpus(cj, expected_head=expected)
     if res is None:
         print(f"[governance] нет corpus.jsonl: {cj}")
         sys.exit(1)
-    status = "✅ целостна" if res["ok"] else f"❌ ПОДМЕНА на записи #{res['broken']}"
+    if res["tampered"]:
+        status = "❌ ПОДМЕНА: голова ≠ build.lock"
+    elif not res["ok"]:
+        status = f"❌ ПОДМЕНА на записи #{res['broken']}"
+    elif res["head_match"]:
+        status = "✅ целостна (сверена с build.lock)"
+    else:
+        status = "✅ цепь консистентна (нет эталона в lock — собери заново для сверки)"
     tiers = " ".join(f"{k}:{v}" for k, v in sorted(res["tiers"].items()))
     print(f"[governance] {cj}")
-    print(f"  записей {res['n']} · цепочка {status} · тиры [{tiers}]")
+    print(f"  записей {res['n']} · {status} · тиры [{tiers}]")
     print(f"  голова-хеш (отпечаток корпуса): {res['head'][:16]}…")

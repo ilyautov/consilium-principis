@@ -18,6 +18,7 @@ import os, sys, json, re, urllib.request, math
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from corpusbuild.paths import corpus_path
+from corpusbuild.kernel_extract import extract_kernels  # ядро вынесено в продакшн-модуль
 
 OLLAMA = os.getenv("OLLAMA_HOST", "http://127.0.0.1:11434")
 KERNEL_MODEL = os.getenv("KERNEL_MODEL", "gemma3:27b")
@@ -71,33 +72,6 @@ def embed(texts, batch=64):
 
 def cos(a, b):
     return sum(x * y for x, y in zip(a, b))
-
-
-def extract_kernels(author, train, k=6, n_sample=28):
-    step = max(1, len(train) // n_sample)
-    sample = [train[i]["text"][:320].strip() for i in range(0, len(train), step)][:n_sample]
-    passages = "\n---\n".join(sample)
-    prompt = (
-        f"You are analyzing the writings of {author}. Below are passages sampled from the corpus.\n"
-        f"Identify the {k} META-IDEAS (generative kernels) that GENERATE these and the author's other "
-        "writings — the recurring THINKING METHODS and core principles running through everything, NOT "
-        "surface topics. For each: a short name and ONE sentence capturing the generative move (HOW the "
-        "author reasons), phrased so it could apply to NEW problems the author never wrote about.\n"
-        f"Output exactly {k} lines, each:\nKERNEL: <name> — <one-sentence generative method>\n\n"
-        f"Passages:\n{passages}\n"
-    )
-    body = json.dumps({"model": KERNEL_MODEL, "prompt": prompt, "stream": False,
-                       "options": {"temperature": 0.4}}).encode()
-    req = urllib.request.Request(f"{OLLAMA}/api/generate", data=body,
-                                 headers={"Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=420) as r:
-        out = json.loads(r.read()).get("response", "")
-    kernels = []
-    for ln in out.splitlines():
-        m = re.match(r"\s*KERNEL[:\-]\s*(.+)", ln, re.I)
-        if m:
-            kernels.append(m.group(1).strip())
-    return kernels
 
 
 def binom_z(wins, n):

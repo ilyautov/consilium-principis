@@ -20,9 +20,7 @@ def drop_groundless(items: list) -> list:
 
 def build_kernels(advisor_dir: str, author: str, k: int = 6, ground_n: int = 5, min_cos: float = 0.45) -> list:
     """extract (gemma) → embed → ground → drop groundless → kernels.json."""
-    import sys, os
-    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # scripts/ на путь
-    from exp_kernels import extract_kernels  # уже валидная экстракция
+    from .kernel_extract import extract_kernels  # стабильное ядро (не exp_*-файл)
     corpus = ids.load_corpus(advisor_dir)
     p1c = [c for c in corpus if c["tier"] in ("P1", "P2") and len(c.get("text", "")) > 250]
     names = extract_kernels(author, [{"text": c["text"]} for c in p1c], k=k)

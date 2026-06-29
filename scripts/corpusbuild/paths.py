@@ -3,6 +3,17 @@
 import os
 
 
+def project_root() -> str:
+    """Корень репо (scripts/corpusbuild/paths.py → на 3 уровня вверх). Единая точка, чтобы
+    читатели конфига не пересчитывали глубину dirname по-разному (раньше — в 3 местах)."""
+    return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
+def config_path() -> str:
+    """board_config.json в корне репо."""
+    return os.path.join(project_root(), "board_config.json")
+
+
 def build_dir(advisor_dir: str) -> str:
     return os.path.join(advisor_dir, "build")
 

@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from typing import List, Optional
 
 from .fidelity import verbatim_in_corpus, best_match  # backend-независимый чек (relative — пакетный стиль)
+from corpusbuild.paths import config_path  # единый резолвер пути конфига (fidelity уже положил scripts/ на path)
 
 
 @dataclass
@@ -85,10 +86,9 @@ def _pick_threshold(at, backend, default):
 
 def load_config_value(key, default):
     """Прочитать произвольный ключ из board_config.json (напр. hybrid_alpha). default если нет."""
-    import os, json
-    root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    import json
     try:
-        with open(os.path.join(root, "board_config.json"), encoding="utf-8") as f:
+        with open(config_path(), encoding="utf-8") as f:
             return json.load(f).get(key, default)
     except Exception:
         return default
@@ -97,10 +97,8 @@ def load_config_value(key, default):
 def load_backend_threshold(advisor_dir, backend, default):
     """Порог abstain per backend из board_config.json. Возврат default, если не найдено.
     advisor_dir пока не влияет на выбор (single-repo); зарезервирован под per-advisor конфиг."""
-    import os, json
-    # __file__ = .../personal-board/scripts/engine/__init__.py → три dirname до корня скилла.
-    root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    cfg_path = os.path.join(root, "board_config.json")
+    import json
+    cfg_path = config_path()
     try:
         with open(cfg_path, encoding="utf-8") as f:
             at = json.load(f).get("abstain_threshold")

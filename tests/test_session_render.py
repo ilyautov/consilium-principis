@@ -41,11 +41,12 @@ def test_md_carries_full_structure_and_contour():
 def test_widget_is_clickable_and_theme_aware():
     w = render_widget(S)
     assert "sendPrompt(" in w                       # клик замыкается в чат
-    assert "--color-text-info" in w                 # 🔵 на семантической переменной (тёмная тема)
-    assert "--color-text-warning" in w              # 🟡
+    assert "--color-text-info" in w                 # семантическая переменная темы (тёмная даром)
     assert "var(--font-sans" in w                   # шрифт Cowork
+    assert 'class="ti ' in w                        # Tabler-иконки (дизайн-система Cowork)
+    assert "🔵" not in w and "🟡" not in w           # БЕЗ эмодзи в вёрстке виджета (дизайн-система)
     assert "<script" not in w.lower()               # без тега script (только inline onclick)
-    assert "position:fixed" not in w                # iframe-констрейнт Cowork
+    assert "position:fixed" not in w                # iframe-констрейнт Cowork (sr-only = absolute, ок)
 
 
 def test_widget_custom_actions():
@@ -61,10 +62,19 @@ def test_html_fallback_self_contained():
 
 
 def test_amber_synonym_maps_to_yellow():
+    # пилюля достоверности в диалоговом виджете висит на ЦИТАТЕ → даём цитату с маркером amber
     s = {"question": "q", "synthesis": "s",
-         "advisors": [{"name": "X", "opinions": [{"marker": "amber", "argument": "a"}]}]}
-    assert "🟡" in render_md(s)
-    assert "--color-text-warning" in render_widget(s)
+         "advisors": [{"name": "X", "opinions": [{"marker": "amber", "argument": "a",
+            "quote": {"text": "t", "source": "src"}}]}]}
+    assert "🟡" in render_md(s)                       # md сохраняет эмодзи-маркер
+    assert "--color-text-warning" in render_widget(s)  # пилюля «в духе автора» (amber→yellow)
+
+
+def test_widget_marker_pill_rides_on_quote():
+    # КОНТУР в диалоговом surface: пилюля «дословно/в духе автора» рендерится при наличии цитаты
+    with_q = {"question": "q", "synthesis": "s", "advisors": [{"name": "X", "opinions": [
+        {"marker": "blue", "argument": "a", "quote": {"text": "t", "source": "Prince"}}]}]}
+    assert "дословно" in render_widget(with_q) and "Prince" in render_widget(with_q)
 
 
 def test_all_surfaces_escape_xss():

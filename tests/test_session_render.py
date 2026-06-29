@@ -77,6 +77,18 @@ def test_widget_marker_pill_rides_on_quote():
     assert "дословно" in render_widget(with_q) and "Prince" in render_widget(with_q)
 
 
+def test_malformed_disagreement_never_crashes_render():
+    # БАГ из живого прогона: кривой disagreement рушил рендер → пересборка лезла в чат.
+    for bad in ({"axis": "X"}, {"sides": ["a", "b"]}, "строка", {"axis": None}, None, []):
+        s = {"question": "q", "synthesis": "s", "advisors": [], "disagreement": bad}
+        for r in (render_md, render_widget, render_html):
+            r(s)                                       # не должно бросить
+    # валидный disagreement всё ещё рендерится
+    ok = {"question": "q", "synthesis": "s", "advisors": [],
+          "disagreement": {"axis": "ось спора", "sides": ["a", "b"], "resolver": "r"}}
+    assert "ось спора" in render_widget(ok)
+
+
 def test_all_surfaces_escape_xss():
     bad = {"question": "<img src=x onerror=alert(1)>", "synthesis": "ok", "advisors": []}
     for r in (render_md, render_widget, render_html):

@@ -12,6 +12,11 @@ board_config.json
 scripts/golden/
 data/embeddings*.npy
 data/embeddings*.meta.json
+# Шипуем lenses/<name>/{corpus.jsonl,sources/manifest.json,*.md} (PD/CC), но НЕ локальные
+# артефакты сборки и затянутые исходники — иначе при build не-PD линзы копирайт уйдёт в public.
+lenses/*/build/
+lenses/*/sources/*
+!lenses/*/sources/manifest.json
 
 # Питон
 __pycache__/

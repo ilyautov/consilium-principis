@@ -10,6 +10,11 @@ from corpusbuild.paths import corpus_path
 from typing import Optional
 
 
+# 🔵/🟢 требует осмысленного фрагмента: одиночное общее слово («the», «и») дословно совпадёт,
+# но как «цитата» бессмысленно и вводит в заблуждение. Ниже порога (норм. длина) → None (🟡).
+MIN_QUOTE_CHARS = 8
+
+
 def _norm(s: str) -> str:
     s = re.sub(r"[^\w\s]", " ", (s or "").lower())
     return re.sub(r"\s+", " ", s).strip()
@@ -61,7 +66,7 @@ def best_match(quote: str, advisor_dir: str):
     пару из ЛУЧШЕГО (самого авторитетного) тира — чтобы source соответствовал
     тиру, который определит маркер. Чанк без поля tier → "A" (fail-closed)."""
     q = _norm(quote)
-    if not q:
+    if len(q) < MIN_QUOTE_CHARS:                         # пусто/слишком коротко → не 🔵 (fail-closed)
         return None
     best = None  # (rank, tier, source)
     for ch in _iter_chunks(advisor_dir):
@@ -94,7 +99,7 @@ def verbatim_in_corpus(quote: str, advisor_dir: str) -> Optional[str]:
     ни в одном чанке, возвращает None (🟡) — кросс-чанковый join не используется,
     чтобы исключить ложные 🔵."""
     q = _norm(quote)
-    if not q:
+    if len(q) < MIN_QUOTE_CHARS:                         # коротыш не считаем верифицированной цитатой
         return None
     chunks = _corpus_norm_text(advisor_dir)
     for src, ctext in chunks:

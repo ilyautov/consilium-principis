@@ -74,3 +74,25 @@ def test_unknown_tier_treated_as_least_authoritative():
     # повышение ОТ него требует.
     assert promote_gate("ZZZ", "P1", evidence=None) == "ZZZ"   # нет доказательства → отказ
     assert promote_gate("P1", "ZZZ", evidence=None) == "ZZZ"   # к менее авторитетному — можно
+
+
+def test_lock_head_catches_corpus_tampering(tmp_path):
+    # P1-фикс: gov_head пишется в build.lock при сборке; verify сверяет с ним. Подмена
+    # corpus.jsonl ПОСЛЕ сборки → голова разъезжается → tampered (раньше цепь сверялась сама
+    # с собой и всегда была ok — тавтология).
+    import json
+    from corpusbuild import pipeline, paths
+    from governance import _verify_corpus, _lock_head
+    adv = str(tmp_path / "adv")
+    os.makedirs(os.path.join(adv, "sources"))
+    with open(os.path.join(adv, "sources", "x.txt"), "w", encoding="utf-8") as f:
+        f.write("First principle of strategy.\nSecond line of the canon.\n")
+    pipeline.build(adv)
+    cj, head = paths.corpus_path(adv), _lock_head(paths.lock_path(adv))
+    assert head                                              # эталонная голова записана
+    clean = _verify_corpus(cj, expected_head=head)
+    assert clean["head_match"] is True and clean["tampered"] is False and clean["ok"]
+    with open(cj, "a", encoding="utf-8") as f:               # подмена постфактум
+        f.write(json.dumps({"text": "INJECTED", "tier": "P1", "source": "x"}, ensure_ascii=False) + "\n")
+    bad = _verify_corpus(cj, expected_head=head)
+    assert bad["tampered"] is True and bad["ok"] is False    # голова ≠ эталон → поймано

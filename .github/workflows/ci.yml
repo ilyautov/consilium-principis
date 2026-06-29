@@ -1,0 +1,32 @@
+name: tests
+
+# Защищает главный инвариант: SIMPLE-тир (гейт верности + сборка корпуса) работает БЕЗ ollama и
+# БЕЗ внешнего движка Гефеста — то есть у любого, кто просто склонировал репо. Семантика (FULL)
+# здесь намеренно недоступна: тесты должны это переживать (graceful fallback), а не падать.
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    env:
+      HEPHAESTUS_ENGINE: /nonexistent      # внешний движок отсутствует (как у внешнего юзера)
+      OLLAMA_HOST: http://127.0.0.1:59999  # ollama недоступен → лексический пол
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest numpy
+      - name: Run tests (SIMPLE-тир, без ollama/движка)
+        run: python -m pytest tests/ -q

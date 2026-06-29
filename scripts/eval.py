@@ -156,7 +156,8 @@ def fidelity_eval(adv_dir):
 # ───────────────────────── RETRIEVAL / ABSTENTION (tier-FULL или лексич. fallback) ───────────
 
 def load_abstain_threshold():
-    cfg = os.path.join(os.path.dirname(HERE), "board_config.json")
+    from corpusbuild.paths import config_path
+    cfg = config_path()
     try:
         at = json.load(open(cfg, encoding="utf-8")).get("abstain_threshold", ABSTAIN_THRESHOLD_DEFAULT)
         if isinstance(at, dict):
@@ -222,8 +223,11 @@ def retrieve(question, adv_dir, top_k=3):
         try:
             return [{"text": p.text, "score": p.score, "source": p.source}
                     for p in eng.retrieve(question, adv_dir, top_k=top_k)]
-        except Exception:
-            pass
+        except Exception as e:
+            # НЕ молча: деградация семантики до лексич. пола наблюдаема (иначе FULL «как бы есть»,
+            # а recall тихо рухнул). Гейт верности при этом не страдает — но качество да.
+            print(f"[retrieve] {type(eng).__name__} упал ({e}); деградация → лексический пол",
+                  file=sys.stderr)
     return lexical_retrieve(question, adv_dir, top_k=top_k)
 
 

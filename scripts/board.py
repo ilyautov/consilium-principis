@@ -51,7 +51,8 @@ def cmd_principis(args):
     if os.path.isfile(out) and "--force" not in args:
         print("principis.md уже есть — добавь --force чтобы перезаписать (или правь руками)")
         return 1
-    open(out, "w", encoding="utf-8").write(scaffold_principis(answers))
+    with open(out, "w", encoding="utf-8") as f:        # with: не полагаемся на GC для flush/close
+        f.write(scaffold_principis(answers))
     print(f"✓ principis.md собран (подача={answers.get('interface_mode', 'rigor')}). "
           f"Вектор держим живым — совет допросит на первом заседании.")
     return 0

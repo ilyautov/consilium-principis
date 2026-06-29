@@ -224,24 +224,31 @@ def test_retrieve_attaches_verbatim_quoting_hint():
     assert "дословно" in r["how_to_quote"].lower() and "🟡" in r["how_to_quote"]
 
 
-def test_cite_returns_ready_verified_blue_quote():
-    # детерминированный рычаг рва: cite отдаёт ГОТОВЫЙ проверенный объект, хост не пишет текст сам
+def test_cite_returns_ready_verified_quotes():
+    # детерминированный рычаг рва: cite отдаёт ГОТОВЫЕ проверенные объекты, хост не пишет текст сам
     r = dispatch("cite", {"advisor_dir": STRAT, "query": "deception in war"})
-    assert r["quote"] is not None and r["marker"] in ("🔵", "🟢")
-    assert r["quote"]["text"] and r["quote"]["source"]
-    # вставленный обратно в гейт — подтверждается тем же маркером (т.е. он реально дословный)
-    fc = dispatch("fidelity_check", {"quote": r["quote"]["text"], "advisor_dir": STRAT})
-    assert fc["status"] == r["marker"] and fc["verbatim"] is True
+    assert r["quotes"] and r["best"]["marker"] in ("🔵", "🟢")
+    for q in r["quotes"]:                          # КАЖДАЯ возвращённая цитата реально дословна
+        fc = dispatch("fidelity_check", {"quote": q["text"], "advisor_dir": STRAT})
+        assert fc["verbatim"] is True and fc["status"] == q["marker"]
 
 
-def test_cite_no_match_returns_null_not_fabrication():
-    r = dispatch("cite", {"advisor_dir": STRAT, "query": "рецепт борща со сметаной и укропом"})
-    # хуже найти нерелевантное, чем выдумать — но в любом случае quote либо реальный, либо null
-    if r["quote"] is None:
+def test_cite_accepts_query_list_for_multiquery_recall():
+    # recall-рычаг: хост шлёт список англ. формулировок (мульти-запрос продакшн-формы)
+    r = dispatch("cite", {"advisor_dir": STRAT,
+                          "query": ["deception in war", "knowing the enemy and yourself"]})
+    assert all(q["text"] for q in r["quotes"])     # пул из нескольких запросов, дедуп, все дословны
+
+
+def test_cite_no_match_returns_empty_not_fabrication():
+    r = dispatch("cite", {"advisor_dir": STRAT,
+                          "query": "рецепт борща", "use_kernels": False})
+    if not r["quotes"]:
         assert r["marker"] == "🟡" and "выдумывай" in r["note"].lower()
     else:
-        fc = dispatch("fidelity_check", {"quote": r["quote"]["text"], "advisor_dir": STRAT})
-        assert fc["verbatim"] is True            # никогда не возвращает невериф. текст
+        for q in r["quotes"]:
+            fc = dispatch("fidelity_check", {"quote": q["text"], "advisor_dir": STRAT})
+            assert fc["verbatim"] is True          # никогда не возвращает невериф. текст
 
 
 def test_cite_registered_and_in_instructions():

@@ -67,31 +67,66 @@ def _retrieve(query, advisor_dir, top_k=3):
                              "а НЕ «дефект корпуса»: возьми ровно строку `text` из этого ответа.")}
 
 
-def _cite(advisor_dir, query, top_k=5):
-    """ГОТОВАЯ верифицированная цитата под довод — детерминированный рычаг рва. Снимает с хоста
-    единственный способ соврать: хост НЕ пишет текст цитаты сам (→ пересказ → 🟡), а получает
-    проверенный объект и вставляет как есть. Тянет пассажи, гоняет КАЖДЫЙ через гейт, возвращает
-    первый дословный (предпочитая 🔵 над 🟢). Совпадения нет → quote:null, маркер 🟡 (без выдумки)."""
+def _kernel_themes(advisor_dir, limit=6):
+    """Сигнатурные темы советника из kernels.json (`**Theme** — …`) — доп-запросы для якорения
+    ретрива к его ключевым идеям (рычаг recall #4). Пусто, если кернелов нет."""
+    import re
+    kp = os.path.join(os.path.dirname(corpus_path(advisor_dir)), "kernels.json")
+    if not os.path.isfile(kp):
+        return []
+    try:
+        data = json.load(open(kp, encoding="utf-8"))
+    except Exception:
+        return []
+    themes = []
+    for k in data if isinstance(data, list) else []:
+        name = k.get("name", "") if isinstance(k, dict) else str(k)
+        m = re.findall(r"\*\*(.+?)\*\*", name)
+        if m:
+            themes.append(m[0].strip())
+    return themes[:limit]
+
+
+def _cite(advisor_dir, query, top_k=8, use_kernels=True, limit=4):
+    """ГОТОВЫЕ верифицированные цитаты под довод — детерминированный рычаг рва + recall. Снимает с
+    хоста способ соврать (он НЕ пишет текст цитаты сам → пересказ → 🟡), а получает проверенные
+    объекты и вставляет как есть. Recall-рычаги: (1) `query` — строка ИЛИ СПИСОК англ. формулировок
+    (мульти-запрос делает хост = продакшн-форма; перевод запроса в язык корпуса — валидированный
+    лифт, в отличие от опровергнутого ollama-моста); (2) top_k=8; (3) якорение по кернелам советника.
+    Пул дедуплицируется, КАЖДЫЙ пассаж через гейт, отдаём список дословных (🔵 раньше 🟢). Нет → []."""
     import eval as _eval
-    passages = _eval.retrieve(query, _resolve(advisor_dir), top_k=top_k)
-    verified = []
-    for p in passages:
-        text = (p.get("text") or "").strip()
-        if not text:
-            continue
-        fc = _fidelity_check(text, advisor_dir)
+    adv_res = _resolve(advisor_dir)
+    queries = [query] if isinstance(query, str) else [q for q in (query or []) if q]
+    if use_kernels:
+        queries += _kernel_themes(advisor_dir)
+    seen_q, uniq_q = set(), []
+    for q in queries:
+        if q and q not in seen_q:
+            seen_q.add(q); uniq_q.append(q)
+    cand, seen_t = [], set()                          # пул кандидатов из всех запросов, дедуп по тексту
+    for q in uniq_q:
+        for p in _eval.retrieve(q, adv_res, top_k=top_k):
+            t = (p.get("text") or "").strip()
+            if t and t not in seen_t:
+                seen_t.add(t); cand.append(t)
+    blue, green = [], []
+    for t in cand:
+        fc = _fidelity_check(t, advisor_dir)
         if fc["verbatim"]:
-            verified.append((fc["status"], text, fc["source"]))
-    for want in ("🔵", "🟢"):                       # 🔵 (первоисточник) приоритетнее 🟢 (комментарий)
-        for status, text, src in verified:
-            if status == want:
-                return {"quote": {"text": text, "source": src}, "marker": status,
-                        "note": ("ГОТОВО: вставь этот `quote` как есть в opinion.quote, marker уже "
-                                 "подтверждён гейтом. НЕ переписывай и НЕ переводи text (перевод — "
-                                 "в quote.translation).")}
-    return {"quote": None, "marker": "🟡",
-            "note": ("Дословного совпадения под этот запрос нет — НЕ выдумывай цитату, иди 🟡 (в духе "
-                     "автора). Гейт исправен; попробуй другой query или оставь довод без цитаты.")}
+            (blue if fc["status"] == "🔵" else green).append(
+                {"text": t, "source": fc["source"], "marker": fc["status"]})
+    ranked = (blue + green)[:limit]                   # 🔵 (первоисточник) приоритетнее 🟢 (комментарий)
+    if ranked:
+        b = ranked[0]
+        return {"quotes": ranked,
+                "best": {"quote": {"text": b["text"], "source": b["source"]}, "marker": b["marker"]},
+                "note": ("Вставь любой из `quotes` как есть в opinion.quote (marker подтверждён гейтом). "
+                         "НЕ переписывай text; перевод — в quote.translation. Запрос давай в ЯЗЫКЕ "
+                         "КОРПУСА (для этих советников — English) и можно списком формулировок — "
+                         "находок больше.")}
+    return {"quotes": [], "best": None, "marker": "🟡",
+            "note": ("Дословного нет — НЕ выдумывай, иди 🟡. Дай query в языке корпуса (English) "
+                     "или другой формулировкой; гейт исправен.")}
 
 
 def _build_tree(d):
@@ -320,14 +355,18 @@ TOOLS = {
         "handler": _fidelity_check,
     },
     "cite": {
-        "description": "ГОТОВАЯ 🔵-цитата под довод (рекомендуется вместо ручной сборки). Даёт "
-                       "проверенный объект {quote:{text,source}, marker} — вставь как есть в "
-                       "opinion.quote, marker уже подтверждён. Совпадения нет → quote:null, 🟡. "
-                       "Так цитата не может оказаться пересказом. НЕ переписывай text.",
+        "description": "ГОТОВЫЕ 🔵-цитаты под довод (вместо ручной сборки — так цитата не станет "
+                       "пересказом). Возвращает {quotes:[{text,source,marker}…], best} — вставь любой "
+                       "как есть в opinion.quote, marker подтверждён. Recall: `query` можно СПИСКОМ "
+                       "формулировок, давай их в ЯЗЫКЕ КОРПУСА (English) — находок больше; ретрив "
+                       "якорится по кернелам советника. Нет дословного → quotes:[], 🟡. НЕ переписывай text.",
         "input_schema": {"type": "object",
                          "properties": {"advisor_dir": {"type": "string"},
-                                        "query": {"type": "string"},
-                                        "top_k": {"type": "integer"}},
+                                        "query": {"type": ["string", "array"],
+                                                  "items": {"type": "string"}},
+                                        "top_k": {"type": "integer"},
+                                        "use_kernels": {"type": "boolean"},
+                                        "limit": {"type": "integer"}},
                          "required": ["advisor_dir", "query"]},
         "handler": _cite,
     },
@@ -575,12 +614,14 @@ Consilium-Principis — личный совет AI-персон реальных
    Юзер отвечает и вклинивается. Голоса советников в чате — это ценность, НЕ «кухня» из правила 1.
    Синтез-виджет — когда контекст собран или юзер просит «давай синтез». Чёткий вопрос — можно сразу.
 
-4. КОНТУР ВЕРНОСТИ (протокол-гейт, НЕ нарушай). 🔵 (дословно) ставь ТОЛЬКО если гейт подтвердил;
-   иначе 🟡. НИКОГДА не выдумывай цитаты. ЧТОБЫ БЫЛИ 🔵 — НЕ собирай цитату руками (соблазн
-   перефразировать → 🟡), а зови `cite(advisor_dir, query)`: он отдаёт ГОТОВЫЙ проверенный объект
-   {quote:{text,source}, marker}. Вставь `quote` как есть в opinion.quote, marker уже подтверждён,
-   перевод — в quote.translation. Если cite вернул quote:null — дословного нет, иди 🟡, НЕ выдумывай.
-   Гейт исправен: 🟡 на «дословном» = текст не точный (перевёл/сократил), это НЕ «дефект корпуса».
+4. КОНТУР ВЕРНОСТИ (протокол-гейт, НЕ нарушай). 🔵 ставь ТОЛЬКО если гейт подтвердил; иначе 🟡.
+   НИКОГДА не выдумывай цитаты. ЧТОБЫ БЫЛИ 🔵 — НЕ собирай цитату руками (соблазн перефразировать
+   → 🟡), а зови `cite(advisor_dir, query)`: он отдаёт ГОТОВЫЕ проверенные `quotes[]` + `best`.
+   Вставь любой `quote` как есть в opinion.quote, marker подтверждён, перевод — в quote.translation.
+   RECALL (чтобы цитат было БОЛЬШЕ): query давай в ЯЗЫКЕ КОРПУСА (для этих советников — English) и
+   МОЖНО списком из 2-4 формулировок-перефразировок — перевод запроса даёт реальный лифт. Если
+   quotes пуст — дословного нет, иди 🟡, НЕ выдумывай. Гейт исправен: 🟡 на «дословном» = текст не
+   точный (перевёл/сократил), это НЕ «дефект корпуса».
 
 5. СОГЛАСИЕ НА КОНТЕКСТ (non-capture). Базовый контекст = корпуса советников + вопрос. Контекст
    СВЕРХ (память, другие проекты, внешнее) — спрашивай разрешение (если в Принцепсе не allow).

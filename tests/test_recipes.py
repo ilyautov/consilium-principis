@@ -19,6 +19,13 @@ def test_recipes_well_formed():
         assert isinstance(r["triggers"], list) and r["triggers"]
 
 
+def test_every_recipe_has_short_button_label():
+    # короткая подпись нужна для кнопок-опций в Code/Cowork (длинный title на кнопку не лезет)
+    for r in load_recipes():
+        assert r.get("short"), f"{r['id']} без short-подписи под кнопку"
+        assert len(r["short"]) <= 22, f"{r['id']} short слишком длинная для кнопки"
+
+
 def test_menu_is_human_readable():
     menu = render_menu(load_recipes())
     assert "Что может пойти не так" in menu        # премортем-триггер виден

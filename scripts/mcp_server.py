@@ -129,6 +129,26 @@ def _cite(advisor_dir, query, top_k=8, use_kernels=True, limit=4):
                      "или другой формулировкой; гейт исправен.")}
 
 
+def _build_lens(name, ground_text, reading_notes=None, author=None, kind="personality",
+                axis=None, slug=None, dest=None, run_kernels=False):
+    """Собрать grounded-линзу (линзы > личности). ground_text → P1 (🔵), reading_notes → U1 (🟡).
+    По умолчанию пишет в advisors/<slug> (гитигнорится — личная линза не шипится). Готовую линзу
+    сразу можно звать в cite/retrieve как advisor_dir. Интервью ведёт ХОСТ (см. instructions)."""
+    import re
+    import lens_builder
+    if dest:
+        d = _resolve(dest)
+    else:
+        s = slug or re.sub(r"[^a-z0-9]+", "-", (name or "lens").lower()).strip("-") or "lens"
+        d = _resolve(os.path.join("advisors", s))     # личная линза → гитигнор-зона, не шипится
+    res = lens_builder.build_lens(d, name=name, ground_text=ground_text, reading_notes=reading_notes,
+                                  author=author, kind=kind, axis=axis, run_kernels=run_kernels)
+    res["advisor_dir"] = d
+    res["next_action"] = ("Линза собрана. Зови cite/retrieve с advisor_dir='" + d + "'. 🔵 — дословно "
+                          "из текста-основы, 🟡 — твоё прочтение. Включи её голосом в следующее заседание.")
+    return res
+
+
 def _build_tree(d):
     """JSON-узел → внутреннее дерево ситуации (Move/node)."""
     mv = d.get("move")
@@ -353,6 +373,27 @@ TOOLS = {
         "input_schema": _obj({"quote": "string", "advisor_dir": "string"},
                              ["quote", "advisor_dir"]),
         "handler": _fidelity_check,
+    },
+    "build_lens": {
+        "description": "Собрать grounded-ЛИНЗУ из любого источника (линзы > личности). ground_text → "
+                       "P1 (🔵 дословные слова авторитета линзы), reading_notes → U1 (🟡 твоё прочтение, "
+                       "не выдаётся за слова автора). kind: personality (=«автор как читаю Я», его PD-текст "
+                       "+ твой слой) | method (текст метода/статьи) | self (твои слова). Пишет в "
+                       "advisors/<slug> (личная, не шипится). Готовую линзу сразу зови в cite/retrieve. "
+                       "Сбор ведётся ИНТЕРАКТИВНО (см. правило интервью): спроси источник + «как ТЫ читаешь».",
+        "input_schema": {"type": "object",
+                         "properties": {"name": {"type": "string"},
+                                        "ground_text": {"type": "string"},
+                                        "reading_notes": {"type": "string"},
+                                        "author": {"type": "string"},
+                                        "kind": {"type": "string",
+                                                 "enum": ["personality", "method", "self"]},
+                                        "axis": {"type": "string"},
+                                        "slug": {"type": "string"},
+                                        "dest": {"type": "string"},
+                                        "run_kernels": {"type": "boolean"}},
+                         "required": ["name", "ground_text"]},
+        "handler": _build_lens,
     },
     "cite": {
         "description": "ГОТОВЫЕ 🔵-цитаты под довод (вместо ручной сборки — так цитата не станет "
@@ -629,6 +670,14 @@ Consilium-Principis — личный совет AI-персон реальных
 
 6. Подача: язык юзера; 🔵-цитата дословна в оригинале + перевод-глосса. depth=plain по умолчанию,
    expert — по запросу.
+
+7. ИНТЕРАКТИВНАЯ СБОРКА ЛИНЗ (линза не загружается, а ВЫСПРАШИВАЕТСЯ — зеркало круглого стола).
+   Когда юзер хочет добавить советника/линзу — НЕ батч «дай файл». Веди интервью голосом: кого/что
+   добавляем? дай источник (вставь текст / файл / ссылку). Если это мыслитель — спроси «а как ТЫ его
+   читаешь: что для тебя главное, что отбрасываешь?» — это твой интерпретирующий слой. Затем зови
+   `build_lens(name, ground_text=<дословный источник>, reading_notes=<как читаешь>, kind)`:
+   kind=personality («автор как читаю Я») | method | self. Контур честен: 🔵 = слова источника (P1),
+   🟡 = твоё прочтение (U1). Не выдавай прочтение за слова автора. Готовую линзу включай голосом в совет.
 """
 
 

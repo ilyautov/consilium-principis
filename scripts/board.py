@@ -5,7 +5,7 @@
   principis <ans.json>   — собрать principis.md из ответов (не перезатирает без --force)
   ingest-telegram <@h>   — выкачать публичный канал в корпус-Принцепса (твои слова = P1)
   validate-manifest <d>  — проверить тир-манифест советника (маркеры реально в тексте? ров цел?)
-  build-advisor <d>      — собрать советника в один шаг: манифест-гейт → corpus → kernels → отчёт
+  build-advisor <d>      — собрать советника в один шаг: манифест-гейт → corpus → kernels → индекс
   seed-council           — собрать стартовый совет PD-мудрецов с нуля (Аврелий + Эпиктет)
   doctor                 — health-check: Python, скилл установлен, тир, самотест рва
 
@@ -87,7 +87,8 @@ def cmd_build_advisor(args):
     if not args:
         print("дай advisors/{имя}")
         return 1
-    res = build_advisor_full(args[0], run_kernels="--no-kernels" not in args)
+    res = build_advisor_full(args[0], run_kernels="--no-kernels" not in args,
+                             run_index="--no-index" not in args)
     if not res["ok"]:
         print(f"✗ остановлено на {res['stopped_at']}: {len(res['problems'])} проблем манифеста")
         for p in res["problems"]:

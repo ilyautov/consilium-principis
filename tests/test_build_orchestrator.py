@@ -51,3 +51,19 @@ def test_kernels_graceful_without_ollama():
         k = [s for s in res["steps"] if s["step"] == "kernels"]
         assert len(k) == 1
         assert res["ok"] is True            # корпус собран независимо от kernels
+
+
+def test_index_step_graceful():
+    with tempfile.TemporaryDirectory() as t:
+        adv = _advisor(t, "Первое. Второе про мудрость и спокойствие.", {"a.txt": {"tier": "P1"}})
+        res = build_advisor_full(adv, run_kernels=False, run_index=True)
+        idx = [s for s in res["steps"] if s["step"] == "index"]
+        assert len(idx) == 1                # семантик-индекс строится (или graceful note без ollama)
+        assert res["ok"] is True            # корпус цел независимо от индекса (контур на полу)
+
+
+def test_index_skipped_when_disabled():
+    with tempfile.TemporaryDirectory() as t:
+        adv = _advisor(t, "Текст.", {"a.txt": {"tier": "P1"}})
+        res = build_advisor_full(adv, run_kernels=False, run_index=False)
+        assert [s for s in res["steps"] if s["step"] == "index"] == []

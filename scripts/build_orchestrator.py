@@ -15,8 +15,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from manifest_builder import validate_manifest
 
 
-def build_advisor_full(advisor_dir, author=None, run_kernels=True):
-    """Манифест-гейт → corpus → (kernels) → отчёт. Возврат: {ok, steps, ...}."""
+def build_advisor_full(advisor_dir, author=None, run_kernels=True, run_index=True):
+    """Манифест-гейт → corpus → (kernels) → (семантик-индекс) → отчёт. Возврат: {ok, steps, ...}."""
     steps = []
     sources_dir = os.path.join(advisor_dir, "sources")
     manifest_path = os.path.join(sources_dir, "manifest.json")
@@ -46,6 +46,19 @@ def build_advisor_full(advisor_dir, author=None, run_kernels=True):
         except Exception as e:
             steps.append({"step": "kernels", "ok": False, "note": f"нужен ollama/gemma: {e}"})
 
-    # 4) ОТЧЁТ готовности
+    # 4) СЕМАНТИК-ИНДЕКС (ollama/bge-m3 → FULL-ретрив; без него остаёмся на полу, контур цел)
+    if run_index:
+        try:
+            import tier_full
+            if tier_full.available():
+                tier_full.build_index(advisor_dir)
+                steps.append({"step": "index", "ok": True})
+            else:
+                steps.append({"step": "index", "ok": False,
+                              "note": "ollama/bge-m3 недоступен → SIMPLE (пол), контур цел"})
+        except Exception as e:
+            steps.append({"step": "index", "ok": False, "note": f"индекс не построен: {e}"})
+
+    # 5) ОТЧЁТ готовности
     from preflight import _advisor_status
     return {"ok": True, "steps": steps, "status": _advisor_status(advisor_dir)}

@@ -231,7 +231,52 @@ _STAGE_STYLE = (
  'padding:7px 15px;border-radius:999px;border:.5px solid var(--color-border-secondary,rgba(127,127,127,.4));'
  'background:transparent;color:var(--color-text-primary,CanvasText)}'
  '.cp-stage .acts i{margin-right:5px}'
+ '.cp-stage .roster{margin:16px 0 0}'
+ '.cp-stage .seat{display:flex;gap:13px;align-items:flex-start;margin:14px 0 0}'
+ '.cp-stage .seat .med{width:38px;height:38px;font-size:13px}'
+ '.cp-stage .seat .who{flex:1;min-width:0;padding-top:3px}'
+ '.cp-stage .seat .nm{margin:0 0 3px}'
+ '.cp-stage .seat .dom{font-size:14px;line-height:1.5;color:var(--color-text-secondary,#888)}'
+ '.cp-stage .invite{text-align:center;font-size:18px;line-height:1.46;margin:22px auto 2px;max-width:34ch}'
+ '.cp-stage .asks{margin:14px auto 0;max-width:34ch;text-align:center}'
+ '.cp-stage .asks .q{font-style:italic;font-size:15px;line-height:1.5;'
+ 'color:var(--color-text-secondary,#999);margin:7px 0}'
+ '.cp-stage .qask{margin:26px auto 0;max-width:540px}'
+ '.cp-stage .qask .q{font-size:14.5px;line-height:1.6;margin:12px 0;padding-left:19px;position:relative}'
+ '.cp-stage .qask .q::before{content:"";position:absolute;left:0;top:8px;width:6px;height:6px;'
+ 'border-radius:50%;background:var(--color-text-info,#185FA5);opacity:.65}'
  '</style>')
+
+
+def render_opening(o, actions=None):
+    """Сценический ОПЕНИНГ круглого стола (занавес поднят): роспись советников (dramatis personae) +
+    приглашение + опц. уточняющие вопросы. o={advisors:[{name, domain?, grounded?}], invitation?,
+    questions?, chips?}. actions/chips → sendPrompt быстрые ответы. grounded=False (линза) → без glow."""
+    seats = []
+    for i, a in enumerate(o.get("advisors", [])):
+        accent = _AVATAR[i % len(_AVATAR)]
+        glow = ((f'box-shadow:0 0 0 1px color-mix(in srgb,{accent} 40%,transparent),'
+                 f'0 3px 16px color-mix(in srgb,{accent} 22%,transparent)')
+                if a.get("grounded", True) else 'opacity:.8')
+        med = f'background:color-mix(in srgb,{accent} 18%,transparent);color:{accent};{glow}'
+        dom = f'<div class="dom">{_e(a["domain"])}</div>' if a.get("domain") else ""
+        seats.append(f'<div class="seat"><div class="med" style="{med}">{_e(_initials(a["name"]))}</div>'
+                     f'<div class="who"><div class="nm">{_e(a["name"])}</div>{dom}</div></div>')
+    invite = f'<p class="invite">{_e(o["invitation"])}</p>' if o.get("invitation") else ""
+    qs = o.get("questions") or []
+    asks = ('<div class="asks">' + "".join(f'<p class="q">{_e(q)}</p>' for q in qs) + '</div>') if qs else ""
+    chips = actions or o.get("chips")
+    btns = ""
+    if chips:
+        norm = [(c[0], c[1], c[2] if len(c) == 3 else "ti-arrow-right") for c in chips]
+        btns = ('<div class="acts">' + "".join(
+            f'<button onclick="{_onclick(p)}"><i class="ti {icon}" aria-hidden="true"></i>{_e(label)}</button>'
+            for label, p, icon in norm) + '</div>')
+    return (_STAGE_STYLE + '<div class="cp-stage">'
+            '<div class="eyebrow"><i class="ti ti-masks-theater" aria-hidden="true"></i>Совет в сборе</div>'
+            f'<div class="roster">{"".join(seats)}</div>'
+            '<div class="rule"><i class="ti ti-diamond" aria-hidden="true"></i></div>'
+            f'{invite}{asks}{btns}</div>')
 
 
 def _pull_quote(q, marker):
@@ -246,13 +291,16 @@ def _pull_quote(q, marker):
 
 
 def render_widget(s, actions=None, depth="plain"):
-    """show_widget (Cowork): заседание как СЦЕНА (театр по умолчанию), инженерия — под тумблером.
-    actions = [(label, prompt[, icon]), ...] → кнопки sendPrompt. depth: plain (театр, .eng скрыт) |
-    expert (инженерия раскрыта сразу, .show-eng). Ров цел: верифицированная цитата + источник видны,
-    фейк-цитат нет; пилюли/цена/форсаж/легенда — .eng, один клик «показать инженерию»."""
+    """show_widget (Cowork): ход заседания как СЦЕНА (театр по умолчанию), инженерия — под тумблером.
+    Рендерит ЛЮБОЙ ход: реакции+вопросы (без synthesis — круглый стол) ИЛИ синтез-вердикт (с synthesis).
+    s.questions=[...] → блок «совет спрашивает». actions=[(label,prompt[,icon])] → sendPrompt. depth:
+    plain (театр) | expert (.show-eng). Ров: верифиц. цитата+источник видны, пилюли — .eng (тумблер)."""
+    has_synth = bool(s.get("synthesis"))
     if actions is None:
-        actions = [("занести в журнал", "занеси это решение совета в журнал", "ti-notebook"),
-                   ("оспорить синтез", "оспорь синтез совета как адвокат дьявола", "ti-swords")]
+        actions = ([("занести в журнал", "занеси это решение совета в журнал", "ti-notebook"),
+                    ("оспорить синтез", "оспорь синтез совета как адвокат дьявола", "ti-swords")]
+                   if has_synth else
+                   [("давай синтез", "давай синтез сейчас, не доспрашивая", "ti-gavel")])
     norm = [(a[0], a[1], a[2] if len(a) == 3 else "ti-arrow-right") for a in actions]
     root_cls = "cp-stage show-eng" if depth == "expert" else "cp-stage"
 
@@ -290,10 +338,17 @@ def render_widget(s, actions=None, depth="plain"):
         parts.append('<div class="rift"><div class="rl">где расходятся</div>'
                      f'<b style="font-weight:500">{_e(d["axis"])}</b>{sd}{rs}</div>')
 
-    cost = (f'<p class="cost eng">Чем платишь: {_e(s["what_you_lose"])}</p>'
-            if s.get("what_you_lose") else "")
-    parts.append('<div class="verdict"><div class="vlabel">Вердикт</div>'
-                 f'<p class="vtext">{_e(s["synthesis"])}</p>{cost}</div>')
+    qs = s.get("questions") or []
+    if qs:                                          # ход круглого стола: совет допрашивает до синтеза
+        items = "".join(f'<p class="q">{_e(q)}</p>' for q in qs)
+        parts.append('<div class="qask"><div class="vlabel">Совет спрашивает</div>'
+                     f'{items}</div>')
+
+    if has_synth:
+        cost = (f'<p class="cost eng">Чем платишь: {_e(s["what_you_lose"])}</p>'
+                if s.get("what_you_lose") else "")
+        parts.append('<div class="verdict"><div class="vlabel">Вердикт</div>'
+                     f'<p class="vtext">{_e(s["synthesis"])}</p>{cost}</div>')
 
     if s.get("step"):
         parts.append('<p class="step"><i class="ti ti-arrow-right" aria-hidden="true"></i>'

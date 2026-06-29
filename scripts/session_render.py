@@ -98,73 +98,161 @@ def render_md(s):
     return "\n".join(out)
 
 
-# ---------- show_widget (нативный Cowork, кликабельный) ----------
+# ---------- show_widget (нативный Cowork, диалоговый формат) ----------
+# Советники = чат-баблы с аватарами; маркер достоверности = пилюля (🔵→«дословно»),
+# не цветная точка. Без эмодзи в вёрстке (Tabler-иконки), веса 400/500, цвет несёт
+# только маркер. Соответствие дизайн-системе Cowork (см. mcp__visualize read_me).
 
-def _opinion_block(op, color_expr):
-    mk = _marker(op.get("marker"))
-    dot = (f'<span style="color:{color_expr}">{mk[0]}</span> ' if mk else "")
-    html = [f'<p style="margin:0 0 6px">{dot}{_e(op["argument"])}</p>']
-    q = op.get("quote")
-    if q:
-        src = f' <span style="opacity:.6;font-size:.85em">({_e(q["source"])})</span>' if q.get("source") else ""
-        tr = (f'<span style="display:block;opacity:.75;margin-top:3px">{_e(q["translation"])}</span>'
-              if q.get("translation") else "")
-        html.append(
-            '<blockquote style="margin:0 0 4px;padding:6px 10px;border-radius:8px;'
-            'background:var(--color-background-secondary,rgba(127,127,127,.12))">'
-            f'<em>«{_e(q["text"])}»</em>{src}{tr}</blockquote>')
-    return "".join(html)
+# аватар-акцент: mid-ramp hex, адаптивен в обе темы через color-mix
+_AVATAR = ["#534AB7", "#D85A30", "#185FA5", "#1D9E75", "#D4537E", "#BA7517"]
+
+# marker → (подпись, css-bg, css-text, fallback-hex, tabler-иконка)
+_PILL = {
+    "blue":      ("дословно",     "--color-background-info",    "--color-text-info",    "#185FA5", "ti-quote"),
+    "yellow":    ("в духе автора", "--color-background-warning", "--color-text-warning", "#854F0B", "ti-bulb"),
+    "violation": ("нарушение",    "--color-background-danger",  "--color-text-danger",  "#A32D2D", "ti-alert-triangle"),
+}
+
+
+def _initials(name):
+    import re as _re
+    words = [w for w in _re.findall(r"[A-Za-zА-Яа-яЁё]+", name) if w]
+    if not words:
+        return "•"
+    if len(words) == 1:
+        return words[0][:2].upper()
+    return (words[0][0] + words[1][0]).upper()
+
+
+def _pill(marker):
+    p = _PILL.get("yellow" if marker == "amber" else marker)
+    if not p:
+        return ""
+    label, bg, fg, hexf, icon = p
+    return (f'<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;'
+            f'font-weight:500;background:var({bg},rgba(55,138,221,.16));color:var({fg},{hexf});'
+            f'padding:2px 8px;border-radius:var(--border-radius-md,8px)">'
+            f'<i class="ti {icon}" aria-hidden="true"></i>{label}</span>')
+
+
+def _quote_widget(q, marker):
+    if not q:
+        return ""
+    src = (f'<span style="font-size:11.5px;opacity:.6">{_e(q["source"])}</span>'
+           if q.get("source") else "")
+    tr = (f'<span style="display:block;font-family:var(--font-sans,system-ui);font-style:normal;'
+          f'opacity:.75;margin-top:5px;font-size:12.5px">{_e(q["translation"])}</span>'
+          if q.get("translation") else "")
+    meta = _pill(marker) + src
+    metarow = (f'<span style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:7px;'
+               f'font-family:var(--font-sans,system-ui);font-style:normal">{meta}</span>') if meta else ""
+    return ('<blockquote style="margin:0 0 4px;padding:8px 12px;border-radius:var(--border-radius-md,8px);'
+            'background:color-mix(in srgb,CanvasText 6%,transparent);'
+            'font-family:var(--font-serif,Georgia,serif);font-size:13.5px;line-height:1.55">'
+            f'«{_e(q["text"])}»{tr}{metarow}</blockquote>')
 
 
 def render_widget(s, actions=None):
-    """HTML-строка для mcp__visualize__show_widget. actions = [(label, prompt), ...] → кнопки
-    sendPrompt. Цвета через --color-* (тёмная тема Cowork адаптируется сама)."""
+    """Диалоговый HTML для mcp__visualize__show_widget: советники = чат-баблы с аватарами.
+    actions = [(label, prompt[, icon]), ...] → кнопки sendPrompt. Цвета через --color-*
+    (тёмная тема Cowork адаптируется сама)."""
     if actions is None:
-        actions = [("📓 занести в журнал", "занеси это решение в журнал"),
-                   ("🔍 покажи разбор", "покажи разбор с числами")]
-    bubbles = []
-    for a in s.get("advisors", []):
-        first_mk = next((_marker(o.get("marker")) for o in a.get("opinions", []) if _marker(o.get("marker"))), None)
-        edge = f"var({first_mk[1]},{first_mk[2]})" if first_mk else "var(--color-text-tertiary,#9aa0a6)"
-        ops = "".join(_opinion_block(o, edge) for o in a.get("opinions", []))
-        bubbles.append(
-            f'<article style="border-left:4px solid {edge};padding:4px 14px;margin:0 0 14px">'
-            f'<h3 style="margin:0 0 6px;font-size:1.02rem">{_e(a["name"])}</h3>{ops}</article>')
-    parts = [
-        '<div style="font-family:var(--font-sans,system-ui,sans-serif);'
-        'color:var(--color-text-primary,CanvasText);max-width:720px">',
-        '<h2 style="font-size:1.25rem;margin:0 0 8px">Заседание совета</h2>',
-        f'<p style="margin:0 0 4px"><span style="opacity:.6">Вопрос:</span> {_e(s["question"])}</p>',
-    ]
+        actions = [("занести в журнал", "занеси это решение совета в журнал", "ti-notebook"),
+                   ("оспорить синтез", "оспорь синтез совета как адвокат дьявола", "ti-swords")]
+    norm = [(a[0], a[1], a[2] if len(a) == 3 else "ti-arrow-right") for a in actions]
+
+    parts = ['<h2 class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;'
+             f'clip:rect(0 0 0 0)">Заседание совета (диалог): {_e(s["question"][:160])}</h2>',
+             '<div style="font-family:var(--font-sans,system-ui,sans-serif);'
+             'color:var(--color-text-primary,CanvasText);max-width:720px;padding:1rem 0">',
+             '<div style="font-size:13px;color:var(--color-text-secondary,#777);margin:0 0 12px">'
+             '<i class="ti ti-users-group" aria-hidden="true" style="font-size:15px;vertical-align:-2px;'
+             'margin-right:5px"></i>Заседание совета · цитаты сверены с корпусом</div>']
+
+    # реплика юзера
+    parts.append('<div style="display:flex;justify-content:flex-end;margin:0 0 4px">'
+                 '<div style="max-width:86%;background:var(--color-background-info,rgba(55,138,221,.14));'
+                 'border-radius:var(--border-radius-lg,12px);padding:10px 14px">'
+                 '<div style="font-size:12px;font-weight:500;color:var(--color-text-info,#185FA5);'
+                 'margin-bottom:3px">ты</div>'
+                 f'<div style="font-size:14px;line-height:1.6">{_e(s["question"])}</div></div></div>')
+
     if s.get("reframe"):
-        parts.append(f'<p style="opacity:.8;font-style:italic;margin:0 0 16px">{_e(s["reframe"])}</p>')
-    parts += ['<div style="margin:16px 0">', *bubbles, "</div>"]
+        parts.append('<p style="text-align:center;font-size:12.5px;font-style:italic;'
+                     'color:var(--color-text-tertiary,#999);margin:10px 24px 18px;line-height:1.55">'
+                     f'Совет переформулирует: {_e(s["reframe"])}</p>')
+
+    for i, a in enumerate(s.get("advisors", [])):
+        accent = _AVATAR[i % len(_AVATAR)]
+        ops = []
+        for op in a.get("opinions", []):
+            ops.append(f'<p style="margin:0 0 8px;font-size:14px;line-height:1.6">{_e(op["argument"])}</p>')
+            ops.append(_quote_widget(op.get("quote"), op.get("marker")))
+        bubble = ("".join(ops)).rstrip()
+        parts.append(
+            '<div style="display:flex;gap:10px;margin:0 0 16px">'
+            f'<div style="flex:none;width:40px;height:40px;border-radius:50%;'
+            f'background:color-mix(in srgb,{accent} 16%,transparent);color:{accent};'
+            'display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500">'
+            f'{_e(_initials(a["name"]))}</div>'
+            '<div style="flex:1;min-width:0">'
+            f'<div style="font-size:14px;font-weight:500;margin:2px 0 6px">{_e(a["name"])}</div>'
+            f'<div style="background:color-mix(in srgb,{accent} 7%,transparent);'
+            f'border-radius:var(--border-radius-lg,12px);padding:12px 14px">{bubble}</div></div></div>')
+
     d = s.get("disagreement")
     if d:
-        sides = " · ".join(_e(x) for x in d.get("sides", []))
-        parts.append(
-            '<section style="margin:14px 0"><h3 style="font-size:.95rem;opacity:.8;margin:0 0 4px">'
-            f'Где расходятся</h3><p style="margin:0"><b>Ось:</b> {_e(d["axis"])}<br>{sides}'
-            + (f'<br><b>Снимается:</b> {_e(d["resolver"])}' if d.get("resolver") else "") + "</p></section>")
-    parts.append(
-        '<section style="border-top:1px solid var(--color-border-primary,rgba(127,127,127,.3));'
-        f'padding-top:12px;margin-top:14px"><h3 style="font-size:.95rem;opacity:.8;margin:0 0 4px">'
-        f'Синтез</h3><p style="margin:0">{_e(s["synthesis"])}</p>'
-        + (f'<p style="opacity:.75;margin:6px 0 0"><em>Чем платишь: {_e(s["what_you_lose"])}</em></p>'
-           if s.get("what_you_lose") else "") + "</section>")
+        sides = "; ".join(_e(x) for x in d.get("sides", []))
+        res = (f'<br><b style="font-weight:500">Снимается:</b> {_e(d["resolver"])}'
+               if d.get("resolver") else "")
+        parts.append('<div style="background:var(--color-background-secondary,rgba(127,127,127,.08));'
+                     'border-radius:var(--border-radius-lg,12px);padding:12px 16px;margin:18px 0 0">'
+                     '<div style="font-size:13px;font-weight:500;color:var(--color-text-secondary,#777);'
+                     'margin-bottom:4px"><i class="ti ti-arrows-split" aria-hidden="true" '
+                     'style="font-size:15px;vertical-align:-2px;margin-right:5px"></i>Где расходятся</div>'
+                     '<p style="margin:0;font-size:13.5px;line-height:1.6">'
+                     f'<b style="font-weight:500">Ось:</b> {_e(d["axis"])}<br>{sides}{res}</p></div>')
+
+    syn = ('<div style="border:1.5px solid var(--color-border-info,rgba(55,138,221,.4));'
+           'border-radius:var(--border-radius-lg,12px);padding:14px 16px;margin:14px 0 0">'
+           '<div style="font-size:13px;font-weight:500;color:var(--color-text-info,#185FA5);'
+           'margin-bottom:5px"><i class="ti ti-gavel" aria-hidden="true" style="font-size:15px;'
+           'vertical-align:-2px;margin-right:5px"></i>Синтез совета</div>'
+           f'<p style="margin:0;font-size:14px;line-height:1.65">{_e(s["synthesis"])}</p>')
+    if s.get("what_you_lose"):
+        syn += ('<p style="margin:8px 0 0;font-size:12.5px;line-height:1.55;'
+                'color:var(--color-text-secondary,#777)"><i class="ti ti-coin" aria-hidden="true" '
+                'style="font-size:14px;vertical-align:-2px;margin-right:4px"></i>Чем платишь: '
+                f'{_e(s["what_you_lose"])}</p>')
+    parts.append(syn + "</div>")
+
     if s.get("step"):
-        parts.append('<section style="margin:14px 0"><h3 style="font-size:.95rem;opacity:.8;margin:0 0 4px">'
-                     f'Шаг</h3><p style="margin:0;font-weight:600">{_e(s["step"])}</p></section>')
+        parts.append('<div style="display:flex;align-items:flex-start;gap:8px;margin:14px 0 0;'
+                     'font-size:14px;line-height:1.6"><i class="ti ti-arrow-right" aria-hidden="true" '
+                     'style="font-size:17px;color:var(--color-text-info,#185FA5);margin-top:2px"></i>'
+                     f'<div><b style="font-weight:500">Шаг:</b> {_e(s["step"])}</div></div>')
+
+    if s.get("forcing_question"):
+        parts.append('<p style="margin:12px 0 0;font-size:13px;font-style:italic;'
+                     'color:var(--color-text-tertiary,#999);line-height:1.55">'
+                     '<i class="ti ti-help-circle" aria-hidden="true" style="font-style:normal;'
+                     'vertical-align:-2px;margin-right:4px"></i>Вопрос-форсаж: '
+                     f'{_e(s["forcing_question"])}</p>')
+
     btns = "".join(
-        f'<button onclick="{_onclick(p)}" style="font:inherit;cursor:pointer;'
-        'padding:8px 14px;border-radius:999px;border:1px solid '
-        'var(--color-border-primary,rgba(127,127,127,.4));background:transparent;'
-        f'color:var(--color-text-primary,CanvasText)">{_e(label)}</button>'
-        for label, p in actions)
-    parts.append(f'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px">{btns}</div>')
-    parts.append(
-        '<p style="margin-top:18px;font-size:.8rem;opacity:.7">🔵 дословная цитата (с источником) · '
-        '🟡 мысль в духе автора · отказ вместо выдумки.</p></div>')
+        f'<button onclick="{_onclick(p)}" style="font:inherit;cursor:pointer;padding:8px 14px;'
+        'border-radius:999px;border:.5px solid var(--color-border-secondary,rgba(127,127,127,.4));'
+        'background:transparent;color:var(--color-text-primary,CanvasText)">'
+        f'<i class="ti {icon}" aria-hidden="true" style="margin-right:5px"></i>{_e(label)}</button>'
+        for label, p, icon in norm)
+    parts.append(f'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:18px">{btns}</div>')
+
+    parts.append('<p style="margin-top:16px;font-size:11.5px;color:var(--color-text-tertiary,#999);'
+                 'line-height:1.5"><span style="display:inline-flex;align-items:center;gap:3px;'
+                 'color:var(--color-text-info,#185FA5)"><i class="ti ti-quote" aria-hidden="true"></i>'
+                 'дословно</span> — сверено с корпусом первоисточника · отказ вместо выдумки, если '
+                 'совпадения нет.</p>')
+    parts.append("</div>")
     return "".join(parts)
 
 

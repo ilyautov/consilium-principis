@@ -273,6 +273,35 @@ def test_build_lens_tool_grounds_and_is_citable(tmp_path):
     assert fc["status"] != "🔵"
 
 
+def test_build_lens_grounds_from_url(monkeypatch, tmp_path):
+    # основа линзы — целый PD-том по URL (фетч+strip), без вставки текста
+    import collect_common as cc
+    monkeypatch.setattr(cc, "fetch", lambda url, timeout=30:
+                        "*** START OF THE PROJECT GUTENBERG EBOOK ***\n"
+                        "He who is feared is safer than he who is loved, in the council of princes.\n"
+                        "*** END OF THE PROJECT GUTENBERG EBOOK ***")
+    dest = str(tmp_path / "url-lens")
+    r = dispatch("build_lens", {"name": "URL-линза", "dest": dest, "kind": "personality",
+                 "ground_url": "https://www.gutenberg.org/cache/epub/1/pg1.txt",
+                 "reading_notes": "Читаю про надёжность стимула."})
+    assert r["tiers"].get("P1", 0) >= 1
+    fc = dispatch("fidelity_check", {"quote": "He who is feared is safer", "advisor_dir": dest})
+    assert fc["status"] == "🔵"                          # дословно из фетченного тома
+    ground = open(os.path.join(dest, "sources", "ground.txt"), encoding="utf-8").read()
+    assert "START OF THE PROJECT GUTENBERG" not in ground   # Gutenberg-boilerplate срезан до сборки
+
+
+def test_build_lens_requires_some_ground(tmp_path):
+    r = dispatch("build_lens", {"name": "пусто", "dest": str(tmp_path / "x")})
+    assert "error" in r and "основу" in r["error"]
+
+
+def test_build_lens_path_traversal_guarded(tmp_path):
+    r = dispatch("build_lens", {"name": "t", "dest": str(tmp_path / "y"),
+                 "ground_path": "../../../../../../etc/passwd"})
+    assert "error" in r and ("traversal" in r["error"].lower() or "вне корня" in r["error"])
+
+
 def test_build_lens_in_instructions():
     from mcp_server import INSTRUCTIONS
     assert "build_lens" in INSTRUCTIONS and "выспрашивается" in INSTRUCTIONS.lower()

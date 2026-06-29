@@ -227,42 +227,46 @@ def _ollama_ensure():
             "note": "Запустил `ollama serve`, демон ещё не ответил — повтори ollama_status через пару секунд."}
 
 
-def _add_source(advisor_dir, url=None, text=None, path=None, basename=None,
-                tier="P1", license=None):
-    """Затянуть источник в advisors/<name>/sources/ без шелла: url (фетч+strip Gutenberg) | text
-    (вставка) | path (локальный текст-файл). Проставляет тир в sources/manifest.json (его читает
-    pipeline.build). Скачивание = подтверди у юзера. Не-PD хост требует явного license."""
+def _load_source_text(url=None, path=None, text=None, license=None):
+    """Безопасно достать текст источника: url (SSRF-гард + Gutenberg-strip) | path (traversal-гард,
+    только внутри репо) | text. Возвращает (text, hint, provenance, license_note) или поднимает
+    ValueError с понятной причиной. Общий рычаг для add_source и build_lens (DRY)."""
     import collect_common as cc
-    d = _resolve(advisor_dir)
     if url:
         if not (cc.is_pd_host(url) or license == "public-domain"):
-            return {"error": "не-PD хост: подтверди PD-статус явно (license=public-domain) — права на тебе"}
-        try:
-            raw = cc.fetch(url)                         # SSRF-гард внутри (ValueError при непубличном IP)
-        except ValueError as e:
-            return {"error": str(e)}
-        except Exception as e:
-            return {"error": f"фетч не удался: {e}"}
+            raise ValueError("не-PD хост: подтверди PD-статус явно (license=public-domain) — права на тебе")
+        raw = cc.fetch(url)                            # SSRF-гард внутри (ValueError при непубличном IP)
         if "gutenberg" in url.lower():
             import collect_pd
             raw = collect_pd.strip_gutenberg(raw)
-        bn = basename or (cc.host_of(url) + "-" + url.rstrip("/").rsplit("/", 1)[-1])
-        src_path = cc.land_to_sources(d, bn, raw, url=url, license_note=license or "public-domain")
-    elif path:
+        hint = cc.host_of(url) + "-" + url.rstrip("/").rsplit("/", 1)[-1]
+        return raw, hint, url, (license or "public-domain")
+    if path:
         rp = os.path.realpath(_resolve(path))
         root = os.path.realpath(_root())               # path traversal: только внутри репо
         if not (rp == root or rp.startswith(root + os.sep)):
-            return {"error": "path вне корня репо запрещён (защита от traversal). Для внешнего файла "
-                             "вставь его текст через text= или положи в репо."}
-        raw = open(rp, encoding="utf-8").read()
-        src_path = cc.land_to_sources(d, basename or os.path.basename(rp), raw,
-                                      url=f"file:{rp}", license_note=license or "unknown")
-    elif text:
-        raw = text
-        src_path = cc.land_to_sources(d, basename or "pasted-source", text,
-                                      url="(вставка)", license_note=license or "unknown")
-    else:
-        return {"error": "дай url | text | path"}
+            raise ValueError("path вне корня репо запрещён (traversal). Внешний файл — через text= или копию в репо.")
+        return open(rp, encoding="utf-8").read(), os.path.basename(rp), f"file:{rp}", (license or "unknown")
+    if text:
+        return text, "pasted-source", "(вставка)", (license or "unknown")
+    raise ValueError("дай url | text | path")
+
+
+def _add_source(advisor_dir, url=None, text=None, path=None, basename=None,
+                tier="P1", license=None):
+    """Затянуть источник в advisors/<name>/sources/ без шелла: url (фетч+strip Gutenberg) | text
+    (вставка) | path (локальный текст-файл, только внутри репо). Проставляет тир в sources/
+    manifest.json (его читает pipeline.build). Скачивание = подтверди у юзера. Не-PD хост требует
+    явного license. SSRF/traversal-гарды в _load_source_text."""
+    import collect_common as cc
+    d = _resolve(advisor_dir)
+    try:
+        raw, hint, prov, lic = _load_source_text(url=url, path=path, text=text, license=license)
+    except ValueError as e:
+        return {"error": str(e)}
+    except Exception as e:
+        return {"error": f"источник не загрузился: {e}"}
+    src_path = cc.land_to_sources(d, basename or hint, raw, url=prov, license_note=lic)
     fn = os.path.basename(src_path)
     man_p = os.path.join(d, "sources", "manifest.json")     # tier-манифест для clean.tag_regions
     try:
@@ -277,13 +281,26 @@ def _add_source(advisor_dir, url=None, text=None, path=None, basename=None,
                            "для кернелов), либо validate_manifest для проверки тиров."}
 
 
-def _build_lens(name, ground_text, reading_notes=None, author=None, kind="personality",
-                axis=None, slug=None, dest=None, run_kernels=False):
-    """Собрать grounded-линзу (линзы > личности). ground_text → P1 (🔵), reading_notes → U1 (🟡).
-    По умолчанию пишет в advisors/<slug> (гитигнорится — личная линза не шипится). Готовую линзу
-    сразу можно звать в cite/retrieve как advisor_dir. Интервью ведёт ХОСТ (см. instructions)."""
+def _build_lens(name, ground_text=None, ground_url=None, ground_path=None, reading_notes=None,
+                author=None, kind="personality", axis=None, slug=None, dest=None, run_kernels=False,
+                license=None):
+    """Собрать grounded-линзу (линзы > личности). Основа → P1 (🔵), reading_notes → U1 (🟡). Основу
+    дай как ground_text (вставка) ИЛИ ground_url (фетч PD-тома + Gutenberg-strip) ИЛИ ground_path
+    (файл в репо) — те же SSRF/traversal-гарды. По умолчанию пишет в advisors/<slug> (гитигнор,
+    не шипится). Готовую линзу сразу зови в cite/retrieve. Интервью ведёт ХОСТ (см. правило #7)."""
     import re
     import lens_builder
+    if not ground_text:                                # основа из url/файла, если не вставлена строкой
+        if ground_url or ground_path:
+            try:
+                ground_text, _hint, _prov, _lic = _load_source_text(
+                    url=ground_url, path=ground_path, license=license)
+            except ValueError as e:
+                return {"error": str(e)}
+            except Exception as e:
+                return {"error": f"основа не загрузилась: {e}"}
+        else:
+            return {"error": "дай основу: ground_text | ground_url | ground_path"}
     if dest:
         d = _resolve(dest)
     else:
@@ -567,15 +584,17 @@ TOOLS = {
         "handler": _ollama_pull,
     },
     "build_lens": {
-        "description": "Собрать grounded-ЛИНЗУ из любого источника (линзы > личности). ground_text → "
-                       "P1 (🔵 дословные слова авторитета линзы), reading_notes → U1 (🟡 твоё прочтение, "
-                       "не выдаётся за слова автора). kind: personality (=«автор как читаю Я», его PD-текст "
-                       "+ твой слой) | method (текст метода/статьи) | self (твои слова). Пишет в "
-                       "advisors/<slug> (личная, не шипится). Готовую линзу сразу зови в cite/retrieve. "
-                       "Сбор ведётся ИНТЕРАКТИВНО (см. правило интервью): спроси источник + «как ТЫ читаешь».",
+        "description": "Собрать grounded-ЛИНЗУ из любого источника (линзы > личности). Основа → P1 "
+                       "(🔵 дословные слова), reading_notes → U1 (🟡 твоё прочтение, не выдаётся за слова "
+                       "автора). Основа: ground_text (вставка) | ground_url (фетч PD-тома + Gutenberg-strip) "
+                       "| ground_path (файл в репо). kind: personality («автор как читаю Я») | method | self. "
+                       "Пишет в advisors/<slug> (личная, не шипится); сразу зови в cite/retrieve. Сбор "
+                       "ИНТЕРАКТИВНЫЙ (правило #7): спроси источник + «как ТЫ читаешь».",
         "input_schema": {"type": "object",
                          "properties": {"name": {"type": "string"},
                                         "ground_text": {"type": "string"},
+                                        "ground_url": {"type": "string"},
+                                        "ground_path": {"type": "string"},
                                         "reading_notes": {"type": "string"},
                                         "author": {"type": "string"},
                                         "kind": {"type": "string",
@@ -583,8 +602,9 @@ TOOLS = {
                                         "axis": {"type": "string"},
                                         "slug": {"type": "string"},
                                         "dest": {"type": "string"},
+                                        "license": {"type": "string"},
                                         "run_kernels": {"type": "boolean"}},
-                         "required": ["name", "ground_text"]},
+                         "required": ["name"]},
         "handler": _build_lens,
     },
     "cite": {

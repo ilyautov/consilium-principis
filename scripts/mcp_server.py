@@ -29,9 +29,20 @@ from corpusbuild.paths import corpus_path
 
 # ───────────────────────── обёртки чистых функций ─────────────────────────
 
+def _root():
+    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def _resolve(p):
+    """Относительный путь → от КОРНЯ репо (а не cwd). Критично: при бридже в Cowork
+    Claude Desktop спавнит сервер с НЕОПРЕДЕЛЁННЫМ cwd → 'advisors/x' иначе не найдётся,
+    контур молча уйдёт в 🟡. См. CONNECT-MCP.md / правило «пути от __file__»."""
+    return p if not p or os.path.isabs(p) else os.path.join(_root(), p)
+
+
 def _fidelity_check(quote, advisor_dir):
     """Протокол-гейт: наиболее авторитетный тир дословного матча → маркер."""
-    m = best_match(quote, advisor_dir)
+    m = best_match(quote, _resolve(advisor_dir))
     if not m:
         return {"status": "🟡", "verbatim": False, "source": ""}
     tier, src = m
@@ -44,7 +55,7 @@ def _fidelity_check(quote, advisor_dir):
 
 def _retrieve(query, advisor_dir, top_k=3):
     import eval as _eval                     # ленивый импорт (тянет corpusbuild/engine)
-    return _eval.retrieve(query, advisor_dir, top_k=top_k)
+    return _eval.retrieve(query, _resolve(advisor_dir), top_k=top_k)
 
 
 def _build_tree(d):
@@ -69,6 +80,7 @@ def _situation_stress_test(tree, perturbations, stance="competitive"):
 
 
 def _governance_verify(path):
+    path = _resolve(path)
     cj = path if path.endswith(".jsonl") else corpus_path(path)
     res = _verify_corpus(cj)
     return res if res is not None else {"ok": False, "error": f"нет corpus.jsonl: {cj}"}
@@ -95,7 +107,7 @@ def _premortem(scenarios, ledger=None):
 
 def _atomic_grounding(text, advisor_dir):
     from atomic import inflation_gap
-    return inflation_gap(text, advisor_dir)
+    return inflation_gap(text, _resolve(advisor_dir))
 
 
 def _advisor_weights(records):
@@ -156,15 +168,11 @@ def _render_session(session, surface="md"):
 def _validate_manifest(advisor_dir):
     from manifest_builder import validate_manifest
     import json as _json
-    sd = os.path.join(advisor_dir, "sources")
+    sd = os.path.join(_resolve(advisor_dir), "sources")
     mp = os.path.join(sd, "manifest.json")
     if not os.path.isfile(mp):
         return {"ok": True, "problems": [], "note": "нет манифеста → всё P1 (бэк-компат)"}
     return validate_manifest(_json.load(open(mp, encoding="utf-8")), sd)
-
-
-def _root():
-    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 # ── lifecycle: весь цикл сборки через MCP, чтобы юзер не выходил из своего агента ──
@@ -179,7 +187,7 @@ def _build_advisor(advisor_dir, author=None, run_kernels=True, run_index=True):
     """Советник под ключ: МАНИФЕСТ-ГЕЙТ → corpus → kernels → индекс. Долгая операция;
     без ollama kernels/индекс деградируют graceful. Сломанный манифест → stopped_at, корпус не родится."""
     from build_orchestrator import build_advisor_full
-    return build_advisor_full(advisor_dir, author=author,
+    return build_advisor_full(_resolve(advisor_dir), author=author,
                               run_kernels=run_kernels, run_index=run_index)
 
 
@@ -193,7 +201,8 @@ def _seed_council():
 def _ingest_telegram(handle, out_path=None):
     """Публичный канал → корпус Принцепса (твои слова = P1). Сеть. 0 постов = приват/неверный handle/sandbox."""
     from ingest_telegram import ingest
-    return ingest(handle, out_path or os.path.join(_root(), "principis_corpus", "telegram.jsonl"))
+    return ingest(handle, _resolve(out_path) if out_path
+                  else os.path.join(_root(), "principis_corpus", "telegram.jsonl"))
 
 
 def _setup_full(consent=True):

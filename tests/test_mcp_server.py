@@ -23,6 +23,15 @@ def test_list_tools_exposes_core_set():
         assert "input_schema" in t and t["input_schema"]["type"] == "object"
 
 
+def test_relative_advisor_dir_resolves_regardless_of_cwd(tmp_path, monkeypatch):
+    # БРИДЖ Cowork: Claude Desktop спавнит сервер с НЕОПРЕДЕЛЁННЫМ cwd. Относительный путь
+    # обязан резолвиться от корня репо, иначе контур молча уйдёт в 🟡 (бесполезен).
+    monkeypatch.chdir(tmp_path)                       # cwd ≠ корень репо
+    r = dispatch("fidelity_check", {"quote": "All warfare is based on deception.",
+                                    "advisor_dir": "lenses/strategist"})
+    assert r["status"] == "🔵"                         # нашёл корпус несмотря на чужой cwd
+
+
 def test_lifecycle_tools_exposed_for_shell_free_hosts():
     # весь цикл сборки доступен как MCP-тулы → чистый MCP-хост (Cowork) не выходит в шелл
     names = {t["name"] for t in list_tools()}

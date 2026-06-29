@@ -41,6 +41,18 @@ import html as _html
 
 _e = _html.escape
 
+
+def _disagreement(s):
+    """Нормализованный блок несогласия или None. Защита: хост может прислать кривую структуру
+    (без axis / не-dict / axis=None) — рендер НЕ должен падать (иначе пересборка лезет в чат)."""
+    d = s.get("disagreement")
+    if isinstance(d, dict) and d.get("axis"):
+        sides = d.get("sides")
+        return {"axis": d["axis"],
+                "sides": [x for x in sides if x] if isinstance(sides, list) else [],
+                "resolver": d.get("resolver")}
+    return None
+
 # marker → (глиф, семантическая переменная Cowork, self-contained цвет-фолбэк)
 _MARK = {
     "blue":      ("🔵", "--color-text-info",    "#2f6fed"),
@@ -80,10 +92,10 @@ def render_md(s):
                 out.append(f"> «{_e(q['text'])}»{src}")
                 if q.get("translation"):
                     out.append(f"> _{_e(q['translation'])}_")
-    d = s.get("disagreement")
+    d = _disagreement(s)
     if d:
         out += ["", "## Где расходятся", f"**Ось:** {_e(d['axis'])}"]
-        out += [f"- {_e(side)}" for side in d.get("sides", [])]
+        out += [f"- {_e(side)}" for side in d["sides"]]
         if d.get("resolver"):
             out.append(f"**Снимается:** {_e(d['resolver'])}")
     out += ["", "## Синтез", _e(s["synthesis"])]
@@ -271,9 +283,9 @@ def render_widget(s, actions=None, depth="plain"):
             f'<div class="stage" style="border-color:color-mix(in srgb,{accent} 55%,transparent)">'
             f'{body}</div></div></div>')
 
-    d = s.get("disagreement")
+    d = _disagreement(s)
     if d:
-        sd = "".join(f'<span class="sd">{_e(x)}</span>' for x in d.get("sides", []))
+        sd = "".join(f'<span class="sd">{_e(x)}</span>' for x in d["sides"])
         rs = (f'<span class="rs">{_e(d["resolver"])}</span>' if d.get("resolver") else "")
         parts.append('<div class="rift"><div class="rl">где расходятся</div>'
                      f'<b style="font-weight:500">{_e(d["axis"])}</b>{sd}{rs}</div>')
@@ -334,9 +346,9 @@ def render_html(s, title="Заседание совета"):
         body.append(f'<article class="voice" style="border-left-color:{color}">'
                     f'<h2>{_e(a["name"])}</h2>{ops}</article>')
     body.append("</div>")
-    d = s.get("disagreement")
+    d = _disagreement(s)
     if d:
-        sides = "".join(f"<li>{_e(x)}</li>" for x in d.get("sides", []))
+        sides = "".join(f"<li>{_e(x)}</li>" for x in d["sides"])
         body.append(f'<section class=fault><h3>Где расходятся</h3><p><b>Ось:</b> {_e(d["axis"])}</p>'
                     f'<ul>{sides}</ul>'
                     + (f'<p><b>Снимается:</b> {_e(d["resolver"])}</p>' if d.get("resolver") else "")

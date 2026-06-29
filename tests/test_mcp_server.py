@@ -208,6 +208,8 @@ def test_initialize_exposes_instructions_to_host():
     assert "show_widget" in instr and "render_session" in instr   # рендер-контракт дошёл до хоста
     assert "fidelity_check" in instr and "🔵" in instr            # протокол-гейт верности
     assert "согласие" in instr.lower() or "захват" in instr.lower()  # non-capture
+    assert "retrieve" in instr and "перефразируй" in instr.lower()  # как вернуть 🔵 (дословный текст)
+    assert "молча" in instr.lower()                                # тихая оркестрация (без тех-преамбулы)
 
 
 def test_unknown_tool_raises():

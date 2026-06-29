@@ -87,6 +87,7 @@ def main() -> None:
     ap.add_argument("--target", default="", help="переопределить целевую папку целиком")
     ap.add_argument("--in-place", action="store_true", help="не копировать; настроить прямо здесь (dev)")
     ap.add_argument("--print", action="store_true", dest="print_only", help="показать план и выйти")
+    ap.add_argument("--setup-full", action="store_true", help="поднять FULL-тир (ollama + pull bge-m3)")
     args = ap.parse_args()
 
     if not py_ok():
@@ -112,6 +113,13 @@ def main() -> None:
 
     semantic = detect_semantic(dest)
     print(f"🎛  tier: {'FULL (semantic, ollama bge-m3)' if semantic else 'SIMPLE (пол — контур работает без ollama)'}")
+    if not semantic:
+        if args.setup_full:
+            print("⬆️  Поднимаю FULL-тир…")
+            subprocess.run([sys.executable, "scripts/setup_full.py"], cwd=dest)
+        else:
+            print("   FULL-тир (умный кросс-язычный поиск) — по желанию: `python3 scripts/board.py setup-full`")
+            print("   (контур 🔵 и совет работают и без него, на полу)")
     subprocess.run([sys.executable, "scripts/board_init.py", "advisors",
                     "--semantic-available", "true" if semantic else "false"], cwd=dest)
     write_breadcrumb(dest, semantic)

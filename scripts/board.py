@@ -8,6 +8,7 @@
   build-advisor <d>      — собрать советника в один шаг: манифест-гейт → corpus → kernels → индекс
   seed-council           — собрать стартовый совет PD-мудрецов с нуля (Аврелий + Эпиктет)
   doctor                 — health-check: Python, скилл установлен, тир, самотест рва
+  setup-full             — поднять FULL-тир: инструкция по ollama + авто-pull модели bge-m3
 
 Логика тонкая — оборачивает preflight/scaffold/ingest_telegram. Реальные вопросы юзеру
 задаёт скилл разговором (см. SKILL.md «Онбординг»), сюда приходят уже структурные ответы.
@@ -130,9 +131,22 @@ def cmd_seed_council(args):
     return 0 if ok else 1
 
 
+def cmd_setup_full(args):
+    from setup_full import run_setup
+    print("Настройка FULL-тира (семантик-ретрив). Системный ollama не ставлю молча — даю команду;")
+    print("модель bge-m3 в стоящий ollama тяну сам.")
+    out = run_setup(consent="--no-pull" not in args)
+    for r in out["results"]:
+        print(f"  [{r['step']}] {'✓ сделано' if r.get('ran') else '→ ' + r['detail']}")
+    f = out["final"]
+    ok = f["ollama_running"] and f["bge_m3_present"]
+    print(f"→ FULL-тир: {'✓ доступен' if ok else '✗ ещё нет (выполни шаги выше, потом повтори)'}")
+    return 0 if ok else 1
+
+
 CMDS = {"status": cmd_status, "principis": cmd_principis, "ingest-telegram": cmd_ingest_telegram,
         "validate-manifest": cmd_validate_manifest, "build-advisor": cmd_build_advisor,
-        "doctor": cmd_doctor, "seed-council": cmd_seed_council}
+        "doctor": cmd_doctor, "seed-council": cmd_seed_council, "setup-full": cmd_setup_full}
 
 if __name__ == "__main__":
     if len(sys.argv) < 2 or sys.argv[1] not in CMDS:

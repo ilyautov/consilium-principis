@@ -79,6 +79,34 @@ def test_add_source_rejects_non_pd_host_without_license(tmp_path):
     assert "error" in r and "PD" in r["error"]
 
 
+def test_add_source_blocks_ssrf_even_with_license(tmp_path):
+    # license НЕ должен открывать egress: SSRF-гард срабатывает на внутренний адрес независимо
+    r = dispatch("add_source", {"advisor_dir": str(tmp_path / "a4"),
+                 "url": "http://127.0.0.1:11434/api/tags", "license": "public-domain"})
+    assert "error" in r and "SSRF" in r["error"]            # loopback заблокирован, лицензия не помогла
+
+
+def test_add_source_blocks_path_traversal(tmp_path):
+    r = dispatch("add_source", {"advisor_dir": str(tmp_path / "a5"),
+                 "path": "../../../../../../etc/passwd"})
+    assert "error" in r and ("traversal" in r["error"].lower() or "вне корня" in r["error"])
+
+
+def test_ssrf_check_passes_public_blocks_private():
+    import collect_common as cc
+    assert cc.ssrf_check("https://www.gutenberg.org/cache/epub/1/pg1.txt") is None  # публичный → ок
+    assert "SSRF" not in (cc.ssrf_check("ftp://x/y") or "")    # схема режется отдельно
+    assert cc.ssrf_check("http://127.0.0.1/") and "127.0.0.1" in cc.ssrf_check("http://127.0.0.1/")
+    assert cc.ssrf_check("file:///etc/passwd")                 # не-web схема → ошибка
+
+
+def test_ollama_install_hint_is_platform_aware(monkeypatch):
+    import setup_full, mcp_server
+    monkeypatch.setattr(setup_full, "_norm_platform", lambda p: "windows")
+    assert "ollama.com/download" in mcp_server._ollama_install_hint()   # не захардкожен Mac
+    assert set(setup_full.INSTALL_HINTS) >= {"darwin", "linux", "windows"}
+
+
 def test_lifecycle_tools_registered():
     names = {t["name"] for t in list_tools()}
     assert {"config_get", "config_set", "ollama_status", "ollama_ensure", "ollama_pull",

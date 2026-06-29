@@ -167,6 +167,25 @@ def _config_set(key, value):
     return out
 
 
+def _ollama_install_hint():
+    """Команда установки ollama под ТЕКУЩУЮ ОС (не только Mac) — из setup_full.INSTALL_HINTS."""
+    import setup_full
+    return setup_full.INSTALL_HINTS.get(setup_full._norm_platform(sys.platform),
+                                        setup_full.INSTALL_HINTS["linux"])
+
+
+def _ollama_serve_popen():
+    """Старт `ollama serve` отвязанно, кросс-платформенно (POSIX setsid / Windows detached group)."""
+    import subprocess
+    kw = {"stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL}
+    if sys.platform == "win32":
+        kw["creationflags"] = (getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+                               | getattr(subprocess, "DETACHED_PROCESS", 0))
+    else:
+        kw["start_new_session"] = True
+    subprocess.Popen(["ollama", "serve"], **kw)
+
+
 def _ollama_status():
     """Состояние FULL-тира: запущен ли ollama, скачан ли bge-m3 (без падений)."""
     import setup_full
@@ -181,26 +200,25 @@ def _ollama_pull(model="bge-m3"):
         return {"ok": True, "model": model, "status": _ollama_status()}
     except FileNotFoundError:
         return {"ok": False, "model": model,
-                "error": "ollama-бинарь не найден — установи: brew install ollama (macOS), потом ollama_ensure"}
+                "error": "ollama-бинарь не найден. Установи: " + _ollama_install_hint() + " → потом ollama_ensure"}
     except Exception as e:
         return {"ok": False, "model": model, "error": str(e)}
 
 
 def _ollama_ensure():
     """Поднять FULL-тир насколько возможно из тула: если демон не запущен, но бинарь есть —
-    стартуем `ollama serve` (отвязанно). Единственный неустранимо-ручной шаг — первая установка
-    бинаря (системный софт молча не ставим). Возвращает состояние + что осталось сделать руками."""
-    import setup_full, subprocess, time
+    стартуем `ollama serve` (кросс-платформенно). Единственный неустранимо-ручной шаг — первая
+    установка бинаря под ТЕКУЩУЮ ОС (системный софт молча не ставим)."""
+    import setup_full, time
     st = setup_full.probe()
     if st["ollama_running"]:
         return {"running": True, "started": False, **st}
     try:
-        subprocess.Popen(["ollama", "serve"], stdout=subprocess.DEVNULL,
-                         stderr=subprocess.DEVNULL, start_new_session=True)
+        _ollama_serve_popen()
     except FileNotFoundError:
         return {"running": False, "started": False, "bge_m3_present": st["bge_m3_present"],
-                "manual": "brew install ollama (macOS) | curl -fsSL https://ollama.com/install.sh | sh (linux)",
-                "note": "Единственный ручной шаг — установка бинаря. После неё снова ollama_ensure."}
+                "platform": setup_full._norm_platform(sys.platform), "manual": _ollama_install_hint(),
+                "note": "Единственный ручной шаг — установка бинаря под твою ОС. После неё снова ollama_ensure."}
     for _ in range(12):                                   # ждём подъёма демона ~6с
         time.sleep(0.5)
         if setup_full.probe()["ollama_running"]:
@@ -219,14 +237,23 @@ def _add_source(advisor_dir, url=None, text=None, path=None, basename=None,
     if url:
         if not (cc.is_pd_host(url) or license == "public-domain"):
             return {"error": "не-PD хост: подтверди PD-статус явно (license=public-domain) — права на тебе"}
-        raw = cc.fetch(url)
+        try:
+            raw = cc.fetch(url)                         # SSRF-гард внутри (ValueError при непубличном IP)
+        except ValueError as e:
+            return {"error": str(e)}
+        except Exception as e:
+            return {"error": f"фетч не удался: {e}"}
         if "gutenberg" in url.lower():
             import collect_pd
             raw = collect_pd.strip_gutenberg(raw)
         bn = basename or (cc.host_of(url) + "-" + url.rstrip("/").rsplit("/", 1)[-1])
         src_path = cc.land_to_sources(d, bn, raw, url=url, license_note=license or "public-domain")
     elif path:
-        rp = _resolve(path)
+        rp = os.path.realpath(_resolve(path))
+        root = os.path.realpath(_root())               # path traversal: только внутри репо
+        if not (rp == root or rp.startswith(root + os.sep)):
+            return {"error": "path вне корня репо запрещён (защита от traversal). Для внешнего файла "
+                             "вставь его текст через text= или положи в репо."}
         raw = open(rp, encoding="utf-8").read()
         src_path = cc.land_to_sources(d, basename or os.path.basename(rp), raw,
                                       url=f"file:{rp}", license_note=license or "unknown")

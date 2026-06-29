@@ -131,9 +131,26 @@ def _scaffold_principis(answers):
     return {"markdown": scaffold_principis(answers)}
 
 
-def _list_recipes():
+def _list_recipes(surface="data"):
     from recipes import load_recipes
-    return {"recipes": load_recipes()}
+    rs = load_recipes()
+    if surface == "widget":      # кликабельное меню для mcp__visualize__show_widget (Cowork)
+        from recipes import render_widget
+        return {"surface": "widget", "content": render_widget(rs)}
+    if surface == "html":
+        from recipes import render_html
+        return {"surface": "html", "content": render_html(rs)}
+    return {"recipes": rs}       # сырые данные (дефолт) — хост рендерит сам
+
+
+def _render_session(session, surface="md"):
+    """Canon-объект заседания → строка под surface. Контур/гейт 🔵 проходят ДО рендера;
+    тут чистая презентация. widget = HTML для show_widget (Cowork), md/html — портативные."""
+    import session_render as SR
+    fn = {"widget": SR.render_widget, "html": SR.render_html, "md": SR.render_md}.get(surface)
+    if fn is None:
+        return {"error": f"неизвестный surface: {surface} (md|widget|html)"}
+    return {"surface": surface, "content": fn(session)}
 
 
 def _validate_manifest(advisor_dir):
@@ -275,10 +292,22 @@ TOOLS = {
     },
     "list_recipes": {
         "description": "Меню «что умеет совет» простыми фразами — покажи юзеру, когда он не знает, "
-                       "что спросить, или просит «что ты умеешь / с чего начать». Каждый рецепт: "
-                       "title, triggers (фразы), does, reads (как читать результат).",
-        "input_schema": {"type": "object", "properties": {}, "required": []},
+                       "что спросить, или просит «что ты умеешь / с чего начать». surface: data "
+                       "(сырые рецепты, дефолт) | widget (кликабельный HTML для show_widget в Cowork) "
+                       "| html (самодостаточный фолбэк).",
+        "input_schema": {"type": "object",
+                         "properties": {"surface": {"type": "string"}}, "required": []},
         "handler": _list_recipes,
+    },
+    "render_session": {
+        "description": "Отрисовать ГОТОВЫЙ canon-объект заседания под surface (контур/гейт 🔵 уже "
+                       "пройдены ризонингом). surface: md (портативный, голый Claude Code) | widget "
+                       "(HTML для mcp__visualize__show_widget в Cowork, кликабельный sendPrompt) | "
+                       "html (самодостаточный фолбэк). Один объект → нужный surface; см. session_render.py.",
+        "input_schema": {"type": "object",
+                         "properties": {"session": {"type": "object"}, "surface": {"type": "string"}},
+                         "required": ["session"]},
+        "handler": _render_session,
     },
     "validate_manifest": {
         "description": "МОАТ-гейт сборки: проверить тир-манифест советника — region-маркеры реально "

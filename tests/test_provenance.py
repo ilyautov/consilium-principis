@@ -6,9 +6,11 @@ def _write_manifest(adv, data):
     os.makedirs(os.path.join(adv, "sources"), exist_ok=True)
     json.dump(data, open(os.path.join(adv, "sources", "manifest.json"), "w", encoding="utf-8"))
 
-def test_no_manifest_defaults_p1(tmp_path):
+def test_no_manifest_is_fail_closed_A(tmp_path):
+    # FAIL-CLOSED: без манифеста провенанс неизвестен → A (🟡), НЕ P1. 🔵 требует явного
+    # объявления провенанса. Раньше дефолтило в P1 (fail-OPEN) — закрыто аудитом 2026-06-30.
     adv = str(tmp_path)
-    assert prov.tier_for("anything.txt", 5, adv) == "P1"
+    assert prov.tier_for("anything.txt", 5, adv) == "A"
 
 def test_source_not_in_manifest_is_fail_closed_A(tmp_path):
     adv = str(tmp_path)

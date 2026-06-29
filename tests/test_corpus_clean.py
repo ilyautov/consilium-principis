@@ -16,8 +16,9 @@ def test_tags_tier_per_region(tmp_path):
     assert [t["tier"] for t in tagged] == ["B", "P1", "P1"]
     assert tagged[0]["text"] == "intro" and tagged[0]["loc"] == ("line", 1)
 
-def test_no_manifest_all_p1(tmp_path):
+def test_no_manifest_all_fail_closed_A(tmp_path):
+    # FAIL-CLOSED: без манифеста сборка печёт A (🟡), не P1 — некурированный текст синим не станет.
     adv = str(tmp_path)
     recs = [(("line", 1), "x"), (("line", 2), "y")]
     tagged = clean.tag_regions(recs, "f.txt", adv)
-    assert all(t["tier"] == "P1" for t in tagged)
+    assert all(t["tier"] == "A" for t in tagged)

@@ -2,9 +2,18 @@
 без правки файлов и шелла. Стережёт: config_get/set реально пишут board_config.json; ollama_* не
 падают и честно сообщают про единственный ручной шаг (установка бинаря)."""
 import os, sys, json
+import pytest
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "scripts"))
+import mcp_server
 from mcp_server import dispatch, list_tools, _config_path
+
+
+@pytest.fixture(autouse=True)
+def _root_in_tmp(monkeypatch, tmp_path):
+    # write-side traversal-гард ограничивает запись корнем репо; тесты пишут советников в tmp_path,
+    # поэтому КОРНЕМ на время теста делаем сам tmp_path (advisor_dir под ним → гард пропускает).
+    monkeypatch.setattr(mcp_server, "_root", lambda: str(tmp_path))
 
 
 def test_config_set_get_roundtrip_persists(monkeypatch, tmp_path):
@@ -105,6 +114,51 @@ def test_ollama_install_hint_is_platform_aware(monkeypatch):
     monkeypatch.setattr(setup_full, "_norm_platform", lambda p: "windows")
     assert "ollama.com/download" in mcp_server._ollama_install_hint()   # не захардкожен Mac
     assert set(setup_full.INSTALL_HINTS) >= {"darwin", "linux", "windows"}
+
+
+def test_add_source_provenance_header_not_citable(tmp_path):
+    # P0: provenance-хедер `# SOURCE/# FETCHED/# LICENSE` не должен попадать в корпус/цитаты
+    adv = str(tmp_path / "adv-hdr")
+    dispatch("add_source", {"advisor_dir": adv, "basename": "canon", "tier": "P1",
+             "text": "All warfare is based on deception, the canon repeats."})
+    from corpusbuild import pipeline, paths
+    pipeline.build(adv)
+    corpus = open(paths.corpus_path(adv), encoding="utf-8").read()
+    assert "# SOURCE" not in corpus and "FETCHED" not in corpus and "LICENSE" not in corpus
+    # тело — по-прежнему 🔵, метаданные источника — нет
+    assert dispatch("fidelity_check", {"quote": "All warfare is based on deception",
+                                       "advisor_dir": adv})["status"] == "🔵"
+    assert dispatch("fidelity_check", {"quote": "SOURCE FETCHED LICENSE",
+                                       "advisor_dir": adv})["status"] != "🔵"
+
+
+def test_add_source_write_traversal_blocked(monkeypatch, tmp_path):
+    # P0: advisor_dir вне корня репо запрещён (write-side traversal). Корень = tmp_path (autouse),
+    # значит путь ВЫШЕ него должен быть отбит.
+    outside = str(tmp_path.parent / "escape-advisor")
+    r = dispatch("add_source", {"advisor_dir": outside, "text": "x", "tier": "P1"})
+    assert "error" in r and "traversal" in r["error"].lower()
+
+
+def test_build_write_traversal_blocked(tmp_path):
+    # гард живёт в _do_build (его зовут и CLI, и фоновый джоб) — тестим там, где он реально стоит
+    r = mcp_server._do_build(str(tmp_path.parent / "escape-build"))
+    assert "error" in r and "traversal" in r["error"].lower()
+
+
+def test_ingest_telegram_handle_sanitized():
+    import ingest_telegram as itg
+    assert itg._safe_handle("@my_channel") == "my_channel"
+    assert itg._safe_handle("evil/../../x?a=1") == "evilxa1"    # слэши/спецсимволы срезаны
+    import pytest as _pt
+    with _pt.raises(ValueError):
+        itg._safe_handle("@@@")                                  # пусто после чистки → отказ
+
+
+def test_instructions_have_antiinjection_rule0():
+    import mcp_server
+    ins = mcp_server.INSTRUCTIONS
+    assert "БЕЗОПАСНОСТЬ ВЫШЕ ВСЕГО" in ins and "ЯВНОЙ просьбе" in ins  # Rule 0 анти-инъекция
 
 
 def test_lifecycle_tools_registered():

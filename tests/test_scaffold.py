@@ -52,6 +52,17 @@ def test_invalid_depth_falls_back_to_plain():
     assert "depth: plain" in md
 
 
+def test_context_expansion_defaults_to_ask():
+    md = scaffold_principis({"who": "X"})
+    assert "context_expansion: ask" in md           # non-capture: молча не подтягиваем
+    assert "Согласие на контекст" in md
+
+
+def test_context_expansion_explicit_and_invalid():
+    assert "context_expansion: deny" in scaffold_principis({"who": "X", "context_expansion": "deny"})
+    assert "context_expansion: ask" in scaffold_principis({"who": "X", "context_expansion": "хм"})
+
+
 def test_next_step_principis_first_when_missing():
     pf = {"principis": {"ok": False, "interface_mode": "rigor"}, "advisors": [], "lenses": []}
     ns = next_step(pf)

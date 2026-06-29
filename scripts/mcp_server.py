@@ -155,14 +155,16 @@ def _list_recipes(surface="data"):
     return {"recipes": rs}       # сырые данные (дефолт) — хост рендерит сам
 
 
-def _render_session(session, surface="md"):
+def _render_session(session, surface="md", depth="plain"):
     """Canon-объект заседания → строка под surface. Контур/гейт 🔵 проходят ДО рендера;
-    тут чистая презентация. widget = HTML для show_widget (Cowork), md/html — портативные."""
+    тут чистая презентация. widget = HTML для show_widget (Cowork), md/html — портативные.
+    depth: plain (дефолт, эстетика) | expert (вся машинерия). Поддержан только в widget."""
     import session_render as SR
     fn = {"widget": SR.render_widget, "html": SR.render_html, "md": SR.render_md}.get(surface)
     if fn is None:
         return {"error": f"неизвестный surface: {surface} (md|widget|html)"}
-    return {"surface": surface, "content": fn(session)}
+    content = SR.render_widget(session, depth=depth) if surface == "widget" else fn(session)
+    return {"surface": surface, "content": content}
 
 
 def _validate_manifest(advisor_dir):
@@ -401,7 +403,8 @@ TOOLS = {
                        "(HTML для mcp__visualize__show_widget в Cowork, кликабельный sendPrompt) | "
                        "html (самодостаточный фолбэк). Один объект → нужный surface; см. session_render.py.",
         "input_schema": {"type": "object",
-                         "properties": {"session": {"type": "object"}, "surface": {"type": "string"}},
+                         "properties": {"session": {"type": "object"}, "surface": {"type": "string"},
+                                        "depth": {"type": "string", "enum": ["plain", "expert"]}},
                          "required": ["session"]},
         "handler": _render_session,
     },

@@ -152,10 +152,12 @@ def _quote_widget(q, marker):
             f'«{_e(q["text"])}»{tr}{metarow}</blockquote>')
 
 
-def render_widget(s, actions=None):
+def render_widget(s, actions=None, depth="plain"):
     """Диалоговый HTML для mcp__visualize__show_widget: советники = чат-баблы с аватарами.
-    actions = [(label, prompt[, icon]), ...] → кнопки sendPrompt. Цвета через --color-*
-    (тёмная тема Cowork адаптируется сама)."""
+    actions = [(label, prompt[, icon]), ...] → кнопки sendPrompt. Цвета через --color-*.
+    depth: plain (дефолт, эстетика — без what_you_lose/forcing_question и прочего шума) |
+    expert (всё). Эстетика: меньше элементов наружу, машинерия остаётся внутри."""
+    expert = depth == "expert"
     if actions is None:
         actions = [("занести в журнал", "занеси это решение совета в журнал", "ti-notebook"),
                    ("оспорить синтез", "оспорь синтез совета как адвокат дьявола", "ti-swords")]
@@ -219,7 +221,7 @@ def render_widget(s, actions=None):
            'margin-bottom:5px"><i class="ti ti-gavel" aria-hidden="true" style="font-size:15px;'
            'vertical-align:-2px;margin-right:5px"></i>Синтез совета</div>'
            f'<p style="margin:0;font-size:14px;line-height:1.65">{_e(s["synthesis"])}</p>')
-    if s.get("what_you_lose"):
+    if expert and s.get("what_you_lose"):           # plain прячет «цену» — машинерия внутри
         syn += ('<p style="margin:8px 0 0;font-size:12.5px;line-height:1.55;'
                 'color:var(--color-text-secondary,#777)"><i class="ti ti-coin" aria-hidden="true" '
                 'style="font-size:14px;vertical-align:-2px;margin-right:4px"></i>Чем платишь: '
@@ -232,7 +234,7 @@ def render_widget(s, actions=None):
                      'style="font-size:17px;color:var(--color-text-info,#185FA5);margin-top:2px"></i>'
                      f'<div><b style="font-weight:500">Шаг:</b> {_e(s["step"])}</div></div>')
 
-    if s.get("forcing_question"):
+    if expert and s.get("forcing_question"):        # plain прячет вопрос-форсаж (expert-деталь)
         parts.append('<p style="margin:12px 0 0;font-size:13px;font-style:italic;'
                      'color:var(--color-text-tertiary,#999);line-height:1.55">'
                      '<i class="ti ti-help-circle" aria-hidden="true" style="font-style:normal;'

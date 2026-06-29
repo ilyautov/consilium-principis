@@ -89,3 +89,14 @@ def test_optional_fields_omitted():
     for r in (render_md, render_widget, render_html):
         out = r(s)
         assert "Где расходятся" not in out and "Шаг" not in out
+
+
+def test_widget_plain_hides_machinery_expert_shows_it():
+    # эстетика: plain (дефолт) прячет «цену» и вопрос-форсаж; expert выкатывает всё
+    plain = render_widget(S)
+    assert "Чем платишь" not in plain and "Вопрос-форсаж" not in plain
+    assert "немного скорости" not in plain          # what_you_lose скрыт
+    expert = render_widget(S, depth="expert")
+    assert "Чем платишь" in expert and "Вопрос-форсаж" in expert
+    # синтез и голоса видны в ОБОИХ — прячем шум, не суть
+    assert "sendPrompt(" in plain and 'class="ti ' in plain

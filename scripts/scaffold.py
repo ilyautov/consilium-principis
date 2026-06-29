@@ -9,23 +9,34 @@
   • next_step(preflight) → один приоритетный шаг по состоянию доски (онбординг за руку).
 """
 VALID_MODES = ("rigor", "support")
+VALID_DEPTH = ("plain", "expert")
 
 
 def scaffold_principis(answers):
-    """Структурированные ответы юзера → текст principis.md. interface_mode fail-safe к rigor."""
+    """Структурированные ответы юзера → текст principis.md. interface_mode fail-safe к rigor.
+    depth: plain (чистый ответ на языке юзера, без чисел/разбора — дефолт для большинства) |
+    expert (полная машинерия: вероятности, robustness, тиры). language: язык ответов
+    ('auto' = подстраиваться под язык реплики юзера)."""
     mode = answers.get("interface_mode", "rigor")
     if mode not in VALID_MODES:
         mode = "rigor"
+    depth = answers.get("depth", "plain")
+    if depth not in VALID_DEPTH:
+        depth = "plain"
+    language = (answers.get("language") or "auto").strip()
     who = (answers.get("who") or "—").strip()
     vector = (answers.get("vector") or "").strip()
     temperament = (answers.get("temperament") or "—").strip()
     not_known = (answers.get("not_known") or "—").strip()
     vec = vector or "ПРОБЕЛ — совет допрашивает (вектор держим живым, не фиксируем как цель)"
     return (
-        f"---\ninterface_mode: {mode}\nowner: principis\nstatus: draft\n---\n"
+        f"---\ninterface_mode: {mode}\ndepth: {depth}\nlanguage: {language}\n"
+        f"owner: principis\nstatus: draft\n---\n"
         f"\n## Кто ты\n{who}\n"
         f"\n## Вектор (Олимп — куда идёшь)\n{vec}\n"
         f"\n## Интерфейс-нужда\n{mode}\n"
+        f"\n## Подача\nЯзык: {language} · Глубина: {depth} "
+        f"(plain — чистый ответ; expert — с вероятностями и разбором)\n"
         f"\n## Темперамент\n{temperament}\n"
         f"\n## Журнал решений\n"
         f"_(пусто — первое консеквенциальное решение запишется сюда; ИСХОД ⏳ дописывается по факту)_\n"

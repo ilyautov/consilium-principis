@@ -208,11 +208,11 @@ def test_initialize_exposes_instructions_to_host():
     assert "show_widget" in instr and "render_session" in instr   # рендер-контракт дошёл до хоста
     assert "fidelity_check" in instr and "🔵" in instr            # протокол-гейт верности
     assert "согласие" in instr.lower() or "захват" in instr.lower()  # non-capture
-    assert "retrieve" in instr and "буква в букву" in instr.lower()  # как вернуть 🔵 (дословный текст)
+    assert "cite" in instr and "перефразир" in instr.lower()       # 🔵 через cite, не ручной пересказ
     assert "молча" in instr.lower()                                # тихая оркестрация (без тех-преамбулы)
     assert "уточняющих" in instr.lower() and "круглый стол" in instr.lower()  # живой интерактив до синтеза
     assert "первый" in instr.lower() and "kind=opening" in instr   # опенинг-виджет с первого кадра
-    assert "не выдумывай дефекты" in instr.lower()                 # запрет конфабуляции дефекта гейта
+    assert "дефект корпуса" in instr.lower()                       # запрет конфабуляции дефекта гейта
 
 
 def test_retrieve_attaches_verbatim_quoting_hint():
@@ -222,6 +222,32 @@ def test_retrieve_attaches_verbatim_quoting_hint():
     r = dispatch("retrieve", {"query": "deception in war", "advisor_dir": adv})
     assert "passages" in r and isinstance(r["passages"], list)
     assert "дословно" in r["how_to_quote"].lower() and "🟡" in r["how_to_quote"]
+
+
+def test_cite_returns_ready_verified_blue_quote():
+    # детерминированный рычаг рва: cite отдаёт ГОТОВЫЙ проверенный объект, хост не пишет текст сам
+    r = dispatch("cite", {"advisor_dir": STRAT, "query": "deception in war"})
+    assert r["quote"] is not None and r["marker"] in ("🔵", "🟢")
+    assert r["quote"]["text"] and r["quote"]["source"]
+    # вставленный обратно в гейт — подтверждается тем же маркером (т.е. он реально дословный)
+    fc = dispatch("fidelity_check", {"quote": r["quote"]["text"], "advisor_dir": STRAT})
+    assert fc["status"] == r["marker"] and fc["verbatim"] is True
+
+
+def test_cite_no_match_returns_null_not_fabrication():
+    r = dispatch("cite", {"advisor_dir": STRAT, "query": "рецепт борща со сметаной и укропом"})
+    # хуже найти нерелевантное, чем выдумать — но в любом случае quote либо реальный, либо null
+    if r["quote"] is None:
+        assert r["marker"] == "🟡" and "выдумывай" in r["note"].lower()
+    else:
+        fc = dispatch("fidelity_check", {"quote": r["quote"]["text"], "advisor_dir": STRAT})
+        assert fc["verbatim"] is True            # никогда не возвращает невериф. текст
+
+
+def test_cite_registered_and_in_instructions():
+    assert "cite" in {t["name"] for t in list_tools()}
+    from mcp_server import INSTRUCTIONS
+    assert "cite" in INSTRUCTIONS
 
 
 def test_unknown_tool_raises():

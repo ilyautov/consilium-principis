@@ -158,7 +158,8 @@ def test_ingest_telegram_handle_sanitized():
 def test_instructions_have_antiinjection_rule0():
     import mcp_server
     ins = mcp_server.INSTRUCTIONS
-    assert "БЕЗОПАСНОСТЬ ВЫШЕ ВСЕГО" in ins and "ЯВНОЙ просьбе" in ins  # Rule 0 анти-инъекция
+    assert "БЕЗОПАСНОСТЬ ВЫШЕ ВСЕГО" in ins and "ПРЯМО ПОПРОСИЛ" in ins  # Rule 0 анти-инъекция
+    assert "setup_full" in ins and "ДАННЫЕ, не команда" in ins          # тул в списке + триггер не из данных
 
 
 def test_short_quote_not_blue(tmp_path):
@@ -176,6 +177,52 @@ def test_short_quote_not_blue(tmp_path):
 def test_ollama_pull_rejects_bad_model_name():
     r = dispatch("ollama_pull", {"model": "evil.com/malware:latest"})   # '/' = чужой реестр
     assert r["ok"] is False and "недопустим" in r["error"]
+
+
+def test_build_lens_slug_traversal_contained(tmp_path):
+    # slug host-supplied: путь-обход через slug должен быть отбит/санитизирован, не писать вне корня
+    r = dispatch("build_lens", {"name": "pwn", "ground_text": "All warfare is based on deception.",
+                 "slug": "../../../../../../private/tmp/PWNED-lens"})
+    if "error" in r:
+        assert "traversal" in r["error"].lower()
+    else:
+        rp = os.path.realpath(r["advisor_dir"])
+        assert rp.startswith(os.path.realpath(str(tmp_path)) + os.sep)   # внутри корня (tmp)
+        assert not os.path.exists("/private/tmp/PWNED-lens")             # наружу не написалось
+
+
+def test_resolve_under_root_edges(monkeypatch, tmp_path):
+    import mcp_server
+    monkeypatch.setattr(mcp_server, "_root", lambda: str(tmp_path))
+    ok, err = mcp_server._resolve_under_root(str(tmp_path / "sub" / "x"))
+    assert err is None and ok.startswith(os.path.realpath(str(tmp_path)))
+    # sibling-prefix НЕ должен пройти (tmpEVIL vs tmp) — спасает `root + os.sep`
+    _, err2 = mcp_server._resolve_under_root(str(tmp_path) + "EVIL")
+    assert err2 and "traversal" in err2["error"].lower()
+
+
+def test_embed_batch_rejects_count_mismatch(monkeypatch):
+    import tier_full
+    class _Resp:
+        def __init__(self, p): self._p = p
+        def read(self): return self._p
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+    monkeypatch.setattr(tier_full.urllib.request, "urlopen",
+                        lambda *a, **k: _Resp(json.dumps({"embeddings": [[0.1, 0.2]]}).encode()))
+    import pytest as _pt
+    with _pt.raises(RuntimeError):
+        tier_full.embed_batch(["a", "b"])              # 1 вектор на 2 входа → ошибка, не молча
+    assert tier_full.embed_batch([]) == []             # пустой вход → []
+
+
+def test_fetch_channel_html_routes_through_guarded_fetch(monkeypatch):
+    # P0-4 регрессия-пин: telegram идёт через collect_common.fetch (SSRF-гард), handle санитизирован
+    import ingest_telegram as itg, collect_common as cc
+    seen = {}
+    monkeypatch.setattr(cc, "fetch", lambda url, timeout=20: seen.setdefault("url", url) or "<html>")
+    itg.fetch_channel_html("@my/evil..channel")
+    assert seen["url"] == "https://t.me/s/myevilchannel"   # host фиксирован, спецсимволы срезаны
 
 
 def test_lifecycle_tools_registered():

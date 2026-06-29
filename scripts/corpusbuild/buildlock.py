@@ -9,7 +9,9 @@ def _gov_head(chunks):
     """Governance-голова: отпечаток корпуса (hash-chain) на момент сборки. Сохраняется в lock,
     чтобы governance.verify ловил ПОДМЕНУ corpus.jsonl ПОСЛЕ факта (раньше цепь сверялась сама
     с собой = тавтология). chunks здесь — те же записи, что пишутся в corpus.jsonl."""
-    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # scripts/
+    scripts_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # scripts/
+    if scripts_dir not in sys.path:                  # без накопления дублей при сборке N советников
+        sys.path.insert(0, scripts_dir)
     from governance import build_chain, GENESIS
     chain = build_chain(list(chunks))
     return chain[-1]["hash"] if chain else GENESIS

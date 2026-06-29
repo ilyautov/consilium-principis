@@ -17,7 +17,10 @@ def extract_kernels(author, train, k=6, n_sample=28):
     """train=[{"text":…}…] (P1-пассажи) → до k строк «имя — порождающий метод» (gemma).
     Сэмплируем равномерно, просим МЕТОДЫ рассуждения (не темы), применимые к новым задачам."""
     step = max(1, len(train) // n_sample)
-    sample = [train[i]["text"][:320].strip() for i in range(0, len(train), step)][:n_sample]
+    # нейтрализуем спуф выходного формата из текста корпуса: пассаж не должен подделать строку
+    # `KERNEL: …` (prompt-injection из источника сместил бы кернелы → recall, гейт не обходит).
+    sample = [re.sub(r"(?i)kernel\s*:", "kernel·", train[i]["text"][:320].strip())
+              for i in range(0, len(train), step)][:n_sample]
     passages = "\n---\n".join(sample)
     prompt = (
         f"You are analyzing the writings of {author}. Below are passages sampled from the corpus.\n"

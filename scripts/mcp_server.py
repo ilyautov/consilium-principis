@@ -18,6 +18,7 @@
 """
 import os
 import sys
+import json
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from engine.fidelity import best_match
@@ -127,6 +128,126 @@ def _cite(advisor_dir, query, top_k=8, use_kernels=True, limit=4):
     return {"quotes": [], "best": None, "marker": "🟡",
             "note": ("Дословного нет — НЕ выдумывай, иди 🟡. Дай query в языке корпуса (English) "
                      "или другой формулировкой; гейт исправен.")}
+
+
+_KNOWN_CONFIG = ("retrieval_mode", "abstain_threshold", "hybrid_alpha",
+                 "interface_mode", "depth", "language", "context_expansion")
+
+
+def _config_path():
+    return os.path.join(_root(), "board_config.json")
+
+
+def _config_get(key=None):
+    """Прочитать board_config.json целиком или один ключ (тюнинг без правки файла руками)."""
+    try:
+        cfg = json.load(open(_config_path(), encoding="utf-8"))
+    except Exception:
+        cfg = {}
+    if key is None:
+        return {"config": cfg, "known_keys": list(_KNOWN_CONFIG)}
+    return {"key": key, "value": cfg.get(key), "known": key in _KNOWN_CONFIG}
+
+
+def _config_set(key, value):
+    """Записать ключ в board_config.json (тюнинг из хоста). Persistent change — хост обязан
+    подтвердить у юзера ПЕРЕД вызовом (см. правила)."""
+    p = _config_path()
+    try:
+        cfg = json.load(open(p, encoding="utf-8"))
+    except Exception:
+        cfg = {}
+    old = cfg.get(key)
+    cfg[key] = value
+    with open(p, "w", encoding="utf-8") as f:
+        json.dump(cfg, f, ensure_ascii=False, indent=2)
+    out = {"key": key, "old": old, "new": value, "config": cfg}
+    if key not in _KNOWN_CONFIG:
+        out["warning"] = f"ключ '{key}' не из известных {list(_KNOWN_CONFIG)} — опечатка?"
+    return out
+
+
+def _ollama_status():
+    """Состояние FULL-тира: запущен ли ollama, скачан ли bge-m3 (без падений)."""
+    import setup_full
+    return setup_full.probe()
+
+
+def _ollama_pull(model="bge-m3"):
+    """Скачать модель в уже запущенный ollama (идемпотентно, безопасно)."""
+    import subprocess
+    try:
+        subprocess.run(["ollama", "pull", model], check=True, timeout=900)
+        return {"ok": True, "model": model, "status": _ollama_status()}
+    except FileNotFoundError:
+        return {"ok": False, "model": model,
+                "error": "ollama-бинарь не найден — установи: brew install ollama (macOS), потом ollama_ensure"}
+    except Exception as e:
+        return {"ok": False, "model": model, "error": str(e)}
+
+
+def _ollama_ensure():
+    """Поднять FULL-тир насколько возможно из тула: если демон не запущен, но бинарь есть —
+    стартуем `ollama serve` (отвязанно). Единственный неустранимо-ручной шаг — первая установка
+    бинаря (системный софт молча не ставим). Возвращает состояние + что осталось сделать руками."""
+    import setup_full, subprocess, time
+    st = setup_full.probe()
+    if st["ollama_running"]:
+        return {"running": True, "started": False, **st}
+    try:
+        subprocess.Popen(["ollama", "serve"], stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL, start_new_session=True)
+    except FileNotFoundError:
+        return {"running": False, "started": False, "bge_m3_present": st["bge_m3_present"],
+                "manual": "brew install ollama (macOS) | curl -fsSL https://ollama.com/install.sh | sh (linux)",
+                "note": "Единственный ручной шаг — установка бинаря. После неё снова ollama_ensure."}
+    for _ in range(12):                                   # ждём подъёма демона ~6с
+        time.sleep(0.5)
+        if setup_full.probe()["ollama_running"]:
+            return {"running": True, "started": True, **setup_full.probe()}
+    return {"running": False, "started": True,
+            "note": "Запустил `ollama serve`, демон ещё не ответил — повтори ollama_status через пару секунд."}
+
+
+def _add_source(advisor_dir, url=None, text=None, path=None, basename=None,
+                tier="P1", license=None):
+    """Затянуть источник в advisors/<name>/sources/ без шелла: url (фетч+strip Gutenberg) | text
+    (вставка) | path (локальный текст-файл). Проставляет тир в sources/manifest.json (его читает
+    pipeline.build). Скачивание = подтверди у юзера. Не-PD хост требует явного license."""
+    import collect_common as cc
+    d = _resolve(advisor_dir)
+    if url:
+        if not (cc.is_pd_host(url) or license == "public-domain"):
+            return {"error": "не-PD хост: подтверди PD-статус явно (license=public-domain) — права на тебе"}
+        raw = cc.fetch(url)
+        if "gutenberg" in url.lower():
+            import collect_pd
+            raw = collect_pd.strip_gutenberg(raw)
+        bn = basename or (cc.host_of(url) + "-" + url.rstrip("/").rsplit("/", 1)[-1])
+        src_path = cc.land_to_sources(d, bn, raw, url=url, license_note=license or "public-domain")
+    elif path:
+        rp = _resolve(path)
+        raw = open(rp, encoding="utf-8").read()
+        src_path = cc.land_to_sources(d, basename or os.path.basename(rp), raw,
+                                      url=f"file:{rp}", license_note=license or "unknown")
+    elif text:
+        raw = text
+        src_path = cc.land_to_sources(d, basename or "pasted-source", text,
+                                      url="(вставка)", license_note=license or "unknown")
+    else:
+        return {"error": "дай url | text | path"}
+    fn = os.path.basename(src_path)
+    man_p = os.path.join(d, "sources", "manifest.json")     # tier-манифест для clean.tag_regions
+    try:
+        man = json.load(open(man_p, encoding="utf-8"))
+    except Exception:
+        man = {}
+    man[fn] = {"tier": tier}
+    with open(man_p, "w", encoding="utf-8") as f:
+        json.dump(man, f, ensure_ascii=False, indent=2)
+    return {"ok": True, "advisor_dir": d, "source_file": fn, "tier": tier, "chars": len(raw),
+            "next_action": "Собери корпус: build_advisor(advisor_dir) — корпус+кернелы (нужен ollama "
+                           "для кернелов), либо validate_manifest для проверки тиров."}
 
 
 def _build_lens(name, ground_text, reading_notes=None, author=None, kind="personality",
@@ -373,6 +494,50 @@ TOOLS = {
         "input_schema": _obj({"quote": "string", "advisor_dir": "string"},
                              ["quote", "advisor_dir"]),
         "handler": _fidelity_check,
+    },
+    "add_source": {
+        "description": "Затянуть источник в sources/ советника БЕЗ шелла: url (фетч + авто-strip "
+                       "Gutenberg) | text (вставка) | path (локальный текст-файл). Проставляет тир "
+                       "(P1=🔵 первоисточник). Скачивание — ПОДТВЕРДИ у юзера; не-PD хост требует "
+                       "license=public-domain. Потом build_advisor для сборки корпуса.",
+        "input_schema": {"type": "object",
+                         "properties": {"advisor_dir": {"type": "string"},
+                                        "url": {"type": "string"}, "text": {"type": "string"},
+                                        "path": {"type": "string"}, "basename": {"type": "string"},
+                                        "tier": {"type": "string"}, "license": {"type": "string"}},
+                         "required": ["advisor_dir"]},
+        "handler": _add_source,
+    },
+    "config_get": {
+        "description": "Прочитать board_config.json (тюнинг без правки файла): весь конфиг или один "
+                       "ключ (retrieval_mode, abstain_threshold, hybrid_alpha…).",
+        "input_schema": {"type": "object", "properties": {"key": {"type": "string"}}, "required": []},
+        "handler": _config_get,
+    },
+    "config_set": {
+        "description": "Записать ключ в board_config.json (тюнинг из хоста, persistent). ПОДТВЕРДИ "
+                       "у юзера перед вызовом. Напр. retrieval_mode=auto|hybrid, abstain_threshold=0.5.",
+        "input_schema": {"type": "object",
+                         "properties": {"key": {"type": "string"},
+                                        "value": {"type": ["string", "number", "boolean"]}},
+                         "required": ["key", "value"]},
+        "handler": _config_set,
+    },
+    "ollama_status": {
+        "description": "Состояние FULL-тира: запущен ли ollama и скачан ли bge-m3. Без падений.",
+        "input_schema": {"type": "object", "properties": {}, "required": []},
+        "handler": _ollama_status,
+    },
+    "ollama_ensure": {
+        "description": "Поднять FULL-тир из тула: стартует `ollama serve`, если бинарь есть. Единственный "
+                       "ручной шаг — первая установка бинаря (вернётся в manual). Потом ollama_pull.",
+        "input_schema": {"type": "object", "properties": {}, "required": []},
+        "handler": _ollama_ensure,
+    },
+    "ollama_pull": {
+        "description": "Скачать модель эмбеддингов в запущенный ollama (идемпотентно). default bge-m3.",
+        "input_schema": {"type": "object", "properties": {"model": {"type": "string"}}, "required": []},
+        "handler": _ollama_pull,
     },
     "build_lens": {
         "description": "Собрать grounded-ЛИНЗУ из любого источника (линзы > личности). ground_text → "

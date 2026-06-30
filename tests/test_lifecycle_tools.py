@@ -259,3 +259,31 @@ def test_lifecycle_tools_registered():
     names = {t["name"] for t in list_tools()}
     assert {"config_get", "config_set", "ollama_status", "ollama_ensure", "ollama_pull",
             "add_source"} <= names
+
+
+def test_add_source_text_with_apparatus_auto_tiers(tmp_path):
+    body = ("Translator intro about Wellington and Waterloo.\n" * 6 +
+            "I. LAYING PLANS\n" +
+            "War is based on deception. [Tu Mu: deceive the foe.]\n" * 4 +
+            "APPENDIX\nbibliography\n")
+    r = dispatch("add_source", {"advisor_dir": "advisors/x-apparatus",
+                                "text": body, "basename": "book", "tier": "P1"})
+    assert r["ok"] and r["mode"] == "tier"
+    assert r["hint"] and "🔵" in r["hint"] and "🟢" in r["hint"]
+    assert any(a["mode"] == "clean" for a in r["adjustments"])
+    import json, os
+    man = json.load(open(os.path.join(r["advisor_dir"], "sources", "manifest.json")))
+    entry = next(v for k, v in man.items() if k.startswith("book"))
+    assert entry["apparatus"]["mode"] == "tier"
+
+
+def test_add_source_clean_mode_writes_clean_file(tmp_path):
+    body = "intro\nI. LAYING PLANS\nWar is deception. [Tu Mu: yes.]\nAPPENDIX\nx\n"
+    r = dispatch("add_source", {"advisor_dir": "advisors/x-clean", "text": body,
+                                "basename": "book", "tier": "P1", "mode": "clean",
+                                "front_until": "I. LAYING PLANS", "back_from": "APPENDIX"})
+    assert r["ok"] and r["mode"] == "clean"
+    import os
+    files = os.listdir(os.path.join(r["advisor_dir"], "sources"))
+    assert any(f.endswith(".clean.txt") for f in files)
+    assert any(f == "book.txt" for f in files)

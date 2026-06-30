@@ -271,7 +271,6 @@ def test_add_source_text_with_apparatus_auto_tiers(tmp_path):
     assert r["ok"] and r["mode"] == "tier"
     assert r["hint"] and "🔵" in r["hint"] and "🟢" in r["hint"]
     assert any(a["mode"] == "clean" for a in r["adjustments"])
-    import json, os
     man = json.load(open(os.path.join(r["advisor_dir"], "sources", "manifest.json")))
     entry = next(v for k, v in man.items() if k.startswith("book"))
     assert entry["apparatus"]["mode"] == "tier"
@@ -283,15 +282,13 @@ def test_add_source_clean_mode_writes_clean_file(tmp_path):
                                 "basename": "book", "tier": "P1", "mode": "clean",
                                 "front_until": "I. LAYING PLANS", "back_from": "APPENDIX"})
     assert r["ok"] and r["mode"] == "clean"
-    import os
     sources = os.path.join(r["advisor_dir"], "sources")
     files = os.listdir(sources)
     assert any(f.endswith(".clean.txt") for f in files)
     # сырой backup лежит в подкаталоге originals/ → pipeline его НЕ ингестит
     assert os.path.isfile(os.path.join(sources, "originals", "book.txt"))
     from corpusbuild import pipeline, paths
-    import json as _json
     pipeline.build(r["advisor_dir"])
-    corpus = [_json.loads(l) for l in open(paths.corpus_path(r["advisor_dir"]))]
+    corpus = [json.loads(l) for l in open(paths.corpus_path(r["advisor_dir"]))]
     assert corpus and all(c["tier"] == "P1" for c in corpus)        # только чистый автор, без A-мусора
     assert not any("Tu Mu" in c["text"] for c in corpus)            # аппарат исчез из корпуса

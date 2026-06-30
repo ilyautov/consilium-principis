@@ -45,25 +45,70 @@ def split_inline(text):
 
 
 _BRACKET_RE = re.compile(r"\[[^\[\]]*\]")
+_CONTENTS_RE = re.compile(r"^\s*(CONTENTS|TABLE\s+OF\s+CONTENTS)\s*$", re.I)
 
 
-def strip_sections(text, front_until=None, back_from=None):
-    """Срез фронт/бэк-материи: всё ДО строки с front_until и ОТ строки с back_from. None → не резать.
-    front_until ВКЛЮЧИТЕЛЬНО: строка с маркером остаётся первой строкой тела (start=i, не i+1).
-    front_until берёт ПЕРВОЕ вхождение, back_from — ПОСЛЕДНЕЕ; при этом scan() сообщает ПЕРВОЕ
-    вхождение back-маркера. Для источников с повторяющимся маркером передавай УНИКАЛЬНУЮ строку."""
-    lines = text.splitlines()
+def _contents_span(lines):
+    """[start, end) блока оглавления, или None. Оглавление = от строки 'Contents' до разрыва в 2+
+    пустых строки (конец списка глав) ИЛИ до первой не-индентированной строки после вхождения
+    индентированных пунктов (работает и на stripped-записях без пустых строк). Маркеры ВНУТРИ —
+    это пункты оглавления, не реальные заголовки; при выборе границ тела их пропускаем."""
+    start = None
+    for i, ln in enumerate(lines):
+        if _CONTENTS_RE.match(ln):
+            start = i
+            break
+    if start is None:
+        return None
+    cap = min(len(lines), start + 120)
+    blanks = 0
+    saw_entry = False   # видели хотя бы один индентированный пункт (= мы в теле TOC)
+    for j in range(start + 1, cap):
+        ln = lines[j]
+        if ln.strip():
+            blanks = 0
+            if ln[0].isspace():
+                saw_entry = True          # индентированный пункт оглавления
+            elif saw_entry:
+                # первая не-индентированная строка после пунктов → TOC закончился
+                return (start, j)
+        else:
+            blanks += 1
+            if blanks >= 2 and j - start > 2:
+                return (start, j)
+    return (start, cap)
+
+
+def _resolve_span(lines, front_until=None, back_from=None):
+    """TOC-aware, регистронезависимое разрешение границ тела. front_until ВКЛЮЧИТЕЛЬНО: первое
+    вхождение маркера ВНЕ блока оглавления. back_from: последнее вхождение ПОСЛЕ начала тела и вне
+    оглавления; иначе среза нет (хвост остаётся телом). Возвращает (start, end) индексы строк."""
+    toc = _contents_span(lines)
+
+    def in_toc(i):
+        return toc is not None and toc[0] <= i < toc[1]
+
     start, end = 0, len(lines)
     if front_until:
+        fl = front_until.lower()
         for i, ln in enumerate(lines):
-            if front_until in ln:
+            if fl in ln.lower() and not in_toc(i):
                 start = i
                 break
     if back_from:
+        bl = back_from.lower()
         for i in range(len(lines) - 1, -1, -1):
-            if back_from in lines[i]:
+            if bl in lines[i].lower() and not in_toc(i) and i > start:
                 end = i
                 break
+    return start, end
+
+
+def strip_sections(text, front_until=None, back_from=None):
+    """Срез фронт/бэк-материи через TOC-aware резолвер: всё ДО строки front_until и ОТ back_from.
+    front_until ВКЛЮЧИТЕЛЬНО (строка-маркер остаётся первой строкой тела). None → не резать."""
+    lines = text.splitlines()
+    start, end = _resolve_span(lines, front_until, back_from)
     return "\n".join(lines[start:end]).strip()
 
 
@@ -96,8 +141,9 @@ def scan(text):
     commentator_hits = sum(text.count(c) for c in _COMMENTATORS)
     fi, front_marker = _first_line(lines, _FRONT_RE)
     bi, back_marker = _first_line(lines, _BACK_RE)
-    front_ok = fi is not None and fi > 3              # есть что отрезать спереди
-    back_ok = bi is not None
+    start, end = _resolve_span(lines, front_marker, back_marker)
+    front_ok = front_marker is not None and start > 3      # тело реально начинается ниже шапки
+    back_ok = back_marker is not None and end < len(lines)  # есть валидный хвост ПОСЛЕ тела
     bracket = bracket_ratio >= 0.25 or commentator_hits >= 5
     has_apparatus = bracket or front_ok or back_ok
     sample_app = next((l.strip() for l in lines if "[" in l and len(l.strip()) > 20), "")
@@ -127,17 +173,7 @@ def tier_records(recs, front_until=None, back_from=None,
     """recs: [(loc, text)] → [{loc, text, tier}]. Секции-поля: drop если уверенно, иначе S1 (🟢,
     fail-closed). Тело: split_inline → author=P1 (🔵), commentary=S1 (🟢)."""
     texts = [t for _, t in recs]
-    start, end = 0, len(recs)
-    if front_until:
-        for i, t in enumerate(texts):
-            if front_until in t:
-                start = i
-                break
-    if back_from:
-        for i in range(len(texts) - 1, -1, -1):
-            if back_from in texts[i]:
-                end = i
-                break
+    start, end = _resolve_span(texts, front_until, back_from)
     out = []
     for i, (loc, text) in enumerate(recs):
         if i < start or i >= end:                     # поле (вступление/приложение)

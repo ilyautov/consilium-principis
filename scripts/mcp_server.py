@@ -362,10 +362,9 @@ def _governance_verify(path):
     path = _resolve(path)
     cj = path if path.endswith(".jsonl") else corpus_path(path)
     expected = None
-    if not path.endswith(".jsonl"):                  # сверка с эталонной головой из build.lock
-        from corpusbuild.paths import lock_path
-        from governance import _lock_head
-        expected = _lock_head(lock_path(path))
+    if not path.endswith(".jsonl"):                  # эталон: build.lock ИЛИ трекаемый corpus.lock.json
+        from governance import expected_head_for
+        expected = expected_head_for(path)
     res = _verify_corpus(cj, expected_head=expected)
     return res if res is not None else {"ok": False, "error": f"нет corpus.jsonl: {cj}"}
 

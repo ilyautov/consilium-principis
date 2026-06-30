@@ -95,6 +95,30 @@ def _lock_head(lock_json):
         return None
 
 
+def expected_head_for(advisor_dir):
+    """Эталонный gov_head советника: build.lock (локальная сборка) ИЛИ трекаемый corpus.lock.json
+    (шипованный корпус — переживает клон). None, если ни одного нет."""
+    import sys, os
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from corpusbuild.paths import lock_path, head_lock_path
+    return _lock_head(lock_path(advisor_dir)) or _lock_head(head_lock_path(advisor_dir))
+
+
+def freeze(advisor_dir):
+    """Записать трекаемый corpus.lock.json = {gov_head} над ТЕКУЩИМ corpus.jsonl советника.
+    Для шипованных корпусов (lenses/*) даёт git-переносимый эталон целостности."""
+    import sys, os
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from corpusbuild.paths import corpus_path, head_lock_path
+    res = _verify_corpus(corpus_path(advisor_dir))
+    if res is None:
+        return None
+    out = head_lock_path(advisor_dir)
+    with open(out, "w", encoding="utf-8") as f:
+        json.dump({"gov_head": res["head"], "n": res["n"]}, f, ensure_ascii=False, indent=2)
+    return {"path": out, "gov_head": res["head"], "n": res["n"]}
+
+
 def _verify_corpus(corpus_jsonl, expected_head=None):
     """Построить цепочку над corpus.jsonl, проверить целостность, дать голову-хеш + гистограмму
     тиров. Если передан expected_head (сохранённый в build.lock при сборке) — СВЕРИТЬ с ним:
@@ -125,26 +149,33 @@ def _verify_corpus(corpus_jsonl, expected_head=None):
 
 if __name__ == "__main__":
     import sys, os
-    if len(sys.argv) < 3 or sys.argv[1] != "verify":
-        print("Использование: python governance.py verify <dir | путь.jsonl>")
+    if len(sys.argv) < 3 or sys.argv[1] not in ("verify", "freeze"):
+        print("Использование: python governance.py verify|freeze <dir | путь.jsonl>")
         sys.exit(1)
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-    from corpusbuild.paths import corpus_path, lock_path  # резолверы, не литералы
+    from corpusbuild.paths import corpus_path  # резолвер, не литерал
     target = sys.argv[2]
+    if sys.argv[1] == "freeze":                          # записать трекаемый эталон corpus.lock.json
+        fr = freeze(target)
+        if fr is None:
+            print(f"[governance] нет corpus.jsonl: {target}"); sys.exit(1)
+        print(f"[governance] заморожен эталон: {fr['path']} ({fr['n']} записей, "
+              f"голова {fr['gov_head'][:16]}…)")
+        sys.exit(0)
     cj = target if target.endswith(".jsonl") else corpus_path(target)
-    expected = _lock_head(lock_path(target)) if not target.endswith(".jsonl") else None
+    expected = expected_head_for(target) if not target.endswith(".jsonl") else None
     res = _verify_corpus(cj, expected_head=expected)
     if res is None:
         print(f"[governance] нет corpus.jsonl: {cj}")
         sys.exit(1)
     if res["tampered"]:
-        status = "❌ ПОДМЕНА: голова ≠ build.lock"
+        status = "❌ ПОДМЕНА: голова ≠ эталон"
     elif not res["ok"]:
         status = f"❌ ПОДМЕНА на записи #{res['broken']}"
     elif res["head_match"]:
-        status = "✅ целостна (сверена с build.lock)"
+        status = "✅ целостна (сверена с эталоном)"
     else:
-        status = "✅ цепь консистентна (нет эталона в lock — собери заново для сверки)"
+        status = "✅ цепь консистентна (нет эталона — freeze/собрать для сверки)"
     tiers = " ".join(f"{k}:{v}" for k, v in sorted(res["tiers"].items()))
     print(f"[governance] {cj}")
     print(f"  записей {res['n']} · {status} · тиры [{tiers}]")

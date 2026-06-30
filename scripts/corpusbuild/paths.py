@@ -22,6 +22,13 @@ def lock_path(advisor_dir: str) -> str:
     return os.path.join(build_dir(advisor_dir), "build.lock.json")
 
 
+def head_lock_path(advisor_dir: str) -> str:
+    """Трекаемый отпечаток корпуса РЯДОМ с легаси corpus.jsonl (НЕ под build/ → едет в git).
+    Для шипованных корпусов (напр. lenses/strategist) это эталон gov_head, переживающий клон —
+    build/ гитигнорится, а этот файл нет. Пишется governance.freeze."""
+    return os.path.join(advisor_dir, "corpus.lock.json")
+
+
 def corpus_path(advisor_dir: str) -> str:
     """build/corpus.jsonl, если он есть; иначе легаси advisors/<slug>/corpus.jsonl,
     если есть; иначе дефолт build/corpus.jsonl (для свежей сборки)."""

@@ -12,8 +12,8 @@ collect_common.py — общая база для сборщиков корпус
   - большие тексты пишутся В ФАЙЛ, наружу печатается только сводка.
 """
 import os, re, sys, json, urllib.request, urllib.error, datetime
-import socket, ipaddress
-from urllib.parse import urlparse
+import socket, ipaddress, ssl, http.client
+from urllib.parse import urlparse, urljoin
 
 UA = "Mozilla/5.0 (Consilium-Principis corpus collector; personal use)"
 
@@ -36,54 +36,94 @@ def is_pd_host(url):
     return any(h == d or h.endswith("." + d) for d in PD_HOSTS)
 
 
+def _is_public_ip(addr):
+    ip = ipaddress.ip_address(addr)
+    return not (ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved
+                or ip.is_multicast or ip.is_unspecified)
+
+
+def _pick_public_ip(host, port):
+    """getaddrinfo(host) → (первый ПУБЛИЧНЫЙ IP, None) или (None, ошибка с непубличным IP)."""
+    try:
+        infos = socket.getaddrinfo(host, port, proto=socket.IPPROTO_TCP)
+    except Exception as e:
+        return None, f"host не резолвится: {e}"
+    blocked = []
+    for info in infos:
+        addr = info[4][0]
+        if _is_public_ip(addr):
+            return addr, None
+        blocked.append(addr)
+    return None, f"host резолвится в непубличный IP ({blocked[0] if blocked else '?'}) — заблокировано (SSRF)"
+
+
 def ssrf_check(url):
     """SSRF-гард: возвращает строку-ошибку или None. Тул дёргается хостом (возможна инъекция из
     веб-контента) → фетч во внутренние сервисы/метадату облака недопустим. Схема только http(s);
-    host обязан резолвиться ТОЛЬКО в публичные IP (нет loopback/private/link-local/reserved)."""
+    host обязан резолвиться в публичный IP."""
     p = urlparse(url or "")
     if p.scheme not in ("http", "https"):
         return f"схема '{p.scheme or '—'}' запрещена — только http/https"
-    host = p.hostname
-    if not host:
+    if not p.hostname:
         return "не разобрал host из url"
-    try:
-        infos = socket.getaddrinfo(host, p.port or (443 if p.scheme == "https" else 80),
-                                   proto=socket.IPPROTO_TCP)
-    except Exception as e:
-        return f"host не резолвится: {e}"
-    for info in infos:
-        ip = ipaddress.ip_address(info[4][0])
-        if (ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved
-                or ip.is_multicast or ip.is_unspecified):
-            return f"host резолвится в непубличный IP ({ip}) — заблокировано (SSRF)"
-    return None
+    _, err = _pick_public_ip(p.hostname, p.port or (443 if p.scheme == "https" else 80))
+    return err
 
 
-class _ValidatingRedirect(urllib.request.HTTPRedirectHandler):
-    """Редирект следуем ТОЛЬКО если новый хоп тоже публичный (иначе PD-хост увёл бы на 169.254…)."""
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
-        err = ssrf_check(newurl)
-        if err:
-            raise urllib.error.URLError(f"redirect заблокирован: {err}")
-        return super().redirect_request(req, fp, code, msg, headers, newurl)
-
-
-def fetch(url, timeout=30, public_only=True):
-    """GET → текст. public_only (дефолт) включает SSRF-гард + ре-валидацию редиректов."""
-    if public_only:
-        err = ssrf_check(url)
-        if err:
-            raise ValueError(f"SSRF-гард: {err}")
-    opener = urllib.request.build_opener(_ValidatingRedirect())
-    req = urllib.request.Request(url, headers={"User-Agent": UA})
-    with opener.open(req, timeout=timeout) as r:
-        raw = r.read()
+def _decode(raw):
     for enc in ("utf-8", "cp1251", "latin-1"):
         try:
             return raw.decode(enc)
         except UnicodeDecodeError:
             continue
     return raw.decode("utf-8", errors="ignore")
+
+
+def _fetch_once(url, timeout):
+    """Один GET к ЗАКРЕПЛЁННОМУ публичному IP (host резолвится ОДИН раз и коннект идёт ровно к
+    тому IP — закрывает DNS-rebinding окно между проверкой и коннектом). TLS: SNI/валидация серта
+    по ИМЕНИ хоста, не по IP. Возвращает (status, location|None, body|None)."""
+    p = urlparse(url)
+    if p.scheme not in ("http", "https"):
+        raise ValueError(f"SSRF-гард: схема '{p.scheme or '—'}' запрещена")
+    host, port = p.hostname, p.port or (443 if p.scheme == "https" else 80)
+    ip, err = _pick_public_ip(host, port)
+    if err:
+        raise ValueError(f"SSRF-гард: {err}")
+    path = p.path or "/"
+    if p.query:
+        path += "?" + p.query
+    raw_sock = socket.create_connection((ip, port), timeout=timeout)
+    try:
+        sock = (ssl.create_default_context().wrap_socket(raw_sock, server_hostname=host)
+                if p.scheme == "https" else raw_sock)              # SNI=host → серт валидится по host
+        conn = http.client.HTTPConnection(host, port, timeout=timeout)
+        conn.sock = sock                                            # коннект уже к проверенному IP
+        conn.request("GET", path, headers={"User-Agent": UA, "Host": host})
+        resp = conn.getresponse()
+        if resp.status in (301, 302, 303, 307, 308):
+            return resp.status, resp.getheader("Location"), None
+        return resp.status, None, resp.read()
+    finally:
+        raw_sock.close()
+
+
+def fetch(url, timeout=30, public_only=True):
+    """GET → текст. public_only (дефолт): SSRF-гард с IP-pinning (резолв+валидация+коннект к тому же
+    IP) и ре-валидацией каждого редирект-хопа — без DNS-rebinding окна."""
+    if not public_only:                                            # явный небезопасный путь (не юзается)
+        req = urllib.request.Request(url, headers={"User-Agent": UA})
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return _decode(r.read())
+    cur = url
+    for _ in range(6):                                            # лимит редиректов
+        status, location, body = _fetch_once(cur, timeout)
+        if body is not None:
+            return _decode(body)
+        if not location:
+            raise ValueError(f"редирект {status} без Location")
+        cur = urljoin(cur, location)                              # следующий хоп ре-валидируется в _fetch_once
+    raise ValueError("слишком много редиректов")
 
 
 def html_to_text(html, selector=None):

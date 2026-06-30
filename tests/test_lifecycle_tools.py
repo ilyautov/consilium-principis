@@ -216,6 +216,19 @@ def test_embed_batch_rejects_count_mismatch(monkeypatch):
     assert tier_full.embed_batch([]) == []             # пустой вход → []
 
 
+def test_embed_batch_happy_path(monkeypatch):
+    import tier_full
+    class _Resp:
+        def __init__(self, p): self._p = p
+        def read(self): return self._p
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+    monkeypatch.setattr(tier_full.urllib.request, "urlopen",
+                        lambda *a, **k: _Resp(json.dumps({"embeddings": [[0.1, 0.2], [0.3, 0.4]]}).encode()))
+    v = tier_full.embed_batch(["one", "two"])
+    assert v == [[0.1, 0.2], [0.3, 0.4]]               # вернул по вектору на вход
+
+
 def test_fetch_channel_html_routes_through_guarded_fetch(monkeypatch):
     # P0-4 регрессия-пин: telegram идёт через collect_common.fetch (SSRF-гард), handle санитизирован
     import ingest_telegram as itg, collect_common as cc

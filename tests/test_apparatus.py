@@ -80,6 +80,27 @@ def test_tier_records_uncertain_front_margin_is_green_not_blue():
     assert pre and pre[0]["tier"] == "S1"            # неуверенно → 🟢, не 🔵
 
 
+def test_tier_records_multiline_bracket_and_footnote_def():
+    # многострочный коммент [..\n..\n..] целиком 🟢 (не только строки со скобками);
+    # строка-определение сноски '[1] ...' целиком 🟢.
+    body = [
+        "1. Sun Tzu said: war is vital.",            # автор 🔵
+        "[Ts’ao Kung opens a long note here",        # 🟢 (открыл скобку)
+        "Wellington at Waterloo concealed his moves", # 🟢 (внутри скобки, своих скобок нет)
+        "and deceived friend and foe alike.]",       # 🟢 (закрыл скобку)
+        "2. All warfare is based on deception.",     # автор 🔵
+        "[1] \"Words on Wellington,\" by Sir W. Fraser.",  # 🟢 (сноска-определение)
+    ]
+    recs = [(("line", i), t) for i, t in enumerate(body)]
+    out = ap.tier_records(recs, inline="bracket")
+    blue = " ".join(t["text"] for t in out if t["tier"] == "P1")
+    green = " ".join(t["text"] for t in out if t["tier"] == "S1")
+    assert "Sun Tzu said" in blue and "based on deception" in blue
+    assert "Wellington" not in blue and "Ts’ao Kung" not in blue
+    assert "Words on Wellington" not in blue            # сноска-определение не 🔵
+    assert "Wellington" in green and "Words on Wellington" in green
+
+
 import json
 import pytest
 

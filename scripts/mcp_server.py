@@ -50,7 +50,9 @@ def _resolve_under_root(p):
     root = os.path.realpath(_root())
     if rp == root or rp.startswith(root + os.sep):
         return rp, None
-    return None, {"error": "путь вне корня репо запрещён (path-traversal). Используй путь внутри проекта."}
+    return None, {"error": "путь вне корня репо запрещён (path-traversal). Используй путь внутри проекта.",
+                  "hint": "Этот файл вне проекта — я не могу к нему обратиться. Вставь текст напрямую "
+                          "или положи файл внутрь проекта."}
 
 
 def _fidelity_check(quote, advisor_dir):
@@ -157,7 +159,9 @@ def _config_get(key=None):
     except Exception:
         cfg = {}
     if key is None:
-        return {"config": cfg, "known_keys": list(_KNOWN_CONFIG)}
+        return {"config": cfg, "known_keys": list(_KNOWN_CONFIG),
+                "hint": "Это внутренние настройки — обычно трогать не нужно. Если что-то «не так» "
+                        "(совет выдумывает / поиск мимо темы) — просто скажи словами, я подкручу."}
     return {"key": key, "value": cfg.get(key), "known": key in _KNOWN_CONFIG}
 
 
@@ -199,9 +203,15 @@ def _ollama_serve_popen():
 
 
 def _ollama_status():
-    """Состояние FULL-тира: запущен ли ollama, скачан ли bge-m3 (без падений)."""
+    """Состояние FULL-тира: запущен ли ollama, скачан ли bge-m3 (без падений). +hint человеч. языком."""
     import setup_full
-    return setup_full.probe()
+    st = setup_full.probe()
+    if st.get("ollama_running") and st.get("bge_m3_present"):
+        st["hint"] = "Умный поиск включён — совет работает в полном режиме."
+    else:
+        st["hint"] = ("Совет работает в базовом режиме — это нормально и его достаточно. Хочешь, "
+                      "чтобы он искал по текстам умнее, — скажи «включи умный поиск», я настрою.")
+    return st
 
 
 def _ollama_pull(model="bge-m3"):
@@ -366,7 +376,16 @@ def _governance_verify(path):
         from governance import expected_head_for
         expected = expected_head_for(path)
     res = _verify_corpus(cj, expected_head=expected)
-    return res if res is not None else {"ok": False, "error": f"нет corpus.jsonl: {cj}"}
+    if res is None:
+        return {"ok": False, "error": f"нет corpus.jsonl: {cj}",
+                "hint": "У этого советника ещё нет собранных текстов — нечего проверять."}
+    if res.get("tampered") or not res.get("ok"):
+        res["hint"] = "Внимание: тексты этого советника, похоже, менялись после сборки — лучше пересобрать."
+    elif res.get("head_match"):
+        res["hint"] = "Тексты целы, подмен нет."
+    else:
+        res["hint"] = "Тексты на месте; точный эталон для сверки не задан (не критично)."
+    return res
 
 
 def _calibrate(log_text):
@@ -418,7 +437,9 @@ def _board_status():
     from scaffold import next_step
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     pf = preflight(root)
-    return {"preflight": pf, "next_step": next_step(pf)}
+    ns = next_step(pf)
+    # hint = тот же next_step человеческим языком — хост показывает ЕГО, не сырой preflight (тиры/чанки)
+    return {"preflight": pf, "next_step": ns, "hint": ns.get("say", "")}
 
 
 def _scaffold_principis(answers):
@@ -937,6 +958,21 @@ Consilium-Principis — личный совет AI-персон реальных
    `build_lens(name, ground_text=<дословный источник>, reading_notes=<как читаешь>, kind)`:
    kind=personality («автор как читаю Я») | method | self. Контур честен: 🔵 = слова источника (P1),
    🟡 = твоё прочтение (U1). Не выдавай прочтение за слова автора. Готовую линзу включай голосом в совет.
+
+8. ПЕРВЫЙ КОНТАКТ / «с чего начать». Юзер чаще НЕ технический. При первом подключении ИЛИ на «с
+   чего начать / что умеешь / я запутался / помоги» — НЕ вываливай список тулов и не проси команд.
+   Тихо вызови board_status (и list_recipes, если юзер не знает, что спросить) и веди простым языком,
+   по одному шагу. У board_status есть поле `hint`, у next_step — `say`: они УЖЕ написаны человеческим
+   языком, опирайся на них, а не на сырой preflight.
+
+9. ПЕРЕВОДИ СЛУЖЕБКУ В ЧЕЛОВЕЧЕСКИЙ ЯЗЫК (для не-технического юзера). НИКОГДА не показывай ему сырые
+   поля JSON и технслова: тиры (P1/S1/🔵-eligible), хеши/«голову», пути, traversal, SSRF, manifest,
+   ollama/bge-m3, чанки, abstain_threshold/hybrid_alpha. Диагностические тулы (board_status, doctor,
+   governance_verify, ollama_status, config_get) несут готовое поле `hint` — показывай ЕГО, не сырой
+   dict. Если тул вернул ошибку с техслова́рём (traversal/SSRF/path/ollama/манифест) — перескажи СМЫСЛ
+   + следующий шаг простыми словами («этот файл вне проекта — вставь текст»; «умный поиск ещё не
+   включён — сказать, как включить?»), само слово не показывай. Настройки (config_set) юзер словами
+   не зовёт по имени — он говорит «совет выдумывает» / «поиск мимо», ты сам решаешь, что подкрутить.
 """
 
 

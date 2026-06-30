@@ -98,7 +98,11 @@ def run_doctor(root="."):
                 break
     if not tested:
         checks.append({"name": "contour", "ok": True, "detail": "пропущен (нет собранных советников)"})
-    return summarize(checks)
+    res = summarize(checks)
+    # hint человеч. языком — хост показывает ЕГО, не сырые detail-строки (рв/fail-closed/tier/ollama)
+    res["hint"] = ("Всё в порядке — можно звать совет." if res["healthy"]
+                   else "Кое-что требует внимания, но базово совет работать может — скажи, помогу настроить.")
+    return res
 
 
 def report():

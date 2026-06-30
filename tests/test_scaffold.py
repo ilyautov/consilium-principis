@@ -88,3 +88,24 @@ def test_next_step_ready_when_all_set():
           "advisors": [{"name": "x", "has_corpus": True, "blue_eligible": True, "has_kernels": True}],
           "lenses": [{"name": "CFO"}]}
     assert next_step(pf)["action"] == "ready"
+
+
+_JARGON = ("p1", "p2", "s1", "tier", "тир", "kernel", "кернел", "manifest", "манифест",
+           "🔵", "blue_eligible", "corpus", "корпус", "traversal", "preflight")
+
+
+def test_next_step_say_is_plain_for_every_branch():
+    # `say` показывается не-тех юзеру → не должен содержать служебных терминов ни в одной ветке
+    states = [
+        {"principis": {"ok": False}, "advisors": [], "lenses": []},
+        {"principis": {"ok": True}, "advisors": [{"name": "X", "has_corpus": False}], "lenses": []},
+        {"principis": {"ok": True}, "advisors": [
+            {"name": "X", "has_corpus": True, "blue_eligible": False, "has_kernels": False}], "lenses": []},
+        {"principis": {"ok": True}, "advisors": [
+            {"name": "X", "has_corpus": True, "blue_eligible": True, "has_kernels": False}], "lenses": []},
+        {"principis": {"ok": True}, "advisors": [
+            {"name": "X", "has_corpus": True, "blue_eligible": True, "has_kernels": True}], "lenses": []},
+    ]
+    for pf in states:
+        say = next_step(pf)["say"].lower()
+        assert say and not any(j in say for j in _JARGON), f"жаргон в say: {say}"

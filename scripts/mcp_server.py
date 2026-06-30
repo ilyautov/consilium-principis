@@ -301,16 +301,22 @@ def _add_source(advisor_dir, url=None, text=None, path=None, basename=None,
     effective = ("tier" if report["has_apparatus"] else "raw") if mode == "auto" else mode
 
     landed_name = basename or hint
-    if effective == "clean":                          # пишем ЧИСТЫЙ файл + сохраняем сырой
+    if effective == "clean":                          # пишем ЧИСТЫЙ файл + прячем сырой backup
         cleaned = ap.clean(raw, fu, bf)
-        cc.land_to_sources(d, landed_name, raw, url=prov, license_note=lic)          # сырой (реверс)
-        # .clean.txt пишем напрямую: land_to_sources→slugify стирает точку, имя ломается
         src_dir = os.path.join(d, "sources")
-        os.makedirs(src_dir, exist_ok=True)
+        # сырой backup → sources/originals/<name>.txt: pipeline.build делает плоский listdir по
+        # расширениям, подкаталог 'originals' пропускается → сырьё НЕ ингестится (иначе тир-A мусор),
+        # но реверс может его прочитать. land_to_sources сюда не зовём (он форсит sources/*.txt).
+        orig_dir = os.path.join(src_dir, "originals")
+        os.makedirs(orig_dir, exist_ok=True)
+        raw_name = (landed_name or "src") + ".txt"
+        with open(os.path.join(orig_dir, raw_name), "w", encoding="utf-8") as _f:
+            _f.write(raw.strip() + "\n")
+        # .clean.txt пишем напрямую: land_to_sources→slugify стирает точку, имя ломается
         fn = (landed_name or "src") + ".clean.txt"
         with open(os.path.join(src_dir, fn), "w", encoding="utf-8") as _f:
             _f.write(cleaned.strip() + "\n")
-        appa = {"mode": "clean", "source_raw": (landed_name or "src") + ".txt"}
+        appa = {"mode": "clean", "source_raw": "originals/" + raw_name}
     else:
         src_path = cc.land_to_sources(d, landed_name, raw, url=prov, license_note=lic)
         fn = os.path.basename(src_path)

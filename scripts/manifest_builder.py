@@ -49,4 +49,13 @@ def validate_manifest(manifest, sources_dir):
                 if marker and marker not in text:
                     problems.append({"source": src, "marker": marker,
                                      "issue": f"marker-not-in-source:{edge}"})
+        appa = rec.get("apparatus")
+        if appa is not None:
+            if appa.get("mode") not in ("tier", "clean", "raw"):
+                problems.append({"source": src, "issue": f"apparatus-mode:{appa.get('mode')}"})
+            for edge in ("front_until", "back_from"):
+                marker = appa.get(edge)
+                if marker and marker not in text:
+                    problems.append({"source": src, "marker": marker,
+                                     "issue": f"apparatus-marker-not-in-source:{edge}"})
     return {"ok": not problems, "problems": problems}

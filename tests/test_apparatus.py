@@ -145,7 +145,52 @@ def test_real_sun_tzu_tier_demotes_commentary(tmp_path):
     chunks = pipeline.build(str(tmp_path))
     blue = [c for c in chunks if c["tier"] == "P1"]
     green = [c for c in chunks if c["tier"] == "S1"]
-    # комментаторы НЕ должны доминировать в 🔵; должны жить в 🟢
     blue_text = " ".join(c["text"] for c in blue)
+    green_text = " ".join(c["text"] for c in green)
     assert "Wellington" not in blue_text                       # вступление вне 🔵
-    assert green, "толкования должны попасть в 🟢, а не исчезнуть"
+    assert "Tu Mu" not in blue_text and "Ts’ao Kung" not in blue_text   # комментаторы НЕ в 🔵
+    assert "Tu Mu" in green_text or "Ts’ao Kung" in green_text          # они демонтированы в 🟢
+    assert "vital importance" in blue_text                     # реальный стих Сунь-Цзы → 🔵
+
+
+def test_scan_toc_aware_picks_real_heading_not_contents():
+    # Мини-репро реального бага Сунь-Цзы: блок 'Contents' с пунктом 'Chapter I' И реальный
+    # заголовок 'Chapter I' ниже; внутренняя 'Bibliography' вступления стоит ДО тела.
+    text = "\n".join([
+        "THE ART OF WAR",          # 0
+        "",                        # 1
+        "Contents",                # 2
+        "",                        # 3
+        "  Introduction",          # 4
+        "  Bibliography",          # 5
+        "  Chapter I. Laying Plans",   # 6  (пункт оглавления)
+        "  Chapter II. Waging War",    # 7
+        "",                        # 8
+        "",                        # 9  (2+ пустые → конец оглавления)
+        "Introduction",            # 10
+        "",                        # 11
+        "This is the translator's essay about the author and his era.",  # 12
+        "It cites [the commentator] Tu Mu more than once.",              # 13
+        "",                        # 14
+        "Bibliography",            # 15 (библиография вступления, ДО тела)
+        "",                        # 16
+        "A list of old treatises cited in the introduction.",            # 17
+        "",                        # 18
+        "",                        # 19
+        "Chapter I. LAYING PLANS", # 20 (РЕАЛЬНЫЙ заголовок)
+        "",                        # 21
+        "1. Sun Tzu said: The art of war is of vital importance.",       # 22
+        "2. It is a matter of life and death.",                          # 23
+    ])
+    r = ap.scan(text)
+    assert r["signals"]["front_until"] and "Laying" in r["signals"]["front_until"]
+    assert r["signals"]["back_from"] is None          # back-якорь ДО тела отвергнут
+    recs = [(("line", i), ln) for i, ln in enumerate(text.split("\n"))]
+    tiered = ap.tier_records(recs, front_until=r["signals"]["front_until"],
+                             back_from=r["signals"]["back_from"],
+                             front_confident=r["signals"]["front_confident"],
+                             back_confident=r["signals"]["back_confident"])
+    blue = " ".join(t["text"] for t in tiered if t["tier"] == "P1")
+    assert "Sun Tzu said" in blue                     # слова автора → 🔵
+    assert "translator's essay" not in blue           # вступление НЕ 🔵
+    assert "list of old treatises" not in blue        # библиография вступления НЕ 🔵

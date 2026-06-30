@@ -276,6 +276,13 @@ def test_add_source_text_with_apparatus_auto_tiers(tmp_path):
     assert entry["apparatus"]["mode"] == "tier"
 
 
+def test_instructions_have_apparatus_rule():
+    ins = __import__("mcp_server").INSTRUCTIONS
+    assert "АППАРАТ" in ins or "аппарат" in ins
+    assert "🔵 автор" in ins or ("🔵" in ins and "🟢" in ins and "толков" in ins.lower())
+    assert "не как обязательный выбор" in ins or "не блокируй" in ins.lower()
+
+
 def test_add_source_clean_mode_writes_clean_file(tmp_path):
     body = "intro\nI. LAYING PLANS\nWar is deception. [Tu Mu: yes.]\nAPPENDIX\nx\n"
     r = dispatch("add_source", {"advisor_dir": "advisors/x-clean", "text": body,

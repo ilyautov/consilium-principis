@@ -81,6 +81,7 @@ def test_tier_records_uncertain_front_margin_is_green_not_blue():
 
 
 import json
+import pytest
 
 
 def _make_advisor(tmp_path, body, manifest):
@@ -122,3 +123,29 @@ def test_validate_manifest_checks_apparatus():
         assert not r2["ok"] and any(p.get("marker") == "MISSING" for p in r2["problems"])
         ok = {"book.txt": {"tier": "P1", "apparatus": {"mode": "tier", "front_until": "I. PLANS"}}}
         assert mb.validate_manifest(ok, sd)["ok"]
+
+
+@pytest.mark.skipif(not os.environ.get("RUN_NET_TESTS"),
+                    reason="сетевой тест Gutenberg — включи RUN_NET_TESTS=1")
+def test_real_sun_tzu_tier_demotes_commentary(tmp_path):
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
+    import collect_common as cc, collect_pd
+    from corpusbuild import pipeline
+    raw = collect_pd.strip_gutenberg(cc.fetch("https://www.gutenberg.org/cache/epub/132/pg132.txt"))
+    r = ap.scan(raw)
+    assert r["has_apparatus"] and r["inline_commentary"] == "bracket"
+    sd = tmp_path / "sources"; sd.mkdir(parents=True)
+    (sd / "aow.txt").write_text(raw, encoding="utf-8")
+    man = {"aow.txt": {"tier": "P1", "apparatus": {
+        "mode": "tier", "inline_commentary": "bracket",
+        "front_until": r["signals"]["front_until"], "back_from": r["signals"]["back_from"],
+        "front_confident": r["signals"]["front_confident"],
+        "back_confident": r["signals"]["back_confident"]}}}
+    (sd / "manifest.json").write_text(json.dumps(man), encoding="utf-8")
+    chunks = pipeline.build(str(tmp_path))
+    blue = [c for c in chunks if c["tier"] == "P1"]
+    green = [c for c in chunks if c["tier"] == "S1"]
+    # комментаторы НЕ должны доминировать в 🔵; должны жить в 🟢
+    blue_text = " ".join(c["text"] for c in blue)
+    assert "Wellington" not in blue_text                       # вступление вне 🔵
+    assert green, "толкования должны попасть в 🟢, а не исчезнуть"

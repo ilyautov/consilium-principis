@@ -284,6 +284,14 @@ def test_add_source_clean_mode_writes_clean_file(tmp_path):
                                 "front_until": "I. LAYING PLANS", "back_from": "APPENDIX"})
     assert r["ok"] and r["mode"] == "clean"
     import os
-    files = os.listdir(os.path.join(r["advisor_dir"], "sources"))
+    sources = os.path.join(r["advisor_dir"], "sources")
+    files = os.listdir(sources)
     assert any(f.endswith(".clean.txt") for f in files)
-    assert any(f == "book.txt" for f in files)
+    # сырой backup лежит в подкаталоге originals/ → pipeline его НЕ ингестит
+    assert os.path.isfile(os.path.join(sources, "originals", "book.txt"))
+    from corpusbuild import pipeline, paths
+    import json as _json
+    pipeline.build(r["advisor_dir"])
+    corpus = [_json.loads(l) for l in open(paths.corpus_path(r["advisor_dir"]))]
+    assert corpus and all(c["tier"] == "P1" for c in corpus)        # только чистый автор, без A-мусора
+    assert not any("Tu Mu" in c["text"] for c in corpus)            # аппарат исчез из корпуса

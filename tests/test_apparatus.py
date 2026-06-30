@@ -105,3 +105,20 @@ def test_pipeline_tier_mode_tags_author_blue_commentary_green(tmp_path):
     assert "P1" in tiers and "S1" in tiers
     assert "Tu Mu" not in " ".join(c["text"] for c in chunks if c["tier"] == "P1")
     assert "Intro" not in blob and "refs" not in blob
+
+
+def test_validate_manifest_checks_apparatus():
+    import manifest_builder as mb
+    import tempfile, os as _os
+    with tempfile.TemporaryDirectory() as sd:
+        with open(_os.path.join(sd, "book.txt"), "w", encoding="utf-8") as f:
+            f.write("I. PLANS\nbody\n")
+        bad = {"book.txt": {"tier": "P1", "apparatus": {"mode": "nonsense"}}}
+        r = mb.validate_manifest(bad, sd)
+        assert not r["ok"] and any("apparatus-mode" in p["issue"] for p in r["problems"])
+        # маркер границы, которого нет в тексте, ловится
+        bad2 = {"book.txt": {"tier": "P1", "apparatus": {"mode": "tier", "front_until": "MISSING"}}}
+        r2 = mb.validate_manifest(bad2, sd)
+        assert not r2["ok"] and any(p.get("marker") == "MISSING" for p in r2["problems"])
+        ok = {"book.txt": {"tier": "P1", "apparatus": {"mode": "tier", "front_until": "I. PLANS"}}}
+        assert mb.validate_manifest(ok, sd)["ok"]

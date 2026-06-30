@@ -204,7 +204,7 @@ def test_scan_toc_aware_picks_real_heading_not_contents():
         "2. It is a matter of life and death.",                          # 23
     ])
     r = ap.scan(text)
-    assert r["signals"]["front_until"] and "Laying" in r["signals"]["front_until"]
+    assert r["signals"]["front_until"] and "laying" in r["signals"]["front_until"].lower()
     assert r["signals"]["back_from"] is None          # back-якорь ДО тела отвергнут
     recs = [(("line", i), ln) for i, ln in enumerate(text.split("\n"))]
     tiered = ap.tier_records(recs, front_until=r["signals"]["front_until"],

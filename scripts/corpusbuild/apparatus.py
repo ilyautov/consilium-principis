@@ -1,6 +1,12 @@
 """Распознавание редакторского аппарата PD-изданий (вступление / инлайн-комментарий / приложения).
-Чистый и ДЕТЕРМИНИРОВАННЫЙ: без ollama, без сети, без I/O. Контур: 🔵 только уверенно-авторскому
-тексту вне [...]. Любая неопределённость → 🟢/drop, НИКОГДА 🔵."""
+Чистый и ДЕТЕРМИНИРОВАННЫЙ: без ollama, без сети, без I/O.
+
+ИНЛАЙН-гейт (внутри тела): 🔵 только уверенно-авторскому тексту вне [...]; любая неопределённость
+в скобках (вложенность/незакрытая/сноска-определение) → 🟢/commentary, НИКОГДА 🔵 — абсолютно.
+
+ГРАНИЦЫ секций (где кончается вступление, где начинаются приложения) в tier-режиме безопасны
+ЧЕРЕЗ needs_host_review: если фронт/бэк не разрешились уверенно (start=0 / нет валидного хвоста),
+scan поднимает needs_host_review=True для хоста (rule 10) — это НЕ абсолютный drop, а host-gate."""
 import re
 
 # Лексикон классических толкователей (издания Giles/Legge Сунь-Цзы и пр.) + общие маркеры.
@@ -154,8 +160,16 @@ def scan(text):
     lines = text.splitlines()
     bracket_ratio = _bracket_ratio(lines)
     commentator_hits = sum(text.count(c) for c in _COMMENTATORS)
-    fi, front_marker = _first_line(lines, _FRONT_RE)
-    bi, back_marker = _first_line(lines, _BACK_RE)
+    toc = _contents_span(lines)
+
+    def _first_outside(rx):
+        for i, ln in enumerate(lines):
+            if (toc is None or not (toc[0] <= i < toc[1])) and rx.match(ln):
+                return i, ln.strip()
+        return None, None
+
+    fi, front_marker = _first_outside(_FRONT_RE)   # реальный заголовок, не пункт оглавления
+    bi, back_marker = _first_line(lines, _BACK_RE)  # back: отдельная хрупкость, follow-up
     start, end = _resolve_span(lines, front_marker, back_marker)
     front_ok = front_marker is not None and start > 3      # тело реально начинается ниже шапки
     back_ok = back_marker is not None and end < len(lines)  # есть валидный хвост ПОСЛЕ тела

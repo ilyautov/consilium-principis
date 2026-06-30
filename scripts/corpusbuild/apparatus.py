@@ -14,10 +14,18 @@ _FRONT_RE = re.compile(r"^\s*(CHAPTER\s+I\b|I\.\s|BOOK\s+I\b|PART\s+I\b)", re.I)
 _BACK_RE = re.compile(r"^\s*(APPENDIX|BIBLIOGRAPHY|INDEX\b|FOOTNOTES|THE\s+END)\b", re.I)
 
 
-def split_inline(text):
-    """[(segment, role)], role ∈ {author, commentary}. author — вне [...]; всё в скобках (вкл.
-    вложенные) — commentary; незакрытая скобка → остаток commentary (fail-closed вниз)."""
-    out, buf, depth = [], [], 0
+_FOOTNOTE_DEF_RE = re.compile(r"^\s*\[\d+\]\s")
+
+
+def _split_depth(text, depth=0):
+    """Ядро split_inline с ПРОТЯГИВАНИЕМ глубины скобок между записями → (segments, end_depth).
+    Многострочный коммент [..\\n..\\n..] остаётся 🟢 на всех строках (depth>0 переносится далее).
+    Строка-ОПРЕДЕЛЕНИЕ сноски '[n] текст' на верхнем уровне целиком 🟢: текст сноски стоит ВНЕ
+    скобок и иначе утёк бы в 🔵 (fail-closed вниз)."""
+    if depth == 0 and _FOOTNOTE_DEF_RE.match(text):
+        s = text.strip()
+        return ([(s, "commentary")] if s else []), 0
+    out, buf = [], []
 
     def push(role):
         s = "".join(buf).strip()
@@ -40,8 +48,15 @@ def split_inline(text):
         else:
             buf.append(ch)
     if buf:
-        push("commentary" if depth > 0 else "author")   # незакрытая скобка → вниз
-    return out
+        push("commentary" if depth > 0 else "author")
+    return out, depth
+
+
+def split_inline(text):
+    """[(segment, role)], role ∈ {author, commentary} для ОДНОЙ строки (depth=0). Тонкая обёртка над
+    _split_depth — обратная совместимость (clean-путь, юнит-тесты fail-closed)."""
+    segs, _ = _split_depth(text, 0)
+    return segs
 
 
 _BRACKET_RE = re.compile(r"\[[^\[\]]*\]")
@@ -171,10 +186,11 @@ def scan(text):
 def tier_records(recs, front_until=None, back_from=None,
                  front_confident=False, back_confident=False, inline="bracket"):
     """recs: [(loc, text)] → [{loc, text, tier}]. Секции-поля: drop если уверенно, иначе S1 (🟢,
-    fail-closed). Тело: split_inline → author=P1 (🔵), commentary=S1 (🟢)."""
+    fail-closed). Тело: _split_depth с протяжкой глубины скобок сквозь записи (многострочный
+    коммент → 🟢 целиком) → author=P1 (🔵), commentary=S1 (🟢)."""
     texts = [t for _, t in recs]
     start, end = _resolve_span(texts, front_until, back_from)
-    out = []
+    out, depth = [], 0
     for i, (loc, text) in enumerate(recs):
         if i < start or i >= end:                     # поле (вступление/приложение)
             confident = front_confident if i < start else back_confident
@@ -183,7 +199,8 @@ def tier_records(recs, front_until=None, back_from=None,
             out.append({"loc": loc, "text": text, "tier": "S1"})   # неуверенно → 🟢
             continue
         if inline == "bracket":
-            for seg, role in split_inline(text):
+            segs, depth = _split_depth(text, depth)   # глубина скобок ТЕЧЁТ сквозь тело
+            for seg, role in segs:
                 out.append({"loc": loc, "text": seg, "tier": "P1" if role == "author" else "S1"})
         else:
             out.append({"loc": loc, "text": text, "tier": "P1"})

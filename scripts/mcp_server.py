@@ -352,7 +352,7 @@ def _add_source(advisor_dir, url=None, text=None, path=None, basename=None,
         out["hint"] = ("Добавил источник. Его слова помечу 🔵, толкования/комментарий — 🟢, "
                        "вступление и приложения отброшу. Хочешь только его слова — скажи об этом.")
         out["adjustments"] = [{"phrase": "только его слова", "mode": "clean"},
-                              {"phrase": "оставь комментарии как есть", "mode": "raw"}]
+                              {"phrase": "доверять всему этому изданию как словам автора", "mode": "raw"}]
         out["needs_host_review"] = report["needs_host_review"]
     elif effective == "clean":
         out["hint"] = "Добавил только слова автора (🔵); комментарий и служебные разделы убраны."

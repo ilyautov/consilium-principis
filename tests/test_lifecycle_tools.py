@@ -259,3 +259,43 @@ def test_lifecycle_tools_registered():
     names = {t["name"] for t in list_tools()}
     assert {"config_get", "config_set", "ollama_status", "ollama_ensure", "ollama_pull",
             "add_source"} <= names
+
+
+def test_add_source_text_with_apparatus_auto_tiers(tmp_path):
+    body = ("Translator intro about Wellington and Waterloo.\n" * 6 +
+            "I. LAYING PLANS\n" +
+            "War is based on deception. [Tu Mu: deceive the foe.]\n" * 4 +
+            "APPENDIX\nbibliography\n")
+    r = dispatch("add_source", {"advisor_dir": "advisors/x-apparatus",
+                                "text": body, "basename": "book", "tier": "P1"})
+    assert r["ok"] and r["mode"] == "tier"
+    assert r["hint"] and "🔵" in r["hint"] and "🟢" in r["hint"]
+    assert any(a["mode"] == "clean" for a in r["adjustments"])
+    man = json.load(open(os.path.join(r["advisor_dir"], "sources", "manifest.json")))
+    entry = next(v for k, v in man.items() if k.startswith("book"))
+    assert entry["apparatus"]["mode"] == "tier"
+
+
+def test_instructions_have_apparatus_rule():
+    ins = __import__("mcp_server").INSTRUCTIONS
+    assert "АППАРАТ" in ins or "аппарат" in ins
+    assert "🔵 автор" in ins or ("🔵" in ins and "🟢" in ins and "толков" in ins.lower())
+    assert "не как обязательный выбор" in ins or "не блокируй" in ins.lower()
+
+
+def test_add_source_clean_mode_writes_clean_file(tmp_path):
+    body = "intro\nI. LAYING PLANS\nWar is deception. [Tu Mu: yes.]\nAPPENDIX\nx\n"
+    r = dispatch("add_source", {"advisor_dir": "advisors/x-clean", "text": body,
+                                "basename": "book", "tier": "P1", "mode": "clean",
+                                "front_until": "I. LAYING PLANS", "back_from": "APPENDIX"})
+    assert r["ok"] and r["mode"] == "clean"
+    sources = os.path.join(r["advisor_dir"], "sources")
+    files = os.listdir(sources)
+    assert any(f.endswith(".clean.txt") for f in files)
+    # сырой backup лежит в подкаталоге originals/ → pipeline его НЕ ингестит
+    assert os.path.isfile(os.path.join(sources, "originals", "book.txt"))
+    from corpusbuild import pipeline, paths
+    pipeline.build(r["advisor_dir"])
+    corpus = [json.loads(l) for l in open(paths.corpus_path(r["advisor_dir"]))]
+    assert corpus and all(c["tier"] == "P1" for c in corpus)        # только чистый автор, без A-мусора
+    assert not any("Tu Mu" in c["text"] for c in corpus)            # аппарат исчез из корпуса

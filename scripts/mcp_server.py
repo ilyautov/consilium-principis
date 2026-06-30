@@ -279,12 +279,12 @@ def _load_source_text(url=None, path=None, text=None, license=None):
 
 
 def _add_source(advisor_dir, url=None, text=None, path=None, basename=None,
-                tier="P1", license=None):
-    """Затянуть источник в advisors/<name>/sources/ без шелла: url (фетч+strip Gutenberg) | text
-    (вставка) | path (локальный текст-файл, только внутри репо). Проставляет тир в sources/
-    manifest.json (его читает pipeline.build). Скачивание = подтверди у юзера. Не-PD хост требует
-    явного license. SSRF/traversal-гарды в _load_source_text."""
+                tier="P1", license=None, mode="auto", front_until=None, back_from=None):
+    """Затянуть источник без шелла. Если PD-том содержит редакторский аппарат (вступление/инлайн-
+    комментарий/приложения) — НЕ запекать его как слова автора: дефолт mode=tier (автор 🔵, коммент
+    🟢), не блокируя выбором. mode: auto|tier|clean|raw. front_until/back_from — хост-оверрайды границ."""
     import collect_common as cc
+    from corpusbuild import apparatus as ap
     d, err = _resolve_under_root(advisor_dir)        # write-side traversal-гард
     if err:
         return err
@@ -294,19 +294,71 @@ def _add_source(advisor_dir, url=None, text=None, path=None, basename=None,
         return {"error": str(e)}
     except Exception as e:
         return {"error": f"источник не загрузился: {e}"}
-    src_path = cc.land_to_sources(d, basename or hint, raw, url=prov, license_note=lic)
-    fn = os.path.basename(src_path)
-    man_p = os.path.join(d, "sources", "manifest.json")     # tier-манифест для clean.tag_regions
+
+    report = ap.scan(raw)
+    fu = front_until or report["signals"]["front_until"]
+    bf = back_from or report["signals"]["back_from"]
+    effective = ("tier" if report["has_apparatus"] else "raw") if mode == "auto" else mode
+
+    landed_name = basename or hint
+    if effective == "clean":                          # пишем ЧИСТЫЙ файл + прячем сырой backup
+        cleaned = ap.clean(raw, fu, bf)
+        src_dir = os.path.join(d, "sources")
+        slug = cc.slugify(landed_name) or "src"       # имена консистентны с land_to_sources
+        raw_name = slug + ".txt"
+        fn = slug + ".clean.txt"
+        # сырой backup → sources/originals/<slug>.txt: pipeline.build делает плоский listdir по
+        # расширениям, подкаталог 'originals' пропускается → сырьё НЕ ингестится (иначе тир-A мусор),
+        # но реверс может его прочитать. land_to_sources сюда не зовём (он форсит sources/*.txt).
+        orig_dir = os.path.join(src_dir, "originals")
+        os.makedirs(orig_dir, exist_ok=True)
+        with open(os.path.join(orig_dir, raw_name), "w", encoding="utf-8") as _f:
+            _f.write(raw.strip() + "\n")
+        # провенанс сырья — теми же ключами, что land_to_sources пишет в _provenance.jsonl
+        # (clean пишет файлы напрямую, иначе url/license фетча потерялись бы)
+        with open(os.path.join(src_dir, "_provenance.jsonl"), "a", encoding="utf-8") as _f:
+            _f.write(json.dumps({"file": "originals/" + raw_name, "url": prov,
+                                 "fetched": cc.today(), "license": lic, "chars": len(raw)},
+                                ensure_ascii=False) + "\n")
+        # .clean.txt пишем напрямую: land_to_sources→slugify стирает точку, имя ломается
+        with open(os.path.join(src_dir, fn), "w", encoding="utf-8") as _f:
+            _f.write(cleaned.strip() + "\n")
+        # source_raw — путь ОТНОСИТЕЛЬНО sources/ (реверс резолвит от sources-дира советника)
+        appa = {"mode": "clean", "source_raw": "originals/" + raw_name}
+    else:
+        src_path = cc.land_to_sources(d, landed_name, raw, url=prov, license_note=lic)
+        fn = os.path.basename(src_path)
+        if effective == "tier":
+            appa = {"mode": "tier", "inline_commentary": report["inline_commentary"] or "bracket",
+                    "front_until": fu, "back_from": bf,
+                    "front_confident": report["signals"]["front_confident"],
+                    "back_confident": report["signals"]["back_confident"]}
+        else:
+            appa = {"mode": "raw"}
+
+    man_p = os.path.join(d, "sources", "manifest.json")
     try:
         man = json.load(open(man_p, encoding="utf-8"))
     except Exception:
         man = {}
-    man[fn] = {"tier": tier}
+    man[fn] = {"tier": tier, "apparatus": appa}
     with open(man_p, "w", encoding="utf-8") as f:
         json.dump(man, f, ensure_ascii=False, indent=2)
-    return {"ok": True, "advisor_dir": d, "source_file": fn, "tier": tier, "chars": len(raw),
-            "next_action": "Собери корпус: build_advisor(advisor_dir) — корпус+кернелы (нужен ollama "
-                           "для кернелов), либо validate_manifest для проверки тиров."}
+
+    out = {"ok": True, "advisor_dir": d, "source_file": fn, "tier": tier,
+           "mode": effective, "chars": len(raw),
+           "next_action": "Собери корпус: build_advisor(advisor_dir)."}
+    if effective == "tier":
+        out["hint"] = ("Добавил источник. Его слова помечу 🔵, толкования/комментарий — 🟢, "
+                       "вступление и приложения отброшу. Хочешь только его слова — скажи об этом.")
+        out["adjustments"] = [{"phrase": "только его слова", "mode": "clean"},
+                              {"phrase": "доверять всему этому изданию как словам автора", "mode": "raw"}]
+        out["needs_host_review"] = report["needs_host_review"]
+    elif effective == "clean":
+        out["hint"] = "Добавил только слова автора (🔵); комментарий и служебные разделы убраны."
+    else:
+        out["hint"] = "Добавил источник."
+    return out
 
 
 def _build_lens(name, ground_text=None, ground_url=None, ground_path=None, reading_notes=None,
@@ -604,7 +656,11 @@ TOOLS = {
                          "properties": {"advisor_dir": {"type": "string"},
                                         "url": {"type": "string"}, "text": {"type": "string"},
                                         "path": {"type": "string"}, "basename": {"type": "string"},
-                                        "tier": {"type": "string"}, "license": {"type": "string"}},
+                                        "tier": {"type": "string"}, "license": {"type": "string"},
+                                        "mode": {"type": "string", "enum": ["auto", "tier", "clean", "raw"],
+                                                 "description": "auto (дефолт): детект аппарата → tier, если есть. tier/clean/raw — явно."},
+                                        "front_until": {"type": "string", "description": "хост-оверрайд: маркер конца вступления"},
+                                        "back_from": {"type": "string", "description": "хост-оверрайд: маркер начала приложений"}},
                          "required": ["advisor_dir"]},
         "handler": _add_source,
     },
@@ -973,6 +1029,15 @@ Consilium-Principis — личный совет AI-персон реальных
    + следующий шаг простыми словами («этот файл вне проекта — вставь текст»; «умный поиск ещё не
    включён — сказать, как включить?»), само слово не показывай. Настройки (config_set) юзер словами
    не зовёт по имени — он говорит «совет выдумывает» / «поиск мимо», ты сам решаешь, что подкрутить.
+
+10. КНИГА С РЕДАКТОРСКИМ АППАРАТОМ. add_source сам детектит вступление переводчика, инлайн-комментарий
+   толкователей и приложения. Когда он вернул mode=tier с hint/adjustments — сообщи юзеру простым
+   языком, ЧТО чьими словами станет (🔵 автор = слова автора, 🟢 = толкования/комментарий, вступление и
+   приложения отброшены), и предложи правку ФРАЗОЙ («хочешь только его слова — скажи»),
+   не как обязательный выбор и не блокируя. Правки обратимы: «только его слова» → add_source(source_file,
+   mode=clean) + пересборка; сырой файл цел. needs_host_review=true → сам сверь границы книги
+   (где кончается предисловие, где начинаются приложения) и при нужде уточни их человеческим
+   вопросом или передай front_until/back_from; технических полей (signals/доли) не показывай.
 """
 
 

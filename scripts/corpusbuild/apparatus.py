@@ -4,9 +4,12 @@
 import re
 
 # Лексикон классических толкователей (издания Giles/Legge Сунь-Цзы и пр.) + общие маркеры.
-_COMMENTATORS = ("Ts'ao Kung", "Ts'ao Kung", "Tu Mu", "Chang Yu", "Chang Yü", "Wang Hsi",
-                 "Li Ch'uan", "Li Ch'uan", "Mei Yao", "Chia Lin", "Tu Yu", "Ho Shih",
-                 "the commentator", "commentators", "scholiast")
+# frozenset → дедуп: любой случайный точный повтор схлопывается, чтобы count не двоился.
+# Прямой И фигурный апострофы — РАЗНЫЕ строки (разные кодировки изданий), оба нужны.
+_COMMENTATORS = frozenset((
+    "Ts'ao Kung", "Ts’ao Kung", "Tu Mu", "Chang Yu", "Chang Yü", "Wang Hsi",
+    "Li Ch'uan", "Li Ch’uan", "Mei Yao", "Chia Lin", "Tu Yu", "Ho Shih",
+    "the commentator", "commentators", "scholiast"))
 _FRONT_RE = re.compile(r"^\s*(CHAPTER\s+I\b|I\.\s|BOOK\s+I\b|PART\s+I\b)", re.I)
 _BACK_RE = re.compile(r"^\s*(APPENDIX|BIBLIOGRAPHY|INDEX\b|FOOTNOTES|THE\s+END)\b", re.I)
 
@@ -45,7 +48,10 @@ _BRACKET_RE = re.compile(r"\[[^\[\]]*\]")
 
 
 def strip_sections(text, front_until=None, back_from=None):
-    """Срез фронт/бэк-материи: всё ДО строки с front_until и ОТ строки с back_from. None → не резать."""
+    """Срез фронт/бэк-материи: всё ДО строки с front_until и ОТ строки с back_from. None → не резать.
+    front_until ВКЛЮЧИТЕЛЬНО: строка с маркером остаётся первой строкой тела (start=i, не i+1).
+    front_until берёт ПЕРВОЕ вхождение, back_from — ПОСЛЕДНЕЕ; при этом scan() сообщает ПЕРВОЕ
+    вхождение back-маркера. Для источников с повторяющимся маркером передавай УНИКАЛЬНУЮ строку."""
     lines = text.splitlines()
     start, end = 0, len(lines)
     if front_until:
@@ -111,6 +117,6 @@ def scan(text):
         "needs_host_review": has_apparatus and not (front_ok and back_ok),
         "sample_author": sample_auth,
         "sample_apparatus": sample_app,
-        "suggested_mode": "tier",
+        "suggested_mode": "tier" if has_apparatus else "raw",
         "inline_commentary": "bracket" if bracket else None,
     }

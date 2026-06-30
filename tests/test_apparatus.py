@@ -14,6 +14,8 @@ def test_split_inline_author_vs_commentary():
 def test_split_inline_unbalanced_is_commentary():
     segs = ap.split_inline("Sun Tzu said [unterminated note about strategy")
     assert ("author" in [r for _, r in segs])
+    assert segs[0][1] == "author"
+    assert segs[0][0].startswith("Sun Tzu")
     assert segs[-1][1] == "commentary"
 
 

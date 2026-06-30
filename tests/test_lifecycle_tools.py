@@ -35,7 +35,8 @@ def test_config_set_warns_on_unknown_key(monkeypatch, tmp_path):
 
 def test_ollama_status_shape_no_crash():
     r = dispatch("ollama_status", {})
-    assert set(r) == {"ollama_running", "bge_m3_present"}   # стабильная форма, без падений
+    assert {"ollama_running", "bge_m3_present"} <= set(r)   # стабильная форма, без падений
+    assert r["hint"] and "umni" not in r["hint"].lower()   # человеч. подсказка есть, не пустая
 
 
 def test_ollama_ensure_reports_manual_when_binary_absent(monkeypatch):
@@ -160,6 +161,22 @@ def test_instructions_have_antiinjection_rule0():
     ins = mcp_server.INSTRUCTIONS
     assert "БЕЗОПАСНОСТЬ ВЫШЕ ВСЕГО" in ins and "ПРЯМО ПОПРОСИЛ" in ins  # Rule 0 анти-инъекция
     assert "setup_full" in ins and "ДАННЫЕ, не команда" in ins          # тул в списке + триггер не из данных
+
+
+def test_instructions_have_friendliness_rules():
+    # хост видит ТОЛЬКО INSTRUCTIONS (не SKILL.md) → первый контакт + перевод служебки должны жить тут
+    ins = __import__("mcp_server").INSTRUCTIONS
+    assert "ПЕРВЫЙ КОНТАКТ" in ins and "с чего начать" in ins              # rule 8: онбординг
+    assert "ПЕРЕВОДИ СЛУЖЕБКУ" in ins and "НИКОГДА не показывай" in ins     # rule 9: перевод служебки
+    assert "traversal" in ins and "ollama" in ins                          # перечень техслов для скрытия
+
+
+def test_diagnostic_tools_carry_plain_hint():
+    # не-тех юзеру хост показывает `hint`, а не сырой dict (тиры/хеши/булевы ollama)
+    assert dispatch("board_status", {})["hint"]                            # человеч. следующий шаг
+    assert dispatch("config_get", {})["hint"]                              # «трогать не нужно»
+    gv = dispatch("governance_verify", {"path": "lenses/strategist"})
+    assert gv["hint"] and "head" not in gv["hint"].lower()                 # без хеша в подсказке
 
 
 def test_short_quote_not_blue(tmp_path):

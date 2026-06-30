@@ -41,6 +41,30 @@ verify сверяет (подмена corpus.jsonl постфактум → `tam
 - **+тесты (340):** embed_batch happy-path, kernel_extract парсинг+нейтрализация спуфа, governance freeze/expected_head.
 - **+тесты:** slug-traversal, edge `_resolve_under_root` (sibling-prefix), `embed_batch` count-mismatch, telegram→fetch SSRF-routing, `_provenance_header_span` safety-ветки (markdown `# Heading` не режется).
 
+## Раунд 4 — удобство для НЕ-технического пользователя (2026-06-30)
+
+Аудит маршрута глазами не-программиста (Cowork/Desktop). Ключевой факт: **хост НЕ читает SKILL.md** —
+видит только тулы + их `description` + серверный `INSTRUCTIONS`. Весь тёплый онбординг из SKILL.md
+для MCP-юзера невидим; диагностические тулы отдавали сырой JSON (тиры/хеши/булевы ollama). Сам совет
+защищён хорошо («тихая оркестрация» + виджеты) — трение всё в установке и admin/diagnostic-тулах.
+
+Топ-5 quick wins реализованы:
+1. **`hint` (человеч. язык) на диагностику** — board_status, doctor, governance_verify, ollama_status,
+   config_get. Хост показывает `hint`, не сырой dict («Тексты целы, подмен нет»; «Совет в базовом
+   режиме — сказать, как включить умный поиск?»).
+2. **INSTRUCTIONS rule 8 (первый контакт)** — на «с чего начать» хост зовёт board_status+list_recipes
+   и ведёт простым языком; онбординг SKILL.md вшит в единственный канал, который видит хост.
+3. **`next_step.say`** — параллель к техническому `why`, человеческим языком («Советник X почти готов —
+   докручиваю за тебя»), без P1/манифест/тиров; board_status.hint = ns.say.
+4. **INSTRUCTIONS rule 9 (переводи служебку)** — запрет показывать сырые тиры/хеши/пути/traversal/
+   SSRF/ollama; ошибки с техслова́рём пересказывать смыслом+следующим шагом. Токены в `error` остаются
+   (тесты/логи), но + поле `hint` и правило-перевод на стороне хоста.
+5. **CONNECT-MCP.md** — для Cowork/Desktop: ZIP без терминала вместо обязательного git clone, одна
+   строка `mcp-install` впереди, «начать просто словами», вся техника — в `<details>`.
+
++тесты (343): `say` без жаргона во всех ветках next_step; INSTRUCTIONS rules 8/9; diagnostic-тулы
+несут `hint` без хеша. Зелено и без ollama/движка.
+
 ---
 
 ## P0 — блокирует пуш / ломается у каждого внешнего юзера / безопасность

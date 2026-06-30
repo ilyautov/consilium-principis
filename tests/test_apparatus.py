@@ -57,3 +57,51 @@ def test_scan_clean_text_no_apparatus():
     r = ap.scan("Just plain prose with no editorial apparatus at all. " * 20)
     assert r["has_apparatus"] is False
     assert r["inline_commentary"] is None
+
+
+def _recs(text):
+    return [(("line", i + 1), ln) for i, ln in enumerate(text.splitlines()) if ln.strip()]
+
+
+def test_tier_records_body_inline_and_confident_sections():
+    text = ("Intro prose\nI. PLANS\nWar is deception. [Tu Mu: yes.]\nKnow the enemy.\nAPPENDIX\nrefs")
+    out = ap.tier_records(_recs(text), front_until="I. PLANS", back_from="APPENDIX",
+                          front_confident=True, back_confident=True, inline="bracket")
+    assert all("Intro prose" not in s["text"] and "refs" not in s["text"] for s in out)  # секции срезаны
+    assert any(s["tier"] == "P1" and "War is deception" in s["text"] for s in out)        # автор 🔵
+    assert any(s["tier"] == "S1" and "Tu Mu" in s["text"] for s in out)                   # коммент 🟢
+
+
+def test_tier_records_uncertain_front_margin_is_green_not_blue():
+    text = "Mystery preamble line\nI. PLANS\nWar is deception."
+    out = ap.tier_records(_recs(text), front_until="I. PLANS", back_from=None,
+                          front_confident=False, back_confident=False, inline="bracket")
+    pre = [s for s in out if "Mystery preamble" in s["text"]]
+    assert pre and pre[0]["tier"] == "S1"            # неуверенно → 🟢, не 🔵
+
+
+import json
+
+
+def _make_advisor(tmp_path, body, manifest):
+    sd = tmp_path / "sources"
+    sd.mkdir(parents=True)
+    (sd / "book.txt").write_text(body, encoding="utf-8")
+    (sd / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    return str(tmp_path)
+
+
+def test_pipeline_tier_mode_tags_author_blue_commentary_green(tmp_path):
+    from corpusbuild import pipeline
+    body = "Intro\nI. PLANS\nWar is deception. [Tu Mu: yes.]\nAPPENDIX\nrefs\n"
+    man = {"book.txt": {"tier": "P1", "apparatus": {
+        "mode": "tier", "inline_commentary": "bracket",
+        "front_until": "I. PLANS", "back_from": "APPENDIX",
+        "front_confident": True, "back_confident": True}}}
+    adv = _make_advisor(tmp_path, body, man)
+    chunks = pipeline.build(adv)
+    tiers = {c["tier"] for c in chunks}
+    blob = " ".join(c["text"] for c in chunks)
+    assert "P1" in tiers and "S1" in tiers
+    assert "Tu Mu" not in " ".join(c["text"] for c in chunks if c["tier"] == "P1")
+    assert "Intro" not in blob and "refs" not in blob

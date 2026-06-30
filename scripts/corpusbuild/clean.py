@@ -14,3 +14,15 @@ def tag_regions(records, source: str, advisor_dir: str):
         tier = prov.tier_for_line(source, i, lines, advisor_dir)
         out.append({"loc": loc, "text": txt, "tier": tier})
     return out
+
+
+def apparatus_tier(recs, source: str, advisor_dir: str):
+    """Тиринг источника с apparatus.mode=='tier': секции + инлайн-комментарий (зовёт apparatus)."""
+    from .apparatus import tier_records
+    man = prov.load_manifest(advisor_dir) or {}
+    appa = (man.get(source) or {}).get("apparatus") or {}
+    return tier_records(recs,
+                        front_until=appa.get("front_until"), back_from=appa.get("back_from"),
+                        front_confident=appa.get("front_confident", False),
+                        back_confident=appa.get("back_confident", False),
+                        inline=appa.get("inline_commentary", "bracket"))

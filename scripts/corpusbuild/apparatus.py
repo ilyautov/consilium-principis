@@ -120,3 +120,35 @@ def scan(text):
         "suggested_mode": "tier" if has_apparatus else "raw",
         "inline_commentary": "bracket" if bracket else None,
     }
+
+
+def tier_records(recs, front_until=None, back_from=None,
+                 front_confident=False, back_confident=False, inline="bracket"):
+    """recs: [(loc, text)] → [{loc, text, tier}]. Секции-поля: drop если уверенно, иначе S1 (🟢,
+    fail-closed). Тело: split_inline → author=P1 (🔵), commentary=S1 (🟢)."""
+    texts = [t for _, t in recs]
+    start, end = 0, len(recs)
+    if front_until:
+        for i, t in enumerate(texts):
+            if front_until in t:
+                start = i
+                break
+    if back_from:
+        for i in range(len(texts) - 1, -1, -1):
+            if back_from in texts[i]:
+                end = i
+                break
+    out = []
+    for i, (loc, text) in enumerate(recs):
+        if i < start or i >= end:                     # поле (вступление/приложение)
+            confident = front_confident if i < start else back_confident
+            if confident:
+                continue                              # уверенно аппарат → drop
+            out.append({"loc": loc, "text": text, "tier": "S1"})   # неуверенно → 🟢
+            continue
+        if inline == "bracket":
+            for seg, role in split_inline(text):
+                out.append({"loc": loc, "text": seg, "tier": "P1" if role == "author" else "S1"})
+        else:
+            out.append({"loc": loc, "text": text, "tier": "P1"})
+    return out

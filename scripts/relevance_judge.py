@@ -40,13 +40,24 @@ def judge(query: str, passage: str, model=None) -> int:
     """Оценивает релевантность passage к query.
 
     Возвращает int ∈ {0,1,2,3}.
-    FAIL-CLOSED: если ответ модели не содержит валидной цифры → 0.
-    Никогда не завышаем (непарсируемое = нерелевантное).
+
+    Парсинг MOAT-SAFE (инвариант: НИКОГДА не вернуть балл выше, чем модель имела в виду):
+      1) строгий одиночный ответ по промпту  (^\\s*[0-3]\\s*$)               → это балл;
+      2) иначе — цифру берём ТОЛЬКО если в ответе ровно одна цифра 0-3
+         (однозначно; напр. "Rating: 2" → 2);
+      3) иначе → 0 (FAIL-CLOSED).
+    Пункт 3 закрывает завышение из прозы: "not a 3, it's a 0" содержит ДВЕ
+    цифры 0-3 (3 и 0) → неоднозначно → 0, а не 3. Непарсируемое = нерелевантное.
     """
     prompt = _JUDGE_PROMPT.format(query=query, passage=passage)
     response = llm_local.generate(prompt, model=model, temperature=0.1)
-    m = re.search(r"[0-3]", response)
-    return int(m.group(0)) if m else 0  # FAIL-CLOSED
+    m = re.match(r"^\s*([0-3])\s*$", response.strip())
+    if m:                                # строгий одиночный ответ по промпту
+        return int(m.group(1))
+    digits = re.findall(r"[0-3]", response)
+    if len(digits) == 1:                 # ровно одна цифра 0-3 → однозначно
+        return int(digits[0])
+    return 0                             # ноль/несколько цифр 0-3 → FAIL-CLOSED (без завышения)
 
 
 def _dcg(rels):

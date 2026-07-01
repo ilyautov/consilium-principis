@@ -210,6 +210,69 @@ def test_config_malformed_value_falls_back_no_crash(monkeypatch, tmp_path):
     assert out.get("relevance_gated") is True
 
 
+def test_config_enabled_string_false_disables_gate(monkeypatch, tmp_path):
+    # Дефект: bool("false") == True в питоне — строка "false" молча оставляла гейт
+    # активным (безопасное направление, но игнорирует явное намерение юзера). Фикс:
+    # регистронезависимая строковая коэрсия.
+    import json
+    cfgfile = tmp_path / "board_config.json"
+    cfgfile.write_text(json.dumps({"relevance_gate": {"enabled": "false"}}), encoding="utf-8")
+    monkeypatch.setattr(relevance_gate, "_config_path", lambda: str(cfgfile))
+    cfg = relevance_gate._gate_config("adv")
+    assert cfg["enabled"] is False
+    _semantic(monkeypatch)
+    j = Counter(0)
+    p = {"text": "x", "score": 0.50, "source": "s"}
+    out = relevance_gate.gate_passage("q", p, "adv", judge_fn=j)
+    assert not out.get("relevance_gated")
+    assert j.calls == 0                                # enabled="false" → инертен, судья не зван
+
+
+def test_config_enabled_string_true_keeps_gate_active(monkeypatch, tmp_path):
+    import json
+    cfgfile = tmp_path / "board_config.json"
+    cfgfile.write_text(json.dumps({"relevance_gate": {"enabled": "true"}}), encoding="utf-8")
+    monkeypatch.setattr(relevance_gate, "_config_path", lambda: str(cfgfile))
+    cfg = relevance_gate._gate_config("adv")
+    assert cfg["enabled"] is True
+    _semantic(monkeypatch)
+    j = Counter(1)
+    p = {"text": "x", "score": 0.50, "source": "s"}
+    out = relevance_gate.gate_passage("q", p, "adv", judge_fn=j)
+    assert out.get("relevance_gated") is True
+    assert j.calls == 1
+
+
+def test_config_enabled_garbage_falls_back_default_true(monkeypatch, tmp_path):
+    # Мусорное значение (число 123, не "true"/"false") → дефолт True (fail-closed = активен).
+    import json
+    cfgfile = tmp_path / "board_config.json"
+    cfgfile.write_text(json.dumps({"relevance_gate": {"enabled": 123}}), encoding="utf-8")
+    monkeypatch.setattr(relevance_gate, "_config_path", lambda: str(cfgfile))
+    cfg = relevance_gate._gate_config("adv")
+    assert cfg["enabled"] is True
+
+
+def test_config_inverted_band_falls_back_to_defaults(monkeypatch, tmp_path):
+    # Инвертированная полоса (band_lo > band_hi после коэрсии) — _in_band никогда true →
+    # гейт молча инертен ВНУТРИ полосы (fail-OPEN). Откат ОБОИХ к калиброванным дефолтам.
+    import json
+    cfgfile = tmp_path / "board_config.json"
+    cfgfile.write_text(json.dumps({"relevance_gate": {"band_lo": 0.7, "band_hi": 0.5}}),
+                       encoding="utf-8")
+    monkeypatch.setattr(relevance_gate, "_config_path", lambda: str(cfgfile))
+    cfg = relevance_gate._gate_config("adv")
+    assert cfg["band_lo"] == relevance_gate.BAND_LO
+    assert cfg["band_hi"] == relevance_gate.BAND_HI
+    # калиброванная полоса по-прежнему работает: 0.50-скор пассаж ДОЛЖЕН судиться
+    _semantic(monkeypatch)
+    j = Counter(1)
+    p = {"text": "x", "score": 0.50, "source": "s"}
+    out = relevance_gate.gate_passage("q", p, "adv", judge_fn=j)
+    assert out.get("relevance_gated") is True
+    assert j.calls == 1
+
+
 # ───────────────────────── wiring in _cite ─────────────────────────
 
 def _force_semantic_cite(monkeypatch, judge_ret):

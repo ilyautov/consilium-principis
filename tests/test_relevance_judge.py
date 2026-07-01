@@ -20,7 +20,7 @@ def test_judge_parses_bare_digit_3(monkeypatch):
 
 
 def test_judge_parses_rating_format(monkeypatch):
-    """'Rating: 2' → первая цифра 0-3 в строке → 2."""
+    """'Rating: 2' → ровно одна цифра 0-3 в строке → однозначно → 2."""
     monkeypatch.setattr(llm_local, "generate", lambda *a, **kw: "Rating: 2")
     assert relevance_judge.judge("вопрос", "пассаж") == 2
 
@@ -51,6 +51,20 @@ def test_judge_fail_closed_empty_response(monkeypatch):
 def test_judge_fail_closed_only_high_digits(monkeypatch):
     """Только цифры 4-9 в ответе (без 0-3) → 0 (fail-closed)."""
     monkeypatch.setattr(llm_local, "generate", lambda *a, **kw: "rating: 4/5, very high")
+    assert relevance_judge.judge("вопрос", "пассаж") == 0
+
+
+def test_judge_no_inflation_from_prose_two_digits(monkeypatch):
+    """MOAT-SAFE: проза с ДВУМЯ цифрами 0-3 ("not a 3, it's a 0") неоднозначна →
+    0 (fail-closed), а не 3. Инвариант: никогда не завышать балл."""
+    monkeypatch.setattr(llm_local, "generate", lambda *a, **kw: "not a 3, it's a 0")
+    assert relevance_judge.judge("вопрос", "пассаж") == 0
+
+
+def test_judge_no_inflation_high_first_low_second(monkeypatch):
+    """Даже когда первая цифра высокая: "the score is not 3 but 1" — две цифры 0-3
+    → неоднозначно → 0. Наивный re.search взял бы 3 (завышение) — здесь исключено."""
+    monkeypatch.setattr(llm_local, "generate", lambda *a, **kw: "the score is not 3 but 1")
     assert relevance_judge.judge("вопрос", "пассаж") == 0
 
 

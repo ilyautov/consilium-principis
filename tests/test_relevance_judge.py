@@ -35,6 +35,54 @@ def test_judge_parses_digit_0(monkeypatch):
     assert relevance_judge.judge("вопрос", "пассаж") == 0
 
 
+# ── judge: source (структурный контекст провенанса, PageIndex-inspired) ─────
+
+def _capture_prompt(monkeypatch):
+    seen = {}
+    def fake_generate(prompt, model=None, temperature=0.1, timeout=120):
+        seen["prompt"] = prompt
+        return "2"
+    monkeypatch.setattr(llm_local, "generate", fake_generate)
+    return seen
+
+
+def test_judge_source_included_in_prompt(monkeypatch):
+    seen = _capture_prompt(monkeypatch)
+    assert relevance_judge.judge("вопрос", "пассаж", source="The Prince, ch. XII") == 2
+    assert "ИСТОЧНИК" in seen["prompt"]
+    assert "The Prince, ch. XII" in seen["prompt"]
+    # структура сохранена: вопрос и пассаж на месте
+    assert "ВОПРОС: вопрос" in seen["prompt"]
+    assert "ПАССАЖ: пассаж" in seen["prompt"]
+
+
+def test_judge_no_source_prompt_unchanged(monkeypatch):
+    # Backward compat: без source промпт БАЙТ-В-БАЙТ прежний (никакой пустой строки-огрызка).
+    seen = _capture_prompt(monkeypatch)
+    relevance_judge.judge("вопрос", "пассаж")
+    expected = """\
+Оцени релевантность ПАССАЖА к ВОПРОСУ по шкале:
+0 = нерелевантно: пассаж не связан с вопросом
+1 = косвенно: пассаж касается смежной темы, но не отвечает на вопрос
+2 = релевантно: пассаж частично отвечает на вопрос или даёт полезный контекст
+3 = прямой ответ: пассаж прямо и полно отвечает на вопрос
+
+ВОПРОС: вопрос
+
+ПАССАЖ: пассаж
+
+Ответь ТОЛЬКО одной цифрой: 0, 1, 2 или 3. Никакого другого текста."""
+    assert seen["prompt"] == expected
+    assert "ИСТОЧНИК" not in seen["prompt"]
+
+
+def test_judge_empty_source_prompt_unchanged(monkeypatch):
+    # source="" (fidelity 🟡-ветка отдаёт пустую строку) → как отсутствие source
+    seen = _capture_prompt(monkeypatch)
+    relevance_judge.judge("вопрос", "пассаж", source="")
+    assert "ИСТОЧНИК" not in seen["prompt"]
+
+
 # ── judge: FAIL-CLOSED (непарсируемое = нерелевантное, никогда не завышать) ─
 
 def test_judge_fail_closed_no_digit(monkeypatch):

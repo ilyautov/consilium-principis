@@ -22,13 +22,15 @@ import relevance_gate
 
 
 class Counter:
-    """judge_fn-заглушка со счётчиком вызовов (латентный контракт)."""
+    """judge_fn-заглушка со счётчиком вызовов (латентный контракт) + захват source."""
     def __init__(self, ret):
         self._ret = ret
         self.calls = 0
+        self.last_source = None
 
-    def __call__(self, query, passage):
+    def __call__(self, query, passage, source=None):
         self.calls += 1
+        self.last_source = source
         if isinstance(self._ret, Exception):
             raise self._ret
         return self._ret
@@ -119,6 +121,14 @@ def test_gate_quote_out_of_band_keeps_no_judge(monkeypatch):
     assert j.calls == 0
 
 
+def test_gate_quote_above_band_hi_keeps_no_judge(monkeypatch):
+    # 0.70 > band_hi 0.65 — калиброванный верх: top-edge утечек на 0.65 не наблюдалось.
+    _semantic(monkeypatch)
+    j = Counter(0)
+    assert relevance_gate.gate_quote("q", "text", 0.70, "adv", judge_fn=j) is True
+    assert j.calls == 0
+
+
 def test_gate_quote_not_semantic_keeps_no_judge(monkeypatch):
     _semantic(monkeypatch, val=False)
     j = Counter(0)
@@ -126,10 +136,11 @@ def test_gate_quote_not_semantic_keeps_no_judge(monkeypatch):
     assert j.calls == 0
 
 
-def test_gate_quote_none_score_keeps_no_judge(monkeypatch):
-    _semantic(monkeypatch)
+def test_gate_quote_not_semantic_subband_keeps_no_judge(monkeypatch):
+    # lexical → sub-band тоже инертен (полоса калибрована под semantic, CI без изменений)
+    _semantic(monkeypatch, val=False)
     j = Counter(0)
-    assert relevance_gate.gate_quote("q", "text", None, "adv", judge_fn=j) is True
+    assert relevance_gate.gate_quote("q", "text", 0.30, "adv", judge_fn=j) is True
     assert j.calls == 0
 
 
@@ -138,6 +149,79 @@ def test_gate_quote_judge_raises_fail_closed_withhold(monkeypatch):
     j = Counter(RuntimeError("boom"))
     assert relevance_gate.gate_quote("q", "text", 0.50, "adv", judge_fn=j) is False
     assert j.calls == 1
+
+
+# ── M1 (sub-band bypass): для ЦИТАТ низкий косинус ≠ безопасно — судим ──────
+
+def test_gate_quote_subband_judged_zero_withheld(monkeypatch):
+    # Был KEEP (out-of-band-low → keep) → _cite отдавал 🔵 на косинусе 0.44 без судьи.
+    # Теперь: sub-band → СУДИТСЯ; judge=0 → снята.
+    _semantic(monkeypatch)
+    j = Counter(0)
+    assert relevance_gate.gate_quote("q", "text", 0.30, "adv", judge_fn=j) is False
+    assert j.calls == 1
+
+
+def test_gate_quote_subband_judged_high_kept(monkeypatch):
+    _semantic(monkeypatch)
+    j = Counter(3)
+    assert relevance_gate.gate_quote("q", "text", 0.30, "adv", judge_fn=j) is True
+    assert j.calls == 1
+
+
+def test_gate_quote_subband_judge_raises_fail_closed(monkeypatch):
+    _semantic(monkeypatch)
+    j = Counter(RuntimeError("boom"))
+    assert relevance_gate.gate_quote("q", "text", 0.30, "adv", judge_fn=j) is False
+    assert j.calls == 1
+
+
+def test_gate_quote_none_score_is_judged(monkeypatch):
+    # None-скор (primary не находил кандидата) → судим (раньше _cite подставлял midpoint —
+    # правило упрощено: для cite судью пропускает ТОЛЬКО score > band_hi).
+    _semantic(monkeypatch)
+    j = Counter(0)
+    assert relevance_gate.gate_quote("q", "text", None, "adv", judge_fn=j) is False
+    assert j.calls == 1
+
+
+def test_gate_quote_none_score_judge_high_kept(monkeypatch):
+    _semantic(monkeypatch)
+    j = Counter(2)
+    assert relevance_gate.gate_quote("q", "text", None, "adv", judge_fn=j) is True
+    assert j.calls == 1
+
+
+# ── Fix 2: source прокидывается судье (структурный контекст) ────────────────
+
+def test_gate_quote_passes_source_to_judge(monkeypatch):
+    _semantic(monkeypatch)
+    j = Counter(3)
+    relevance_gate.gate_quote("q", "text", 0.50, "adv", judge_fn=j,
+                              source="The Prince, ch. XII")
+    assert j.calls == 1
+    assert j.last_source == "The Prince, ch. XII"
+
+
+def test_gate_quote_no_source_backward_compat_two_arg_judge(monkeypatch):
+    # judge_fn старой сигнатуры (query, passage) БЕЗ source — работает, если source не дан
+    _semantic(monkeypatch)
+    calls = {"n": 0}
+    def legacy_judge(query, passage):
+        calls["n"] += 1
+        return 3
+    assert relevance_gate.gate_quote("q", "text", 0.50, "adv", judge_fn=legacy_judge) is True
+    assert calls["n"] == 1
+
+
+def test_gate_passage_passes_source_to_judge(monkeypatch):
+    _semantic(monkeypatch)
+    j = Counter(3)
+    p = {"text": "answers it", "score": 0.50, "source": "Meditations, book IV"}
+    out = relevance_gate.gate_passage("q", p, "adv", judge_fn=j)
+    assert j.calls == 1
+    assert j.last_source == "Meditations, book IV"
+    assert not out.get("relevance_gated")
 
 
 # ───────────────────────── config override ─────────────────────────
@@ -287,7 +371,8 @@ def _force_semantic_cite(monkeypatch, judge_ret):
     monkeypatch.setattr(mcp_server, "_fidelity_check",
                         lambda t, d: {"status": "🔵", "verbatim": True, "source": "src"})
     import relevance_judge
-    monkeypatch.setattr(relevance_judge, "judge", lambda q, p, model=None: judge_ret)
+    monkeypatch.setattr(relevance_judge, "judge",
+                        lambda q, p, model=None, source=None: judge_ret)
     return mcp_server
 
 
@@ -314,7 +399,7 @@ def test_cite_wiring_lexical_unaffected(monkeypatch):
                         lambda t, d: {"status": "🔵", "verbatim": True, "source": "src"})
     import relevance_judge
     called = {"n": 0}
-    def _spy(q, p, model=None):
+    def _spy(q, p, model=None, source=None):
         called["n"] += 1
         return 0
     monkeypatch.setattr(relevance_judge, "judge", _spy)
@@ -342,10 +427,71 @@ def test_cite_wiring_secondary_query_quote_still_judged(monkeypatch):
                         lambda t, d: {"status": "🔵", "verbatim": True, "source": "src"})
     import relevance_judge
     calls = {"n": 0}
-    def _spy(q, p, model=None):
+    def _spy(q, p, model=None, source=None):
         calls["n"] += 1
         return 0                                        # судья режет
     monkeypatch.setattr(relevance_judge, "judge", _spy)
     r = mcp_server._cite("advisors/machiavelli", ["primary", "secondary"], use_kernels=False)
     assert calls["n"] >= 1                              # судья ЗВАН на kernel/secondary-цитате
     assert r["quotes"] == [] and r["marker"] == "🟡"    # снята → честный 🟡 (не утекла как 🔵)
+
+
+def test_cite_subband_candidate_judged_and_withheld(monkeypatch):
+    # M1 (sub-band bypass): кандидат с primary-косинусом 0.44 < band_lo РАНЬШЕ шёл в 🔵 без
+    # судьи (out-of-band-low → keep, а abstention-пола у _cite нет). Теперь судится; judge=0 → 🟡.
+    import mcp_server
+    _semantic(monkeypatch)
+    fake = [{"text": "All warfare is based on deception.", "score": 0.44, "source": "src"}]
+    import eval as _eval_mod
+    monkeypatch.setattr(_eval_mod, "retrieve", lambda q, d, top_k=8: list(fake))
+    monkeypatch.setattr(mcp_server, "_fidelity_check",
+                        lambda t, d: {"status": "🔵", "verbatim": True, "source": "src"})
+    import relevance_judge
+    calls = {"n": 0}
+    def _spy(q, p, model=None, source=None):
+        calls["n"] += 1
+        return 0
+    monkeypatch.setattr(relevance_judge, "judge", _spy)
+    r = mcp_server._cite("advisors/machiavelli", "adjacent-domain camouflage q", use_kernels=False)
+    assert calls["n"] == 1                              # sub-band → судья ЗВАН (раньше 0)
+    assert r["quotes"] == [] and r["marker"] == "🟡"
+
+
+def test_cite_passes_source_into_judge(monkeypatch):
+    # Fix 2 wiring: _cite прокидывает fc["source"] судье (структурный контекст промпта).
+    import mcp_server
+    _semantic(monkeypatch)
+    fake = [{"text": "All warfare is based on deception.", "score": 0.50,
+             "source": "Art of War, ch. I"}]
+    import eval as _eval_mod
+    monkeypatch.setattr(_eval_mod, "retrieve", lambda q, d, top_k=8: list(fake))
+    monkeypatch.setattr(mcp_server, "_fidelity_check",
+                        lambda t, d: {"status": "🔵", "verbatim": True,
+                                      "source": "Art of War, ch. I"})
+    import relevance_judge
+    seen = {}
+    def _spy(q, p, model=None, source=None):
+        seen["source"] = source
+        return 3
+    monkeypatch.setattr(relevance_judge, "judge", _spy)
+    r = mcp_server._cite("advisors/machiavelli", "deception in war", use_kernels=False)
+    assert r["quotes"]
+    assert seen["source"] == "Art of War, ch. I"
+
+
+def test_retrieve_passes_source_into_judge(monkeypatch):
+    # Fix 2 wiring: _retrieve → gate_passage → судья видит p["source"].
+    import mcp_server
+    _semantic(monkeypatch)
+    fake = [{"text": "topical passage", "score": 0.50, "source": "Meditations, book II"}]
+    import eval as _eval_mod
+    monkeypatch.setattr(_eval_mod, "retrieve", lambda q, d, top_k=3: list(fake))
+    import relevance_judge
+    seen = {}
+    def _spy(q, p, model=None, source=None):
+        seen["source"] = source
+        return 3
+    monkeypatch.setattr(relevance_judge, "judge", _spy)
+    r = mcp_server._retrieve("q", "advisors/machiavelli")
+    assert r["passages"]
+    assert seen["source"] == "Meditations, book II"

@@ -6,7 +6,14 @@
 
 ГРАНИЦЫ секций (где кончается вступление, где начинаются приложения) в tier-режиме безопасны
 ЧЕРЕЗ needs_host_review: если фронт/бэк не разрешились уверенно (start=0 / нет валидного хвоста),
-scan поднимает needs_host_review=True для хоста (rule 10) — это НЕ абсолютный drop, а host-gate."""
+scan поднимает needs_host_review=True для хоста (rule 10) — это НЕ абсолютный drop, а host-gate.
+
+#55: back-срез засчитывается уверенным, только если кандидат лежит в хвостовых ~30% файла
+(_is_trailing) — иначе это, вероятно, ВНУТРЕННЯЯ секция (напр. библиография научного PD-издания
+посреди тела), резать которую значит терять реальный текст автора после неё; в этом случае
+срез не делается, а сигналится back_suspect. Если front-маркер вообще не разрешился, но есть
+блок оглавления (TOC) — это само по себе сигнал аппарата (front_unresolved_toc_present);
+tier_records в этом случае не запекает голову-до-конца-TOC как 🔵, даже без точной границы."""
 import re
 
 # Лексикон классических толкователей (издания Giles/Legge Сунь-Цзы и пр.) + общие маркеры.
@@ -155,8 +162,28 @@ def _first_line(lines, rx):
     return None, None
 
 
+_BACK_TRAIL_FRACTION = 0.70  # срез-кандидат должен лежать в последних ~30% строк файла,
+# иначе это, вероятнее всего, ВНУТРЕННЯЯ секция (напр. библиография научного PD-издания
+# посреди тела) — резать её значит молча терять реальные слова автора после неё (#55).
+
+
+def _is_trailing(idx, n):
+    """idx (граница среза) — в хвостовых ~30% файла? n=0 → тривиально true (нет строк резать)."""
+    return n == 0 or idx >= _BACK_TRAIL_FRACTION * n
+
+
 def scan(text):
-    """Детерминированный отчёт об аппарате. Поле signals — СЛУЖЕБНОЕ (юзеру не показывать)."""
+    """Детерминированный отчёт об аппарате. Поле signals — СЛУЖЕБНОЕ (юзеру не показывать).
+
+    Два host-gated усиления (#55, follow-up после апарат-ревью):
+    1. back-срез засчитывается уверенным (back_confident) только если кандидат лежит в
+       хвостовых ~30% файла (_is_trailing); иначе — back_suspect=True, среза НЕТ (хвост тела
+       не режем), но хосту сигналим причину. Так внутренняя ("mid-file") библиография/индекс
+       научного издания не срубает реальный текст автора после себя.
+    2. если front-маркер вообще не нашёлся (регекс не совпал), но при этом есть блок оглавления
+       (TOC) — это само по себе сигнал аппарата: has_apparatus/needs_host_review поднимаются
+       с явной причиной front_unresolved_toc_present, а tier_records (ниже) не запекает
+       голову-до-конца-TOC как 🔵, даже без точной границы вступления."""
     lines = text.splitlines()
     bracket_ratio = _bracket_ratio(lines)
     commentator_hits = sum(text.count(c) for c in _COMMENTATORS)
@@ -169,12 +196,21 @@ def scan(text):
         return None, None
 
     fi, front_marker = _first_outside(_FRONT_RE)   # реальный заголовок, не пункт оглавления
-    bi, back_marker = _first_line(lines, _BACK_RE)  # back: отдельная хрупкость, follow-up
+    bi, back_marker = _first_line(lines, _BACK_RE)  # первое совпадение — кандидат-текст на срез
     start, end = _resolve_span(lines, front_marker, back_marker)
     front_ok = front_marker is not None and start > 3      # тело реально начинается ниже шапки
-    back_ok = back_marker is not None and end < len(lines)  # есть валидный хвост ПОСЛЕ тела
+    back_cut = back_marker is not None and end < len(lines)     # срез вообще нашёлся
+    back_trailing = back_cut and _is_trailing(end, len(lines))  # и лежит в хвосте файла
+    back_ok = back_trailing                                     # уверенный срез = хвостовой срез
+    back_suspect = back_cut and not back_trailing   # найден, но НЕ хвостовой → mid-file, не режем
+    front_unresolved_apparatus = front_marker is None and toc is not None
     bracket = bracket_ratio >= 0.25 or commentator_hits >= 5
-    has_apparatus = bracket or front_ok or back_ok
+    has_apparatus = bracket or front_ok or back_ok or back_suspect or front_unresolved_apparatus
+    reasons = []
+    if back_suspect:
+        reasons.append("back_suspect_mid_file")
+    if front_unresolved_apparatus:
+        reasons.append("front_unresolved_toc_present")
     sample_app = next((l.strip() for l in lines if "[" in l and len(l.strip()) > 20), "")
     sample_auth = next((l.strip() for l in lines
                         if l.strip() and "[" not in l and len(l.strip()) > 20
@@ -188,8 +224,11 @@ def scan(text):
             "back_from": back_marker if back_ok else None,
             "front_confident": front_ok,
             "back_confident": back_ok,
+            "back_suspect": back_suspect,
+            "toc_present": toc is not None,
         },
         "needs_host_review": has_apparatus and not (front_ok and back_ok),
+        "review_reasons": reasons,
         "sample_author": sample_auth,
         "sample_apparatus": sample_app,
         "suggested_mode": "tier" if has_apparatus else "raw",
@@ -201,9 +240,18 @@ def tier_records(recs, front_until=None, back_from=None,
                  front_confident=False, back_confident=False, inline="bracket"):
     """recs: [(loc, text)] → [{loc, text, tier}]. Секции-поля: drop если уверенно, иначе S1 (🟢,
     fail-closed). Тело: _split_depth с протяжкой глубины скобок сквозь записи (многострочный
-    коммент → 🟢 целиком) → author=P1 (🔵), commentary=S1 (🟢)."""
+    коммент → 🟢 целиком) → author=P1 (🔵), commentary=S1 (🟢).
+
+    Fail-closed #55(2): если front_until вообще не разрешился (None — регекс не нашёл заголовок),
+    но в тексте есть блок оглавления (TOC), голова-до-конца-TOC гарантированно НЕ тело — её сдвигаем
+    в front-срез (обычно уйдёт в S1 через front_confident=False), а не отдаём в общий body-тиринг,
+    где она без скобок запеклась бы 🔵. На файлах без TOC это ветвь не трогает ничего (no-op)."""
     texts = [t for _, t in recs]
     start, end = _resolve_span(texts, front_until, back_from)
+    if front_until is None:
+        toc = _contents_span(texts)
+        if toc is not None and toc[1] > start:
+            start = toc[1]
     out, depth = [], 0
     for i, (loc, text) in enumerate(recs):
         if i < start or i >= end:                     # поле (вступление/приложение)

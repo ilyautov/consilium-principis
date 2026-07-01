@@ -174,6 +174,119 @@ def test_real_sun_tzu_tier_demotes_commentary(tmp_path):
     assert "vital importance" in blue_text                     # реальный стих Сунь-Цзы → 🔵
 
 
+def test_scan_clean_plain_file_unchanged_by_boundary_hardening():
+    # Файл без единого сигнала аппарата (нет TOC, скобок, комментаторов, front/back-маркеров):
+    # усиление границ (#55) не должно менять ЭТО поведение ни на йоту — иначе ложный позитив.
+    text = "Just plain prose with no editorial apparatus at all. " * 20
+    r = ap.scan(text)
+    assert r["has_apparatus"] is False
+    assert r["needs_host_review"] is False
+    assert r["inline_commentary"] is None
+    assert r["suggested_mode"] == "raw"
+    assert r["signals"]["front_confident"] is False
+    assert r["signals"]["back_confident"] is False
+    assert r["signals"]["front_until"] is None
+    assert r["signals"]["back_from"] is None
+    # новые поля существуют и нейтральны на чистом файле
+    assert r["signals"].get("back_suspect", False) is False
+    assert r["signals"].get("toc_present", False) is False
+    assert r.get("review_reasons", []) == []
+    recs = [(("line", i), ln) for i, ln in enumerate(text.split("\n"))]
+    tiered = ap.tier_records(recs, front_until=r["signals"]["front_until"],
+                             back_from=r["signals"]["back_from"],
+                             front_confident=r["signals"]["front_confident"],
+                             back_confident=r["signals"]["back_confident"])
+    assert all(t["tier"] == "P1" for t in tiered)     # чистое тело целиком 🔵, как и раньше
+    assert len(tiered) == len(recs)
+
+
+def test_scan_back_boundary_trailing_appendix_still_cuts():
+    # Регрессионный якорь: настоящее хвостовое приложение (в последних ~30% файла) должно
+    # по-прежнему резаться уверенно — усиление (#55) не должно испортить реальный кейс Giles.
+    text = ("An Introduction by the translator about Wellington.\n" * 6 +
+            "I. LAYING PLANS\n" +
+            "Sun Tzu said: war is deception. [Tu Mu says: deceive.]\n" * 5 +
+            "APPENDIX\nbibliography\n")
+    r = ap.scan(text)
+    assert r["signals"]["back_confident"] is True
+    assert r["signals"]["back_from"] is not None
+    assert r["signals"]["back_from"].startswith("APPENDIX")
+    assert r["signals"].get("back_suspect", False) is False
+
+
+def test_scan_mid_file_bibliography_does_not_cut_real_tail():
+    # Реальный сценарий научного PD-издания: внутренняя библиография СЕРЕДИНЫ книги (не хвоста) —
+    # после неё ещё идёт настоящий авторский текст. Старое правило "последнее совпадение после
+    # начала тела" резало здесь ВЕСЬ хвост (включая реальные слова автора) — баг #55(1).
+    lines = [
+        "Preface line one about the translator himself.",
+        "Preface line two continuing the same preface prose.",
+        "Preface line three still in the same preface prose.",
+        "Preface line four still in the same preface prose.",
+        "I. LAYING PLANS",
+        "Sun Tzu said: the first truth of war is deception itself.",
+        "Sun Tzu said: the second truth of war is preparation.",
+        "Sun Tzu said: the third truth of war is timing.",
+        "BIBLIOGRAPHY",
+        "A list of classical treatises consulted by the editor himself.",
+        "Sun Tzu said: know your enemy and yourself for victory.",
+        "Sun Tzu said: attack only when the enemy is unprepared.",
+        "Sun Tzu said: the final word on strategy is patience itself.",
+        "Sun Tzu said: victory rewards the well prepared army indeed.",
+    ]
+    text = "\n".join(lines)
+    r = ap.scan(text)
+    # mid-file кандидат НЕ должен подниматься до уверенного среза
+    assert r["signals"]["back_confident"] is False
+    assert r["signals"]["back_from"] is None
+    # но флаг подозрения обязан присутствовать — хосту есть что проверить
+    assert r["signals"]["back_suspect"] is True
+    assert "back_suspect_mid_file" in r["review_reasons"]
+    assert r["needs_host_review"] is True
+    recs = [(("line", i), ln) for i, ln in enumerate(lines)]
+    tiered = ap.tier_records(recs, front_until=r["signals"]["front_until"],
+                             back_from=r["signals"]["back_from"],
+                             front_confident=r["signals"]["front_confident"],
+                             back_confident=r["signals"]["back_confident"])
+    blue = " ".join(t["text"] for t in tiered if t["tier"] == "P1")
+    # реальный хвост (после mid-file "библиографии") НЕ потерян
+    assert "know your enemy" in blue
+    assert "final word on strategy" in blue
+    assert "victory rewards the well prepared" in blue
+
+
+def test_scan_unresolved_front_with_toc_fails_closed():
+    # Нет узнаваемого front-маркера (регекс не совпал), но есть Contents-блок — явный сигнал
+    # аппарата. Раньше это молча текло в тело и запекалось 🔵 (баг #55(2)); теперь хотя бы
+    # голова-до-конца-TOC не должна попадать в 🔵, и needs_host_review обязан объяснить почему.
+    text = "\n".join([
+        "MY BOOK",                                                    # 0
+        "",                                                            # 1
+        "Contents",                                                   # 2
+        "  Introduction",                                             # 3
+        "  Some Chapter",                                              # 4
+        "",                                                            # 5
+        "",                                                            # 6 (конец TOC)
+        "Sun Tzu said: the actual words of the author begin now.",     # 7
+        "Know your enemy and yourself and victory is assured indeed.", # 8
+    ])
+    r = ap.scan(text)
+    assert r["signals"]["front_until"] is None        # фронт действительно не разрешился
+    assert r["signals"]["toc_present"] is True
+    assert r["needs_host_review"] is True
+    assert "front_unresolved_toc_present" in r["review_reasons"]
+    recs = [(("line", i), ln) for i, ln in enumerate(text.split("\n"))]
+    tiered = ap.tier_records(recs, front_until=r["signals"]["front_until"],
+                             back_from=r["signals"]["back_from"],
+                             front_confident=r["signals"]["front_confident"],
+                             back_confident=r["signals"]["back_confident"])
+    blue = " ".join(t["text"] for t in tiered if t["tier"] == "P1")
+    green = " ".join(t["text"] for t in tiered if t["tier"] == "S1")
+    assert "Contents" not in blue and "Some Chapter" not in blue and "Introduction" not in blue
+    assert "Contents" in green or "Some Chapter" in green            # TOC ушла в 🟢, не пропала
+    assert "actual words of the author" in blue                      # реальное тело всё ещё 🔵
+
+
 def test_scan_toc_aware_picks_real_heading_not_contents():
     # Мини-репро реального бага Сунь-Цзы: блок 'Contents' с пунктом 'Chapter I' И реальный
     # заголовок 'Chapter I' ниже; внутренняя 'Bibliography' вступления стоит ДО тела.

@@ -70,7 +70,13 @@ def _fidelity_check(quote, advisor_dir):
 
 def _retrieve(query, advisor_dir, top_k=3):
     import eval as _eval                     # ленивый импорт (тянет corpusbuild/engine)
-    passages = _eval.retrieve(query, _resolve(advisor_dir), top_k=top_k)
+    import relevance_gate
+    adv_res = _resolve(advisor_dir)
+    passages = _eval.retrieve(query, adv_res, top_k=top_k)
+    # Borderline-гейт релевантности: топически-близкий-но-не-отвечающий пассаж (камуфляж
+    # смежного домена) флагуется relevance_gated (не выбрасываем — прозрачность). Инертен
+    # на lexical и вне полосы неуверенности (латентный контракт).
+    passages = [relevance_gate.gate_passage(query, p, adv_res) for p in passages]
     # Point-of-use директива: салиентнее правила в instructions. Хост склонен перефразировать
     # пассаж и потом удивляться 🟡 → выдумывать «дефект корпуса». Гасим в момент выдачи.
     return {"passages": passages,
@@ -79,7 +85,9 @@ def _retrieve(query, advisor_dir, top_k=3):
                              "подтвердит 🔵. НЕ перефразируй и НЕ переводи текст до гейта — пересказ → "
                              "🟡. Перевод клади отдельно в quote.translation. Если гейт вернул 🟡 на "
                              "том, что ты считал дословным — значит текст НЕ точный (перевёл/сократил), "
-                             "а НЕ «дефект корпуса»: возьми ровно строку `text` из этого ответа.")}
+                             "а НЕ «дефект корпуса»: возьми ровно строку `text` из этого ответа. "
+                             "Пассаж с `relevance_gated:true` — топически связан, но НЕ отвечает на "
+                             "вопрос: НЕ подавай его как 🔵, трактуй как 🟡-экстраполяцию.")}
 
 
 def _kernel_themes(advisor_dir, limit=6):
@@ -110,8 +118,12 @@ def _cite(advisor_dir, query, top_k=8, use_kernels=True, limit=4):
     лифт, в отличие от опровергнутого ollama-моста); (2) top_k=8; (3) якорение по кернелам советника.
     Пул дедуплицируется, КАЖДЫЙ пассаж через гейт, отдаём список дословных (🔵 раньше 🟢). Нет → []."""
     import eval as _eval
+    import relevance_gate
     adv_res = _resolve(advisor_dir)
     queries = [query] if isinstance(query, str) else [q for q in (query or []) if q]
+    # Судить релевантность против РЕАЛЬНОГО вопроса юзера, НЕ против кернел-тем (те — recall-
+    # экспансия ретрива, не то, на что цитата обязана отвечать).
+    primary = query if isinstance(query, str) else (query[0] if query else "")
     if use_kernels:
         queries += _kernel_themes(advisor_dir)
     seen_q, uniq_q = set(), []
@@ -119,10 +131,16 @@ def _cite(advisor_dir, query, top_k=8, use_kernels=True, limit=4):
         if q and q not in seen_q:
             seen_q.add(q); uniq_q.append(q)
     cand, seen_t = [], set()                          # пул кандидатов из всех запросов, дедуп по тексту
+    score_by_text = {}                                # макс retrieval-score текста по всем запросам (для гейта)
     for q in uniq_q:
         for p in _eval.retrieve(q, adv_res, top_k=top_k):
             t = (p.get("text") or "").strip()
-            if t and t not in seen_t:
+            if not t:
+                continue
+            s = p.get("score")
+            if isinstance(s, (int, float)) and (t not in score_by_text or s > score_by_text[t]):
+                score_by_text[t] = s
+            if t not in seen_t:
                 seen_t.add(t); cand.append(t)
     blue, green = [], []
     for t in cand:
@@ -130,7 +148,12 @@ def _cite(advisor_dir, query, top_k=8, use_kernels=True, limit=4):
         if fc["verbatim"]:
             (blue if fc["status"] == "🔵" else green).append(
                 {"text": t, "source": fc["source"], "marker": fc["status"]})
-    ranked = (blue + green)[:limit]                   # 🔵 (первоисточник) приоритетнее 🟢 (комментарий)
+    # Borderline-гейт релевантности ПОВЕРХ verbatim-тиринга: снимаем дословные-но-НЕ-
+    # отвечающие цитаты (снятая → честный 🟡-путь ниже). Инертен на lexical и вне полосы
+    # неуверенности → судья зовётся только для in-band на semantic (латентный контракт).
+    pool = [c for c in (blue + green)
+            if relevance_gate.gate_quote(primary, c["text"], score_by_text.get(c["text"]), adv_res)]
+    ranked = pool[:limit]                             # 🔵 (первоисточник) приоритетнее 🟢 (комментарий)
     if ranked:
         b = ranked[0]
         return {"quotes": ranked,
@@ -998,7 +1021,9 @@ Consilium-Principis — личный совет AI-персон реальных
    RECALL (чтобы цитат было БОЛЬШЕ): query давай в ЯЗЫКЕ КОРПУСА (для этих советников — English) и
    МОЖНО списком из 2-4 формулировок-перефразировок — перевод запроса даёт реальный лифт. Если
    quotes пуст — дословного нет, иди 🟡, НЕ выдумывай. Гейт исправен: 🟡 на «дословном» = текст не
-   точный (перевёл/сократил), это НЕ «дефект корпуса».
+   точный (перевёл/сократил), это НЕ «дефект корпуса». Пассаж retrieve с `relevance_gated:true` —
+   топически связан, но НЕ отвечает на вопрос (потолок 🟡): НЕ подавай как 🔵, трактуй как
+   экстраполяцию.
 
 5. СОГЛАСИЕ НА КОНТЕКСТ (non-capture). Базовый контекст = корпуса советников + вопрос. Контекст
    СВЕРХ (память, другие проекты, внешнее) — спрашивай разрешение (если в Принцепсе не allow).

@@ -5,17 +5,23 @@
 отвечающие на него (камуфляж смежного домена — напр. Макиавелли про «дезинформацию на
 X» вытягивает дословный пассаж про обман). Хост подаёт TRUE 🔵-цитату, ПРИМЕНЁННУЮ к
 вопросу, на который она не отвечает. Судья релевантности (relevance_judge.judge, 0-3)
-это ловит. Гейтим ТОЛЬКО в неуверенной косинус-полосе [band_lo, band_hi] — вне полосы
-уверенность высока (низкий скор → и так 🟡-путь; высокий → истинное попадание) → судью
-НЕ зовём, латентность ограничена.
+это ловит. Полоса действия судьи АСИММЕТРИЧНА по поверхностям:
+  • gate_passage (retrieve): судим ТОЛЬКО в полосе [band_lo, band_hi] — sub-band пассажи
+    уже покрыты host-abstention-рамкой (0.50), флаг там transparency-only;
+  • gate_quote (cite): для ЦИТАТ низкий косинус ≠ безопасно — у _cite нет abstention-пола,
+    verbatim не-отвечающая цитата на 0.44 уходила как 🔵 (M1 sub-band bypass). Судью
+    пропускает ТОЛЬКО score > band_hi (калиброванный верх: top-edge утечек на 0.65 нет).
+Выше band_hi уверенность высока (истинное попадание) → судью НЕ зовём, латентность
+ограничена.
 
 Инварианты:
   • INERT на lexical-бэкенде — полоса калибрована под semantic-скор. CI (ollama-free →
     lexical) не видит изменений.
-  • FAIL-CLOSED: судья упал/неуверен in-band → gated (пассаж флагнут / цитата снята),
+  • FAIL-CLOSED: судья упал/неуверен → gated (пассаж флагнут / цитата снята),
     НИКОГДА не выдаём 🔵 «на всякий».
   • ADDITIVE: слой релевантности ПОВЕРХ verbatim-тиринга — _fidelity_check не трогаем.
-  • Судья зовётся ТОЛЬКО для in-band на semantic (латентный контракт).
+  • Судья зовётся ТОЛЬКО на semantic; retrieve — только in-band (латентный контракт),
+    cite — всё, что не выше band_hi.
 
 `judge_fn` — TEST SEAM (в проде = relevance_judge.judge).
 """
@@ -108,9 +114,18 @@ def is_semantic(advisor_dir) -> bool:
         return False
 
 
-def _default_judge(query, passage):
+def _default_judge(query, passage, source=None):
     import relevance_judge
-    return relevance_judge.judge(query, passage)
+    return relevance_judge.judge(query, passage, source=source)
+
+
+def _call_judge(jf, query, text, source):
+    """source прокидываем ТОЛЬКО когда он есть — judge_fn старой сигнатуры
+    (query, passage) без source продолжает работать, пока source не подаётся.
+    (jf с source, но старой сигнатурой → TypeError → у вызывающих fail-closed.)"""
+    if source:
+        return jf(query, text, source=source)
+    return jf(query, text)
 
 
 def _in_band(score, cfg):
@@ -130,7 +145,7 @@ def gate_passage(query, passage, advisor_dir, judge_fn=None, cfg=None) -> dict:
         return passage
     jf = judge_fn if judge_fn is not None else _default_judge
     try:
-        rel = jf(query, passage.get("text", ""))
+        rel = _call_judge(jf, query, passage.get("text", ""), passage.get("source"))
     except Exception:
         out = dict(passage)
         out["relevance_gated"] = True                  # fail-closed
@@ -144,19 +159,29 @@ def gate_passage(query, passage, advisor_dir, judge_fn=None, cfg=None) -> dict:
     return out
 
 
-def gate_quote(query, quote_text, score, advisor_dir, judge_fn=None, cfg=None) -> bool:
-    """keep=True / withhold=False. Вне semantic ИЛИ score вне полосы → keep (True).
-    In-band → судья: keep iff judge>=threshold. FAIL-CLOSED: судья бросил → withhold
-    (False). Для cite (обещает «это ТА самая цитата») снять не-отвечающую верно — путь
-    схлопывается в честный 🟡 «дословного ответа нет»."""
+def gate_quote(query, quote_text, score, advisor_dir, judge_fn=None, cfg=None,
+               source=None) -> bool:
+    """keep=True / withhold=False. Вне semantic → keep (True). На semantic судью
+    пропускает ТОЛЬКО score > band_hi (калибровано: top-edge утечек на 0.65 не
+    наблюдалось); всё остальное (in-band, SUB-BAND, None-score) → судья: keep iff
+    judge>=threshold. FAIL-CLOSED: судья бросил → withhold (False).
+
+    Для ЦИТАТ низкий косинус ≠ безопасно — асимметрия с gate_passage. У retrieve
+    низкий скор и так уходит в 🟡-путь (host abstention 0.50), а _cite БЕЗ пола
+    abstention возвращал дословную цитату на косинусе 0.44 как 🔵 — verbatim
+    не-отвечающая цитата и есть сетап misapply (измерено: M1, 4 утечки Marcus,
+    судья по ним давал сплошные нули → судить sub-band = снять все четыре).
+    Снятая цитата → путь схлопывается в честный 🟡 «дословного ответа нет»."""
     cfg = cfg or _gate_config(advisor_dir)
     if not cfg.get("enabled", True):
         return True
-    if not is_semantic(advisor_dir) or not _in_band(score, cfg):
+    if not is_semantic(advisor_dir):
         return True
+    if isinstance(score, (int, float)) and score > cfg["band_hi"]:
+        return True                                    # единственный не-судимый путь
     jf = judge_fn if judge_fn is not None else _default_judge
     try:
-        rel = jf(query, quote_text)
+        rel = _call_judge(jf, query, quote_text, source)
     except Exception:
         return False                                   # fail-closed withhold
     return rel >= cfg["rel_threshold"]

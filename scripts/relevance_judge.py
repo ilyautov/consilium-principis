@@ -22,6 +22,8 @@ if HERE not in sys.path:
 import llm_local
 
 # Детерминированный рубричный промпт — минимально вариативный, числовой вывод.
+# {source_block}: пустой → промпт байт-в-байт прежний; при source → строка
+# «ИСТОЧНИК: …» между ВОПРОСОМ и ПАССАЖЕМ (структурный контекст провенанса).
 _JUDGE_PROMPT = """\
 Оцени релевантность ПАССАЖА к ВОПРОСУ по шкале:
 0 = нерелевантно: пассаж не связан с вопросом
@@ -30,16 +32,22 @@ _JUDGE_PROMPT = """\
 3 = прямой ответ: пассаж прямо и полно отвечает на вопрос
 
 ВОПРОС: {query}
-
+{source_block}
 ПАССАЖ: {passage}
 
 Ответь ТОЛЬКО одной цифрой: 0, 1, 2 или 3. Никакого другого текста."""
 
 
-def judge(query: str, passage: str, model=None) -> int:
+def judge(query: str, passage: str, model=None, source=None) -> int:
     """Оценивает релевантность passage к query.
 
     Возвращает int ∈ {0,1,2,3}.
+
+    source (опционально): провенанс пассажа («The Prince, ch. XII») — структурный
+    контекст в промпте (PageIndex-inspired). Обостряет различение «отвечает» vs
+    «делит тему»: пассаж про наёмников при вопросе про think tanks с виду «полезный
+    контекст» (judge=2), но зная главу-источник судья видит тематическую подмену.
+    Пустой/None → промпт байт-в-байт прежний (backward compatible).
 
     Парсинг MOAT-SAFE (инвариант: НИКОГДА не вернуть балл выше, чем модель имела в виду):
       1) строгий одиночный ответ по промпту  (^\\s*[0-3]\\s*$)               → это балл;
@@ -49,7 +57,8 @@ def judge(query: str, passage: str, model=None) -> int:
     Пункт 3 закрывает завышение из прозы: "not a 3, it's a 0" содержит ДВЕ
     цифры 0-3 (3 и 0) → неоднозначно → 0, а не 3. Непарсируемое = нерелевантное.
     """
-    prompt = _JUDGE_PROMPT.format(query=query, passage=passage)
+    source_block = f"\nИСТОЧНИК ПАССАЖА: {source}\n" if source else ""
+    prompt = _JUDGE_PROMPT.format(query=query, passage=passage, source_block=source_block)
     response = llm_local.generate(prompt, model=model, temperature=0.1)
     m = re.match(r"^\s*([0-3])\s*$", response.strip())
     if m:                                # строгий одиночный ответ по промпту

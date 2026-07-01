@@ -154,20 +154,17 @@ def _cite(advisor_dir, query, top_k=8, use_kernels=True, limit=4):
             (blue if fc["status"] == "🔵" else green).append(
                 {"text": t, "source": fc["source"], "marker": fc["status"]})
     # Borderline-гейт релевантности ПОВЕРХ verbatim-тиринга: снимаем дословные-но-НЕ-
-    # отвечающие цитаты (снятая → честный 🟡-путь ниже). Инертен на lexical и вне полосы
-    # неуверенности → судья зовётся только для in-band на semantic (латентный контракт).
-    # cfg читаем ОДИН раз. Кандидат, которого primary НЕ находил (score=None) — «может не
-    # отвечать на вопрос юзера» → судим его (mid-band форсит in-band; на lexical/disabled
-    # gate_quote всё равно инертен, судья не зван) → fail-closed.
+    # отвечающие цитаты (снятая → честный 🟡-путь ниже). Инертен на lexical/disabled.
+    # Для ЦИТАТ судью пропускает ТОЛЬКО primary-score > band_hi (M1 sub-band bypass:
+    # низкий косинус ≠ безопасно — verbatim не-отвечающая цитата на 0.44 уходила как 🔵
+    # без судьи, abstention-пола у cite нет). None-score (кандидат вторичного запроса,
+    # primary его не находил) судится так же — midpoint-подмена больше не нужна.
+    # source (fc["source"]) — структурный контекст провенанса в промпте судьи:
+    # обостряет «отвечает» vs «делит тему» (M2 judge-tail). cfg читаем ОДИН раз.
     gcfg = relevance_gate._gate_config(adv_res)
-    _mid = (gcfg["band_lo"] + gcfg["band_hi"]) / 2.0
-
-    def _gate_score(text):
-        s = primary_score_by_text.get(text)
-        return s if s is not None else _mid
-
     pool = [c for c in (blue + green)
-            if relevance_gate.gate_quote(primary, c["text"], _gate_score(c["text"]), adv_res, cfg=gcfg)]
+            if relevance_gate.gate_quote(primary, c["text"], primary_score_by_text.get(c["text"]),
+                                         adv_res, cfg=gcfg, source=c["source"])]
     ranked = pool[:limit]                             # 🔵 (первоисточник) приоритетнее 🟢 (комментарий)
     if ranked:
         b = ranked[0]

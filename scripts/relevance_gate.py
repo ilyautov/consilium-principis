@@ -46,6 +46,26 @@ def _config_path():
     return os.path.join(_root(), "board_config.json")
 
 
+def _coerce_enabled(val):
+    """bool()-коэрсия строк — наивный bool("false") == True (Python), молча игнорирует
+    намерение юзера. Реальные bool/числа → bool() как есть; строки регистронезависимо
+    "true"/"false" → соответствующий bool; ЛЮБОЕ другое значение (мусор, "yes", список,
+    ...) → дефолт True (fail-closed = гейт активен), никогда не бросает."""
+    if isinstance(val, bool):
+        return val
+    if isinstance(val, str):
+        low = val.strip().lower()
+        if low == "true":
+            return True
+        if low == "false":
+            return False
+        return True
+    try:
+        return bool(val)
+    except Exception:
+        return True
+
+
 def _gate_config(advisor_dir=None):
     """Дефолты + опциональные оверрайды из board_config.json ключа `relevance_gate`.
     Форма: {"enabled":bool, "band_lo":float, "band_hi":float, "rel_threshold":int}.
@@ -60,14 +80,20 @@ def _gate_config(advisor_dir=None):
     if isinstance(raw, dict):
         # Коэрсим ЗНАЧЕНИЯ per-key: битое значение (напр. band_lo:"0.45") НЕ должно доходить
         # до _in_band и валить retrieve/cite TypeError'ом. Провал коэрса → default (fail-closed
-        # = гейт активен). enabled через bool (не бросает).
-        _coerce = {"enabled": bool, "band_lo": float, "band_hi": float, "rel_threshold": int}
+        # = гейт активен). enabled — через _coerce_enabled (bool() тупо на строках: "false" → True).
+        _coerce = {"enabled": _coerce_enabled, "band_lo": float, "band_hi": float,
+                   "rel_threshold": int}
         for k, fn in _coerce.items():
             if k in raw:
                 try:
                     cfg[k] = fn(raw[k])
                 except (TypeError, ValueError):
                     pass
+    if cfg["band_lo"] > cfg["band_hi"]:
+        # Инвертированная полоса — _in_band никогда не true → гейт молча инертен ВНУТРИ
+        # полосы (fail-OPEN направление). Откатываем ОБА оверрайда к калиброванным дефолтам.
+        cfg["band_lo"] = BAND_LO
+        cfg["band_hi"] = BAND_HI
     return cfg
 
 

@@ -75,8 +75,9 @@ def _retrieve(query, advisor_dir, top_k=3):
     passages = _eval.retrieve(query, adv_res, top_k=top_k)
     # Borderline-гейт релевантности: топически-близкий-но-не-отвечающий пассаж (камуфляж
     # смежного домена) флагуется relevance_gated (не выбрасываем — прозрачность). Инертен
-    # на lexical и вне полосы неуверенности (латентный контракт).
-    passages = [relevance_gate.gate_passage(query, p, adv_res) for p in passages]
+    # на lexical и вне полосы неуверенности (латентный контракт). cfg читаем ОДИН раз (не per-пассаж).
+    gcfg = relevance_gate._gate_config(adv_res)
+    passages = [relevance_gate.gate_passage(query, p, adv_res, cfg=gcfg) for p in passages]
     # Point-of-use директива: салиентнее правила в instructions. Хост склонен перефразировать
     # пассаж и потом удивляться 🟡 → выдумывать «дефект корпуса». Гасим в момент выдачи.
     return {"passages": passages,
@@ -131,15 +132,19 @@ def _cite(advisor_dir, query, top_k=8, use_kernels=True, limit=4):
         if q and q not in seen_q:
             seen_q.add(q); uniq_q.append(q)
     cand, seen_t = [], set()                          # пул кандидатов из всех запросов, дедуп по тексту
-    score_by_text = {}                                # макс retrieval-score текста по всем запросам (для гейта)
+    # Гейтим по score ПЕРВИЧНОГО запроса (реальный вопрос юзера), НЕ по max-across-queries:
+    # иначе кернел/вторичный запрос вытащил бы цитату на высоком косинусе к СВОЕЙ теме и она
+    # прошла бы мимо судьи, хотя primary её не находил (тот же класс утечки, что чинит гейт).
+    primary_score_by_text = {}                         # score текста ТОЛЬКО из primary-запроса
     for q in uniq_q:
         for p in _eval.retrieve(q, adv_res, top_k=top_k):
             t = (p.get("text") or "").strip()
             if not t:
                 continue
             s = p.get("score")
-            if isinstance(s, (int, float)) and (t not in score_by_text or s > score_by_text[t]):
-                score_by_text[t] = s
+            if q == primary and isinstance(s, (int, float)) and (
+                    t not in primary_score_by_text or s > primary_score_by_text[t]):
+                primary_score_by_text[t] = s
             if t not in seen_t:
                 seen_t.add(t); cand.append(t)
     blue, green = [], []
@@ -151,8 +156,18 @@ def _cite(advisor_dir, query, top_k=8, use_kernels=True, limit=4):
     # Borderline-гейт релевантности ПОВЕРХ verbatim-тиринга: снимаем дословные-но-НЕ-
     # отвечающие цитаты (снятая → честный 🟡-путь ниже). Инертен на lexical и вне полосы
     # неуверенности → судья зовётся только для in-band на semantic (латентный контракт).
+    # cfg читаем ОДИН раз. Кандидат, которого primary НЕ находил (score=None) — «может не
+    # отвечать на вопрос юзера» → судим его (mid-band форсит in-band; на lexical/disabled
+    # gate_quote всё равно инертен, судья не зван) → fail-closed.
+    gcfg = relevance_gate._gate_config(adv_res)
+    _mid = (gcfg["band_lo"] + gcfg["band_hi"]) / 2.0
+
+    def _gate_score(text):
+        s = primary_score_by_text.get(text)
+        return s if s is not None else _mid
+
     pool = [c for c in (blue + green)
-            if relevance_gate.gate_quote(primary, c["text"], score_by_text.get(c["text"]), adv_res)]
+            if relevance_gate.gate_quote(primary, c["text"], _gate_score(c["text"]), adv_res, cfg=gcfg)]
     ranked = pool[:limit]                             # 🔵 (первоисточник) приоритетнее 🟢 (комментарий)
     if ranked:
         b = ranked[0]

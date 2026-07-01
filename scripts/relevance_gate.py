@@ -28,8 +28,13 @@ if HERE not in sys.path:
     sys.path.insert(0, HERE)
 
 # Дефолты — семантически-калиброванная полоса неуверенности + порог «релевантно».
+# band_hi=0.65 НАМЕРЕННО выше камуфляж-потолка 0.612 (Machiavelli) / 0.596 (Marcus) из
+# adversarial-eval: OOC-камуфляж и отвечающие спаны (0.537–0.689) ПЕРЕСЕКАЮТСЯ на
+# [0.537, 0.612] — за это и отвечает судья. НЕ «прибирать» назад к 0.60: (0.60, 0.612] —
+# top-edge leak (худший наблюдённый кейс 0.612 уходил бы ungated). Отвечающие в 0.60–0.65
+# наберут rel≥2 и пройдут → цена = ограниченное число лишних in-band вызовов судьи (его работа).
 BAND_LO = 0.45
-BAND_HI = 0.60
+BAND_HI = 0.65
 REL_THRESHOLD = 2
 
 
@@ -50,12 +55,19 @@ def _gate_config(advisor_dir=None):
     try:
         with open(_config_path(), encoding="utf-8") as f:
             raw = json.load(f).get("relevance_gate")
-        if isinstance(raw, dict):
-            for k in ("enabled", "band_lo", "band_hi", "rel_threshold"):
-                if k in raw:
-                    cfg[k] = raw[k]
     except Exception:
-        pass
+        raw = None
+    if isinstance(raw, dict):
+        # Коэрсим ЗНАЧЕНИЯ per-key: битое значение (напр. band_lo:"0.45") НЕ должно доходить
+        # до _in_band и валить retrieve/cite TypeError'ом. Провал коэрса → default (fail-closed
+        # = гейт активен). enabled через bool (не бросает).
+        _coerce = {"enabled": bool, "band_lo": float, "band_hi": float, "rel_threshold": int}
+        for k, fn in _coerce.items():
+            if k in raw:
+                try:
+                    cfg[k] = fn(raw[k])
+                except (TypeError, ValueError):
+                    pass
     return cfg
 
 

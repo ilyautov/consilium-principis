@@ -73,7 +73,7 @@ python3 scripts/diversity_check.py advisors/a advisors/b ...        # соста
 python3 scripts/eval.py advisors/a advisors/b ...                  # точность (FIDELITY+RETRIEVAL+ABSTENTION+CHALLENGE)
 ```
 tier-FULL: движок Гефеста подключается как зависимость через `scripts/tier_full.py`
-(env `HEPHAESTUS_ENGINE`, дефолт `~/personal/pilots/rag-sds/engine`); эмбеддинги в `personal-board/data/`.
+(env `HEPHAESTUS_ENGINE=/path/to/rag-sds/engine`, дефолта нет — не задан → rerank недоступен, честная деградация); эмбеддинги в `personal-board/data/`.
 
 ## Честные ограничения (Evidence Gate)
 - Ценность vs baseline: получен PROXY (LLM-judge A/B, N=3) — совет 3/3 по осе «остановит ошибочное

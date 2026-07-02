@@ -70,7 +70,7 @@ verify сверяет (подмена corpus.jsonl постфактум → `tam
 ## P0 — блокирует пуш / ломается у каждого внешнего юзера / безопасность
 
 ### P0-1. pytest падает на сборке у любого, кроме этой машины
-`scripts/tier_full.py:38` — модуль-топ `import build_semantic_index` из хардкод-пути `HEPHAESTUS_ENGINE` (`/Users/USER/.../rag-sds/engine`). `tests/test_index_tier.py:3` импортит `tier_full` на топ-уровне. На чистом клоне/CI: `ModuleNotFoundError` → **collection aborted, 0 тестов**. Зелёные «324 passed» — артефакт наличия приватного соседнего репо. **Фикс:** lazy-import (обернуть в try/except → `bsi=None`, тянуть внутри функций) + `pytest.importorskip` в тесте.
+`scripts/tier_full.py:38` — модуль-топ `import build_semantic_index` из хардкод-пути `HEPHAESTUS_ENGINE` (`/path/to/rag-sds/engine`). `tests/test_index_tier.py:3` импортит `tier_full` на топ-уровне. На чистом клоне/CI: `ModuleNotFoundError` → **collection aborted, 0 тестов**. Зелёные «324 passed» — артефакт наличия приватного соседнего репо. **Фикс:** lazy-import (обернуть в try/except → `bsi=None`, тянуть внутри функций) + `pytest.importorskip` в тесте.
 
 ### P0-2. Write-side path traversal (мы закалили только чтение)
 Traversal-гард есть лишь на READ (`_load_source_text`, `mcp_server.py:245`). WRITE-пути не ограничены корнем репо: `ingest_telegram out_path` (`:499`), `add_source advisor_dir` (`:262`), `build_advisor advisor_dir` (`:488`), `build_lens dest` (`:305`). Инъекция из контента → `out_path=~/.ssh/authorized_keys` пишет туда подконтрольный текст. **Фикс:** тот же realpath-под-`_root()` гард на все четыре write-входа.

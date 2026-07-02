@@ -39,7 +39,9 @@ EMBED_MODEL = os.getenv("EMBED_MODEL", "bge-m3")
 # Опциональный кросс-энкодер (rerank=True) живёт во внешнем движке Гефеста. FULL-тир его НЕ
 # требует — только ollama+bge-m3 (см. embed_batch ниже). sys.path к движку подключается ЛЕНИВО
 # в rerank-ветке, поэтому `import tier_full` никогда не зависит от наличия чужого репо.
-ENGINE_DIR = os.getenv("HEPHAESTUS_ENGINE", "/Users/USER/personal/pilots/rag-sds/engine")
+# Дефолта-пути НЕТ (не шипуем персональный /Users/... в public): не задан HEPHAESTUS_ENGINE →
+# rerank недоступен, честная деградация (косинусный retrieve работает и без него).
+ENGINE_DIR = os.getenv("HEPHAESTUS_ENGINE", "")
 
 
 def embed_batch(texts):
@@ -196,6 +198,10 @@ def retrieve(question: str, advisor_dir: str, top_k: int = 3, rerank: bool = Fal
 
     # rerank=True: пул top-N по косинусу -> кросс-энкодер bge-reranker-v2-m3 (движок Гефеста).
     # Опциональная зависимость: подключаем sys.path к движку ЛЕНИВО, только здесь.
+    if not ENGINE_DIR:
+        raise RuntimeError(
+            "rerank=True требует внешний движок Гефеста: задай HEPHAESTUS_ENGINE=/path/to/rag-sds/engine. "
+            "Без него используй rerank=False (косинусный retrieve работает на FULL-тире без реранкера).")
     if ENGINE_DIR not in sys.path:
         sys.path.insert(0, ENGINE_DIR)
     from reranker_model import CrossEncoderReranker  # ленивый импорт: тянет torch/transformers

@@ -58,6 +58,34 @@ def check_judge():
         return {"name": "judge", "ok": True, "detail": f"судья релевантности: не определён ({e})"}
 
 
+def check_calibration(root="."):
+    """§3.2 moat-v2: per-advisor флаг автокалибровки порогов (build/calibration.json,
+    пишет calibrate_advisor.py). «Не калиброван» — НЕ болезнь (глобальные дефолты
+    действуют) → ok=True всегда; сам факт честно виден юзеру, как уровень судьи."""
+    try:
+        from corpusbuild.paths import corpus_path
+        import engine
+        adv_root = os.path.join(root, "advisors")
+        parts = []
+        if os.path.isdir(adv_root):
+            for d in sorted(os.listdir(adv_root)):
+                p = os.path.join(adv_root, d)
+                if not (os.path.isdir(p) and os.path.isfile(corpus_path(p))):
+                    continue
+                cal = engine.load_calibration(p)
+                if cal:
+                    t = (cal.get("abstain_threshold") or {}).get("semantic")
+                    rg = cal.get("relevance_gate") or {}
+                    parts.append(f"{d}: калиброван (t={t}, полоса "
+                                 f"[{rg.get('band_lo')}, {rg.get('band_hi')}])")
+                else:
+                    parts.append(f"{d}: не калиброван (глобальные дефолты)")
+        detail = "; ".join(parts) if parts else "нет собранных советников"
+        return {"name": "calibration", "ok": True, "detail": detail}
+    except Exception as e:                             # диагностика не роняет doctor
+        return {"name": "calibration", "ok": True, "detail": f"не определено ({e})"}
+
+
 def check_contour(advisor_dir):
     """Самотест рва на конкретном советнике. ok=True если фрагмент P1 matchнулся и фейк→None,
     либо пропущен (нет корпуса с P1 — нечего тестировать)."""
@@ -98,7 +126,8 @@ def summarize(checks):
 def run_doctor(root="."):
     """Полный health-check. Контур тестируем на первом советнике с корпусом."""
     from corpusbuild.paths import corpus_path
-    checks = [check_python(), check_skill_installed(), check_tier(), check_judge()]
+    checks = [check_python(), check_skill_installed(), check_tier(), check_judge(),
+              check_calibration(root)]
     adv_root = os.path.join(root, "advisors")
     tested = False
     if os.path.isdir(adv_root):

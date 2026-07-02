@@ -86,7 +86,12 @@ def _gate_config(advisor_dir=None):
     """Дефолты + опциональные оверрайды из board_config.json ключа `relevance_gate`.
     Форма: {"enabled":bool, "band_lo":float, "band_hi":float, "rel_threshold":int,
     "judge_backend":str}. По умолчанию enabled=True, judge_backend=auto. Любая ошибка
-    чтения → дефолты (гейт активен, fail-closed)."""
+    чтения → дефолты (гейт активен, fail-closed).
+    §3.2: поверх глобального конфига оверлеится PER-ADVISOR калибровка полосы
+    (advisors/<slug>/build/calibration.json → relevance_gate.band_lo/band_hi) —
+    пишет calibrate_advisor.py; битые/инвертированные значения игнорируются
+    (остаётся глобальная полоса). enabled/rel_threshold/judge_backend калибровка
+    НЕ трогает — это политика, не распределение скоров."""
     cfg = {"enabled": True, "band_lo": BAND_LO, "band_hi": BAND_HI,
            "rel_threshold": REL_THRESHOLD, "judge_backend": JUDGE_BACKEND_DEFAULT}
     try:
@@ -111,6 +116,22 @@ def _gate_config(advisor_dir=None):
         # полосы (fail-OPEN направление). Откатываем ОБА оверрайда к калиброванным дефолтам.
         cfg["band_lo"] = BAND_LO
         cfg["band_hi"] = BAND_HI
+    # §3.2: per-advisor полоса из build/calibration.json (приоритетнее глобальной —
+    # она посчитана по РАСПРЕДЕЛЕНИЮ ЭТОГО корпуса). Валидна только пара lo < hi.
+    try:
+        import engine as _engine
+        cal = _engine.load_calibration(advisor_dir)
+    except Exception:
+        cal = None
+    if cal:
+        rg = cal.get("relevance_gate")
+        if isinstance(rg, dict):
+            try:
+                lo, hi = float(rg["band_lo"]), float(rg["band_hi"])
+                if lo < hi:
+                    cfg["band_lo"], cfg["band_hi"] = lo, hi
+            except (KeyError, TypeError, ValueError):
+                pass                                   # битая калибровка → глобальная полоса
     return cfg
 
 

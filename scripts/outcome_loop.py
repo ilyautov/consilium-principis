@@ -10,16 +10,48 @@
      фактом → `loop_status` даёт точность прогнозов; `seal` = tamper-evident снимок (governance).
 Запись несёт RATIONALE (почему решил) — чтобы hindsight-bias не переписал прошлое (ловит seal).
 """
+import re
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from calibration import parse_decision_log
 from premortem import simulation_accuracy
 from governance import build_chain
 
+# Ф4 (§6): строка прогноза записи журнала — «- Прогноз: 📐 <predicted> (карта: decisions/…)»
+# (её отдаёт save_decision_map как journal_line). Глиф 📐 обязателен: он отличает прогноз
+# расчёта от произвольного слова «Прогноз» в тексте решения.
+_FORECAST_RE = re.compile(r"(?m)^\s*[-*]?\s*Прогноз:\s*📐\s*(\S.*)$")
+
+
+def predicted_from_block(block):
+    """Ф4: текст прогноза из блока записи журнала. Fail-closed: нет строки «Прогноз: 📐 …» /
+    пустой хвост / кривой вход → None (поле predicted у pending-item просто не появляется)."""
+    if not isinstance(block, str):
+        return None
+    m = _FORECAST_RE.search(block)
+    return m.group(1).strip() if m else None
+
 
 def pending_from_journal(text):
     """#2: заголовки решений с незакрытым исходом (⏳) из markdown-журнала."""
     return [e["title"] for e in parse_decision_log(text) if e["outcome"] == "pending"]
+
+
+def pending_entries(text):
+    """#2 + Ф4: незакрытые записи с опциональным прогнозом: [{"title", "predicted"?}].
+    Блоки режутся ТЕМ ЖЕ регексом, что parse_decision_log (### …) — zip выравнен по
+    построению. predicted появляется только при строке «Прогноз: 📐 …» (fail-closed)."""
+    blocks = re.split(r"(?m)^###\s+", text)[1:]
+    out = []
+    for blk, e in zip(blocks, parse_decision_log(text)):
+        if e["outcome"] != "pending":
+            continue
+        item = {"title": e["title"]}
+        pred = predicted_from_block(blk)
+        if pred is not None:
+            item["predicted"] = pred
+        out.append(item)
+    return out
 
 
 def pending_from_files(root):
@@ -43,7 +75,9 @@ def pending_from_files(root):
                 text = f.read()
         except OSError:
             continue
-        out.extend({"title": t, "source": label} for t in pending_from_journal(text))
+        for ent in pending_entries(text):      # Ф4: predicted едет вместе с записью
+            ent["source"] = label
+            out.append(ent)
     return out
 
 

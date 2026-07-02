@@ -127,13 +127,16 @@ def _resolve_advisor_dir(name):
 
 
 def _validate_session_attribution(session):
-    """(session', violations). Для каждой opinion.quote с grounded-маркером (blue/green):
-    fidelity-гейт против корпуса ЕГО советника; не верифицируется → маркер понижен до
-    violation + явная причина (в argument, чтобы дошла до любого surface). Вход не мутируем
-    (хост пере-рендерит тот же объект). Нерезолвящийся советник → понижение (fail-closed)."""
+    """(session', violations, reconciliations). Для каждой opinion.quote с grounded-маркером
+    (blue/green): fidelity-гейт против корпуса ЕГО советника. Не верифицируется → маркер
+    понижен до violation + явная причина (в argument, чтобы дошла до любого surface).
+    Verbatim ≠ карт-бланш на маркер (review HIGH-2): «blue» на 🟢-тире (комментарий) →
+    понижение до green (тир-инфляция), обратное само-занижение (green при 🔵-тире) — безопасно,
+    не трогаем. Вход не мутируем (хост пере-рендерит тот же объект). Нерезолвящийся советник →
+    понижение (fail-closed); явный advisor_dir идёт через root-гард (данные от хоста)."""
     if not isinstance(session, dict) or not isinstance(session.get("advisors"), list):
-        return session, []
-    violations, new_advisors = [], []
+        return session, [], []
+    violations, reconciliations, new_advisors = [], [], []
     for a in session["advisors"]:
         if not isinstance(a, dict) or not isinstance(a.get("opinions"), list):
             new_advisors.append(a)
@@ -149,14 +152,30 @@ def _validate_session_attribution(session):
                 continue
             if not resolved:                          # лениво и один раз на советника
                 explicit = a.get("advisor_dir")
-                adv_dir = _resolve(explicit) if explicit else _resolve_advisor_dir(a.get("name"))
+                if explicit:                          # путь от хоста = данные → root-гард
+                    adv_dir, _err = _resolve_under_root(explicit)
+                else:
+                    adv_dir = _resolve_advisor_dir(a.get("name"))
                 resolved = True
             if adv_dir is None:
                 reason = "советник не резолвится"
-            elif _fidelity_check(qtext, adv_dir)["verbatim"]:
-                new_ops.append(op)                    # цитата своя — маркер честен
-                continue
             else:
+                fc = _fidelity_check(qtext, adv_dir)
+                if fc["verbatim"]:
+                    # Тир-реконсиляция: хост назвал комментарий (🟢-тир) «blue» → рендерим
+                    # green + причина. Понижение доверия — да; повышение — никогда.
+                    if op.get("marker") == "blue" and fc["status"] != "🔵":
+                        rreason = "цитата — комментарий (🟢), не первоисточник"
+                        nop = dict(op)
+                        nop["marker"] = "green"
+                        nop["attribution_reason"] = rreason
+                        nop["argument"] = f"{op.get('argument', '')} [{rreason}]".strip()
+                        new_ops.append(nop)
+                        reconciliations.append({"advisor": a.get("name"), "quote": qtext[:80],
+                                                "from": "blue", "to": "green", "reason": rreason})
+                        continue
+                    new_ops.append(op)                # цитата своя, тир не завышен — маркер честен
+                    continue
                 reason = "цитата не из корпуса этого советника"
             nop = dict(op)
             nop["marker"] = "violation"
@@ -167,11 +186,11 @@ def _validate_session_attribution(session):
         na = dict(a)
         na["opinions"] = new_ops
         new_advisors.append(na)
-    if not violations:
-        return session, []
+    if not violations and not reconciliations:
+        return session, [], []
     ns = dict(session)
     ns["advisors"] = new_advisors
-    return ns, violations
+    return ns, violations, reconciliations
 
 
 def _retrieve(query, advisor_dir, top_k=3):
@@ -226,7 +245,8 @@ def _cite(advisor_dir, query, top_k=8, use_kernels=True, limit=4):
     объекты и вставляет как есть. Recall-рычаги: (1) `query` — строка ИЛИ СПИСОК англ. формулировок
     (мульти-запрос делает хост = продакшн-форма; перевод запроса в язык корпуса — валидированный
     лифт, в отличие от опровергнутого ollama-моста); (2) top_k=8; (3) якорение по кернелам советника.
-    Пул дедуплицируется, КАЖДЫЙ пассаж через гейт, отдаём список дословных (🔵 раньше 🟢). Нет → []."""
+    Пул дедуплицируется, verbatim-гейт — по всему пулу, судья — лениво до набора limit; 🔵
+    (первоисточник) приоритетнее 🟢 (комментарий) и для ВКЛЮЧЕНИЯ, и для подачи. Нет → []."""
     import eval as _eval
     import relevance_gate
     import lang_check
@@ -257,10 +277,15 @@ def _cite(advisor_dir, query, top_k=8, use_kernels=True, limit=4):
                 primary_score_by_text[t] = s
             if t not in seen_t:
                 seen_t.add(t); cand.append(t)
-    # Early-exit судейство (§1.2 moat-v2): кандидаты — в порядке УБЫВАНИЯ primary-косинуса
-    # (без primary-скора — последними, стабильно в порядке дедупа); каждый через дешёвый
-    # verbatim-гейт, затем судью; скан ОСТАНАВЛИВАЕТСЯ, как только limit кандидатов прошло
-    # оба гейта. Результат = top-limit полного прогона (~limit+K вызовов судьи вместо ~38).
+    # Early-exit судейство (§1.2 moat-v2, двухпроходное — review HIGH-1).
+    # Пасс 1 (дешёвый, БЕЗ судьи): verbatim-тиринг ВСЕГО пула в порядке убывания
+    # primary-косинуса (без primary-скора — последними, стабильно в порядке дедупа) →
+    # партиции 🔵/🟢. Пасс 2 (судья, ЛЕНИВО): сперва 🔵 до набора limit; 🟢 судятся
+    # ТОЛЬКО на остаток. Контракт: 🔵 (первоисточник) приоритетен для ВКЛЮЧЕНИЯ, не
+    # только подачи — 🟢 с более высоким косинусом НЕ вытесняет прошедший 🔵. Поэтому
+    # результат = полному прогону В ПРЕДЕЛАХ ТИРА (top-прошедшие 🔵, затем 🟢 на
+    # остаток), а НЕ глобальному top-limit по косинусу на смешанном пуле — намеренно.
+    # Кандидат не судится дважды; вызовов судьи ≈ limit + K (встреченные реджекты).
     #
     # Borderline-гейт релевантности ПОВЕРХ verbatim-тиринга: снимаем дословные-но-НЕ-
     # отвечающие цитаты (снятая → честный 🟡-путь ниже). Инертен на lexical/disabled.
@@ -273,24 +298,25 @@ def _cite(advisor_dir, query, top_k=8, use_kernels=True, limit=4):
     def _order_key(t):
         s = primary_score_by_text.get(t)
         return (0, -s) if isinstance(s, (int, float)) else (1, 0.0)
-    gcfg = relevance_gate._gate_config(adv_res)
-    selected = []
+    blues, greens = [], []
     for t in sorted(cand, key=_order_key):
-        if len(selected) >= limit:
-            break                                     # набрали limit — остальных НЕ судим
         fc = _fidelity_check(t, advisor_dir)
-        if not fc["verbatim"]:
-            continue                                  # дешёвый гейт первым: не-verbatim → мимо судьи
+        if fc["verbatim"]:
+            (blues if fc["status"] == "🔵" else greens).append(
+                {"text": t, "source": fc["source"], "marker": fc["status"]})
+    gcfg = relevance_gate._gate_config(adv_res)
+    ranked = []                                       # 🔵 раньше 🟢 по построению (blues+greens)
+    for c in blues + greens:
+        if len(ranked) >= limit:
+            break                                     # набрали limit — остальных НЕ судим
         try:
-            keep = relevance_gate.gate_quote(primary, t, primary_score_by_text.get(t),
-                                             adv_res, cfg=gcfg, source=fc["source"])
+            keep = relevance_gate.gate_quote(primary, c["text"],
+                                             primary_score_by_text.get(c["text"]),
+                                             adv_res, cfg=gcfg, source=c["source"])
         except Exception:
             keep = False                              # fail-closed: гейт/судья бросил → кандидат снят
         if keep:
-            selected.append({"text": t, "source": fc["source"], "marker": fc["status"]})
-    # отбор — по косинусу; ПОДАЧА — 🔵 (первоисточник) раньше 🟢 (комментарий), стабильно
-    ranked = ([q for q in selected if q["marker"] == "🔵"]
-              + [q for q in selected if q["marker"] != "🔵"])
+            ranked.append(c)
     # §1.3: мисматч языка primary-запроса ↔ корпус → явная директива (перевод — ризонинг хоста)
     out = lang_check.mismatch(primary, adv_res) or {}
     if ranked:
@@ -682,9 +708,9 @@ def _render_session(session, surface="md", depth="plain", kind="session"):
     grounded?}], invitation?, questions?, chips?}). widget = show_widget (Cowork), md/html — портативны.
     depth: plain (дефолт) | expert. Любой ход совета в Cowork рендерь виджетом, не прозой."""
     import session_render as SR
-    violations = []
+    violations, reconciliations = [], []
     if kind != "opening":                             # атрибуция (§1.1): ДО рендера, раз на объект
-        session, violations = _validate_session_attribution(session)
+        session, violations, reconciliations = _validate_session_attribution(session)
 
     def _attach(out):
         if violations:
@@ -692,6 +718,8 @@ def _render_session(session, surface="md", depth="plain", kind="session"):
             out["note"] = ("⛔ атрибуция: %d цитат(ы) не верифицируются корпусом СВОЕГО советника — "
                            "маркер понижен до нарушения. Убери цитату или верни её законному автору "
                            "(cite по advisor_dir этого советника)." % len(violations))
+        if reconciliations:
+            out["marker_reconciliations"] = reconciliations
         return out
 
     if surface == "widget":
@@ -1039,8 +1067,10 @@ TOOLS = {
                        "(только если show_widget недоступен) | html (фолбэк). Контур/гейт 🔵 "
                        "пройдены ризонингом ДО рендера. Рендер ДОПОЛНИТЕЛЬНО валидирует атрибуцию: "
                        "🔵/🟢-цитата, не верифицируемая корпусом СВОЕГО советника, понижается до "
-                       "нарушения (не переставляй цитаты между советниками). depth=plain по "
-                       "умолчанию. См. session_render.py.",
+                       "нарушения (не переставляй цитаты между советниками); «blue» на цитате из "
+                       "комментария (S-тир) понижается до green. Клади `advisor_dir` в каждый "
+                       "advisors[]-блок — надёжный канал атрибуции (имя — exact-match фолбэк). "
+                       "depth=plain по умолчанию. См. session_render.py.",
         "input_schema": {"type": "object",
                          "properties": {"session": {"type": "object"}, "surface": {"type": "string"},
                                         "depth": {"type": "string", "enum": ["plain", "expert"]},
@@ -1161,6 +1191,8 @@ Consilium-Principis — личный совет AI-персон реальных
        `synthesis`, но с `questions:[...]`;
    (в) СИНТЕЗ — объект С `synthesis` {question, reframe?, advisors:[{name, opinions:[{marker,
        argument, quote?}]}], disagreement?, synthesis, step}.
+   В каждый advisors[]-блок клади `advisor_dir` каждому советнику (тот же путь, что давал
+   cite/retrieve) — надёжный канал атрибуции цитат; резолв по имени — exact-match фолбэк.
    Один `render_session(surface=widget)` рендерит все три; скорми `content` в show_widget. В чат —
    максимум 1-2 строки подводки. Markdown — только если show_widget недоступен.
 

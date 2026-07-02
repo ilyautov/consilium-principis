@@ -27,7 +27,8 @@ def rank_in(hits, anchor):
     return None
 
 def load(path):
-    return [json.loads(l) for l in open(path, encoding="utf-8") if l.strip()]
+    from golden_meta import split_meta                # §1.4: _meta-строка ≠ golden-запись
+    return split_meta([json.loads(l) for l in open(path, encoding="utf-8") if l.strip()])[1]
 
 def recall(ranks, k):
     return sum(1 for r in ranks if r is not None and r <= k)

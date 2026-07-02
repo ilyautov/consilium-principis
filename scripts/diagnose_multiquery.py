@@ -31,8 +31,9 @@ def lenses_of(adv):
 
 def run(slug, n_variants=6):
     adv = f"advisors/{slug}"
-    ru = [json.loads(l) for l in open(f"scripts/golden/{slug}.retrieval.jsonl") if l.strip()]
-    en = [json.loads(l) for l in open(f"scripts/golden/{slug}.retrieval.en.jsonl") if l.strip()]
+    from golden_meta import split_meta                # §1.4: _meta-строка ≠ golden-запись
+    ru = split_meta([json.loads(l) for l in open(f"scripts/golden/{slug}.retrieval.jsonl") if l.strip()])[1]
+    en = split_meta([json.loads(l) for l in open(f"scripts/golden/{slug}.retrieval.en.jsonl") if l.strip()])[1]
     lenses = lenses_of(adv)
     hyb = ENG.resolve_engine(adv, prefer="hybrid")
     print(f"\n{'='*74}\n{slug}   линзы: {lenses}\n{'='*74}")

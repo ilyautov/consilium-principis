@@ -1,10 +1,12 @@
-"""§1.2 moat-v2: early-exit судейство в cite.
+"""§1.2 moat-v2: early-exit судейство в cite (двухпроходное, review HIGH-1).
 
 Было: cite судит ВЕСЬ пул кандидатов (~38 вызовов судьи), потом режет top-limit —
-минуты латентности. Стало: кандидаты судятся ЛЕНИВО в порядке убывания primary-косинуса
-(без primary-скора — последними), скан останавливается, как только `limit` кандидатов
-прошло оба гейта (verbatim + судья). Результат идентичен полному прогону для top-limit
-набора; fail-closed сохранён (гейт бросил → кандидат снят, скан продолжается).
+минуты латентности. Стало: пасс 1 — дешёвый verbatim-тиринг всего пула в порядке
+убывания primary-косинуса (без primary-скора — последними) → партиции 🔵/🟢; пасс 2 —
+судья ЛЕНИВО: сперва 🔵 до набора limit, 🟢 судятся ТОЛЬКО на остаток. Инвариант
+контракта: 🔵 (первоисточник) приоритетен для ВКЛЮЧЕНИЯ, не только подачи — 🟢 с более
+высоким косинусом НЕ вытесняет прошедший 🔵. Вызовов судьи ≈ limit + K (реджекты);
+fail-closed сохранён (гейт бросил → кандидат снят, скан продолжается).
 """
 import os, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -66,8 +68,10 @@ def test_judge_calls_bounded_by_limit_plus_rejections(cite_env, monkeypatch):
                          "passage-04 body of the candidate", "passage-06 body of the candidate"]
 
 
-def test_result_identical_to_full_scan(cite_env, monkeypatch):
-    # эталон: полный прогон (судим всех, топ-limit из прошедших по косинусу) == early-exit
+def test_result_identical_to_full_scan_on_uniform_tier(cite_env, monkeypatch):
+    # эталон НА ОДНОТИРНОМ пуле (все 🔵): полный прогон (судим всех, топ-limit прошедших
+    # по косинусу) == early-exit. На СМЕШАННОМ пуле равенства глобальному top-limit НЕТ
+    # намеренно: 🔵 приоритетен для включения (см. test_blue_included_ahead_of_greens).
     pool, calls, make_gate = cite_env
     reject = ("passage-02", "passage-07")
     gate = make_gate(reject=reject)
@@ -118,16 +122,64 @@ def test_non_verbatim_candidates_never_reach_judge(cite_env, monkeypatch):
     assert _texts(r) == [p["text"] for p in pool[2:6]]
 
 
-def test_blue_still_ranked_before_green_in_output(cite_env, monkeypatch):
-    # контракт подачи «🔵 раньше 🟢» сохранён: отбор — по косинусу, презентация — по тиру
-    pool, calls, make_gate = cite_env
-
+def _fidelity_by_blue_set(blue_substrings):
+    """_fidelity_check-мок: 🔵 только для перечисленных кандидатов, остальные — 🟢 (verbatim)."""
     def fidelity(quote, adv):
-        tier_green = "passage-00" in quote            # самый близкий — комментарий (S1)
-        return {"status": "🟢" if tier_green else "🔵", "verbatim": True, "source": "src"}
-    monkeypatch.setattr(mcp_server, "_fidelity_check", fidelity)
+        blue = any(b in quote for b in blue_substrings)
+        return {"status": "🔵" if blue else "🟢", "verbatim": True, "source": "src"}
+    return fidelity
+
+
+def test_blue_included_ahead_of_greens(cite_env, monkeypatch):
+    # HIGH-1 review: 🔵 приоритетен для ВКЛЮЧЕНИЯ — низкокосинусный прошедший 🔵 НЕ
+    # вытесняется 🟢 с более высоким косинусом (контрпример master-контракта: limit=2,
+    # 🟢0.95, 🟢0.93, ... 🔵 глубоко в хвосте → {🔵, топ-🟢}, а не {🟢, 🟢})
+    pool, calls, make_gate = cite_env
+    monkeypatch.setattr(mcp_server, "_fidelity_check", _fidelity_by_blue_set(("passage-15",)))
+    monkeypatch.setattr(relevance_gate, "gate_quote", make_gate())
+    r = mcp_server._cite("advisors/x", "q", use_kernels=False, limit=2)
+    assert _texts(r) == ["passage-15 body of the candidate",   # 🔵 включён, хотя косинус ниже
+                         "passage-00 body of the candidate"]   # 🟢 доливает остаток (топ по косинусу)
+    assert [q["marker"] for q in r["quotes"]] == ["🔵", "🟢"]
+    assert r["best"]["marker"] == "🔵"
+    assert len(calls) == 2                            # early-exit жив: limit вызовов, не пул
+
+
+def test_greens_fill_only_remainder_after_blues(cite_env, monkeypatch):
+    # 🟢 судятся ТОЛЬКО когда прошедших 🔵 не хватило на limit; внутри тира — по косинусу
+    pool, calls, make_gate = cite_env
+    monkeypatch.setattr(mcp_server, "_fidelity_check",
+                        _fidelity_by_blue_set(("passage-07", "passage-09")))
     monkeypatch.setattr(relevance_gate, "gate_quote", make_gate())
     r = mcp_server._cite("advisors/x", "q", use_kernels=False, limit=3)
-    markers = [q["marker"] for q in r["quotes"]]
-    assert markers == ["🔵", "🔵", "🟢"]               # green в наборе, но после blue
-    assert r["best"]["marker"] == "🔵"
+    assert _texts(r) == ["passage-07 body of the candidate",   # оба 🔵 (в порядке косинуса)
+                         "passage-09 body of the candidate",
+                         "passage-00 body of the candidate"]   # + один 🟢 на остаток
+    assert [q["marker"] for q in r["quotes"]] == ["🔵", "🔵", "🟢"]
+    assert len(calls) == 3                            # каждый судился один раз, ровно limit
+
+
+def test_enough_blues_means_no_green_judged(cite_env, monkeypatch):
+    # прошедших 🔵 хватает на limit → 🟢 вообще не доходят до судьи
+    pool, calls, make_gate = cite_env
+    blues = ("passage-03", "passage-08", "passage-12")
+    monkeypatch.setattr(mcp_server, "_fidelity_check", _fidelity_by_blue_set(blues))
+    monkeypatch.setattr(relevance_gate, "gate_quote", make_gate())
+    r = mcp_server._cite("advisors/x", "q", use_kernels=False, limit=3)
+    assert [q["marker"] for q in r["quotes"]] == ["🔵", "🔵", "🔵"]
+    assert all(any(b in c for b in blues) for c in calls)      # судились только 🔵
+    assert len(calls) == 3
+
+
+def test_call_count_bounded_on_mixed_tiers_with_rejections(cite_env, monkeypatch):
+    # смешанный пул + реджект 🔵: вызовов limit+K, сильно меньше пула; 🟢 доливают остаток
+    pool, calls, make_gate = cite_env
+    monkeypatch.setattr(mcp_server, "_fidelity_check",
+                        _fidelity_by_blue_set(("passage-06", "passage-11")))
+    monkeypatch.setattr(relevance_gate, "gate_quote", make_gate(reject=("passage-11",)))
+    r = mcp_server._cite("advisors/x", "q", use_kernels=False, limit=3)
+    assert _texts(r) == ["passage-06 body of the candidate",   # 🔵 прошёл (11 срезан судьёй)
+                         "passage-00 body of the candidate",   # 🟢 остаток по косинусу
+                         "passage-01 body of the candidate"]
+    assert len(calls) == 3 + 1                        # limit + K (один реджект)
+    assert len(calls) < len(pool)

@@ -939,6 +939,28 @@ def _list_recipes(surface="data"):
     return {"recipes": rs}       # сырые данные (дефолт) — хост рендерит сам
 
 
+# ── «Principis-расчёт» Ф2 (спека §§5,7): карта решения → детерминированный МК ──
+# Тонкие обёртки ядра Ф1 (decision_map.validate_map / mc_run.mc_run): логика гейтов и
+# счёта живёт ТОЛЬКО там; здесь MCP-контракт, «📐 рамка» и point-of-use директивы.
+# Ошибки — RU-строки: хост доносит их до юзера как ВОПРОСЫ совета, не как техдамп.
+
+_RELAY_AS_QUESTIONS_HINT = (
+    "Карта пока не готова — донеси каждую ошибку до юзера как ВОПРОС совета (голосом "
+    "советника, простыми словами), не как техдамп; исправь карту его ответами и "
+    "провалидируй снова.")
+
+
+def _validate_decision_map(map):
+    """Гейты честности карты решения БЕЗ счёта (fail-closed, спека §2). Хост зовёт после
+    допроса круглого стола, ПЕРЕД run_calculation; errors → вопросы совета юзеру."""
+    from decision_map import validate_map
+    errors = validate_map(map)
+    if errors:
+        return {"valid": False, "errors": errors, "hint": _RELAY_AS_QUESTIONS_HINT}
+    return {"valid": True, "errors": [],
+            "hint": "Карта проходит гейты — можно считать: run_calculation(map)."}
+
+
 def _render_session(session, surface="md", depth="plain", kind="session"):
     """Ход заседания → строка под surface. Контур/гейт 🔵 проходят ДО рендера; тут чистая презентация.
     kind: session (любой ход — реакции+вопросы ИЛИ синтез, авто по наличию synthesis) | opening
@@ -1331,6 +1353,16 @@ TOOLS = {
         "input_schema": {"type": "object",
                          "properties": {"surface": {"type": "string"}}, "required": []},
         "handler": _list_recipes,
+    },
+    "validate_decision_map": {
+        "description": "Гейты честности карты решения («Principis-расчёт», fail-closed): каждая "
+                       "величина подтверждена юзером (confirmed_by_user), тройки min<=mode<=max / "
+                       "prob в [0,1], статус-кво вариант есть, формулы парсятся, у каждой — словесная "
+                       "версия. → {valid, errors[]}. Ошибки доноси до юзера ВОПРОСАМИ совета, не "
+                       "техдампом. Зови после допроса карты, ПЕРЕД run_calculation.",
+        "input_schema": {"type": "object", "properties": {"map": {"type": "object"}},
+                         "required": ["map"]},
+        "handler": _validate_decision_map,
     },
     "render_session": {
         "description": "ОБЯЗАТЕЛЬНЫЙ финал заседания совета в Cowork: отрисовать canon-объект "

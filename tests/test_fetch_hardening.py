@@ -91,6 +91,38 @@ def test_private_loopback_linklocal_ip_refused(monkeypatch, ip):
         cc.fetch("https://internal.example/secret")
 
 
+@pytest.mark.parametrize("addr", [
+    "100.64.0.1",       # CGNAT (RFC 6598): внутреннее облако/оркестрация (AWS internal, GKE pod/svc)
+    "100.127.255.254",  # верхний край CGNAT-диапазона
+    "2002:a00:1::1",    # 6to4: встроенный v4 = 10.0.0.1 (приватный, спрятан в публично-глобальном v6)
+    "2002:7f00:1::1",   # 6to4: встроенный v4 = 127.0.0.1 (loopback)
+])
+def test_is_public_ip_blocks_cgnat_and_tunneled_private(addr):
+    # CGNAT: is_global=False → ловится напрямую. 6to4: is_global=True (НЕ ловится флагом!) —
+    # ловится извлечением встроенного v4. Позитивный блоклист пропускал оба (HIGH-регрессия).
+    assert cc._is_public_ip(addr) is False
+
+
+@pytest.mark.parametrize("addr", ["8.8.8.8", "1.1.1.1", "2606:4700:4700::1111", "2001:4860:4860::8888"])
+def test_is_public_ip_still_allows_real_public_hosts(addr):
+    # Реальные публичные v4/v6 (Google DNS, Cloudflare) НЕ должны заблокироваться ужесточением.
+    assert cc._is_public_ip(addr) is True
+
+
+def test_is_public_ip_allows_real_gutenberg_ip():
+    # Реальный публичный IP gutenberg.org (снапшот): гард обязан его пропускать (иначе PD-сборка мертва).
+    assert cc._is_public_ip("152.19.134.47") is True
+
+
+def test_cgnat_refused_end_to_end(monkeypatch):
+    # PD-хост, чей DNS отравлен в CGNAT-адрес, обязан упереться в SSRF-гард (не «публичный»).
+    monkeypatch.setattr(socket, "getaddrinfo", lambda *a, **kw: _addrinfo("100.64.0.1"))
+    monkeypatch.setattr(socket, "create_connection",
+                        lambda *a, **kw: pytest.fail("коннект к CGNAT не должен случиться"))
+    with pytest.raises(ValueError, match="SSRF"):
+        cc.fetch("https://www.gutenberg.org/cache/epub/1/pg1.txt")
+
+
 def test_redirect_into_private_zone_refused(monkeypatch):
     # Хоп 1 — обычный ответ-редирект; хоп 2 резолвится в приватную зону → отказ на ре-валидации.
     real_once = cc._fetch_once

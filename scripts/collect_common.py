@@ -36,10 +36,32 @@ def is_pd_host(url):
     return any(h == d or h.endswith("." + d) for d in PD_HOSTS)
 
 
+def _embedded_v4s(ip):
+    """IPv4-адреса, СПРЯТАННЫЕ внутри туннельных v6-форм: IPv4-mapped (::ffff:a.b.c.d),
+    6to4 (2002::/16) и Teredo (2001::/32). Без этого приватный v4 (10.0.0.1) прячется в
+    публично-выглядящем v6 (2002:a00:1::1 с is_global=True) и обходит блоклист."""
+    out = []
+    for attr in ("ipv4_mapped", "sixtofour"):
+        v = getattr(ip, attr, None)
+        if v is not None:
+            out.append(v)
+    teredo = getattr(ip, "teredo", None)               # (server_v4, client_v4)
+    if teredo is not None:
+        out.extend(teredo)
+    return out
+
+
 def _is_public_ip(addr):
+    """АЛЛОУЛИСТ по is_global (а не позитивный блоклист): закрывает CGNAT 100.64.0.0/10
+    (is_private=False на 3.11, но внутреннее облако — AWS internal / GKE pod-svc) и прочие
+    не-глобальные диапазоны одним движением. Плюс рекурсивная проверка встроенного v4 в
+    туннельных v6-формах (6to4 is_global=True флагом не ловится). multicast/reserved
+    исключаем явно (::ffff:-mapped помечен reserved → блок, безопасное направление сохранено)."""
     ip = ipaddress.ip_address(addr)
-    return not (ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved
-                or ip.is_multicast or ip.is_unspecified)
+    for emb in _embedded_v4s(ip):                      # спрятанный приватный v4 → блок
+        if not _is_public_ip(str(emb)):
+            return False
+    return ip.is_global and not (ip.is_multicast or ip.is_reserved)
 
 
 def _pick_public_ip(host, port):

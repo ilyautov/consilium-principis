@@ -8,6 +8,11 @@ advisors/*
 principis.md
 relationship.md
 principis_corpus/
+# затянутые СЫРЫЕ исходники для сборки корпусов (чужие книги под копирайтом) — строго локально,
+# как и собранные из них советники в advisors/*. Никогда не в public-репо.
+reference-library-raw/
+reference-library/
+*-raw/
 board_config.json
 scripts/golden/
 data/embeddings*.npy

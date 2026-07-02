@@ -56,10 +56,17 @@ def _anchor_of(text):
 
 # ── Общий helper ───────────────────────────────────────────────────────────────
 
-def write_jsonl(path, rows):
-    """Записать список dict-ов в JSONL-файл (UTF-8). Создаёт папки при необходимости."""
+def write_jsonl(path, rows, advisor_dir=None):
+    """Записать список dict-ов в JSONL-файл (UTF-8). Создаёт папки при необходимости.
+    advisor_dir задан → первой строкой meta-запись с хэшем корпуса (§1.4: golden↔corpus
+    версионирование; eval-лоадер громко предупредит при дрейфе корпуса)."""
     os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
     with open(path, "w", encoding="utf-8") as fh:
+        if advisor_dir:
+            from golden_meta import meta_record
+            meta = meta_record(advisor_dir)
+            if meta:
+                fh.write(json.dumps(meta, ensure_ascii=False) + "\n")
         for row in rows:
             fh.write(json.dumps(row, ensure_ascii=False) + "\n")
 
@@ -249,7 +256,7 @@ def main():
         # 1. Adversarial OOC
         ooc = gen_adversarial_ooc(advisor_dir, author, n)
         path = os.path.join(golden_dir, f"{slug}.adversarial.jsonl")
-        write_jsonl(path, ooc)
+        write_jsonl(path, ooc, advisor_dir=advisor_dir)
         print(f"  adversarial OOC : {len(ooc):3d} → {path}")
         for item in ooc[:3]:
             print(f"    • {item['q'][:80]}")
@@ -258,13 +265,13 @@ def main():
         # 2. Answerable
         ans = gen_answerable(advisor_dir, n)
         path = os.path.join(golden_dir, f"{slug}.synth_answerable.jsonl")
-        write_jsonl(path, ans)
+        write_jsonl(path, ans, advisor_dir=advisor_dir)
         print(f"  answerable      : {len(ans):3d} → {path}")
 
         # 3. Atomic compounds
         cmp = gen_atomic_compounds(advisor_dir, n)
         path = os.path.join(golden_dir, f"{slug}.synth_atomic.jsonl")
-        write_jsonl(path, cmp)
+        write_jsonl(path, cmp, advisor_dir=advisor_dir)
         print(f"  atomic compounds: {len(cmp):3d} → {path}")
 
 

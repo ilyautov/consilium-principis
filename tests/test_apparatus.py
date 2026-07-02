@@ -328,3 +328,100 @@ def test_scan_toc_aware_picks_real_heading_not_contents():
     assert "Sun Tzu said" in blue                     # слова автора → 🔵
     assert "translator's essay" not in blue           # вступление НЕ 🔵
     assert "list of old treatises" not in blue        # библиография вступления НЕ 🔵
+
+
+# ─────────────── #55: консервативный автодетект back-границы (только high-confidence) ───────────────
+
+def test_scan_pg_license_tail_autodetected_as_back():
+    # path=/text=-входы обходят strip_gutenberg (он только для url с 'gutenberg') → лицензионный
+    # хвост PG тёк бы в 🔵-тело. Маркер «*** END OF THE PROJECT GUTENBERG…» — стопроцентный
+    # аппарат: back-граница режется УВЕРЕННО (автодетект, без host-review по back).
+    lines = (
+        ["An Introduction by the translator about his method and era."] * 4 +
+        ["I. LAYING PLANS"] +
+        ["Sun Tzu said: all warfare is based on deception. [Tu Mu: yes.]"] * 10 +
+        ["*** END OF THE PROJECT GUTENBERG EBOOK THE ART OF WAR ***",
+         "Updated editions will replace the previous one.",
+         "Section 1. General Terms of Use."]
+    )
+    r = ap.scan("\n".join(lines))
+    assert r["signals"]["back_confident"] is True
+    assert "END OF THE PROJECT GUTENBERG" in r["signals"]["back_from"]
+    recs = [(("line", i), ln) for i, ln in enumerate(lines)]
+    out = ap.tier_records(recs, front_until=r["signals"]["front_until"],
+                          back_from=r["signals"]["back_from"],
+                          front_confident=r["signals"]["front_confident"],
+                          back_confident=r["signals"]["back_confident"])
+    blob = " ".join(t["text"] for t in out)
+    assert "General Terms of Use" not in blob            # лицензия PG срезана
+    blue = " ".join(t["text"] for t in out if t["tier"] == "P1")
+    assert "all warfare is based on deception" in blue   # автор остался 🔵
+
+
+def test_scan_weak_trailing_marker_is_gated_not_cut():
+    # Авторская строка прозы «The end of all things…» в хвостовых 30% раньше АВТОМАТИЧЕСКИ
+    # срезала весь хвост (маркер THE END + trailing). Теперь: слабый (не-заголовочный) кандидат
+    # → back_suspect + host-review, среза НЕТ — слова автора никогда не режутся молча.
+    lines = (
+        ["Preface by the translator himself, going on and on."] * 4 +
+        ["I. LAYING PLANS"] +
+        ["Sun Tzu said: victory comes from calculation, not from luck."] * 10 +
+        ["The end of all striving is stillness, said the master finally.",
+         "Sun Tzu said: therefore rest is also a weapon of the wise."]
+    )
+    r = ap.scan("\n".join(lines))
+    assert r["signals"]["back_confident"] is False
+    assert r["signals"]["back_from"] is None             # среза нет
+    assert r["signals"]["back_suspect"] is True
+    assert "back_weak_marker" in r["review_reasons"]
+    assert r["needs_host_review"] is True                # fail-open К ВОПРОСУ, не к ножницам
+    assert "The end of all striving" in r["signals"]["back_candidate"]
+    recs = [(("line", i), ln) for i, ln in enumerate(lines)]
+    out = ap.tier_records(recs, front_until=r["signals"]["front_until"],
+                          back_from=r["signals"]["back_from"],
+                          front_confident=r["signals"]["front_confident"],
+                          back_confident=r["signals"]["back_confident"])
+    blue = " ".join(t["text"] for t in out if t["tier"] == "P1")
+    assert "rest is also a weapon" in blue               # авторский хвост НЕ потерян
+    assert "The end of all striving" in blue
+
+
+def test_scan_heading_like_notes_glossary_autodetected():
+    # Новые маркеры (NOTES/GLOSSARY/ENDNOTES) засчитываются ТОЛЬКО в заголовочной форме —
+    # standalone-заголовок в хвосте режется уверенно…
+    lines = (
+        ["Intro by the editor about sources and manuscripts."] * 4 +
+        ["CHAPTER I"] +
+        ["The author speaks of virtue and of fortune at length."] * 10 +
+        ["NOTES",
+         "1. On the dating of the manuscript, see the preface.",
+         "2. The spelling follows the 1910 edition."]
+    )
+    r = ap.scan("\n".join(lines))
+    assert r["signals"]["back_confident"] is True
+    assert r["signals"]["back_from"] == "NOTES"
+
+
+def test_scan_notes_in_prose_creates_no_candidate_no_noise():
+    # …а «Notes passed between the generals…» в прозе — вообще НЕ кандидат: ни среза, ни флага
+    # (консервативность к ложным позитивам: обычный роман не должен уходить в host-review).
+    text = ("Notes passed between the generals during the long night. " +
+            "Just plain prose with no editorial apparatus at all. " * 20)
+    lines = "Notes passed between the generals during the long night.\n" + \
+            "Just plain prose with no editorial apparatus at all.\n" * 20
+    r = ap.scan(lines)
+    assert r["has_apparatus"] is False
+    assert r["signals"]["back_suspect"] is False
+    assert r["needs_host_review"] is False
+
+
+def test_scan_trailing_uppercase_appendix_still_confident():
+    # Регрессия: настоящий заголовок APPENDIX в хвосте по-прежнему автодетектится (не отвалился
+    # от ужесточения) — уже покрыто выше, здесь пин формы заголовка с нумерацией.
+    lines = (["Preface prose by the translator, quite long indeed."] * 4 +
+             ["I. LAYING PLANS"] +
+             ["Sun Tzu said: the clever combatant imposes his will."] * 10 +
+             ["APPENDIX I. THE COMMENTATORS", "A list of the classical commentators follows."])
+    r = ap.scan("\n".join(lines))
+    assert r["signals"]["back_confident"] is True
+    assert r["signals"]["back_from"].startswith("APPENDIX")

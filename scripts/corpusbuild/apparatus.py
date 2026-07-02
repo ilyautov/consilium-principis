@@ -8,12 +8,15 @@
 ЧЕРЕЗ needs_host_review: если фронт/бэк не разрешились уверенно (start=0 / нет валидного хвоста),
 scan поднимает needs_host_review=True для хоста (rule 10) — это НЕ абсолютный drop, а host-gate.
 
-#55: back-срез засчитывается уверенным, только если кандидат лежит в хвостовых ~30% файла
-(_is_trailing) — иначе это, вероятно, ВНУТРЕННЯЯ секция (напр. библиография научного PD-издания
-посреди тела), резать которую значит терять реальный текст автора после неё; в этом случае
-срез не делается, а сигналится back_suspect. Если front-маркер вообще не разрешился, но есть
-блок оглавления (TOC) — это само по себе сигнал аппарата (front_unresolved_toc_present);
-tier_records в этом случае не запекает голову-до-конца-TOC как 🔵, даже без точной границы."""
+#55: back-срез засчитывается уверенным, только если кандидат (а) лежит в хвостовых ~30% файла
+(_is_trailing) И (б) выглядит заголовком секции (_heading_like: капс/маркер-слово с нумерацией)
+ЛИБО является PG-лицензией (_BACK_STRONG_RE — аппарат по определению). Иначе — back_suspect,
+среза НЕТ: mid-file кандидат = вероятная внутренняя секция (резать → терять текст автора после
+неё), слабый прозаический матч («The end of all striving…») = вероятные слова автора. Fail-open
+к ВОПРОСУ (needs_host_review + back_candidate), никогда — к молчаливым ножницам. Если
+front-маркер вообще не разрешился, но есть блок оглавления (TOC) — это само по себе сигнал
+аппарата (front_unresolved_toc_present); tier_records в этом случае не запекает
+голову-до-конца-TOC как 🔵, даже без точной границы."""
 import re
 
 # Лексикон классических толкователей (издания Giles/Legge Сунь-Цзы и пр.) + общие маркеры.
@@ -25,6 +28,43 @@ _COMMENTATORS = frozenset((
     "the commentator", "commentators", "scholiast"))
 _FRONT_RE = re.compile(r"^\s*(CHAPTER\s+I\b|I\.\s|BOOK\s+I\b|PART\s+I\b)", re.I)
 _BACK_RE = re.compile(r"^\s*(APPENDIX|BIBLIOGRAPHY|INDEX\b|FOOTNOTES|THE\s+END)\b", re.I)
+# Стопроцентный аппарат: лицензионная обёртка Project Gutenberg. strip_gutenberg срезает её
+# только на url-пути с 'gutenberg' — path=/text=-входы несут хвост сюда (#55, автодетект).
+_BACK_STRONG_RE = re.compile(
+    r"^\s*(\*{3}\s*END OF (THE|THIS) PROJECT GUTENBERG|End of (the )?Project Gutenberg)", re.I)
+# Дополнительные back-маркеры, засчитываемые ТОЛЬКО в заголовочной форме (см. _heading_like):
+# в прозе «Notes passed between…» — не кандидат вообще (ноль шума на обычном романе).
+_BACK_EXTRA_RE = re.compile(r"^\s*(NOTES|ENDNOTES|GLOSSARY)\b", re.I)
+# Заголовочная форма: слово-маркер + необязательная нумерация/подзаголовок из ограниченного
+# алфавита (римские/арабские цифры, пунктуация) — «The end. But not for him.» не пройдёт.
+_BACK_HEADING_WORDS_RE = re.compile(
+    r"^(appendix|bibliography|index|footnotes|notes|endnotes|glossary|the\s+end)"
+    r"[\s.:;,\-—ivxlcd\d]*$", re.I)
+
+
+def _heading_like(line):
+    """Строка ПОХОЖА на заголовок секции: короткая И (все буквы капсом ИЛИ маркер-слово с
+    нумерацией). Слабый матч (_BACK_RE в обычной прозе) больше НЕ режет хвост автоматически."""
+    s = (line or "").strip()
+    if not s or len(s) > 60:
+        return False
+    letters = [ch for ch in s if ch.isalpha()]
+    if letters and all(ch.isupper() for ch in letters):
+        return True
+    return bool(_BACK_HEADING_WORDS_RE.match(s))
+
+
+def _back_candidate(lines):
+    """Первый кандидат back-границы: (index, текст строки, strong). strong = PG-лицензия
+    (аппарат по определению). _BACK_EXTRA_RE-маркеры участвуют только в заголовочной форме."""
+    for i, ln in enumerate(lines):
+        if _BACK_STRONG_RE.match(ln):
+            return i, ln.strip(), True
+        if _BACK_RE.match(ln):
+            return i, ln.strip(), False
+        if _BACK_EXTRA_RE.match(ln) and _heading_like(ln):
+            return i, ln.strip(), False
+    return None, None, False
 
 
 _FOOTNOTE_DEF_RE = re.compile(r"^\s*\[\d+\]\s")
@@ -175,11 +215,13 @@ def _is_trailing(idx, n):
 def scan(text):
     """Детерминированный отчёт об аппарате. Поле signals — СЛУЖЕБНОЕ (юзеру не показывать).
 
-    Два host-gated усиления (#55, follow-up после апарат-ревью):
+    Host-gated усиления (#55, follow-up после апарат-ревью):
     1. back-срез засчитывается уверенным (back_confident) только если кандидат лежит в
-       хвостовых ~30% файла (_is_trailing); иначе — back_suspect=True, среза НЕТ (хвост тела
-       не режем), но хосту сигналим причину. Так внутренняя ("mid-file") библиография/индекс
-       научного издания не срубает реальный текст автора после себя.
+       хвостовых ~30% файла (_is_trailing) И заголовочен/PG-strong (_heading_like /
+       _BACK_STRONG_RE); иначе — back_suspect=True, среза НЕТ (хвост тела не режем), но хосту
+       сигналим причину (back_suspect_mid_file / back_weak_marker) и сам кандидат
+       (signals.back_candidate). Так ни внутренняя ("mid-file") библиография научного издания,
+       ни авторская проза с «The end…» не срубают реальный текст автора после себя.
     2. если front-маркер вообще не нашёлся (регекс не совпал), но при этом есть блок оглавления
        (TOC) — это само по себе сигнал аппарата: has_apparatus/needs_host_review поднимаются
        с явной причиной front_unresolved_toc_present, а tier_records (ниже) не запекает
@@ -196,19 +238,23 @@ def scan(text):
         return None, None
 
     fi, front_marker = _first_outside(_FRONT_RE)   # реальный заголовок, не пункт оглавления
-    bi, back_marker = _first_line(lines, _BACK_RE)  # первое совпадение — кандидат-текст на срез
+    bi, back_marker, back_strong = _back_candidate(lines)   # первый кандидат-текст на срез
     start, end = _resolve_span(lines, front_marker, back_marker)
     front_ok = front_marker is not None and start > 3      # тело реально начинается ниже шапки
     back_cut = back_marker is not None and end < len(lines)     # срез вообще нашёлся
     back_trailing = back_cut and _is_trailing(end, len(lines))  # и лежит в хвосте файла
-    back_ok = back_trailing                                     # уверенный срез = хвостовой срез
-    back_suspect = back_cut and not back_trailing   # найден, но НЕ хвостовой → mid-file, не режем
+    # #55: уверенный срез = хвостовой И заголовочный/PG-strong. Слабый (прозаический) матч
+    # в хвосте раньше резал автоматически — теперь host-gated: fail-open к ВОПРОСУ, не к ножницам.
+    back_ok = back_trailing and (back_strong or _heading_like(back_marker))
+    back_suspect = back_cut and not back_ok         # mid-file ИЛИ слабый маркер → не режем, сигналим
     front_unresolved_apparatus = front_marker is None and toc is not None
     bracket = bracket_ratio >= 0.25 or commentator_hits >= 5
     has_apparatus = bracket or front_ok or back_ok or back_suspect or front_unresolved_apparatus
     reasons = []
-    if back_suspect:
+    if back_cut and not back_trailing:
         reasons.append("back_suspect_mid_file")
+    elif back_suspect:
+        reasons.append("back_weak_marker")
     if front_unresolved_apparatus:
         reasons.append("front_unresolved_toc_present")
     sample_app = next((l.strip() for l in lines if "[" in l and len(l.strip()) > 20), "")
@@ -225,6 +271,7 @@ def scan(text):
             "front_confident": front_ok,
             "back_confident": back_ok,
             "back_suspect": back_suspect,
+            "back_candidate": back_marker if back_suspect else None,   # хосту: ЧТО проверить
             "toc_present": toc is not None,
         },
         "needs_host_review": has_apparatus and not (front_ok and back_ok),

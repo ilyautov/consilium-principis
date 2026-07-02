@@ -9,10 +9,16 @@
      хешем предыдущей (как блоки git/блокчейна). Подмена текста ПОСЛЕ факта рвёт цепочку
      и ловится verify_chain. Нужно для Принцепса: факты/решения юзера должны быть
      неизменяемо-зафиксированы, а не переписываемы задним числом.
-     МОДЕЛЬ УГРОЗ (честно): gov_head в build.lock ловит СЛУЧАЙНУЮ порчу / частичную подмену
-     (правка corpus.jsonl без обновления lock). Это НЕ защита от противника с записью в ОБА
-     файла: lock не подписан и лежит в том же доверенном домене — пересчитав публичный sha256,
-     он обновит и gov_head. Для одного локального юзера релевантна именно случайная порча.
+     МОДЕЛЬ УГРОЗ (честно, три слоя):
+       • gov_head в build.lock ловит СЛУЧАЙНУЮ порчу / частичную подмену (правка corpus.jsonl
+         без обновления lock);
+       • ЯКОРЬ в gov_heads.json (корень доски, ВНЕ папки советника) ловит подмену советника
+         ЦЕЛИКОМ: противник, заменивший всю папку (corpus.jsonl + самосогласованные lock'и),
+         проходит внутренние проверки, но голова не совпадёт с якорем. Актуально для
+         open-source: корпуса/книги приходят извне, «скачанный советник» — подменяемая единица;
+       • якорь НЕ защищает от противника с записью в КОРЕНЬ доски (он перепишет и реестр) и
+         НЕ защищает от отравленной ПЕРЕСБОРКИ через легитимный pipeline (это гейтят Rule 0 и
+         гарды add_source): легитимная сборка обновляет якорь по определению.
 
   2. PROMOTE-GATE — повышение тира (рост доверия, A→S→P) проходит гейт с ДОКАЗАТЕЛЬСТВОМ.
      Нельзя просто пометить запись P1; повышение требует evidence (ссылка на манифест/
@@ -104,9 +110,102 @@ def expected_head_for(advisor_dir):
     return _lock_head(lock_path(advisor_dir)) or _lock_head(head_lock_path(advisor_dir))
 
 
-def freeze(advisor_dir):
-    """Записать трекаемый corpus.lock.json = {gov_head} над ТЕКУЩИМ corpus.jsonl советника.
-    Для шипованных корпусов (lenses/*) даёт git-переносимый эталон целостности."""
+# ─────────────────────────── ЯКОРЬ ВНЕ ПОДМЕНЯЕМОЙ ПАПКИ ───────────────────────────
+# gov_heads.json в КОРНЕ доски: advisor→head. build.lock/corpus.lock живут ВНУТРИ папки
+# советника и подменяются вместе с ней; якорь снаружи — единственная точка, которую
+# «шипованный» (самосогласованный) советник-подкидыш не может унести с собой.
+
+REGISTRY_NAME = "gov_heads.json"
+
+
+def _registry_root(root=None):
+    if root is not None:
+        return root
+    import sys, os
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from corpusbuild.paths import project_root
+    return project_root()
+
+
+def registry_path(root=None):
+    import os
+    return os.path.join(_registry_root(root), REGISTRY_NAME)
+
+
+def _advisor_key(advisor_dir, root):
+    """Ключ реестра = путь советника ОТНОСИТЕЛЬНО корня доски (forward-slash, кросс-платформенно).
+    Советник вне корня (tmp/внешний каталог) → None: якорить нечем, реестр не трогаем."""
+    import os
+    rel = os.path.relpath(os.path.realpath(advisor_dir), os.path.realpath(root))
+    if rel == ".." or rel.startswith(".." + os.sep) or os.path.isabs(rel):
+        return None
+    return rel.replace(os.sep, "/")
+
+
+def load_registry(root=None):
+    import os
+    p = registry_path(root)
+    if not os.path.isfile(p):
+        return {}
+    try:
+        reg = json.load(open(p, encoding="utf-8"))
+        return reg if isinstance(reg, dict) else {}   # кривой реестр → как отсутствующий
+    except Exception:
+        return {}
+
+
+def register_head(advisor_dir, head, n=None, root=None):
+    """Зарегистрировать/обновить якорь советника в gov_heads.json. Зовётся ТОЛЬКО легитимной
+    сборкой (buildlock.write_lock) и владельческим freeze. Советник вне корня → None (no-op)."""
+    root = _registry_root(root)
+    key = _advisor_key(advisor_dir, root)
+    if key is None:
+        return None
+    reg = load_registry(root)
+    reg[key] = {"gov_head": head, "n": n}
+    p = registry_path(root)
+    with open(p, "w", encoding="utf-8") as f:
+        json.dump(reg, f, ensure_ascii=False, indent=2, sort_keys=True)
+    return {"path": p, "key": key, "gov_head": head}
+
+
+def anchored_head_for(advisor_dir, root=None):
+    """Якорная голова советника из gov_heads.json, или None (не зарегистрирован / нет реестра)."""
+    root = _registry_root(root)
+    key = _advisor_key(advisor_dir, root)
+    if key is None:
+        return None
+    entry = load_registry(root).get(key)
+    return entry.get("gov_head") if isinstance(entry, dict) else None
+
+
+def verify_advisor(advisor_dir, root=None):
+    """Полная проверка советника: цепь + внутрипапочный эталон (build.lock/corpus.lock.json)
+    + внешний якорь (gov_heads.json). Ключевой случай — ПОДМЕНА ЦЕЛИКОМ: вся папка заменена
+    самосогласованным двойником → цепь сходится, внутренние lock'и сходятся, но голова ≠ якорю
+    → swap_suspect=True, tampered=True (громкий вердикт). Якорь не зарегистрирован →
+    anchor_registered=False (предупреждение, НЕ провал: миграция старых советников)."""
+    import sys, os
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from corpusbuild.paths import corpus_path
+    res = _verify_corpus(corpus_path(advisor_dir), expected_head=expected_head_for(advisor_dir))
+    if res is None:
+        return None
+    anchor = anchored_head_for(advisor_dir, root=root)
+    res["anchor_head"] = anchor
+    res["anchor_registered"] = anchor is not None
+    res["anchor_match"] = None if anchor is None else (res["head"] == anchor)
+    res["swap_suspect"] = res["anchor_match"] is False and res["ok"]  # внутри сходится, снаружи нет
+    if res["anchor_match"] is False:
+        res["ok"] = False
+        res["tampered"] = True
+    return res
+
+
+def freeze(advisor_dir, root=None):
+    """Записать трекаемый corpus.lock.json = {gov_head} над ТЕКУЩИМ corpus.jsonl советника
+    И зарегистрировать якорь в gov_heads.json (корень доски). Для шипованных корпусов (lenses/*)
+    даёт git-переносимый эталон; для владельца — one-shot регистрация якоря старого советника."""
     import sys, os
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from corpusbuild.paths import corpus_path, head_lock_path
@@ -116,7 +215,9 @@ def freeze(advisor_dir):
     out = head_lock_path(advisor_dir)
     with open(out, "w", encoding="utf-8") as f:
         json.dump({"gov_head": res["head"], "n": res["n"]}, f, ensure_ascii=False, indent=2)
-    return {"path": out, "gov_head": res["head"], "n": res["n"]}
+    anchored = register_head(advisor_dir, res["head"], n=res["n"], root=root)
+    return {"path": out, "gov_head": res["head"], "n": res["n"],
+            "anchored": bool(anchored), "anchor_key": (anchored or {}).get("key")}
 
 
 def _verify_corpus(corpus_jsonl, expected_head=None):
@@ -159,21 +260,30 @@ if __name__ == "__main__":
         fr = freeze(target)
         if fr is None:
             print(f"[governance] нет corpus.jsonl: {target}"); sys.exit(1)
+        anchor_note = f", якорь → gov_heads.json[{fr['anchor_key']}]" if fr["anchored"] else \
+            ", якорь НЕ зарегистрирован (советник вне корня доски)"
         print(f"[governance] заморожен эталон: {fr['path']} ({fr['n']} записей, "
-              f"голова {fr['gov_head'][:16]}…)")
+              f"голова {fr['gov_head'][:16]}…{anchor_note})")
         sys.exit(0)
-    cj = target if target.endswith(".jsonl") else corpus_path(target)
-    expected = expected_head_for(target) if not target.endswith(".jsonl") else None
-    res = _verify_corpus(cj, expected_head=expected)
+    if target.endswith(".jsonl"):
+        res = _verify_corpus(target)
+        cj = target
+    else:
+        res = verify_advisor(target)
+        cj = corpus_path(target)
     if res is None:
         print(f"[governance] нет corpus.jsonl: {cj}")
         sys.exit(1)
-    if res["tampered"]:
+    if res.get("swap_suspect"):
+        status = "❌ ЦЕПЬ ПОДМЕНЕНА ЦЕЛИКОМ? Внутри советник самосогласован, но голова ≠ якорю доски (gov_heads.json)"
+    elif res["tampered"]:
         status = "❌ ПОДМЕНА: голова ≠ эталон"
     elif not res["ok"]:
         status = f"❌ ПОДМЕНА на записи #{res['broken']}"
+    elif res.get("anchor_match"):
+        status = "✅ целостна (сверена с якорем доски)"
     elif res["head_match"]:
-        status = "✅ целостна (сверена с эталоном)"
+        status = "✅ целостна (сверена с эталоном; якорь не зарегистрирован — `governance.py freeze` закрепит)"
     else:
         status = "✅ цепь консистентна (нет эталона — freeze/собрать для сверки)"
     tiers = " ".join(f"{k}:{v}" for k, v in sorted(res["tiers"].items()))

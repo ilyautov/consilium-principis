@@ -823,19 +823,26 @@ def _situation_stress_test(tree, perturbations, stance="competitive"):
 
 def _governance_verify(path):
     path = _resolve(path)
-    cj = path if path.endswith(".jsonl") else corpus_path(path)
-    expected = None
-    if not path.endswith(".jsonl"):                  # эталон: build.lock ИЛИ трекаемый corpus.lock.json
-        from governance import expected_head_for
-        expected = expected_head_for(path)
-    res = _verify_corpus(cj, expected_head=expected)
+    if path.endswith(".jsonl"):                      # голый файл: цепь без эталонов/якоря
+        res = _verify_corpus(path)
+        cj = path
+    else:                                            # советник: цепь + внутренний эталон + ЯКОРЬ доски
+        from governance import verify_advisor
+        res = verify_advisor(path)
+        cj = corpus_path(path)
     if res is None:
         return {"ok": False, "error": f"нет corpus.jsonl: {cj}",
                 "hint": "У этого советника ещё нет собранных текстов — нечего проверять."}
-    if res.get("tampered") or not res.get("ok"):
+    if res.get("swap_suspect"):
+        res["hint"] = ("Тревога: тексты этого советника выглядят подменёнными ЦЕЛИКОМ — внутри всё "
+                       "самосогласовано, но отпечаток не совпадает с якорем доски. Не доверяй его "
+                       "цитатам; пересобери советника из доверенных источников.")
+    elif res.get("tampered") or not res.get("ok"):
         res["hint"] = "Внимание: тексты этого советника, похоже, менялись после сборки — лучше пересобрать."
     elif res.get("head_match"):
-        res["hint"] = "Тексты целы, подмен нет."
+        res["hint"] = ("Тексты целы, подмен нет." if res.get("anchor_match")
+                       else "Тексты целы, подмен нет. Якорь целостности ещё не закреплён — "
+                            "могу закрепить (freeze), чтобы ловить и полную подмену.")
     else:
         res["hint"] = "Тексты на месте; точный эталон для сверки не задан (не критично)."
     return res

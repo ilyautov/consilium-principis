@@ -38,4 +38,9 @@ def write_lock(advisor_dir: str, config: dict, chunks, built_at: str) -> dict:
     os.makedirs(paths.build_dir(advisor_dir), exist_ok=True)
     with open(paths.lock_path(advisor_dir), "w", encoding="utf-8") as f:
         json.dump(lock, f, ensure_ascii=False, indent=2)
+    # Якорь ВНЕ подменяемой папки: легитимная сборка регистрирует голову в gov_heads.json
+    # (корень доски) — verify_advisor ловит подмену советника ЦЕЛИКОМ (самосогласованный
+    # двойник несёт свои lock'и, но якорь унести не может). Советник вне корня → no-op.
+    from governance import register_head
+    register_head(advisor_dir, lock["gov_head"], n=len(chunks))
     return lock

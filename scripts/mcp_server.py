@@ -177,6 +177,7 @@ def _validate_session_attribution(session):
 def _retrieve(query, advisor_dir, top_k=3):
     import eval as _eval                     # ленивый импорт (тянет corpusbuild/engine)
     import relevance_gate
+    import lang_check
     adv_res = _resolve(advisor_dir)
     passages = _eval.retrieve(query, adv_res, top_k=top_k)
     # Borderline-гейт релевантности: топически-близкий-но-не-отвечающий пассаж (камуфляж
@@ -186,7 +187,8 @@ def _retrieve(query, advisor_dir, top_k=3):
     passages = [relevance_gate.gate_passage(query, p, adv_res, cfg=gcfg) for p in passages]
     # Point-of-use директива: салиентнее правила в instructions. Хост склонен перефразировать
     # пассаж и потом удивляться 🟡 → выдумывать «дефект корпуса». Гасим в момент выдачи.
-    return {"passages": passages,
+    out = lang_check.mismatch(query, adv_res) or {}   # §1.3: мисматч языка → явная директива
+    out.update({"passages": passages,
             "how_to_quote": ("Чтобы цитата получила 🔵: возьми поле `text` пассажа ДОСЛОВНО (буква в "
                              "букву) в quote.text, `source` → quote.source, затем fidelity_check "
                              "подтвердит 🔵. НЕ перефразируй и НЕ переводи текст до гейта — пересказ → "
@@ -194,7 +196,8 @@ def _retrieve(query, advisor_dir, top_k=3):
                              "том, что ты считал дословным — значит текст НЕ точный (перевёл/сократил), "
                              "а НЕ «дефект корпуса»: возьми ровно строку `text` из этого ответа. "
                              "Пассаж с `relevance_gated:true` — топически связан, но НЕ отвечает на "
-                             "вопрос: НЕ подавай его как 🔵, трактуй как 🟡-экстраполяцию.")}
+                             "вопрос: НЕ подавай его как 🔵, трактуй как 🟡-экстраполяцию.")})
+    return out
 
 
 def _kernel_themes(advisor_dir, limit=6):
@@ -226,6 +229,7 @@ def _cite(advisor_dir, query, top_k=8, use_kernels=True, limit=4):
     Пул дедуплицируется, КАЖДЫЙ пассаж через гейт, отдаём список дословных (🔵 раньше 🟢). Нет → []."""
     import eval as _eval
     import relevance_gate
+    import lang_check
     adv_res = _resolve(advisor_dir)
     queries = [query] if isinstance(query, str) else [q for q in (query or []) if q]
     # Судить релевантность против РЕАЛЬНОГО вопроса юзера, НЕ против кернел-тем (те — recall-
@@ -287,17 +291,21 @@ def _cite(advisor_dir, query, top_k=8, use_kernels=True, limit=4):
     # отбор — по косинусу; ПОДАЧА — 🔵 (первоисточник) раньше 🟢 (комментарий), стабильно
     ranked = ([q for q in selected if q["marker"] == "🔵"]
               + [q for q in selected if q["marker"] != "🔵"])
+    # §1.3: мисматч языка primary-запроса ↔ корпус → явная директива (перевод — ризонинг хоста)
+    out = lang_check.mismatch(primary, adv_res) or {}
     if ranked:
         b = ranked[0]
-        return {"quotes": ranked,
+        out.update({"quotes": ranked,
                 "best": {"quote": {"text": b["text"], "source": b["source"]}, "marker": b["marker"]},
                 "note": ("Вставь любой из `quotes` как есть в opinion.quote (marker подтверждён гейтом). "
                          "НЕ переписывай text; перевод — в quote.translation. Запрос давай в ЯЗЫКЕ "
                          "КОРПУСА (для этих советников — English) и можно списком формулировок — "
-                         "находок больше.")}
-    return {"quotes": [], "best": None, "marker": "🟡",
+                         "находок больше.")})
+        return out
+    out.update({"quotes": [], "best": None, "marker": "🟡",
             "note": ("Дословного нет — НЕ выдумывай, иди 🟡. Дай query в языке корпуса (English) "
-                     "или другой формулировкой; гейт исправен.")}
+                     "или другой формулировкой; гейт исправен.")})
+    return out
 
 
 _KNOWN_CONFIG = ("retrieval_mode", "abstain_threshold", "hybrid_alpha",

@@ -12,6 +12,27 @@ def test_report_has_tier_line(monkeypatch, capsys):
     assert "SIMPLE" in out and "ollama" in out
 
 
+def test_cli_main_runs_full_healthcheck(capsys):
+    # MEDIUM #2 pre-publish: `python3 scripts/doctor.py` должен гнать ПОЛНЫЙ run_doctor
+    # (контур-самотест + gov-anchor + hint), а не усечённый report() (только тир).
+    import doctor
+    doctor.main([])
+    out = capsys.readouterr().out
+    assert "contour" in out          # самотест рва виден
+    assert "gov-anchor" in out       # якорь целостности виден
+    assert ("Всё в порядке" in out or "требует внимания" in out)  # человеч. hint
+
+
+def test_cli_main_tier_flag_keeps_legacy_report(monkeypatch, capsys):
+    # Обратная совместимость: --tier по-прежнему отдаёт короткий отчёт о тире.
+    from engine.semantic import SemanticEngine
+    monkeypatch.setattr(SemanticEngine, "available", staticmethod(lambda: False))
+    import doctor
+    doctor.main(["--tier"])
+    out = capsys.readouterr().out
+    assert "SIMPLE" in out and "ollama" in out
+
+
 # --- расширенный health-check (юзер с нуля: «работает ли у меня?») ---
 from doctor import check_python, check_skill_installed, check_contour, summarize
 

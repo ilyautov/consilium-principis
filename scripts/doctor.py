@@ -240,5 +240,24 @@ def report():
         print("  поднять до FULL: запустить ollama + `ollama pull bge-m3`, затем build_index")
 
 
+def main(argv=None):
+    """CLI-вход: ПОЛНЫЙ health-check (run_doctor) — то, что обещает докстринг модуля и что
+    делают board.py doctor / MCP-тул doctor. `--tier` оставляет короткий legacy-отчёт report()."""
+    import argparse
+    ap = argparse.ArgumentParser(description="Consilium-Principis — доктор («работает ли у меня?»)")
+    ap.add_argument("--tier", action="store_true", help="только короткий отчёт о тире ретрива (legacy)")
+    ap.add_argument("--root", default=".", help="корень доски (по умолчанию текущая папка)")
+    args = ap.parse_args(argv)
+    if args.tier:
+        report()
+        return
+    res = run_doctor(args.root)
+    print("Consilium-Principis — доктор:", "✅ здоров" if res["healthy"] else "⚠️  требует внимания")
+    for c in res["checks"]:
+        mark = "✓" if c["ok"] else "✗"
+        print(f"  {mark} {c['name']}: {c['detail']}")
+    print(f"\n{res['hint']}")
+
+
 if __name__ == "__main__":
-    report()
+    main()

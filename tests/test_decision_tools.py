@@ -242,3 +242,70 @@ def test_save_slug_attacks_rejected(board_root, bad):
 def test_save_slug_non_string_rejected(board_root):
     r = dispatch("save_decision_map", {"map": _valid_map(), "slug": 42, "n": 100})
     assert "error" in r and not (board_root / "decisions").exists()
+
+
+# ── §4.3: calculation-блок сессии → строка «Прогноз: 📐» в outcome_nudge ─────
+
+def _synth_session(**extra):
+    s = {"question": "q", "synthesis": "вердикт",
+         "advisors": [{"name": "М", "opinions": [{"marker": "yellow", "argument": "a"}]}]}
+    s.update(extra)
+    return s
+
+
+# Бэк-компат пин: без calculation нудж обязан быть БАЙТ-В-БАЙТ прежним (§4.3 как внедрён)
+_BASE_NUDGE = ("Синтез выдан — предложи замкнуть петлю исхода. ОДИН РАЗ, одной строкой, предложи "
+               "юзеру занести решение в журнал; согласился — допиши в principis.md (раздел "
+               "«Журнал решений») запись:\n"
+               "### <дата> · <решение в 3-5 словах>\n"
+               "- Решение: <что решил и почему (rationale)>\n"
+               "- Подача: светлая|тёмная\n"
+               "- **ИСХОД: ⏳ pending**\n"
+               "Отказался или промолчал — НЕ повторяй и не дави: запись — его жест. Висящие ⏳ "
+               "потом всплывут через loop_status — так петля закрывается.")
+
+
+def test_nudge_without_calculation_is_byte_identical():
+    md = dispatch("render_session", {"session": _synth_session(), "surface": "md"})
+    assert md["outcome_nudge"] == _BASE_NUDGE
+
+
+def test_nudge_with_calculation_journal_line_extends_template():
+    jl = "- Прогноз: 📐 лучший вариант — «X»: P(лучший) 0.83 (карта: decisions/2026-07-02-x.json)"
+    s = _synth_session(calculation={"journal_line": jl})
+    md = dispatch("render_session", {"session": s, "surface": "md"})
+    n = md["outcome_nudge"]
+    assert jl in n
+    assert n.index("Прогноз: 📐") < n.index("**ИСХОД")     # прогноз — строка записи, перед исходом
+    assert md["content"]                                   # calculation-блок не ломает рендер
+    w = dispatch("render_session", {"session": s, "surface": "widget"})
+    assert jl in w["outcome_nudge"]                        # не зависит от surface
+
+
+def test_nudge_with_predicted_only_builds_line():
+    s = _synth_session(calculation={"predicted": "лучший вариант — «X»: P(лучший) 0.70"})
+    n = dispatch("render_session", {"session": s, "surface": "md"})["outcome_nudge"]
+    assert "- Прогноз: 📐 лучший вариант — «X»" in n
+
+
+def test_nudge_with_garbage_calculation_falls_back_to_base():
+    for junk in ({"foo": 1}, "строка", 42, {"journal_line": "   "}, None):
+        s = _synth_session(calculation=junk)
+        md = dispatch("render_session", {"session": s, "surface": "md"})
+        assert md["outcome_nudge"] == _BASE_NUDGE          # мусор → прежний нудж, не падение
+
+
+def test_no_nudge_on_roundtable_even_with_calculation():
+    # ход без синтеза нуджа не несёт — calculation этого не меняет (не шумим на каждый ход)
+    s = _synth_session(calculation={"journal_line": "- Прогноз: 📐 x"})
+    del s["synthesis"]
+    s["questions"] = ["что болит?"]
+    assert "outcome_nudge" not in dispatch("render_session", {"session": s, "surface": "widget"})
+
+
+def test_save_journal_line_flows_into_nudge(board_root):
+    # сквозной: save_decision_map → journal_line → calculation-блок сессии → нудж с прогнозом
+    saved = dispatch("save_decision_map", {"map": _valid_map(), "slug": "flow", "n": 100})
+    s = _synth_session(calculation={"journal_line": saved["journal_line"]})
+    n = dispatch("render_session", {"session": s, "surface": "md"})["outcome_nudge"]
+    assert saved["path"] in n and "Прогноз: 📐" in n

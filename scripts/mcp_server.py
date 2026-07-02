@@ -1065,6 +1065,23 @@ def _save_decision_map(map, slug=None, seed=_CALC_SEED_DEFAULT, n=None):
                      "в render_session — outcome_nudge сам расширится прогнозом.")}
 
 
+def _calc_forecast_line(calculation):
+    """Ф2×§4.3: опциональный calculation-блок канона сессии → строка «- Прогноз: 📐 …»
+    для шаблона записи в outcome_nudge. Канал детекции — ЯВНЫЙ: хост кладёт в сессию
+    calculation={journal_line} (из save_decision_map) или {predicted} (из run_calculation
+    до сохранения). Нет блока / мусор → None — нудж остаётся байт-в-байт прежним (бэк-компат)."""
+    if not isinstance(calculation, dict):
+        return None
+    jl = calculation.get("journal_line")
+    if isinstance(jl, str) and jl.strip():
+        line = jl.strip()
+        return line if line.startswith("-") else "- " + line
+    pred = calculation.get("predicted")
+    if isinstance(pred, str) and pred.strip():
+        return "- Прогноз: 📐 " + pred.strip()
+    return None
+
+
 def _render_session(session, surface="md", depth="plain", kind="session"):
     """Ход заседания → строка под surface. Контур/гейт 🔵 проходят ДО рендера; тут чистая презентация.
     kind: session (любой ход — реакции+вопросы ИЛИ синтез, авто по наличию synthesis) | opening
@@ -1079,13 +1096,17 @@ def _render_session(session, surface="md", depth="plain", kind="session"):
     # §4.3 замыкание петли: «синтез выдан» = естественный конец заседания → point-of-use нудж
     # записать решение (салиентнее правила в instructions). Только на synthesis-ходе: опенинг и
     # ходы круглого стола (без synthesis) нуджа НЕ несут — исследующие сессии не шумим.
+    # Ф2: сессия с calculation-блоком ({journal_line} из save_decision_map или {predicted}
+    # из run_calculation) расширяет шаблон записи строкой прогноза; без него — байт-в-байт прежний.
+    forecast = _calc_forecast_line(session.get("calculation")) if isinstance(session, dict) else None
     nudge = ("Синтез выдан — предложи замкнуть петлю исхода. ОДИН РАЗ, одной строкой, предложи "
              "юзеру занести решение в журнал; согласился — допиши в principis.md (раздел "
              "«Журнал решений») запись:\n"
              "### <дата> · <решение в 3-5 словах>\n"
              "- Решение: <что решил и почему (rationale)>\n"
              "- Подача: светлая|тёмная\n"
-             "- **ИСХОД: ⏳ pending**\n"
+             + (forecast + "\n" if forecast else "")
+             + "- **ИСХОД: ⏳ pending**\n"
              "Отказался или промолчал — НЕ повторяй и не дави: запись — его жест. Висящие ⏳ "
              "потом всплывут через loop_status — так петля закрывается.") \
         if kind != "opening" and session.get("synthesis") else None

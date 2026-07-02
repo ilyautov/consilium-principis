@@ -247,6 +247,41 @@ def test_division_by_zero_fails_whole_run():
         mc_run(m, seed=42, n=200)
 
 
+def test_overflow_to_inf_fails_whole_run_in_russian():
+    # 1e308 * 1e308 → inf на eval: расчёт падает RU-ошибкой, НЕ сырым
+    # OverflowError из fsum и НЕ тихим nan в выходе (review C1, вектор 2)
+    m = _map([_cont("x", 1e308, 1e308, 1e308)], {"a": "x * x", "b": "0"})
+    with pytest.raises(ValueError) as e:
+        mc_run(m, seed=42, n=100)
+    msg = str(e.value)
+    assert any("а" <= ch <= "я" or ch == "ё" for ch in msg.lower())
+
+
+def test_inf_minus_inf_nan_fails_whole_run():
+    # inf - inf → nan: тихо ронял ΣP(best)=1 (winners пуст) и mean=nan
+    # (review C1, вектор 3) — теперь fail-closed
+    m = _map([_cont("x", 1e308, 1e308, 1e308)], {"a": "x * x - x * x", "b": "0"})
+    with pytest.raises(ValueError) as e:
+        mc_run(m, seed=42, n=100)
+    msg = str(e.value)
+    assert any("а" <= ch <= "я" or ch == "ё" for ch in msg.lower())
+
+
+def test_infinite_literal_map_rejected_at_validation():
+    # 1e999 в формуле карты (review C1, вектор 1) — режется гейтом validate_map,
+    # который mc_run гоняет сам
+    m = _map([_cont("x", 0, 1, 2)], {"a": "x * 1e999", "b": "0"})
+    with pytest.raises(ValueError) as e:
+        mc_run(m, seed=42, n=100)
+    assert "не проходит гейты" in str(e.value)
+
+
+def test_no_nan_or_inf_in_healthy_output():
+    # санити: валидный расчёт не содержит nan/inf нигде в json
+    out = json.dumps(mc_run(_spec_map(), seed=42, n=1000))
+    assert "NaN" not in out and "Infinity" not in out
+
+
 def test_bad_n_and_seed_rejected():
     with pytest.raises(ValueError):
         mc_run(_spec_map(), seed=42, n=0)

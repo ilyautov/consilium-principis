@@ -8,7 +8,8 @@
 
 Гейты (спека §2):
   • каждая uncertainty имеет `confirmed_by_user: true` — все числа юзерские;
-  • continuous: числовые min <= mode <= max; event: prob в [0,1];
+  • continuous: КОНЕЧНЫЕ числовые min <= mode <= max; event: prob в [0,1]
+    (inf/nan — отказ: non-finite магнитуда отравила бы расчёт, review I1);
   • kind только continuous|event (YAGNI: других видов в v1 нет);
   • stakes (metric + direction max|min) и horizon присутствуют;
   • >= 2 options, среди них статус-кво;
@@ -30,6 +31,7 @@
   • `elicited` НЕ гейтится кодом: честность цитаты — host-тир (спека §8),
     правило уровня INSTRUCTIONS (Ф2), аудит-механика — кандидат в Ф5+.
 """
+import math
 import os
 import sys
 
@@ -54,8 +56,16 @@ MODEL_WORDS_KEY = "words"
 
 
 def _is_number(v):
-    """Число модели: int/float, НЕ bool (bool — подкласс int, но True — не величина)."""
-    return isinstance(v, (int, float)) and not isinstance(v, bool)
+    """Число модели: КОНЕЧНЫЙ int/float, НЕ bool (bool — подкласс int, но True — не
+    величина). inf/nan и int крупнее float-диапазона отвергаются (review I1):
+    non-finite магнитуда в min/mode/max/prob отравила бы «📐 расчёт» — гейт обязан
+    донести это вопросом совета, а не глубинный runtime стектрейсом."""
+    if not isinstance(v, (int, float)) or isinstance(v, bool):
+        return False
+    try:
+        return math.isfinite(v)
+    except OverflowError:
+        return False
 
 
 def _nonempty_str(v):
@@ -91,14 +101,14 @@ def _validate_uncertainty(u, idx, errors):
         prob = u.get("prob")
         if not _is_number(prob) or not (0.0 <= prob <= 1.0):
             errors.append(
-                "У события %s вероятность prob должна быть числом от 0 до 1 — "
+                "У события %s вероятность prob должна быть конечным числом от 0 до 1 — "
                 "сейчас: %r." % (label, prob))
     else:  # continuous
         lo, mode, hi = u.get("min"), u.get("mode"), u.get("max")
         if not (_is_number(lo) and _is_number(mode) and _is_number(hi)):
             errors.append(
-                "У величины %s нужны числовые min/mode/max (худший реалистичный / "
-                "типичный / лучший) — сейчас: min=%r, mode=%r, max=%r."
+                "У величины %s нужны конечные числовые min/mode/max (худший "
+                "реалистичный / типичный / лучший) — сейчас: min=%r, mode=%r, max=%r."
                 % (label, lo, mode, hi))
         elif not (lo <= mode <= hi):
             errors.append(

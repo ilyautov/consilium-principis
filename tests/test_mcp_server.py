@@ -404,7 +404,7 @@ def test_render_session_no_nudge_before_synthesis():
 
 
 def test_board_status_surfaces_pending_outcomes(tmp_path, monkeypatch):
-    # старт сессии = board_status (правило 8) → висящие решения видны сразу
+    # старт сессии = board_status (правило 9) → висящие решения видны сразу
     import mcp_server
     (tmp_path / "principis.md").write_text(_JOURNAL_PENDING, encoding="utf-8")
     monkeypatch.setattr(mcp_server, "_root", lambda: str(tmp_path))

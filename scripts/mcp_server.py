@@ -755,6 +755,10 @@ def _add_source(advisor_dir, url=None, text=None, path=None, basename=None,
         out["adjustments"] = [{"phrase": "только его слова", "mode": "clean"},
                               {"phrase": "доверять всему этому изданию как словам автора", "mode": "raw"}]
         out["needs_host_review"] = report["needs_host_review"]
+        if report["needs_host_review"]:                # хосту: ПОЧЕМУ и ЧТО именно сверить (#55)
+            out["review_reasons"] = report["review_reasons"]
+            if report["signals"].get("back_candidate"):
+                out["back_candidate"] = report["signals"]["back_candidate"]
     elif effective == "clean":
         out["hint"] = "Добавил только слова автора (🔵); комментарий и служебные разделы убраны."
     else:

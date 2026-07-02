@@ -96,3 +96,103 @@ def test_lock_head_catches_corpus_tampering(tmp_path):
         f.write(json.dumps({"text": "INJECTED", "tier": "P1", "source": "x"}, ensure_ascii=False) + "\n")
     bad = _verify_corpus(cj, expected_head=head)
     assert bad["tampered"] is True and bad["ok"] is False    # голова ≠ эталон → поймано
+
+
+# ─────────────── якорь ВНЕ подменяемой папки (gov_heads.json, защита от «шипованного» корпуса) ───────────────
+
+def _built_advisor(root, name, body):
+    """Собрать советника под root через легитимный pipeline (write_lock регистрирует якорь)."""
+    from corpusbuild import pipeline
+    adv = os.path.join(root, "advisors", name)
+    os.makedirs(os.path.join(adv, "sources"))
+    with open(os.path.join(adv, "sources", "x.txt"), "w", encoding="utf-8") as f:
+        f.write(body)
+    pipeline.build(adv)
+    return adv
+
+
+def test_anchor_detects_self_consistent_whole_dir_swap(tmp_path, monkeypatch):
+    # Противник подменяет ВСЮ папку советника самосогласованным двойником: corpus.jsonl +
+    # build.lock.json + corpus.lock.json сходятся между собой → внутренние проверки проходят.
+    # Якорь в gov_heads.json (корень доски, ВНЕ папки) обязан поймать подмену целиком.
+    import shutil
+    from corpusbuild import paths as cp
+    from governance import verify_advisor, freeze
+    root = str(tmp_path)
+    monkeypatch.setattr(cp, "project_root", lambda: root)     # корень доски = tmp (легит. сборка регистрирует)
+    adv = _built_advisor(root, "sage", "Первый принцип стратегии.\nВторая строка канона.\n")
+    ok = verify_advisor(adv, root=root)
+    assert ok["ok"] and ok["anchor_match"] is True and ok["swap_suspect"] is False
+
+    fake = _built_advisor(root, "fake-twin", "ШИПОВАННЫЙ текст противника.\nЕщё строка яда.\n")
+    freeze(fake, root=root)                                   # у двойника есть и corpus.lock.json
+    # подмена ЦЕЛИКОМ: перенести самосогласованные артефакты двойника в папку жертвы
+    shutil.copy(cp.corpus_path(fake), cp.corpus_path(adv))
+    shutil.copy(cp.lock_path(fake), cp.lock_path(adv))
+    shutil.copy(cp.head_lock_path(fake), cp.head_lock_path(adv))
+    bad = verify_advisor(adv, root=root)
+    assert bad["broken"] is None                              # цепь двойника САМОсогласована...
+    assert bad["head_match"] is True                          # ...и внутренние lock'и сходятся...
+    assert bad["swap_suspect"] is True                        # ...но якорь снаружи ловит подмену
+    assert bad["tampered"] is True and bad["ok"] is False
+
+
+def test_legit_rebuild_updates_anchor(tmp_path, monkeypatch):
+    from corpusbuild import pipeline, paths as cp
+    from governance import verify_advisor, load_registry
+    root = str(tmp_path)
+    monkeypatch.setattr(cp, "project_root", lambda: root)
+    adv = _built_advisor(root, "sage", "Старый корпус советника.\n")
+    old = load_registry(root)["advisors/sage"]["gov_head"]
+    with open(os.path.join(adv, "sources", "x.txt"), "w", encoding="utf-8") as f:
+        f.write("Новый легитимный корпус после пересборки.\n")
+    pipeline.build(adv)                                       # легитимная пересборка
+    new = load_registry(root)["advisors/sage"]["gov_head"]
+    assert new != old                                         # якорь обновился вместе со сборкой
+    res = verify_advisor(adv, root=root)
+    assert res["ok"] and res["anchor_match"] is True          # и сверка снова зелёная
+
+
+def test_unregistered_anchor_is_warning_not_fail(tmp_path):
+    # Миграция: советник без записи в реестре (или вовсе без gov_heads.json) — НЕ провал.
+    from governance import verify_advisor
+    adv = _built_advisor(str(tmp_path), "legacy", "Корпус до эпохи якорей.\n")
+    # реестра в tmp_path нет (write_lock с реальным project_root пропустил внешний каталог)
+    res = verify_advisor(adv, root=str(tmp_path))
+    assert res["ok"] is True and res["tampered"] is False
+    assert res["anchor_registered"] is False and res["anchor_match"] is None
+    assert res["swap_suspect"] is False
+
+
+def test_register_head_skips_advisor_outside_root(tmp_path):
+    # Советник ВНЕ корня доски: якорить нечем — no-op, реестр не создаётся (нет мусорных ключей).
+    from governance import register_head, registry_path
+    outside = tmp_path / "elsewhere" / "adv"
+    os.makedirs(outside)
+    root = str(tmp_path / "board")
+    os.makedirs(root)
+    assert register_head(str(outside), "deadbeef", root=root) is None
+    assert not os.path.exists(registry_path(root))
+
+
+def test_freeze_registers_anchor_one_shot(tmp_path):
+    # Владельческий one-shot: freeze пишет corpus.lock.json И регистрирует якорь в gov_heads.json.
+    from governance import freeze, anchored_head_for, verify_advisor
+    root = str(tmp_path)
+    adv = _built_advisor(root, "legacy", "Старый советник получает якорь одним шагом.\n")
+    fr = freeze(adv, root=root)
+    assert fr["anchored"] is True and fr["anchor_key"] == "advisors/legacy"
+    assert anchored_head_for(adv, root=root) == fr["gov_head"]
+    res = verify_advisor(adv, root=root)
+    assert res["ok"] and res["anchor_match"] is True
+
+
+def test_corrupt_registry_treated_as_missing(tmp_path):
+    # Кривой gov_heads.json (не-JSON / не-dict) → как отсутствующий: предупреждение, не крэш.
+    from governance import verify_advisor, registry_path
+    root = str(tmp_path)
+    adv = _built_advisor(root, "sage", "Корпус при сломанном реестре.\n")
+    with open(registry_path(root), "w", encoding="utf-8") as f:
+        f.write("НЕ JSON ВООБЩЕ {")
+    res = verify_advisor(adv, root=root)
+    assert res["ok"] is True and res["anchor_registered"] is False

@@ -72,3 +72,48 @@ def test_advisory_failure_does_not_drop_healthy():
 
 def test_check_skill_installed_is_advisory():
     assert check_skill_installed(skills_home="/nonexistent").get("advisory") is True
+
+
+# ─────────────── gov-anchor: подмена советника целиком видна врачу ───────────────
+
+def _build_under(root, name, body):
+    from corpusbuild import pipeline
+    adv = os.path.join(root, "advisors", name)
+    os.makedirs(os.path.join(adv, "sources"))
+    with open(os.path.join(adv, "sources", "x.txt"), "w", encoding="utf-8") as f:
+        f.write(body)
+    pipeline.build(adv)
+    return adv
+
+
+def test_gov_anchor_mismatch_is_loud_failure(tmp_path):
+    # Якорь есть, но голова не совпала (симуляция подмены целиком) → громкий провал по-русски.
+    from doctor import check_gov_anchors
+    from governance import registry_path
+    root = str(tmp_path)
+    _build_under(root, "sage", "Настоящий корпус советника.\n")
+    with open(registry_path(root), "w", encoding="utf-8") as f:
+        json.dump({"advisors/sage": {"gov_head": "0" * 64, "n": 1}}, f)
+    c = check_gov_anchors(root)
+    assert c["ok"] is False
+    assert "подменена целиком" in c["detail"] and "advisors/sage" in c["detail"]
+
+
+def test_gov_anchor_unregistered_is_warning_not_fail(tmp_path):
+    # Реестра нет (старый советник) → предупреждение с шагом регистрации, здоровье не падает.
+    from doctor import check_gov_anchors
+    root = str(tmp_path)
+    _build_under(root, "legacy", "Корпус до эпохи якорей.\n")
+    c = check_gov_anchors(root)
+    assert c["ok"] is True
+    assert "не зарегистрирован" in c["detail"] and "freeze" in c["detail"]
+
+
+def test_gov_anchor_match_is_quiet_ok(tmp_path):
+    from doctor import check_gov_anchors
+    from governance import freeze
+    root = str(tmp_path)
+    adv = _build_under(root, "sage", "Корпус с закреплённым якорем.\n")
+    freeze(adv, root=root)
+    c = check_gov_anchors(root)
+    assert c["ok"] is True and "якорь совпал: 1" in c["detail"]

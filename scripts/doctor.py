@@ -142,6 +142,47 @@ def check_contour(advisor_dir):
             "detail": "✓ дословный→🔵, фейк→fail-closed" if ok else "✗ рв не держит — проверь корпус/тиры"}
 
 
+def check_gov_anchors(root="."):
+    """Якорь целостности (gov_heads.json в корне доски) против подмены советника ЦЕЛИКОМ.
+    Три исхода на советника: якорь совпал (тихо ок) · якорь НЕ совпал (громкий провал:
+    «цепь подменена целиком?») · якорь не зарегистрирован (предупреждение, НЕ провал —
+    миграция: старые советники регистрируются одноразовым `governance.py freeze <dir>`)."""
+    try:
+        from corpusbuild.paths import corpus_path
+        from governance import verify_advisor
+        swapped, unregistered, verified = [], [], 0
+        for sub in ("advisors", "lenses"):
+            base = os.path.join(root, sub)
+            if not os.path.isdir(base):
+                continue
+            for d in sorted(os.listdir(base)):
+                p = os.path.join(base, d)
+                if not (os.path.isdir(p) and os.path.isfile(corpus_path(p))):
+                    continue
+                res = verify_advisor(p, root=root)
+                if res is None:
+                    continue
+                if res.get("swap_suspect") or res.get("anchor_match") is False:
+                    swapped.append(f"{sub}/{d}")
+                elif not res.get("anchor_registered"):
+                    unregistered.append(f"{sub}/{d}")
+                else:
+                    verified += 1
+        if swapped:
+            return {"name": "gov-anchor", "ok": False,
+                    "detail": ("✗ цепь подменена целиком? Советник самосогласован, но не совпадает "
+                               f"с якорем доски: {', '.join(swapped)} — не доверяй цитатам, пересобери "
+                               "из доверенных источников")}
+        parts = [f"✓ якорь совпал: {verified}"] if verified else []
+        if unregistered:
+            parts.append("якорь не зарегистрирован (предупреждение): " + ", ".join(unregistered) +
+                         " — закрепи: python scripts/governance.py freeze <dir>")
+        return {"name": "gov-anchor", "ok": True,
+                "detail": "; ".join(parts) if parts else "пропущен (нет собранных советников)"}
+    except Exception as e:                             # диагностика не должна ронять doctor
+        return {"name": "gov-anchor", "ok": True, "detail": f"не определено ({e})"}
+
+
 def summarize(checks):
     # healthy = по СОДЕРЖАТЕЛЬНЫМ чекам; advisory (skill-installed) не роняет здоровье —
     # in-place из репо / MCP-режим работают без глобальной установки. Чек виден, но не блокирует.
@@ -154,7 +195,7 @@ def run_doctor(root="."):
     """Полный health-check. Контур тестируем на первом советнике с корпусом."""
     from corpusbuild.paths import corpus_path
     checks = [check_python(), check_skill_installed(), check_tier(), check_judge(),
-              check_calibration(root)]
+              check_calibration(root), check_gov_anchors(root)]
     adv_root = os.path.join(root, "advisors")
     tested = False
     if os.path.isdir(adv_root):

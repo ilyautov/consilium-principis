@@ -245,3 +245,150 @@ def test_register_head_atomic_no_partial_file_on_failure(tmp_path, monkeypatch):
     assert status == "ok" and reg["advisors/a"]["gov_head"] == "HEAD_ONE"
     leftovers = [f for f in os.listdir(root) if f.startswith(".gov_heads.")]
     assert leftovers == []
+
+
+# ─────────────── РАЗДЕЛЕНИЕ РЕЕСТРА ПО ШИПУЕМОСТИ (приватность/копирайт-файрвол) ───────────────
+# gov_heads.json ТРЕКАЕТСЯ и едет в public-репо/инсталл → в нём ТОЛЬКО шипуемое (lenses/* PD/CC).
+# Приватные советники (advisors/* = реальные живые люди) якорятся в gov_heads.local.json —
+# GITIGNORED, per-user. Один git add -A не должен утащить имена реальных людей в git.
+
+def test_register_private_advisor_lands_in_local_not_tracked(tmp_path):
+    from governance import (register_head, registry_path, local_registry_path,
+                            _read_registry_file)
+    root = str(tmp_path)
+    register_head(os.path.join(root, "advisors", "real-person"), "PRIVHEAD", n=7, root=root)
+    # приватный якорь — в ЛОКАЛЬНОМ (gitignored) файле
+    ls, local = _read_registry_file(local_registry_path(root))
+    assert ls == "ok" and local["advisors/real-person"]["gov_head"] == "PRIVHEAD"
+    # трекаемый файл НЕ создан / НЕ содержит приватных ключей
+    ts, tracked = _read_registry_file(registry_path(root))
+    assert "advisors/real-person" not in tracked
+    assert not os.path.exists(registry_path(root)) or all(
+        not k.startswith("advisors/") for k in tracked)
+
+
+def test_register_shippable_lens_lands_in_tracked_not_local(tmp_path):
+    from governance import (register_head, registry_path, local_registry_path,
+                            _read_registry_file)
+    root = str(tmp_path)
+    register_head(os.path.join(root, "lenses", "strategist"), "LENSHEAD", n=31, root=root)
+    ts, tracked = _read_registry_file(registry_path(root))
+    assert ts == "ok" and tracked["lenses/strategist"]["gov_head"] == "LENSHEAD"
+    # локальный файл не задет шипуемой линзой
+    assert not os.path.exists(local_registry_path(root))
+
+
+def test_verify_advisor_reads_union_private_anchor_from_local(tmp_path, monkeypatch):
+    # Приватный советник, собранный легит-сборкой → якорь в local; verify обязан читать ОБЪЕДИНЕНИЕ
+    # (local ∪ tracked) и находить его. Трекаемый файл при этом чист от приватного имени.
+    from corpusbuild import paths as cp
+    from governance import (verify_advisor, registry_path, local_registry_path,
+                            _read_registry_file, anchored_head_for)
+    root = str(tmp_path)
+    monkeypatch.setattr(cp, "project_root", lambda: root)
+    adv = _built_advisor(root, "real-person", "Приватный корпус живого человека.\n")
+    # якорь ушёл в local, tracked чист от advisors/*
+    ls, local = _read_registry_file(local_registry_path(root))
+    assert "advisors/real-person" in local
+    ts, tracked = _read_registry_file(registry_path(root))
+    assert all(not k.startswith("advisors/") for k in tracked)
+    # union-резолюция: verify находит якорь и сходится
+    assert anchored_head_for(adv, root=root) == local["advisors/real-person"]["gov_head"]
+    res = verify_advisor(adv, root=root)
+    assert res["ok"] and res["anchor_match"] is True and res["anchor_registered"] is True
+
+
+def test_migration_evacuates_legacy_advisors_from_tracked(tmp_path, monkeypatch):
+    # Легаси/грязное состояние: трекаемый gov_heads.json уже содержит advisors/* (ровно текущая
+    # ситуация рабочего дерева). Само-лечение при load/verify: приватные ключи переезжают в local,
+    # трекаемый переписывается БЕЗ них — один раз, прозрачно.
+    import json as _json
+    from corpusbuild import paths as cp
+    from governance import (verify_advisor, registry_path, local_registry_path,
+                            _read_registry_file)
+    root = str(tmp_path)
+    monkeypatch.setattr(cp, "project_root", lambda: root)
+    adv = _built_advisor(root, "real-person", "Приватный корпус.\n")
+    real_head = _read_registry_file(local_registry_path(root))[1]["advisors/real-person"]["gov_head"]
+    # засеять ГРЯЗНЫЙ трекаемый файл: приватный ключ + шипуемая линза (как в рабочем дереве)
+    dirty = {"advisors/real-person": {"gov_head": real_head, "n": 1},
+             "lenses/strategist": {"gov_head": "L" * 64, "n": 31}}
+    with open(registry_path(root), "w", encoding="utf-8") as f:
+        _json.dump(dirty, f)
+    # триггерим лечение (verify_advisor читает объединение и лечит)
+    verify_advisor(adv, root=root)
+    ts, tracked = _read_registry_file(registry_path(root))
+    ls, local = _read_registry_file(local_registry_path(root))
+    assert ts == "ok" and "advisors/real-person" not in tracked      # приватное эвакуировано
+    assert tracked["lenses/strategist"]["gov_head"] == "L" * 64      # шипуемое осталось
+    assert local["advisors/real-person"]["gov_head"] == real_head    # приватное живёт локально
+
+
+def test_tracked_never_gains_advisors_after_heal(tmp_path, monkeypatch):
+    # Инвариант файрвола: после лечения ни одна операция чтения/верификации не возвращает
+    # advisors/* в трекаемый файл.
+    from corpusbuild import paths as cp
+    from governance import (verify_advisor, load_registry, registry_path, _read_registry_file)
+    root = str(tmp_path)
+    monkeypatch.setattr(cp, "project_root", lambda: root)
+    adv = _built_advisor(root, "real-person", "Приватный корпус.\n")
+    load_registry(root)                                              # union-чтение
+    verify_advisor(adv, root=root)                                   # верификация
+    ts, tracked = _read_registry_file(registry_path(root))
+    assert all(not k.startswith("advisors/") for k in tracked)
+
+
+def test_local_registry_malformed_is_loud_failure(tmp_path, monkeypatch):
+    # fail-closed сохранён для ОБОИХ файлов: битый local (усечённая/оборванная приватная запись) —
+    # это ПОРЧА, не «ещё не мигрировали»; verify обязан кричать.
+    from corpusbuild import paths as cp
+    from governance import verify_advisor, local_registry_path
+    root = str(tmp_path)
+    monkeypatch.setattr(cp, "project_root", lambda: root)
+    adv = _built_advisor(root, "real-person", "Приватный корпус.\n")
+    with open(local_registry_path(root), "w", encoding="utf-8") as f:
+        f.write('{"advisors/real-person": {"gov_head": "abc"')      # усечённый JSON
+    res = verify_advisor(adv, root=root)
+    assert res["registry_malformed"] is True and res["ok"] is False
+
+
+def test_register_local_atomic_no_partial_on_failure(tmp_path, monkeypatch):
+    # Атомарная запись сохранена для local: падение json.dump не оставляет усечённый local-реестр.
+    import json as _json
+    import governance
+    from governance import register_head, local_registry_path, _read_registry_file
+    root = str(tmp_path)
+    register_head(os.path.join(root, "advisors", "a"), "HEAD_ONE", n=1, root=root)
+    assert _read_registry_file(local_registry_path(root))[0] == "ok"
+    def boom(obj, fp, **kw):
+        fp.write('{"partial": ')
+        raise IOError("disk full")
+    monkeypatch.setattr(governance.json, "dump", boom)
+    with pytest.raises(IOError):
+        register_head(os.path.join(root, "advisors", "b"), "HEAD_TWO", n=1, root=root)
+    monkeypatch.setattr(governance.json, "dump", _json.dump)
+    status, reg = _read_registry_file(local_registry_path(root))
+    assert status == "ok" and reg["advisors/a"]["gov_head"] == "HEAD_ONE"
+    assert [f for f in os.listdir(root) if f.startswith(".gov_heads.")] == []
+
+
+def test_install_does_not_ship_local_registry():
+    # Копирайт-файрвол на инсталле: RUNTIME шипует трекаемый gov_heads.json, но НИКОГДА
+    # gov_heads.local.json (приватные имена per-user).
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "install_mod", os.path.join(HERE, "..", "install.py"))
+    install = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(install)
+    assert "gov_heads.json" in install.RUNTIME
+    assert "gov_heads.local.json" not in install.RUNTIME
+
+
+def test_doctor_gov_anchor_ok_for_private_advisor_via_local(tmp_path, monkeypatch):
+    from corpusbuild import paths as cp
+    from doctor import check_gov_anchors
+    root = str(tmp_path)
+    monkeypatch.setattr(cp, "project_root", lambda: root)
+    _built_advisor(root, "real-person", "Приватный корпус, якорь в local.\n")
+    c = check_gov_anchors(root)
+    assert c["ok"] is True and "якорь совпал: 1" in c["detail"]

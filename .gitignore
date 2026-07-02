@@ -14,6 +14,9 @@ reference-library-raw/
 reference-library/
 *-raw/
 board_config.json
+# ЛОКАЛЬНЫЙ реестр якорей приватных советников (advisors/* = реальные живые люди). Трекается
+# только gov_heads.json (шипуемые lenses/*); имена приватных советников НИКОГДА не в git.
+gov_heads.local.json
 scripts/golden/
 data/embeddings*.npy
 data/embeddings*.meta.json

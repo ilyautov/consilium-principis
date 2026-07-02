@@ -22,6 +22,10 @@ P(вариант лучший); expected regret (упущенное против
   • Деление на ноль в ЛЮБОМ сценарии → падает ВЕСЬ расчёт (fail-closed):
     формула, делящаяся на ноль внутри подтверждённых диапазонов, — дефект
     модели; молча выкидывать сценарии = врать о распределении.
+  • Тот же принцип для inf/nan (review C1): не-конечный исход любого варианта
+    в любом сценарии (переполнение 1e308*1e308, inf-inf → nan) → RU-ошибка,
+    весь расчёт падает; nan иначе ТИХО ломал ΣP(best)=1 и отдавал mean=nan.
+    Второй рубеж — try/except OverflowError вокруг агрегатов (fsum/Пирсон).
   • Торнадо — ОДИН метод: impact = |корреляция Пирсона| сэмплов величины с
     исходом ЛУЧШЕГО варианта каждого сценария (то, что юзер реально получает,
     выбирая оптимально). Детерминирован, без повторных прогонов; нулевая
@@ -118,6 +122,17 @@ def mc_run(m, seed, n=N_DEFAULT):
         except SafeExprEvalError as e:
             raise ValueError("Расчёт остановлен (fail-closed): %s" % e)
 
+        # review C1: переполнение (1e308*1e308 → inf) и inf-inf → nan НЕ ошибки
+        # для питона — но nan ТИХО ломал бы ΣP(best)=1 и отдавал mean=nan, а inf
+        # ронял бы fsum сырым OverflowError. Единая точка: не-конечный исход
+        # ЛЮБОГО варианта в ЛЮБОМ сценарии → падает весь расчёт, RU-ошибкой.
+        for oid, v in values.items():
+            if not math.isfinite(v):
+                raise ValueError(
+                    "Расчёт остановлен (fail-closed): формула варианта «%s» даёт "
+                    "нечисловой исход (переполнение/бесконечность/NaN) внутри "
+                    "подтверждённых диапазонов — проверьте диапазоны и формулу." % oid)
+
         best = min(values.values()) if is_min else max(values.values())
         best_values.append(best)
         winners = [oid for oid in option_ids if values[oid] == best]
@@ -134,21 +149,29 @@ def mc_run(m, seed, n=N_DEFAULT):
                 elif (va < vb) if is_min else (va > vb):
                     pair_wins[a][b] += 1.0
 
-    options_out = {}
-    for oid in option_ids:
-        vals = sorted(o_values[oid])
-        options_out[oid] = {
-            "mean": math.fsum(vals) / n,
-            "median": _percentile(vals, 0.5),
-            "p10": _percentile(vals, 0.10),
-            "p90": _percentile(vals, 0.90),
-        }
+    # второй рубеж (review C1): даже на конечных по-сценарным исходах агрегаты
+    # (fsum, дисперсии Пирсона) могут переполниться — сырой OverflowError
+    # «intermediate overflow in fsum» не должен доехать до юзера.
+    try:
+        options_out = {}
+        for oid in option_ids:
+            vals = sorted(o_values[oid])
+            options_out[oid] = {
+                "mean": math.fsum(vals) / n,
+                "median": _percentile(vals, 0.5),
+                "p10": _percentile(vals, 0.10),
+                "p90": _percentile(vals, 0.90),
+            }
 
-    # торнадо: |corr(сэмплы величины, исход лучшего варианта сценария)|;
-    # сортировка по вкладу, при равенстве — порядок величин в карте (stable sort)
-    tornado = [{"id": u["id"], "impact": _pearson(u_samples[u["id"]], best_values)}
-               for u in uncertainties]
-    tornado.sort(key=lambda t: -t["impact"])
+        # торнадо: |corr(сэмплы величины, исход лучшего варианта сценария)|;
+        # сортировка по вкладу, при равенстве — порядок величин в карте (stable sort)
+        tornado = [{"id": u["id"], "impact": _pearson(u_samples[u["id"]], best_values)}
+                   for u in uncertainties]
+        tornado.sort(key=lambda t: -t["impact"])
+    except OverflowError:
+        raise ValueError(
+            "Расчёт остановлен (fail-closed): агрегаты переполнились — магнитуды "
+            "модели за пределами разумного, проверьте диапазоны и формулы.")
 
     return {
         "options": options_out,

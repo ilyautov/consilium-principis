@@ -126,6 +126,9 @@ def test_empty_allowed_rejects_any_name():
     "(1, 2)",
     "f'{x}'",
     "x := 1",
+    "1e999",               # литерал-inf: питон парсит как валидный float inf (review C1)
+    "1e400 + x",
+    "-1e999",
 ])
 def test_attacks_rejected(attack):
     with pytest.raises(SafeExprError):
@@ -171,6 +174,27 @@ def test_error_messages_are_russian_strings():
     assert isinstance(msg, str) and len(msg) > 0
     # человеческая формулировка — кириллица присутствует
     assert any("а" <= ch <= "я" or ch == "ё" for ch in msg.lower())
+
+
+def test_infinite_literal_rejected_with_russian_message():
+    # 1e999 — валидный для питона float-литерал со значением inf; режем на
+    # компиляции, иначе inf/nan отравляет «📐 расчёт» (review C1/I1)
+    with pytest.raises(SafeExprError) as e:
+        compile_expr("1e999", ALLOWED)
+    msg = str(e.value).lower()
+    assert any("а" <= ch <= "я" or ch == "ё" for ch in msg)
+
+
+def test_huge_int_literal_rejected():
+    # int-литерал крупнее float-диапазона: math.isfinite на нём кидает
+    # OverflowError — тоже режем на компиляции
+    with pytest.raises(SafeExprError):
+        compile_expr("9" * 400, ALLOWED)
+
+
+def test_finite_large_literal_still_allowed():
+    # конечные большие числа легальны; переполнение АРИФМЕТИКИ ловит mc_run (рубеж 2)
+    assert _ev("1e308") == 1e308
 
 
 # ── деление на ноль: ошибка на eval, не NaN ─────────────────────────────────

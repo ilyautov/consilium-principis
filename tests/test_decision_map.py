@@ -154,6 +154,30 @@ def test_missing_min_blocks():
     assert any("hours_to_ship" in e for e in errs)
 
 
+@pytest.mark.parametrize("bad", [float("inf"), float("-inf"), float("nan")])
+def test_non_finite_bounds_block(bad):
+    # inf/nan в min/mode/max отравил бы «📐 расчёт» (review I1) — гейт, не runtime
+    errs = _errors(lambda m: m["uncertainties"][1].update(mode=bad))
+    assert any("hours_to_ship" in e for e in errs)
+    errs = _errors(lambda m: m["uncertainties"][2].update(max=bad))
+    assert any("upside_hours" in e for e in errs)
+
+
+def test_non_finite_prob_blocks():
+    errs = _errors(lambda m: m["uncertainties"][0].update(prob=float("nan")))
+    assert any("traction_prob" in e for e in errs)
+    errs = _errors(lambda m: m["uncertainties"][0].update(prob=float("inf")))
+    assert any("traction_prob" in e for e in errs)
+
+
+def test_infinite_literal_in_formula_blocks():
+    # 1e999 — float-литерал inf: режется уже на валидации (через safe_expr)
+    def mut(m):
+        m["model"]["ship_public"]["expr"] = "traction_prob * 1e999"
+    errs = _errors(mut)
+    assert any("ship_public" in e for e in errs)
+
+
 @pytest.mark.parametrize("bad", ["20", None, True])
 def test_non_numeric_bound_blocks(bad):
     errs = _errors(lambda m: m["uncertainties"][1].update(mode=bad))

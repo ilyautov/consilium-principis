@@ -880,19 +880,46 @@ def _pending_outcomes(journal_text):
     return {"pending": pending_from_journal(journal_text)}
 
 
-def _loop_status(ledger):
-    from outcome_loop import loop_status
-    return loop_status(ledger)
+def _loop_status(ledger=None):
+    """§4.3: без ledger (старт новой сессии — хосту его неоткуда взять) тул САМ читает
+    существующие журналы (principis.md + advisors/*/relationship.md) и отдаёт висящие ⏳.
+    Ноль висящих → тихий минимум без hint (не шумим, где юзер просто исследует).
+    С ledger — прежний контракт (total/resolved/pending/accuracy) без изменений."""
+    from outcome_loop import loop_status, pending_from_files
+    if ledger is not None:
+        return loop_status(ledger)
+    pend = pending_from_files(_root())
+    out = {"pending": pend, "count": len(pend)}
+    if pend:
+        out["hint"] = ("У юзера %d незакрыт(ых) решений(я) — исход ещё не зафиксирован. "
+                       "МЯГКО и ОДИН РАЗ предложи вернуться: «как легло — сработало или нет?» "
+                       "Ответил — обнови запись в её файле (source): строку ИСХОД ⏳ → ✅/❌ и "
+                       "добавь «Одобрено: да/нет». Отказался/молчит — не дави." % len(pend))
+    return out
 
 
 def _board_status():
     from preflight import preflight
     from scaffold import next_step
-    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    root = _root()
     pf = preflight(root)
     ns = next_step(pf)
     # hint = тот же next_step человеческим языком — хост показывает ЕГО, не сырой preflight (тиры/чанки)
-    return {"preflight": pf, "next_step": ns, "hint": ns.get("say", "")}
+    out = {"preflight": pf, "next_step": ns, "hint": ns.get("say", "")}
+    # §4.3: старт сессии = board_status (правило 8) → висящие исходы видны сразу.
+    # Fail-closed: сбой чтения журналов НЕ роняет онбординг; ноль висящих → ключей нет (тихо).
+    try:
+        from outcome_loop import pending_from_files
+        pend = pending_from_files(root)
+    except Exception:
+        pend = []
+    if pend:
+        out["pending_outcomes"] = pend
+        out["loop_nudge"] = ("Кроме ответа юзеру: у него %d решений(я) без зафиксированного "
+                             "исхода (см. pending_outcomes). Упомяни ОДИН РАЗ, в одну строку и "
+                             "между делом («кстати, по „%s“ — как легло?»); юзер не подхватил — "
+                             "больше в этой сессии не поднимай." % (len(pend), pend[0]["title"]))
+    return out
 
 
 def _scaffold_principis(answers):
@@ -923,7 +950,23 @@ def _render_session(session, surface="md", depth="plain", kind="session"):
     if kind != "opening":                             # атрибуция (§1.1): ДО рендера, раз на объект
         session, violations, reconciliations = _validate_session_attribution(session)
 
+    # §4.3 замыкание петли: «синтез выдан» = естественный конец заседания → point-of-use нудж
+    # записать решение (салиентнее правила в instructions). Только на synthesis-ходе: опенинг и
+    # ходы круглого стола (без synthesis) нуджа НЕ несут — исследующие сессии не шумим.
+    nudge = ("Синтез выдан — предложи замкнуть петлю исхода. ОДИН РАЗ, одной строкой, предложи "
+             "юзеру занести решение в журнал; согласился — допиши в principis.md (раздел "
+             "«Журнал решений») запись:\n"
+             "### <дата> · <решение в 3-5 словах>\n"
+             "- Решение: <что решил и почему (rationale)>\n"
+             "- Подача: светлая|тёмная\n"
+             "- **ИСХОД: ⏳ pending**\n"
+             "Отказался или промолчал — НЕ повторяй и не дави: запись — его жест. Висящие ⏳ "
+             "потом всплывут через loop_status — так петля закрывается.") \
+        if kind != "opening" and session.get("synthesis") else None
+
     def _attach(out):
+        if nudge:
+            out["outcome_nudge"] = nudge
         if violations:
             out["attribution_violations"] = violations
             out["note"] = ("⛔ атрибуция: %d цитат(ы) не верифицируются корпусом СВОЕГО советника — "
@@ -1257,15 +1300,19 @@ TOOLS = {
         "handler": _pending_outcomes,
     },
     "loop_status": {
-        "description": "Сводка петли исхода: открыто/закрыто + точность прогнозов + доля одобренных. "
-                       "ledger=[{decision_id,predicted,actual,endorsed}].",
+        "description": "Петля исхода. БЕЗ аргументов (старт новой сессии): сам читает журналы "
+                       "(principis.md + relationship.md) и отдаёт висящие ⏳-решения + hint, как "
+                       "мягко предложить их закрыть; ноль висящих → тихий {count:0}. С ledger "
+                       "[{decision_id,predicted,actual,endorsed}] — сводка: открыто/закрыто + "
+                       "точность прогнозов + доля одобренных.",
         "input_schema": {"type": "object", "properties": {"ledger": {"type": "array"}},
-                         "required": ["ledger"]},
+                         "required": []},
         "handler": _loop_status,
     },
     "board_status": {
         "description": "Шасси-онбординг: что на доске готово (Принцепс/советники/линзы) + ОДИН "
-                       "приоритетный следующий шаг сборки. Зови в начале, чтобы вести юзера за руку.",
+                       "приоритетный следующий шаг сборки. Зови в начале, чтобы вести юзера за руку. "
+                       "Может вернуть pending_outcomes (решения без исхода) + loop_nudge — следуй ему.",
         "input_schema": {"type": "object", "properties": {}, "required": []},
         "handler": _board_status,
     },
@@ -1484,6 +1531,16 @@ Consilium-Principis — личный совет AI-персон реальных
    mode=clean) + пересборка; сырой файл цел. needs_host_review=true → сам сверь границы книги
    (где кончается предисловие, где начинаются приложения) и при нужде уточни их человеческим
    вопросом или передай front_until/back_from; технических полей (signals/доли) не показывай.
+
+11. ПЕТЛЯ ИСХОДА (совет — продукт, только если решения возвращаются исходами). Ненавязчиво,
+   но не теряй: (а) СТАРТ сессии — board_status/loop_status могут вернуть pending_outcomes
+   (решения с висящим ⏳): упомяни ОДИН РАЗ, одной строкой, между делом («кстати, по X — как
+   легло?»); не подхватил — в этой сессии больше не поднимай. (б) СИНТЕЗ выдан —
+   render_session вернёт outcome_nudge: один раз предложи занести решение в журнал и, если
+   юзер согласился, допиши запись по шаблону из нуджа в principis.md (раздел «Журнал решений»).
+   (в) РЕЗОЛЮЦИЯ: юзер рассказал, чем кончилось → в его записи ИСХОД ⏳ → ✅/❌ + «Одобрено:
+   да/нет» (одобрил бы задним числом?). Запись/правка журнала — только с согласия юзера
+   (это правка ЕГО модели); отказ — не дави и не повторяй.
 """
 
 

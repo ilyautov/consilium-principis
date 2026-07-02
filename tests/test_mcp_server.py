@@ -314,3 +314,98 @@ def test_build_lens_in_instructions():
 def test_unknown_tool_raises():
     with pytest.raises(KeyError):
         dispatch("nonexistent_tool", {})
+
+
+# ── §4.3 петля исхода (минимум): loop_status без леджера + outcome_nudge после синтеза ──
+
+_JOURNAL_PENDING = "## Журнал решений\n### Форум-конфликт\n- **ИСХОД: ⏳ pending**\n"
+
+
+def test_loop_status_without_ledger_reads_journal(tmp_path, monkeypatch):
+    # старт новой сессии: хосту неоткуда взять ledger → тул сам читает существующий журнал
+    import mcp_server
+    (tmp_path / "principis.md").write_text(_JOURNAL_PENDING, encoding="utf-8")
+    monkeypatch.setattr(mcp_server, "_root", lambda: str(tmp_path))
+    r = dispatch("loop_status", {})
+    assert r["count"] == 1 and r["pending"][0]["title"] == "Форум-конфликт"
+    assert "hint" in r and "исход" in r["hint"].lower()      # директива «вернись и закрой»
+
+
+def test_loop_status_zero_pending_stays_quiet(tmp_path, monkeypatch):
+    # ноль висящих → минимальный тихий ответ (не шумим в сессии, где юзер просто исследует)
+    import mcp_server
+    (tmp_path / "principis.md").write_text("### Цены\n- **ИСХОД: ✅**\n", encoding="utf-8")
+    monkeypatch.setattr(mcp_server, "_root", lambda: str(tmp_path))
+    r = dispatch("loop_status", {})
+    assert r["count"] == 0 and r["pending"] == [] and "hint" not in r
+
+
+def test_loop_status_ledger_mode_is_backcompat():
+    r = dispatch("loop_status", {"ledger": []})
+    assert r["total"] == 0 and r["endorse_rate"] is None     # прежний контракт не тронут
+
+
+def test_render_session_synthesis_carries_outcome_nudge():
+    # естественный момент «синтез выдан» → point-of-use нудж записать решение (один раз)
+    s = {"question": "q", "synthesis": "вердикт",
+         "advisors": [{"name": "М", "opinions": [{"marker": "yellow", "argument": "a"}]}]}
+    w = dispatch("render_session", {"session": s, "surface": "widget"})
+    assert "outcome_nudge" in w and "журнал" in w["outcome_nudge"].lower()
+    assert "ИСХОД: ⏳" in w["outcome_nudge"]                  # шаблон записи прямо в директиве
+    assert "не повторяй" in w["outcome_nudge"].lower()        # ненавязчивость — часть директивы
+    md = dispatch("render_session", {"session": s, "surface": "md"})
+    assert "outcome_nudge" in md                              # нудж не зависит от surface
+
+
+def test_render_session_no_nudge_before_synthesis():
+    # круглый стол ещё идёт (нет synthesis) или опенинг → нуджа НЕТ (не шумим на каждый ход)
+    s = {"question": "q", "questions": ["что болит?"],
+         "advisors": [{"name": "М", "opinions": [{"marker": "yellow", "argument": "a"}]}]}
+    assert "outcome_nudge" not in dispatch("render_session", {"session": s, "surface": "widget"})
+    o = dispatch("render_session", {"session": {"advisors": [{"name": "М"}]},
+                                    "surface": "widget", "kind": "opening"})
+    assert "outcome_nudge" not in o
+
+
+def test_board_status_surfaces_pending_outcomes(tmp_path, monkeypatch):
+    # старт сессии = board_status (правило 8) → висящие решения видны сразу
+    import mcp_server
+    (tmp_path / "principis.md").write_text(_JOURNAL_PENDING, encoding="utf-8")
+    monkeypatch.setattr(mcp_server, "_root", lambda: str(tmp_path))
+    r = dispatch("board_status", {})
+    assert [p["title"] for p in r["pending_outcomes"]] == ["Форум-конфликт"]
+    assert "loop_nudge" in r
+
+
+def test_board_status_quiet_without_pending(tmp_path, monkeypatch):
+    import mcp_server
+    monkeypatch.setattr(mcp_server, "_root", lambda: str(tmp_path))
+    r = dispatch("board_status", {})
+    assert "pending_outcomes" not in r and "loop_nudge" not in r   # ноль висящих → как раньше
+
+
+def test_outcome_loop_round_trip_record_status_resolve(tmp_path, monkeypatch):
+    # полный круг: синтез → нудж (шаблон) → хост записал → loop_status видит ⏳ →
+    # юзер закрыл исход → loop_status снова тихий
+    import mcp_server
+    monkeypatch.setattr(mcp_server, "_root", lambda: str(tmp_path))
+    j = tmp_path / "principis.md"
+    j.write_text("## Журнал решений\n", encoding="utf-8")
+    s = {"question": "выходить ли из спора", "synthesis": "выйти",
+         "advisors": [{"name": "М", "opinions": [{"marker": "yellow", "argument": "a"}]}]}
+    nudge = dispatch("render_session", {"session": s, "surface": "md"})["outcome_nudge"]
+    assert "ИСХОД: ⏳" in nudge
+    j.write_text(j.read_text(encoding="utf-8") +
+                 "\n### 2026-07-02 · выйти из спора\n- Решение: выйти\n- Почему: не моя игра\n"
+                 "- **ИСХОД: ⏳ pending**\n", encoding="utf-8")
+    st = dispatch("loop_status", {})
+    assert st["count"] == 1 and "2026-07-02" in st["pending"][0]["title"]
+    j.write_text(j.read_text(encoding="utf-8").replace(
+        "**ИСХОД: ⏳ pending**", "**ИСХОД: ✅** — сработало. Одобрено: да"), encoding="utf-8")
+    st2 = dispatch("loop_status", {})
+    assert st2["count"] == 0 and "hint" not in st2
+
+
+def test_outcome_loop_in_instructions():
+    from mcp_server import INSTRUCTIONS
+    assert "outcome_nudge" in INSTRUCTIONS and "loop_status" in INSTRUCTIONS

@@ -14,6 +14,7 @@ import sys, os, json, re, urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from corpusbuild.paths import corpus_path
+from golden_meta import meta_record
 
 OLLAMA = os.getenv("OLLAMA_HOST", "http://127.0.0.1:11434")
 GOLDEN_MODEL = os.getenv("GOLDEN_MODEL", "qwen2.5:7b")
@@ -74,6 +75,9 @@ def run(slug, k, model):
     out_path = f"scripts/golden/{slug}.auto.jsonl"
     n = 0
     with open(out_path, "w", encoding="utf-8") as fh:
+        meta = meta_record(adv)                       # §1.4: хэш корпуса на момент генерации
+        if meta:
+            fh.write(json.dumps(meta, ensure_ascii=False) + "\n")
         for c in chunks:
             anc = anchor_of(c["text"])
             if not anc:

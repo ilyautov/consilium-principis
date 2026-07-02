@@ -231,7 +231,10 @@ def retrieve(question, adv_dir, top_k=3):
     return lexical_retrieve(question, adv_dir, top_k=top_k)
 
 
-def load_golden(name, kind):
+def load_golden(name, kind, advisor_dir=None):
+    """Грузит golden-jsonl. §1.4: если файл несёт _meta-строку с хэшем корпуса (пишут
+    gen_golden/synth_eval), сравниваем с ТЕКУЩИМ корпусом и при дрейфе громко предупреждаем
+    в stderr (не падение). Легаси-файлы без meta грузятся молча, как раньше."""
     path = os.path.join(GOLDEN_DIR, f"{name}.{kind}.jsonl")
     if not os.path.isfile(path):
         return None, None
@@ -243,12 +246,17 @@ def load_golden(name, kind):
                 rows.append(json.loads(line))
             except Exception:
                 pass
+    import golden_meta
+    meta, rows = golden_meta.split_meta(rows)
+    if meta:
+        adv = advisor_dir or os.path.join(os.path.dirname(HERE), "advisors", name)
+        golden_meta.warn_on_drift(meta, adv, path=path)
     return rows, path
 
 
 def retrieval_eval(adv_dir):
     name = os.path.basename(adv_dir.rstrip("/"))
-    golden, path = load_golden(name, "retrieval")
+    golden, path = load_golden(name, "retrieval", advisor_dir=adv_dir)
     if not golden:
         return None
     top1 = top3 = 0
@@ -282,8 +290,8 @@ def abstention_eval(adv_dir, threshold):
     """Fail-closed. Для out-of-corpus вопросов: max(score)<threshold → корректный отказ.
     Ложные отказы меряем на golden-retrieval (in-corpus = «отвечаемые»)."""
     name = os.path.basename(adv_dir.rstrip("/"))
-    ooc, ooc_path = load_golden(name, "abstention")
-    answerable, _ = load_golden(name, "retrieval")
+    ooc, ooc_path = load_golden(name, "abstention", advisor_dir=adv_dir)
+    answerable, _ = load_golden(name, "retrieval", advisor_dir=adv_dir)
     if not ooc:
         return None
     # out-of-corpus: ждём отказ (max score < threshold)
@@ -314,8 +322,8 @@ def abstention_eval(adv_dir, threshold):
 def collect_abstention_scores(adv_dir):
     """Сырьё для кривой: max-скор ретрива по каждому golden-вопросу, раздельно для
     OOC (должны отказать) и answerable (должны ответить). Ретрив зовём по разу на вопрос."""
-    ooc, _ = load_golden(os.path.basename(adv_dir.rstrip("/")), "abstention")
-    answerable, _ = load_golden(os.path.basename(adv_dir.rstrip("/")), "retrieval")
+    ooc, _ = load_golden(os.path.basename(adv_dir.rstrip("/")), "abstention", advisor_dir=adv_dir)
+    answerable, _ = load_golden(os.path.basename(adv_dir.rstrip("/")), "retrieval", advisor_dir=adv_dir)
     def _max_scores(rows):
         out = []
         for row in rows or []:

@@ -345,6 +345,42 @@ def test_loop_status_ledger_mode_is_backcompat():
     assert r["total"] == 0 and r["endorse_rate"] is None     # прежний контракт не тронут
 
 
+_JOURNAL_WITH_FORECAST = ("## Журнал решений\n### Шипнуть\n"
+                          "- Прогноз: 📐 P(лучший) 0.83 (карта: decisions/x.json)\n"
+                          "- **ИСХОД: ⏳ pending**\n")
+
+
+def test_loop_status_pending_carries_predicted_and_calibration_hint(tmp_path, monkeypatch):
+    # Ф4 (§6): запись с прогнозом → pending-item несёт predicted, hint велит сравнить
+    # прогноз и факт при резолюции (расхождение = калибровка, не провал)
+    import mcp_server
+    (tmp_path / "principis.md").write_text(_JOURNAL_WITH_FORECAST, encoding="utf-8")
+    monkeypatch.setattr(mcp_server, "_root", lambda: str(tmp_path))
+    r = dispatch("loop_status", {})
+    assert r["pending"][0]["predicted"].startswith("P(лучший) 0.83")
+    assert "сравни" in r["hint"].lower() and "калибровка" in r["hint"].lower()
+    assert "не провал" in r["hint"].lower()
+
+
+def test_loop_status_hint_quiet_about_forecast_without_predicted(tmp_path, monkeypatch):
+    # fail-closed: нет строки прогноза → нет поля predicted и нет калибровочного хвоста
+    import mcp_server
+    (tmp_path / "principis.md").write_text(_JOURNAL_PENDING, encoding="utf-8")
+    monkeypatch.setattr(mcp_server, "_root", lambda: str(tmp_path))
+    r = dispatch("loop_status", {})
+    assert "predicted" not in r["pending"][0]
+    assert "калибровка" not in r["hint"].lower()
+
+
+def test_board_status_pending_carries_predicted(tmp_path, monkeypatch):
+    # board_status использует тот же сёрфейсер → predicted виден и на старте сессии
+    import mcp_server
+    (tmp_path / "principis.md").write_text(_JOURNAL_WITH_FORECAST, encoding="utf-8")
+    monkeypatch.setattr(mcp_server, "_root", lambda: str(tmp_path))
+    r = dispatch("board_status", {})
+    assert r["pending_outcomes"][0]["predicted"].startswith("P(лучший) 0.83")
+
+
 def test_render_session_synthesis_carries_outcome_nudge():
     # естественный момент «синтез выдан» → point-of-use нудж записать решение (один раз)
     s = {"question": "q", "synthesis": "вердикт",

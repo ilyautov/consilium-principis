@@ -390,6 +390,16 @@ def test_fewshot_formulas_selfconsistent_with_safe_expr():
         assert m["words"] and _has_cyrillic(m["words"])   # словесная версия — образец визирования
 
 
+def test_instructions_resolution_compares_predicted_vs_actual():
+    # Ф4 (§6): правило 11(в) — при резолюции ⏳→✅/❌ хост сравнивает прогноз и факт вслух
+    I = _instr()
+    rule11 = I.split("11. ПЕТЛЯ ИСХОДА")[1].split("12. ")[0]
+    assert "РЕЗОЛЮЦИЯ" in rule11
+    assert "Прогноз: 📐" in rule11 and "predicted" in rule11
+    low = rule11.lower()
+    assert "сравни" in low and "не провал" in low and "калибровка" in low
+
+
 def test_fewshot_covers_three_model_families():
     import mcp_server
     joined = " ".join(m["name"].lower() for m in mcp_server._FEWSHOT_MODELS)

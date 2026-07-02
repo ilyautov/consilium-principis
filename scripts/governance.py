@@ -121,7 +121,16 @@ def expected_head_for(advisor_dir):
 # советника и подменяются вместе с ней; якорь снаружи — единственная точка, которую
 # «шипованный» (самосогласованный) советник-подкидыш не может унести с собой.
 
+# РАЗДЕЛЕНИЕ ПО ШИПУЕМОСТИ (копирайт/приватность-файрвол): реестр расщеплён на два файла.
+#   • gov_heads.json (ТРЕКАЕТСЯ git, едет в public-репо и install RUNTIME) — ТОЛЬКО шипуемое:
+#     lenses/* (PD/CC-линзы). Их имена публичны по определению.
+#   • gov_heads.local.json (GITIGNORED, per-user) — advisors/* = якоря приватных советников
+#     (реальные живые люди). Имена НИКОГДА не должны попасть в git. Один `git add -A` над
+#     трекаемым файлом не может утащить приватное — оно физически в другом, игнорируемом файле.
+# Читатели (verify/doctor) берут ОБЪЕДИНЕНИЕ обоих (local дополняет/переопределяет tracked);
+# writer маршрутизирует по ключу; лечение эвакуирует легаси-advisors/* из трекаемого файла.
 REGISTRY_NAME = "gov_heads.json"
+LOCAL_REGISTRY_NAME = "gov_heads.local.json"
 
 
 def _registry_root(root=None):
@@ -134,8 +143,26 @@ def _registry_root(root=None):
 
 
 def registry_path(root=None):
+    """Путь ТРЕКАЕМОГО реестра (шипуемое: lenses/*)."""
     import os
     return os.path.join(_registry_root(root), REGISTRY_NAME)
+
+
+def local_registry_path(root=None):
+    """Путь ЛОКАЛЬНОГО (gitignored) реестра приватных советников (advisors/*)."""
+    import os
+    return os.path.join(_registry_root(root), LOCAL_REGISTRY_NAME)
+
+
+def _is_private_key(key):
+    """Приватный ключ = советник (advisors/*): реальный живой человек, per-user, НЕ шипуется.
+    Всё прочее (lenses/* и т.п.) — шипуемое, живёт в трекаемом реестре."""
+    return isinstance(key, str) and key.startswith("advisors/")
+
+
+def _registry_path_for_key(key, root=None):
+    """Маршрут якоря по ключу: приватный → local (gitignored), шипуемый → tracked (git)."""
+    return local_registry_path(root) if _is_private_key(key) else registry_path(root)
 
 
 def _advisor_key(advisor_dir, root):
@@ -148,25 +175,65 @@ def _advisor_key(advisor_dir, root):
     return rel.replace(os.sep, "/")
 
 
-def _read_registry(root=None):
-    """(status, dict), status ∈ 'absent'|'ok'|'malformed'. БИТЫЙ файл ≠ ОТСУТСТВУЮЩИЙ:
-    truncated/невалидный JSON — это ПОРЧА (оборванная запись / подмена / внешняя порча),
-    а НЕ «ещё не мигрировали». Отсутствие → мягкое предупреждение (миграция); порча →
+def _read_registry_file(path):
+    """(status, dict) для ОДНОГО файла-реестра, status ∈ 'absent'|'ok'|'malformed'. БИТЫЙ ≠
+    ОТСУТСТВУЮЩИЙ: truncated/невалидный JSON — это ПОРЧА (оборванная запись / подмена / внешняя
+    порча), а НЕ «ещё не мигрировали». Отсутствие → мягкое предупреждение (миграция); порча →
     громкий провал (fail-closed) — иначе битый реестр молча отключал бы детект подмены."""
     import os
-    root = _registry_root(root)
-    p = registry_path(root)
-    if not os.path.isfile(p):
+    if not os.path.isfile(path):
         return "absent", {}
     try:
-        reg = json.load(open(p, encoding="utf-8"))
+        reg = json.load(open(path, encoding="utf-8"))
     except Exception:
         return "malformed", {}
     return ("ok", reg) if isinstance(reg, dict) else ("malformed", {})
 
 
+def _read_registry(root=None):
+    """ОБЪЕДИНЕНИЕ трекаемого (lenses/*) и локального (advisors/*) реестров, (status, dict).
+    status='malformed', если ЛЮБОЙ из файлов битый (fail-closed для обоих); иначе 'ok', если
+    хоть один присутствует; иначе 'absent'. local дополняет/переопределяет tracked (per-user
+    поверх шипуемого). Побочно само-лечит легаси: эвакуирует advisors/* из трекаемого файла."""
+    root = _registry_root(root)
+    _heal_tracked_registry(root)
+    ts, tracked = _read_registry_file(registry_path(root))
+    ls, local = _read_registry_file(local_registry_path(root))
+    if ts == "malformed" or ls == "malformed":
+        return "malformed", {}
+    merged = dict(tracked)
+    merged.update(local)                                 # local поверх tracked
+    if ts == "absent" and ls == "absent":
+        return "absent", {}
+    return "ok", merged
+
+
+def _heal_tracked_registry(root=None):
+    """Одноразовое само-лечение легаси/грязного состояния: если ТРЕКАЕМЫЙ gov_heads.json содержит
+    приватные ключи (advisors/* — ровно текущее грязное рабочее дерево), эвакуировать их в local
+    (gitignored) и переписать трекаемый БЕЗ них. Так пользователь с приватными записями в
+    трекаемом файле автоматически получает их вынос, а public-репо остаётся чист от имён людей.
+    Битый любой из файлов → no-op (порча — громкий провал в читателях, НЕ молчаливая миграция;
+    не затираем битый файл). Идемпотентно: после первого прогона advisors/* в трекаемом нет."""
+    root = _registry_root(root)
+    ts, tracked = _read_registry_file(registry_path(root))
+    if ts != "ok":
+        return
+    private = {k: v for k, v in tracked.items() if _is_private_key(k)}
+    if not private:
+        return                                           # чисто — нечего лечить
+    ls, local = _read_registry_file(local_registry_path(root))
+    if ls == "malformed":
+        return                                           # не затираем битый local (fail-closed)
+    for k, v in private.items():
+        local.setdefault(k, v)                           # существующий local-якорь приоритетнее
+    _atomic_write_json(local_registry_path(root), local)
+    remaining = {k: v for k, v in tracked.items() if not _is_private_key(k)}
+    _atomic_write_json(registry_path(root), remaining)   # трекаемый — только шипуемое
+
+
 def load_registry(root=None):
-    """Совместимость: dict (пустой при absent/malformed). Различать статусы — _read_registry."""
+    """Совместимость: dict-объединение (пустой при absent/malformed). Статусы — _read_registry."""
     return _read_registry(root)[1]
 
 
@@ -197,11 +264,11 @@ def register_head(advisor_dir, head, n=None, root=None):
     key = _advisor_key(advisor_dir, root)
     if key is None:
         return None
-    reg = _read_registry(root)[1]
+    target = _registry_path_for_key(key, root)           # advisors/* → local; lenses/* → tracked
+    reg = _read_registry_file(target)[1]                 # битый целевой → {} → пересбор с этого ключа
     reg[key] = {"gov_head": head, "n": n}
-    p = registry_path(root)
-    _atomic_write_json(p, reg)
-    return {"path": p, "key": key, "gov_head": head}
+    _atomic_write_json(target, reg)
+    return {"path": target, "key": key, "gov_head": head}
 
 
 def anchored_head_for(advisor_dir, root=None):

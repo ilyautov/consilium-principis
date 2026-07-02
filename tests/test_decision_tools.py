@@ -119,6 +119,29 @@ def test_run_calculation_note_is_point_of_use_directive():
     assert "🔵" in note and "📐" in note              # лейблы рядом, не смешивать
 
 
+def test_run_calculation_carries_histogram_and_render_block():
+    # Ф3: тул сам прокидывает histogram=True и отдаёт готовые surface (md + widget) —
+    # хосту не надо собирать подачу руками; render — чистая функция результата
+    r = dispatch("run_calculation", {"map": _valid_map(), "seed": 7, "n": 400})
+    h = r["histogram"]
+    assert h["bins"] == 20 and set(h["counts"]) == {"ship_public", "status_quo"}
+    assert all(sum(c) == 400 for c in h["counts"].values())
+    rb = r["render"]
+    assert r["label_text"] in rb["md"]                # «📐 рамка» — внутри подачи
+    assert "Выпустить публично" in rb["md"]           # имена вариантов, не голые id
+    assert "Выпустить публично" in rb["widget"]
+    assert "cp-calc" in rb["widget"] and "<script" not in rb["widget"].lower()
+    assert "📐" not in rb["widget"]                    # вёрстка виджета без эмодзи
+    assert "show_widget" in r["note"]                 # директива: в Cowork рисуй виджетом
+
+
+def test_run_calculation_render_absent_on_invalid_map():
+    m = _valid_map()
+    del m["stakes"]
+    r = dispatch("run_calculation", {"map": m, "n": 100})
+    assert "render" not in r and "histogram" not in r  # fail-closed: никакой подачи без чисел
+
+
 def test_run_calculation_deterministic_same_seed():
     a = dispatch("run_calculation", {"map": _valid_map(), "seed": 11, "n": 300})
     b = dispatch("run_calculation", {"map": _valid_map(), "seed": 11, "n": 300})

@@ -974,7 +974,10 @@ def _calc_label_text(label):
 
 def _run_calculation(map, seed=_CALC_SEED_DEFAULT, n=None):
     """Валидация (fail-closed, errors → вопросы совета) → mc_run (считает ТОЛЬКО код,
-    детерминированно) → результат ядра + label_text («📐 рамка») + point-of-use директива."""
+    детерминированно) → результат ядра + label_text («📐 рамка») + point-of-use директива.
+    Ф3: histogram=True прокидывается сам, `render` несёт ГОТОВУЮ подачу (md + widget,
+    calc_render) — гистограмма исходов, торнадо, сводка; рамка уже внутри."""
+    import calc_render
     from decision_map import validate_map
     from mc_run import N_DEFAULT, mc_run
     errors = validate_map(map)
@@ -983,12 +986,21 @@ def _run_calculation(map, seed=_CALC_SEED_DEFAULT, n=None):
                          "(fail-closed).",
                 "errors": errors, "hint": _RELAY_AS_QUESTIONS_HINT}
     try:
-        res = mc_run(map, seed, N_DEFAULT if n is None else n)
+        res = mc_run(map, seed, N_DEFAULT if n is None else n, histogram=True)
     except ValueError as e:
         return {"error": str(e)}
     res["label_text"] = _calc_label_text(res["label"])
+    names = {o["id"]: (o.get("name") or o["id"]) for o in map["options"]}
+    res["render"] = {
+        "md": calc_render.render_calc_md(res, label_text=res["label_text"],
+                                         option_names=names),
+        "widget": calc_render.render_calc_widget(res, label_text=res["label_text"],
+                                                 option_names=names),
+    }
     res["note"] = (
         "Показывай расчёт юзеру ТОЛЬКО вместе с рамкой label_text — без неё «📐» не существует. "
+        "Подача ГОТОВА в render: в Cowork скорми render.widget в mcp__visualize__show_widget "
+        "(гистограмма исходов + торнадо + сводка, рамка уже внутри), иначе покажи render.md. "
         "Лейбл «📐 расчёт» ставь РЯДОМ с мнениями советников (🔵/🟢/🟡), НЕ смешивая: расчёт — "
         "не цитата и не истина. top_uncertainties — величины, которые реально решают исход: "
         "предложи юзеру разыграть 2×2, назвав их осями (сам формат 2×2 — заседание совета, "

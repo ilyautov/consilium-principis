@@ -1,6 +1,6 @@
 {
   "meta": {
-    "ts": "2026-07-02T10:16:38Z",
+    "ts": "2026-07-02T17:31:20Z",
     "judge_backend": "openrouter",
     "judge_model": "google/gemini-2.5-flash",
     "seed": 0,
@@ -13,22 +13,30 @@
     },
     "corpus_sha256": {
       "machiavelli": "6d5b1ebf223b19ec333cbfe27b151a90e501dd30326bdb76be2bd90b562b3528",
-      "marcus-aurelius": "4a4e0c6cad907946a1a19442658d00fed4a0a2513186633e95b962fef55f4beb"
+      "marcus-aurelius": "4a4e0c6cad907946a1a19442658d00fed4a0a2513186633e95b962fef55f4beb",
+      "sun-tzu": "696afa88cd2da578ae8be16de9dcff9b92d737c464d191738473e910b821f1fc"
     }
   },
   "advisors": {
     "machiavelli": {
       "misapply_rate": 0.1667,
       "n_camouflage": 12,
-      "coverage": 0.75,
-      "n_ans": 8,
+      "coverage": 0.8333,
+      "n_ans": 12,
       "judge_ooc_false_accept": 0.0833
     },
     "marcus-aurelius": {
       "misapply_rate": 0.0833,
       "n_camouflage": 12,
       "coverage": 1.0,
-      "n_ans": 6,
+      "n_ans": 12,
+      "judge_ooc_false_accept": 0.0
+    },
+    "sun-tzu": {
+      "misapply_rate": 0.0833,
+      "n_camouflage": 12,
+      "coverage": 1.0,
+      "n_ans": 12,
       "judge_ooc_false_accept": 0.0
     }
   },

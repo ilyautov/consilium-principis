@@ -134,6 +134,25 @@ def test_battery_advisors_requires_all_three(tmp_path):
     assert moat_check.battery_advisors(str(tmp_path)) == []
 
 
+def test_battery_advisors_discovers_when_all_three_present(tmp_path, monkeypatch):
+    """sun-tzu-кейс: корпус + замороженный камуфляж + локальный golden (retrieval.en)
+    → советник входит в батарею автоматически, без ручного списка."""
+    adv = tmp_path / "advisors" / "sun-tzu"
+    (adv / "build").mkdir(parents=True)
+    (adv / "build" / "corpus.jsonl").write_text('{"text": "chunk"}\n', encoding="utf-8")
+    scripts = tmp_path / "scripts"
+    (scripts / "moat_battery").mkdir(parents=True)
+    (scripts / "golden").mkdir()
+    (scripts / "moat_battery" / "sun-tzu.camouflage.jsonl").write_text(
+        '{"q": "ooc"}\n', encoding="utf-8")
+    (scripts / "golden" / "sun-tzu.retrieval.en.jsonl").write_text(
+        '{"q": "ans", "anchor": "chunk", "ref": "I.1"}\n', encoding="utf-8")
+    monkeypatch.setattr(moat_check, "HERE", str(scripts))
+    monkeypatch.setattr(moat_check, "BATTERY_DIR", str(scripts / "moat_battery"))
+    got = moat_check.battery_advisors(str(tmp_path))
+    assert [os.path.basename(p) for p in got] == ["sun-tzu"]
+
+
 # ───────────────────────── run_battery на сеамах ─────────────────────────────
 
 def _mk_battery_advisor(tmp_path):

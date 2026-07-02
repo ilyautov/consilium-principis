@@ -30,6 +30,9 @@ fidelity-гейт (best_match) ОДИН раз; surface'ы — чистая пр
         } ],
     } ],
     "disagreement": {"axis": str, "sides": [str,...], "resolver": str} | None,
+    "premortem": [ {"advisor": str, "reason": str} ] | None,      # §4: pre-mortem ДО расчёта
+    "matrix2x2": {"axes": [str, str],                             # §4: 2×2 ПОСЛЕ расчёта
+                  "quadrants": [{"corner": str, "name": str, "council_read": str}]} | None,
     "synthesis": str,                                  # обязателен
     "what_you_lose": str | None,                       # чем платишь за синтез
     "step": str | None,
@@ -52,6 +55,39 @@ def _disagreement(s):
                 "sides": [x for x in sides if x] if isinstance(sides, list) else [],
                 "resolver": d.get("resolver")}
     return None
+
+def _premortem_items(s):
+    """Нормализованный pre-mortem (§4, «прошёл год — почему провалилось») или []. Та же
+    защита, что _disagreement: кривая структура от хоста НЕ роняет рендер. Элемент живёт
+    только с ОБОИМИ полями (advisor+reason) — половинки тихо опускаются (fail-closed)."""
+    p = s.get("premortem")
+    if not isinstance(p, list):
+        return []
+    return [{"advisor": str(it["advisor"]), "reason": str(it["reason"])}
+            for it in p
+            if isinstance(it, dict) and it.get("advisor") and it.get("reason")]
+
+
+def _matrix2x2(s):
+    """Нормализованный 2×2 (§4, оси = top_uncertainties расчёта) или None. Fail-closed:
+    без ровно двух непустых осей или без валидных квадрантов блок не рендерится."""
+    m = s.get("matrix2x2")
+    if not isinstance(m, dict):
+        return None
+    axes = m.get("axes")
+    if not (isinstance(axes, list) and len(axes) == 2 and all(axes)):
+        return None
+    quads = m.get("quadrants")
+    if not isinstance(quads, list):
+        return None
+    q_out = [{"corner": str(q["corner"]), "name": str(q.get("name") or ""),
+              "council_read": str(q["council_read"])}
+             for q in quads
+             if isinstance(q, dict) and q.get("corner") and q.get("council_read")]
+    if not q_out:
+        return None
+    return {"axes": [str(a) for a in axes], "quadrants": q_out}
+
 
 # marker → (глиф, семантическая переменная Cowork, self-contained цвет-фолбэк)
 _MARK = {
@@ -99,6 +135,16 @@ def render_md(s):
         out += [f"- {_e(side)}" for side in d["sides"]]
         if d.get("resolver"):
             out.append(f"**Снимается:** {_e(d['resolver'])}")
+    pm = _premortem_items(s)
+    if pm:
+        out += ["", "## Пре-мортем — год спустя, вариант провалился: почему?"]
+        out += [f"- **{_e(it['advisor'])}:** {_e(it['reason'])}" for it in pm]
+    mx = _matrix2x2(s)
+    if mx:
+        out += ["", f"## 2×2: {_e(mx['axes'][0])} × {_e(mx['axes'][1])}"]
+        for q in mx["quadrants"]:
+            nm = f" · {_e(q['name'])}" if q["name"] else ""
+            out.append(f"- **{_e(q['corner'])}{nm}:** {_e(q['council_read'])}")
     out += ["", "## Синтез", _e(s["synthesis"])]
     if s.get("what_you_lose"):
         out.append(f"_Чем платишь:_ {_e(s['what_you_lose'])}")
@@ -339,6 +385,23 @@ def render_widget(s, actions=None, depth="plain"):
         rs = (f'<span class="rs">{_e(d["resolver"])}</span>' if d.get("resolver") else "")
         parts.append('<div class="rift"><div class="rl">где расходятся</div>'
                      f'<b style="font-weight:500">{_e(d["axis"])}</b>{sd}{rs}</div>')
+
+    pm = _premortem_items(s)
+    if pm:                                          # §4: pre-mortem — заседание, не счёт
+        rows = "".join(f'<span class="sd"><b style="font-weight:500">{_e(it["advisor"])}</b>'
+                       f' — {_e(it["reason"])}</span>' for it in pm)
+        parts.append('<div class="rift"><div class="rl">пре-мортем · год спустя — почему '
+                     f'провалилось</div>{rows}</div>')
+
+    mx = _matrix2x2(s)
+    if mx:                                          # §4: 2×2 по осям торнадо (после расчёта)
+        rows = []
+        for q in mx["quadrants"]:
+            nm = f' · {_e(q["name"])}' if q["name"] else ""
+            rows.append(f'<span class="sd"><b style="font-weight:500">{_e(q["corner"])}{nm}</b>'
+                        f' — {_e(q["council_read"])}</span>')
+        parts.append(f'<div class="rift"><div class="rl">2×2 · {_e(mx["axes"][0])} × '
+                     f'{_e(mx["axes"][1])}</div>{"".join(rows)}</div>')
 
     qs = s.get("questions") or []
     if qs:                                          # ход круглого стола: совет допрашивает до синтеза

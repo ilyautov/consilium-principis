@@ -253,12 +253,11 @@ def _cite(advisor_dir, query, top_k=8, use_kernels=True, limit=4):
                 primary_score_by_text[t] = s
             if t not in seen_t:
                 seen_t.add(t); cand.append(t)
-    blue, green = [], []
-    for t in cand:
-        fc = _fidelity_check(t, advisor_dir)
-        if fc["verbatim"]:
-            (blue if fc["status"] == "🔵" else green).append(
-                {"text": t, "source": fc["source"], "marker": fc["status"]})
+    # Early-exit судейство (§1.2 moat-v2): кандидаты — в порядке УБЫВАНИЯ primary-косинуса
+    # (без primary-скора — последними, стабильно в порядке дедупа); каждый через дешёвый
+    # verbatim-гейт, затем судью; скан ОСТАНАВЛИВАЕТСЯ, как только limit кандидатов прошло
+    # оба гейта. Результат = top-limit полного прогона (~limit+K вызовов судьи вместо ~38).
+    #
     # Borderline-гейт релевантности ПОВЕРХ verbatim-тиринга: снимаем дословные-но-НЕ-
     # отвечающие цитаты (снятая → честный 🟡-путь ниже). Инертен на lexical/disabled.
     # Для ЦИТАТ судью пропускает ТОЛЬКО primary-score > band_hi (M1 sub-band bypass:
@@ -267,11 +266,27 @@ def _cite(advisor_dir, query, top_k=8, use_kernels=True, limit=4):
     # primary его не находил) судится так же — midpoint-подмена больше не нужна.
     # source (fc["source"]) — структурный контекст провенанса в промпте судьи:
     # обостряет «отвечает» vs «делит тему» (M2 judge-tail). cfg читаем ОДИН раз.
+    def _order_key(t):
+        s = primary_score_by_text.get(t)
+        return (0, -s) if isinstance(s, (int, float)) else (1, 0.0)
     gcfg = relevance_gate._gate_config(adv_res)
-    pool = [c for c in (blue + green)
-            if relevance_gate.gate_quote(primary, c["text"], primary_score_by_text.get(c["text"]),
-                                         adv_res, cfg=gcfg, source=c["source"])]
-    ranked = pool[:limit]                             # 🔵 (первоисточник) приоритетнее 🟢 (комментарий)
+    selected = []
+    for t in sorted(cand, key=_order_key):
+        if len(selected) >= limit:
+            break                                     # набрали limit — остальных НЕ судим
+        fc = _fidelity_check(t, advisor_dir)
+        if not fc["verbatim"]:
+            continue                                  # дешёвый гейт первым: не-verbatim → мимо судьи
+        try:
+            keep = relevance_gate.gate_quote(primary, t, primary_score_by_text.get(t),
+                                             adv_res, cfg=gcfg, source=fc["source"])
+        except Exception:
+            keep = False                              # fail-closed: гейт/судья бросил → кандидат снят
+        if keep:
+            selected.append({"text": t, "source": fc["source"], "marker": fc["status"]})
+    # отбор — по косинусу; ПОДАЧА — 🔵 (первоисточник) раньше 🟢 (комментарий), стабильно
+    ranked = ([q for q in selected if q["marker"] == "🔵"]
+              + [q for q in selected if q["marker"] != "🔵"])
     if ranked:
         b = ranked[0]
         return {"quotes": ranked,

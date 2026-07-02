@@ -57,23 +57,55 @@ def test_judge_source_included_in_prompt(monkeypatch):
 
 
 def test_judge_no_source_prompt_unchanged(monkeypatch):
-    # Backward compat: без source промпт БАЙТ-В-БАЙТ прежний (никакой пустой строки-огрызка).
+    # Backward compat: без source промпт БАЙТ-В-БАЙТ равен шаблону (никакой
+    # пустой строки-огрызка от {source_block}).
     seen = _capture_prompt(monkeypatch)
     relevance_judge.judge("вопрос", "пассаж")
-    expected = """\
-Оцени релевантность ПАССАЖА к ВОПРОСУ по шкале:
-0 = нерелевантно: пассаж не связан с вопросом
-1 = косвенно: пассаж касается смежной темы, но не отвечает на вопрос
-2 = релевантно: пассаж частично отвечает на вопрос или даёт полезный контекст
-3 = прямой ответ: пассаж прямо и полно отвечает на вопрос
-
-ВОПРОС: вопрос
-
-ПАССАЖ: пассаж
-
-Ответь ТОЛЬКО одной цифрой: 0, 1, 2 или 3. Никакого другого текста."""
+    expected = relevance_judge._JUDGE_PROMPT.format(
+        query="вопрос", passage="пассаж", source_block="")
     assert seen["prompt"] == expected
     assert "ИСТОЧНИК" not in seen["prompt"]
+
+
+# ── judge: рубрика v2 (камуфляж-фикс: «полезный контекст» больше не уровень 2) ─
+
+def test_rubric_v2_level2_requires_specific_subject(monkeypatch):
+    """Уровень 2 требует КОНКРЕТНЫЙ ПРЕДМЕТ вопроса; «полезный контекст» не
+    упоминается в уровне 2 (это и была дыра камуфляж-утечки)."""
+    seen = _capture_prompt(monkeypatch)
+    relevance_judge.judge("вопрос", "пассаж")
+    prompt = seen["prompt"]
+    lvl2 = next(l for l in prompt.splitlines() if l.startswith("2 ="))
+    assert "КОНКРЕТНЫЙ ПРЕДМЕТ" in lvl2
+    assert "полезный контекст" not in lvl2
+
+
+def test_rubric_v2_level1_caps_same_theme(monkeypatch):
+    """Уровень 1 явно вмещает «та же тема / полезный фон, но предмет не разбирается»."""
+    seen = _capture_prompt(monkeypatch)
+    relevance_judge.judge("вопрос", "пассаж")
+    lvl1 = next(l for l in seen["prompt"].splitlines() if l.startswith("1 ="))
+    assert "та же тема" in lvl1
+    assert "не разбирается" in lvl1
+
+
+def test_rubric_v2_discriminating_instruction_present(monkeypatch):
+    """Дискриминирующее правило: конкретный предмет отсутствует в пассаже
+    (современный институт/технология/событие) → потолок 1."""
+    seen = _capture_prompt(monkeypatch)
+    relevance_judge.judge("вопрос", "пассаж")
+    prompt = seen["prompt"]
+    assert "не может получить выше 1" in prompt
+    assert "современный институт, технология или событие" in prompt
+
+
+def test_rubric_v2_output_contract_line_unchanged(monkeypatch):
+    """Контракт вывода (одна цифра 0-3) — байт-в-байт прежний: от него зависит
+    fail-closed парсер."""
+    seen = _capture_prompt(monkeypatch)
+    relevance_judge.judge("вопрос", "пассаж")
+    assert seen["prompt"].endswith(
+        "Ответь ТОЛЬКО одной цифрой: 0, 1, 2 или 3. Никакого другого текста.")
 
 
 def test_judge_empty_source_prompt_unchanged(monkeypatch):

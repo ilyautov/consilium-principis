@@ -289,3 +289,57 @@ def test_bad_n_and_seed_rejected():
         mc_run(_spec_map(), seed=42, n=-5)
     with pytest.raises(ValueError):
         mc_run(_spec_map(), seed="сорок два", n=100)
+
+
+# ── гистограмма (Ф3, opt-in): бины детерминированы, дефолтный выход не тронут ──
+
+_BASE_KEYS = {"options", "pairwise", "p_best", "expected_regret",
+              "tornado", "top_uncertainties", "label"}
+
+
+def test_default_output_has_no_histogram_and_same_keys():
+    # Ф3 добавляет histogram ТОЛЬКО по opt-in: дефолтный вызов — прежний состав ключей
+    r = mc_run(_spec_map(), seed=42, n=500)
+    assert set(r) == _BASE_KEYS
+    assert json.dumps(r, sort_keys=True) == json.dumps(
+        mc_run(_spec_map(), seed=42, n=500, histogram=False), sort_keys=True)
+
+
+def test_histogram_opt_in_structure():
+    r = mc_run(_spec_map(), seed=42, n=1000, histogram=True)
+    h = r["histogram"]
+    assert set(r) == _BASE_KEYS | {"histogram"}      # только ДОБАВЛЯЕТ ключ
+    assert h["bins"] == 20
+    assert h["lo"] <= h["hi"]
+    for oid in ("ship_public", "status_quo"):
+        counts = h["counts"][oid]
+        assert len(counts) == h["bins"]
+        assert sum(counts) == 1000                   # каждый сэмпл в каком-то бине
+        assert all(isinstance(c, int) and c >= 0 for c in counts)
+
+
+def test_histogram_deterministic_same_seed():
+    a = mc_run(_spec_map(), seed=7, n=800, histogram=True)
+    b = mc_run(_spec_map(), seed=7, n=800, histogram=True)
+    assert json.dumps(a, sort_keys=True) == json.dumps(b, sort_keys=True)
+
+
+def test_histogram_does_not_change_core_numbers():
+    # opt-in гистограмма не смещает счёт: ядро байт-в-байт как без неё
+    plain = mc_run(_spec_map(), seed=11, n=600)
+    with_h = mc_run(_spec_map(), seed=11, n=600, histogram=True)
+    with_h.pop("histogram")
+    assert json.dumps(plain, sort_keys=True) == json.dumps(with_h, sort_keys=True)
+
+
+def test_histogram_bounds_cover_joint_samples():
+    # lo/hi — общие по ВСЕМ вариантам (совместные сэмплы): бины сравнимы между вариантами
+    m = _map([_cont("x", 0, 50, 100)], {"a": "x + 10", "b": "x"})
+    h = mc_run(m, seed=42, n=2000, histogram=True)["histogram"]
+    assert h["lo"] <= 10 + 1e-9 and h["hi"] >= 100 - 20   # a >= 10, b <= 100
+
+def test_histogram_degenerate_constant_option():
+    # вариант-константа (статус-кво «0») не роняет биннинг и не даёт отрицательных индексов
+    m = _map([_cont("x", 0, 5, 10)], {"a": "0", "b": "0"})
+    h = mc_run(m, seed=42, n=300, histogram=True)["histogram"]
+    assert sum(h["counts"]["a"]) == 300 and sum(h["counts"]["b"]) == 300

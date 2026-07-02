@@ -145,6 +145,85 @@ def test_theater_expert_reveals_engineering_by_default():
     assert "cp-stage show-eng" in expert               # инженерия раскрыта сразу
     assert "Чем платишь" in expert                     # та же разметка, просто видима
 
+def test_premortem_block_renders_md_and_widget():
+    # §4 сценарный слой: pre-mortem — формат заседания; canon несёт premortem:[{advisor,reason}]
+    s = {"question": "q", "synthesis": "s", "advisors": [],
+         "premortem": [{"advisor": "Макиавелли", "reason": "конкурент скопировал за месяц"},
+                       {"advisor": "Аврелий", "reason": "выгорел, не дошипил"}]}
+    m = render_md(s)
+    assert "Пре-мортем" in m and "конкурент скопировал" in m and "Аврелий" in m
+    w = render_widget(s)
+    assert "пре-мортем" in w.lower() and "конкурент скопировал" in w
+    assert "выгорел, не дошипил" in w
+    assert "<script" not in w.lower()
+
+
+def test_matrix2x2_block_renders_md_and_widget():
+    # §4: 2×2 ПОСЛЕ расчёта — оси = top_uncertainties, совет разыгрывает 4 квадранта
+    s = {"question": "q", "synthesis": "s", "advisors": [],
+         "matrix2x2": {"axes": ["traction_prob", "hours_to_ship"],
+                       "quadrants": [
+                           {"corner": "++", "name": "быстрый успех", "council_read": "шипим и жмём"},
+                           {"corner": "+-", "name": "успех, но дорого", "council_read": "режем скоуп"},
+                           {"corner": "-+", "name": "дёшево, но мимо", "council_read": "пивот за неделю"},
+                           {"corner": "--", "name": "провал", "council_read": "статус-кво был прав"}]}}
+    m = render_md(s)
+    assert "2×2" in m and "traction_prob" in m and "hours_to_ship" in m
+    assert "быстрый успех" in m and "статус-кво был прав" in m
+    w = render_widget(s)
+    assert "2×2" in w and "traction_prob" in w
+    assert "пивот за неделю" in w and "режем скоуп" in w
+    assert "<script" not in w.lower()
+
+
+def test_scenario_blocks_backward_compat_pinned():
+    # бэк-компат ЗАПИНЕН: сессия без блоков (и с пустыми/None) → рендер байт-в-байт
+    # как у объекта вовсе без этих ключей; маркеры секций не всплывают
+    base_md, base_w = render_md(S), render_widget(S)
+    assert "Пре-мортем" not in base_md and "2×2" not in base_md
+    for empty in (None, [], {}):
+        s2 = dict(S)
+        s2["premortem"] = empty
+        s2["matrix2x2"] = empty if isinstance(empty, dict) or empty is None else None
+        assert render_md(s2) == base_md
+        assert render_widget(s2) == base_w
+
+
+def test_scenario_blocks_malformed_never_crash():
+    # та же защита, что у disagreement: кривая структура от хоста НЕ роняет рендер
+    bads_pm = ("строка", 42, [{"advisor": "X"}], [{"reason": "без имени"}], [None], [{}])
+    bads_mx = ("строка", 42, {"axes": ["one"]}, {"axes": ["a", "b"]},
+               {"axes": ["a", "b"], "quadrants": "не список"},
+               {"axes": ["a", "b"], "quadrants": [{}]}, {"quadrants": []})
+    for pm in bads_pm:
+        for r in (render_md, render_widget, render_html):
+            r({"question": "q", "synthesis": "s", "advisors": [], "premortem": pm})
+    for mx in bads_mx:
+        for r in (render_md, render_widget, render_html):
+            r({"question": "q", "synthesis": "s", "advisors": [], "matrix2x2": mx})
+
+
+def test_scenario_blocks_escape_xss():
+    s = {"question": "q", "synthesis": "s", "advisors": [],
+         "premortem": [{"advisor": "<img src=x onerror=alert(1)>", "reason": "r"}],
+         "matrix2x2": {"axes": ["<b>a</b>", "b"],
+                       "quadrants": [{"corner": "++", "name": "<img src=y>",
+                                      "council_read": "чтение"}]}}
+    for r in (render_md, render_widget):
+        out = r(s)
+        assert "<img" not in out and "&lt;img" in out
+        assert "<b>a</b>" not in out
+
+
+def test_premortem_renders_on_roundtable_turn_too():
+    # pre-mortem идёт ДО расчёта, т.е. чаще на ходе круглого стола (без synthesis)
+    s = {"question": "q", "advisors": [],
+         "questions": ["какую величину мы не учли?"],
+         "premortem": [{"advisor": "М", "reason": "рынок не заметил"}]}
+    w = render_widget(s)
+    assert "рынок не заметил" in w and "Совет спрашивает" in w
+
+
 def test_theater_never_shows_fake_quote_but_keeps_source():
     # ров в театре: верифицированная цитата + источник видны; пилюля достоверности — под .eng
     s = {"question": "q", "synthesis": "s", "advisors": [{"name": "Макиавелли", "opinions": [

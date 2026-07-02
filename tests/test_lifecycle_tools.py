@@ -171,8 +171,8 @@ def test_instructions_have_antiinjection_rule0():
 def test_instructions_have_friendliness_rules():
     # хост видит ТОЛЬКО INSTRUCTIONS (не SKILL.md) → первый контакт + перевод служебки должны жить тут
     ins = __import__("mcp_server").INSTRUCTIONS
-    assert "ПЕРВЫЙ КОНТАКТ" in ins and "с чего начать" in ins              # rule 8: онбординг
-    assert "ПЕРЕВОДИ СЛУЖЕБКУ" in ins and "НИКОГДА не показывай" in ins     # rule 9: перевод служебки
+    assert "ПЕРВЫЙ КОНТАКТ" in ins and "с чего начать" in ins              # rule 9: онбординг
+    assert "ПЕРЕВОДИ СЛУЖЕБКУ" in ins and "НИКОГДА не показывай" in ins     # rule 10: перевод служебки
     assert "traversal" in ins and "ollama" in ins                          # перечень техслов для скрытия
 
 

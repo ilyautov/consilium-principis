@@ -27,6 +27,14 @@ _SPARK = "▁▂▃▄▅▆▇█"          # уровни спарклайна
 _TORNADO_BAR_W = 20           # ширина торнадо-бара в md, символов на impact=1.0
 
 
+def _md(s):
+    """Хост-строки (имена вариантов, id величин) в markdown-контексте: '|' рвёт строки
+    таблиц, бэктик рвёт код-спаны. Заменяем на визуально эквивалентные безопасные символы
+    (fullwidth '｜' и апостроф) — бэкслэш-экранирование внутри код-спана не работает.
+    ТОЛЬКО для md-пути; widget экранирует html и в этом не нуждается."""
+    return _e(str(s)).replace("|", "｜").replace("`", "'")
+
+
 def _fmt(v):
     """Число статистики компактно и детерминированно (как predicted в mcp_server)."""
     return "%.4g" % v
@@ -65,7 +73,7 @@ def render_calc_md(res, label_text=None, option_names=None):
     out += ["", "### Исходы по вариантам"]
     for oid, name in opts:
         st = res["options"][oid]
-        out += ["", "**%s** — P(лучший) %s" % (_e(name), _prob(res["p_best"][oid]))]
+        out += ["", "**%s** — P(лучший) %s" % (_md(name), _prob(res["p_best"][oid]))]
         if hist and oid in hist["counts"]:
             out.append("`%s`  (диапазон %s … %s)"
                        % (_spark(hist["counts"][oid]), _fmt(hist["lo"]), _fmt(hist["hi"])))
@@ -75,13 +83,13 @@ def render_calc_md(res, label_text=None, option_names=None):
     out += ["", "### Что решает исход (торнадо)"]
     for t in res["tornado"]:
         bar = "█" * max(1, round(t["impact"] * _TORNADO_BAR_W)) if t["impact"] > 0 else "·"
-        out.append("- `%s` %s %s" % (_e(str(t["id"])), bar, _prob(t["impact"])))
+        out.append("- `%s` %s %s" % (_md(t["id"]), bar, _prob(t["impact"])))
 
     out += ["", "### Сводка",
             "| Вариант | P(лучший) | Ожидаемое сожаление |", "|---|---|---|"]
     for oid, name in opts:
         out.append("| %s | %s | %s |"
-                   % (_e(name), _prob(res["p_best"][oid]), _fmt(res["expected_regret"][oid])))
+                   % (_md(name), _prob(res["p_best"][oid]), _fmt(res["expected_regret"][oid])))
     return "\n".join(out)
 
 

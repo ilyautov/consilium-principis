@@ -112,6 +112,33 @@ def test_all_surfaces_escape_xss():
         assert "<script" not in out.lower()
 
 
+def test_md_hostile_option_name_does_not_break_table():
+    """Хост-строка с '|' в имени варианта не должна рвать строки md-таблицы сводки."""
+    names = {"ship": "pipe|col", "wait": "ок"}
+    m = render_calc_md(RES, label_text=LABEL, option_names=names)
+    row = next(l for l in m.splitlines() if l.startswith("|") and "pipe" in l)
+    assert row.count("|") == 4                         # ровно 3 ячейки: | a | b | c |
+    assert "pipe" in row and "col" in row              # имя не потеряно, а экранировано
+
+
+def test_md_hostile_uncertainty_id_does_not_break_code_span():
+    """Бэктик в id величины не должен рвать код-спан торнадо-строки."""
+    res = dict(RES)
+    res["tornado"] = [{"id": "up`side", "impact": 0.91},
+                      {"id": "hours", "impact": 0.22}]
+    m = render_calc_md(res, label_text=LABEL, option_names=NAMES)
+    line = next(l for l in m.splitlines() if "side" in l and l.startswith("- "))
+    assert line.count("`") == 2                        # спан открыт и закрыт, не разорван
+    assert "side" in line
+
+
+def test_md_escaping_does_not_touch_widget_path():
+    """Widget-путь уже экранирует html — md-экранирование его не трогает."""
+    names = {"ship": "pipe|col", "wait": "ок"}
+    w = render_calc_widget(RES, label_text=LABEL, option_names=names)
+    assert "pipe|col" in w                             # '|' в HTML безопасен, остаётся как есть
+
+
 def test_renders_real_mc_run_output_end_to_end():
     m = {
         "question": "тест",

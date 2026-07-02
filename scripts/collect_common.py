@@ -79,7 +79,46 @@ def _decode(raw):
     return raw.decode("utf-8", errors="ignore")
 
 
-def _fetch_once(url, timeout):
+# Потолок скачивания: PD-книги — единицы МБ; всё сильно больше — не «источник советника»,
+# а заливка (истощение диска/памяти через отравленный URL или бесконечный стрим).
+MAX_FETCH_BYTES = 20 * 1024 * 1024
+
+
+def _read_capped(resp, max_bytes):
+    """Тело ответа с жёстким потолком байт. Content-Length (если сервер прислал) режется ДО
+    чтения; лживый/отсутствующий Content-Length ловится почанковым счётчиком (стрим без
+    заголовка не обойдёт лимит)."""
+    try:
+        cl = resp.getheader("Content-Length")
+    except Exception:
+        cl = None
+    if cl and cl.isdigit() and int(cl) > max_bytes:
+        raise ValueError(f"источник больше лимита {max_bytes // (1024 * 1024)} МБ — отказ (анти-заливка)")
+    chunks, total = [], 0
+    while True:
+        chunk = resp.read(65536)
+        if not chunk:
+            return b"".join(chunks)
+        total += len(chunk)
+        if total > max_bytes:
+            raise ValueError(f"источник больше лимита {max_bytes // (1024 * 1024)} МБ — отказ (анти-заливка)")
+        chunks.append(chunk)
+
+
+def _check_scheme(scheme, prev_scheme, allow_http):
+    """Политика схем: https-only по умолчанию; http — только по явному allow_http;
+    даунгрейд https→http на редиректе запрещён ВСЕГДА (даже с allow_http)."""
+    if scheme not in ("http", "https"):
+        raise ValueError(f"схема '{scheme or '—'}' запрещена — только https (http лишь с allow_http)")
+    if scheme == "http":
+        if prev_scheme == "https":
+            raise ValueError("редирект-даунгрейд https→http запрещён — дальше по пути текст шёл бы открытым")
+        if not allow_http:
+            raise ValueError("http без шифрования запрещён по умолчанию — используй https-URL "
+                             "(или явно allow_http=True, если источник доступен только по http)")
+
+
+def _fetch_once(url, timeout, max_bytes=MAX_FETCH_BYTES):
     """Один GET к ЗАКРЕПЛЁННОМУ публичному IP (host резолвится ОДИН раз и коннект идёт ровно к
     тому IP — закрывает DNS-rebinding окно между проверкой и коннектом). TLS: SNI/валидация серта
     по ИМЕНИ хоста, не по IP. Возвращает (status, location|None, body|None)."""
@@ -103,25 +142,48 @@ def _fetch_once(url, timeout):
         resp = conn.getresponse()
         if resp.status in (301, 302, 303, 307, 308):
             return resp.status, resp.getheader("Location"), None
-        return resp.status, None, resp.read()
+        return resp.status, None, _read_capped(resp, max_bytes)
     finally:
         raw_sock.close()
 
 
-def fetch(url, timeout=30, public_only=True):
-    """GET → текст. public_only (дефолт): SSRF-гард с IP-pinning (резолв+валидация+коннект к тому же
-    IP) и ре-валидацией каждого редирект-хопа — без DNS-rebinding окна."""
+def fetch(url, timeout=30, public_only=True, allow_http=False, max_bytes=MAX_FETCH_BYTES):
+    """GET → текст. Слои защиты (что каждый даёт и чего НЕ даёт — честно):
+
+      1. https-only по умолчанию: http-URL → отказ, если не allow_http=True явно; даунгрейд
+         https→http на редиректе запрещён всегда. Защищает от MITM-подмены текста по пути.
+         НЕ защищает от вредоносного КОНТЕНТА на легитимном https-хосте.
+      2. SSRF-гард: host обязан резолвиться в ПУБЛИЧНЫЙ IP (private/loopback/link-local/
+         reserved → отказ). Защищает метадату облака и внутренние сервисы от фетча по
+         инъецированному URL. НЕ покрывает OLLAMA_HOST (env-only, осознанно: localhost там
+         легитимен) и публичные хосты под контролем атакующего.
+      3. IP-pinning: host резолвится ОДИН раз, коннект идёт ровно к проверенному IP; TLS
+         SNI/серт валидируются по ИМЕНИ хоста. Закрывает DNS-rebinding окно «проверил одно,
+         соединился с другим». НЕ защищает, если сам легитимный DNS-ответ уже указывает на
+         хост атакующего (публичный IP с валидным сертом — это «настоящий» чужой сервер).
+      4. Редиректы: максимум 6 хопов, каждый хоп заново проходит слои 1-3 (схема, SSRF,
+         pinning). Защищает от open-redirect в приватную зону/на http. НЕ защищает от
+         редиректа на другой ПУБЛИЧНЫЙ https-хост — это легитимный веб.
+      5. Потолок размера (max_bytes, дефолт 20 МБ): Content-Length ДО чтения + почанковый
+         счётчик (лживый заголовок не обходит). Защищает от заливки диска/памяти. НЕ
+         защищает от медленного стрима (это режет timeout).
+
+    public_only=False — явный небезопасный путь БЕЗ слоёв 2-3 (не используется продом)."""
+    p0 = urlparse(url or "")
+    _check_scheme(p0.scheme, None, allow_http)                    # слой 1 — ДО любого DNS/коннекта
     if not public_only:                                            # явный небезопасный путь (не юзается)
         req = urllib.request.Request(url, headers={"User-Agent": UA})
         with urllib.request.urlopen(req, timeout=timeout) as r:
-            return _decode(r.read())
-    cur = url
+            return _decode(_read_capped(r, max_bytes) if hasattr(r, "getheader") else r.read())
+    cur, prev_scheme = url, None
     for _ in range(6):                                            # лимит редиректов
-        status, location, body = _fetch_once(cur, timeout)
+        _check_scheme(urlparse(cur).scheme, prev_scheme, allow_http)  # ре-валидация КАЖДОГО хопа
+        status, location, body = _fetch_once(cur, timeout, max_bytes)
         if body is not None:
             return _decode(body)
         if not location:
             raise ValueError(f"редирект {status} без Location")
+        prev_scheme = urlparse(cur).scheme
         cur = urljoin(cur, location)                              # следующий хоп ре-валидируется в _fetch_once
     raise ValueError("слишком много редиректов")
 

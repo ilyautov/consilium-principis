@@ -90,10 +90,15 @@ def test_add_source_rejects_non_pd_host_without_license(tmp_path):
 
 
 def test_add_source_blocks_ssrf_even_with_license(tmp_path):
-    # license НЕ должен открывать egress: SSRF-гард срабатывает на внутренний адрес независимо
+    # license НЕ должен открывать egress: слоёный гард режет внутренний адрес независимо.
+    # http-loopback теперь режется ещё РАНЬШЕ — https-only слоем (до DNS), тоже fail-closed:
     r = dispatch("add_source", {"advisor_dir": str(tmp_path / "a4"),
                  "url": "http://127.0.0.1:11434/api/tags", "license": "public-domain"})
-    assert "error" in r and "SSRF" in r["error"]            # loopback заблокирован, лицензия не помогла
+    assert "error" in r and "http без шифрования" in r["error"]
+    # https-loopback проходит слой схемы и обязан упереться в SSRF-гард (лицензия не помогает):
+    r2 = dispatch("add_source", {"advisor_dir": str(tmp_path / "a4"),
+                  "url": "https://127.0.0.1:11434/api/tags", "license": "public-domain"})
+    assert "error" in r2 and "SSRF" in r2["error"]          # loopback заблокирован, лицензия не помогла
 
 
 def test_add_source_blocks_path_traversal(tmp_path):

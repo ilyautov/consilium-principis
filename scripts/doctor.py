@@ -151,6 +151,7 @@ def check_gov_anchors(root="."):
         from corpusbuild.paths import corpus_path
         from governance import verify_advisor
         swapped, unregistered, verified = [], [], 0
+        registry_malformed = False
         for sub in ("advisors", "lenses"):
             base = os.path.join(root, sub)
             if not os.path.isdir(base):
@@ -162,12 +163,19 @@ def check_gov_anchors(root="."):
                 res = verify_advisor(p, root=root)
                 if res is None:
                     continue
+                if res.get("registry_malformed"):
+                    registry_malformed = True
                 if res.get("swap_suspect") or res.get("anchor_match") is False:
                     swapped.append(f"{sub}/{d}")
                 elif not res.get("anchor_registered"):
                     unregistered.append(f"{sub}/{d}")
                 else:
                     verified += 1
+        if registry_malformed:                           # битый файл ≠ отсутствующий → громкий провал
+            return {"name": "gov-anchor", "ok": False,
+                    "detail": ("✗ реестр целостности gov_heads.json повреждён (не читается как JSON) — "
+                               "детект подмены отключён; восстанови из git или пересобери советников: "
+                               "python scripts/governance.py freeze <dir>")}
         if swapped:
             return {"name": "gov-anchor", "ok": False,
                     "detail": ("✗ цепь подменена целиком? Советник самосогласован, но не совпадает "

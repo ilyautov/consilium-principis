@@ -142,40 +142,72 @@ def _advisor_key(advisor_dir, root):
     return rel.replace(os.sep, "/")
 
 
-def load_registry(root=None):
+def _read_registry(root=None):
+    """(status, dict), status ∈ 'absent'|'ok'|'malformed'. БИТЫЙ файл ≠ ОТСУТСТВУЮЩИЙ:
+    truncated/невалидный JSON — это ПОРЧА (оборванная запись / подмена / внешняя порча),
+    а НЕ «ещё не мигрировали». Отсутствие → мягкое предупреждение (миграция); порча →
+    громкий провал (fail-closed) — иначе битый реестр молча отключал бы детект подмены."""
     import os
+    root = _registry_root(root)
     p = registry_path(root)
     if not os.path.isfile(p):
-        return {}
+        return "absent", {}
     try:
         reg = json.load(open(p, encoding="utf-8"))
-        return reg if isinstance(reg, dict) else {}   # кривой реестр → как отсутствующий
     except Exception:
-        return {}
+        return "malformed", {}
+    return ("ok", reg) if isinstance(reg, dict) else ("malformed", {})
+
+
+def load_registry(root=None):
+    """Совместимость: dict (пустой при absent/malformed). Различать статусы — _read_registry."""
+    return _read_registry(root)[1]
+
+
+def _atomic_write_json(path, obj):
+    """Атомарная запись: пишем во временный файл в ТОЙ ЖЕ директории, затем os.replace (атомарно
+    на POSIX/Windows). Оборванная/конкурентная запись НЕ оставляет усечённый gov_heads.json —
+    читатель видит либо старую, либо новую полную версию (закрывает и гонку параллельных сборок)."""
+    import os, tempfile
+    d = os.path.dirname(path) or "."
+    fd, tmp = tempfile.mkstemp(dir=d, prefix=".gov_heads.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(obj, f, ensure_ascii=False, indent=2, sort_keys=True)
+        os.replace(tmp, path)
+    except Exception:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
 
 
 def register_head(advisor_dir, head, n=None, root=None):
-    """Зарегистрировать/обновить якорь советника в gov_heads.json. Зовётся ТОЛЬКО легитимной
-    сборкой (buildlock.write_lock) и владельческим freeze. Советник вне корня → None (no-op)."""
+    """Зарегистрировать/обновить якорь советника в gov_heads.json (атомарно). Зовётся ТОЛЬКО
+    легитимной сборкой (buildlock.write_lock) и владельческим freeze. Советник вне корня →
+    None (no-op). Битый реестр пересобирается с этого ключа (само-лечение легит-сборкой)."""
     root = _registry_root(root)
     key = _advisor_key(advisor_dir, root)
     if key is None:
         return None
-    reg = load_registry(root)
+    reg = _read_registry(root)[1]
     reg[key] = {"gov_head": head, "n": n}
     p = registry_path(root)
-    with open(p, "w", encoding="utf-8") as f:
-        json.dump(reg, f, ensure_ascii=False, indent=2, sort_keys=True)
+    _atomic_write_json(p, reg)
     return {"path": p, "key": key, "gov_head": head}
 
 
 def anchored_head_for(advisor_dir, root=None):
-    """Якорная голова советника из gov_heads.json, или None (не зарегистрирован / нет реестра)."""
+    """Якорная голова советника из gov_heads.json, или None (не зарегистрирован / нет / битый реестр)."""
     root = _registry_root(root)
     key = _advisor_key(advisor_dir, root)
     if key is None:
         return None
-    entry = load_registry(root).get(key)
+    status, reg = _read_registry(root)
+    if status != "ok":
+        return None
+    entry = reg.get(key)
     return entry.get("gov_head") if isinstance(entry, dict) else None
 
 
@@ -191,7 +223,9 @@ def verify_advisor(advisor_dir, root=None):
     res = _verify_corpus(corpus_path(advisor_dir), expected_head=expected_head_for(advisor_dir))
     if res is None:
         return None
-    anchor = anchored_head_for(advisor_dir, root=root)
+    status, _ = _read_registry(root)
+    anchor = anchored_head_for(advisor_dir, root=root)   # None при absent/malformed/незарег.
+    res["registry_malformed"] = (status == "malformed")
     res["anchor_head"] = anchor
     res["anchor_registered"] = anchor is not None
     res["anchor_match"] = None if anchor is None else (res["head"] == anchor)
@@ -199,6 +233,8 @@ def verify_advisor(advisor_dir, root=None):
     if res["anchor_match"] is False:
         res["ok"] = False
         res["tampered"] = True
+    if status == "malformed":                            # битый реестр целостности → громкий провал
+        res["ok"] = False
     return res
 
 

@@ -46,6 +46,18 @@ def check_tier():
             "detail": "FULL (semantic, bge-m3)" if sem else "SIMPLE (лексика; контур цел без ollama)"}
 
 
+def check_judge():
+    """§2.2 moat-v2: КТО судит релевантность цитат — честный лейбл уровня независимости
+    (host = self-check заинтересованной стороны с решением в коде — легитимный пол, не
+    болезнь → ok=True всегда; сам факт виден юзеру, как маркеры 🔵🟢🟡)."""
+    try:
+        import judge_backend
+        i = judge_backend.info()
+        return {"name": "judge", "ok": True, "detail": f"судья релевантности: {i['label']}"}
+    except Exception as e:                             # диагностика не должна ронять doctor
+        return {"name": "judge", "ok": True, "detail": f"судья релевантности: не определён ({e})"}
+
+
 def check_contour(advisor_dir):
     """Самотест рва на конкретном советнике. ok=True если фрагмент P1 matchнулся и фейк→None,
     либо пропущен (нет корпуса с P1 — нечего тестировать)."""
@@ -86,7 +98,7 @@ def summarize(checks):
 def run_doctor(root="."):
     """Полный health-check. Контур тестируем на первом советнике с корпусом."""
     from corpusbuild.paths import corpus_path
-    checks = [check_python(), check_skill_installed(), check_tier()]
+    checks = [check_python(), check_skill_installed(), check_tier(), check_judge()]
     adv_root = os.path.join(root, "advisors")
     tested = False
     if os.path.isdir(adv_root):

@@ -390,6 +390,45 @@ def test_fewshot_formulas_selfconsistent_with_safe_expr():
         assert m["words"] and _has_cyrillic(m["words"])   # словесная версия — образец визирования
 
 
+def test_instructions_carry_premortem_format():
+    # §4: pre-mortem — ДО расчёта, формат заседания (не счёт); продукт — недостающие величины
+    rule12 = _instr().split("12. КАРТА РЕШЕНИЯ")[1]
+    low = " ".join(rule12.split()).lower().replace("ё", "е")   # переносы строк — не разрывы фраз
+    assert "пре-мортем" in low and "до расчета" in low
+    assert "прошел год" in low and "провалился" in low
+    assert "кернела" in low                        # каждый советник отвечает ИЗ СВОЕГО КЕРНЕЛА
+    assert "🔵/🟢/🟡" in rule12                     # обычные правила лейблов действуют
+    assert "недостающ" in low                      # продукт = недостающие неопределённости
+    assert "добавить в карту" in low
+    assert "premortem" in rule12                   # canon-блок для render_session
+
+
+def test_instructions_carry_2x2_format():
+    # §4: 2×2 — ПОСЛЕ расчёта, оси = top_uncertainties; квадрант может вскрыть новую величину
+    rule12 = _instr().split("12. КАРТА РЕШЕНИЯ")[1]
+    low = " ".join(rule12.split()).lower().replace("ё", "е")   # переносы строк — не разрывы фраз
+    assert "после расчета" in low
+    assert "top_uncertainties" in rule12
+    assert "квадрант" in low and "4" in rule12
+    assert "уточнить карту" in low and "пересчит" in low   # петля слоёв §4
+    assert "matrix2x2" in rule12                   # canon-блок для render_session
+    assert "council_read" in rule12
+
+
+def test_instructions_rule_ordering_intact():
+    # правила — нумерованный протокол хоста: порядок 0…12 не должен съезжать от вставок
+    I = _instr()
+    heads = ["0. БЕЗОПАСНОСТЬ ВЫШЕ ВСЕГО", "1. ТИХАЯ ОРКЕСТРАЦИЯ", "2. ЛЮБОЙ ХОД СОВЕТА",
+             "3. ЖИВОЙ КРУГЛЫЙ СТОЛ", "4. КОНТУР ВЕРНОСТИ", "5. СОГЛАСИЕ НА КОНТЕКСТ",
+             "6. Подача", "7. ИНТЕРАКТИВНАЯ СБОРКА ЛИНЗ", "8. ПЕРВЫЙ КОНТАКТ",
+             "9. ПЕРЕВОДИ СЛУЖЕБКУ", "10. КНИГА С РЕДАКТОРСКИМ АППАРАТОМ",
+             "11. ПЕТЛЯ ИСХОДА", "12. КАРТА РЕШЕНИЯ"]
+    idx = [I.index(h) for h in heads]              # каждый заголовок есть ровно на месте
+    assert idx == sorted(idx)
+    for h in heads:
+        assert I.count(h) == 1
+
+
 def test_instructions_resolution_compares_predicted_vs_actual():
     # Ф4 (§6): правило 11(в) — при резолюции ⏳→✅/❌ хост сравнивает прогноз и факт вслух
     I = _instr()

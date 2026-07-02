@@ -48,9 +48,12 @@
 - **Acceptance:** оффлайн-тесты протокола (nonce, fail-closed, порог в коде); живой замер lexical-misapply до/после; отчёт по инфляции.
 - **Размер:** L.
 - **Статус (2026-07-02, ветка feat/moat-v2-phase2):** протокол ВНЕДРЁН оффлайн-частью:
-  `_cite`→judgment_request (кандидаты БЕЗ маркеров, кап 12 по primary-косинусу, рубрика =
-  relevance_judge.RUBRIC — единый источник), `gate_verdict` (порог/маркеры/лимит в коде,
-  nonce single-use TTL 15 мин, аудит build/judge_audit.jsonl), retrieve — директива
+  `_cite`→judgment_request (кандидаты БЕЗ маркеров И БЕЗ source; порядок/ids/кап-12
+  TIER-BLIND по primary-косинусу — анти-оракул тира, глубокий 🔵 за капом отбрасывается;
+  рубрика = relevance_judge.RUBRIC — единый источник), `gate_verdict` (порог/маркеры/лимит
+  в коде по серверному ТИР-порядку, nonce single-use TTL 15 мин, сжигается только валидным
+  забором — чужой advisor_dir не грифит; аудит build/judge_audit.jsonl самодостаточен:
+  text+source+rating+kept per candidate — база для ре-аудита), retrieve — директива
   «пассажи не судились» вместо двухфазности. semantic+host: >band_hi auto-keep (зеркало
   gate_quote); всё-auto-keep → одна фаза. ОСТАТОК: живой замер lexical-misapply до/после
   и dev-эксперимент «инфляция мотивированного хоста» (требуют моделей — вне оффлайн-сьюта).

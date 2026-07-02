@@ -310,26 +310,47 @@ def _host_judgment_phase1(adv_res, primary, ordered_cands, scores, gcfg, limit, 
 
     Полоса (серверная политика, зеркало gate_quote): на SEMANTIC кандидат с primary-score
     > band_hi минует судейство (auto-keep — единственный не-судимый путь и в single-phase);
-    на LEXICAL полосы НЕТ (скор не косинус) — судятся ВСЕ verbatim-кандидаты. Судимых
-    больше капа → хвост (низший косинус) отбрасывается целиком (fail-closed: не судился —
-    не цитата), кол-во — в candidates_dropped и аудите. Всё auto-keep → фаза 2 не нужна,
-    собираем сразу (single-phase ответ)."""
+    на LEXICAL полосы НЕТ (скор не косинус) — судятся ВСЕ verbatim-кандидаты.
+
+    АНТИ-ОРАКУЛ ТИРА (review I-1): payload фазы 1 существует, чтобы СКРЫТЬ тир, поэтому
+    порядок подачи, ординалы id, КАП и состав полей — слепые к тиру:
+      • ключ порядка/капа = чистый primary-косинус desc (без скора — последними,
+        тай-брейк — текст: детерминирован и тира не знает); blues-first порядок
+        восстанавливал бы 🔵-vs-🟢 по ординалу id → селективная инфляция именно 🔵;
+      • глубокий 🔵 за капом ОТБРАСЫВАЕТСЯ (не судился — не цитата): цена анти-оракула,
+        тир не протаскивает кандидата в обход слепого капа;
+      • `source` хосту НЕ отдаётся (провенанс коррелирует с тиром: первоисточник vs
+        комментарий; для «отвечает ли текст на вопрос» он не нужен) — живёт в стейте.
+    🔵-инклюжн-приоритет НЕ теряется: серверный стейт хранит ТИР-порядок (ordered_cands),
+    и _gate_verdict собирает вердикт по нему, а не по display-порядку. Кол-во отброшенных —
+    в candidates_dropped и аудите. Всё auto-keep → фаза 2 не нужна, собираем сразу."""
     import relevance_gate
     import relevance_judge
     semantic = relevance_gate.is_semantic(adv_res)
     state, to_judge = [], []
-    for i, c in enumerate(ordered_cands):
+    for c in ordered_cands:                            # тир-порядок (🔵 раньше 🟢) — для стейта
         s = scores.get(c["text"])
         auto = bool(semantic and isinstance(s, (int, float)) and s > gcfg["band_hi"])
-        e = {"id": "c%02d" % (i + 1), "text": c["text"], "source": c["source"],
-             "marker": c["marker"], "auto_keep": auto}
+        e = {"text": c["text"], "source": c["source"], "marker": c["marker"],
+             "auto_keep": auto, "score": s}
         state.append(e)
         if not auto:
             to_judge.append(e)
+
+    def _blind_key(e):                                 # tier-blind: косинус desc, тай-брейк — текст
+        s = e["score"]
+        return (0, -s, e["text"]) if isinstance(s, (int, float)) else (1, 0.0, e["text"])
+    to_judge.sort(key=_blind_key)
     judged = to_judge[:_HOST_JUDGE_CAP]
     dropped = len(to_judge) - len(judged)
-    judged_ids = {e["id"] for e in judged}
-    kept_state = [e for e in state if e["auto_keep"] or e["id"] in judged_ids]
+    for i, e in enumerate(judged):
+        e["id"] = "c%02d" % (i + 1)                    # display-id = ординал СЛЕПОГО порядка
+    nxt = len(judged)
+    for e in state:                                    # auto-keep: id только для аудита (хосту не видны)
+        if e["auto_keep"]:
+            nxt += 1
+            e["id"] = "c%02d" % nxt
+    kept_state = [e for e in state if "id" in e]       # тир-порядок; судимые за капом — отброшены
     if not judged:                                     # судить нечего (всё auto-keep) → одна фаза
         ranked = [{"text": e["text"], "source": e["source"], "marker": e["marker"]}
                   for e in kept_state[:limit]]
@@ -345,8 +366,8 @@ def _host_judgment_phase1(adv_res, primary, ordered_cands, scores, gcfg, limit, 
     out = dict(lang_out or {})
     out.update({
         "phase": "judgment_request", "nonce": nonce, "question": primary,
-        "candidates": [{"id": e["id"], "text": e["text"], "source": e["source"]}
-                       for e in judged],              # БЕЗ маркеров: тир — серверная тайна до вердикта
+        "candidates": [{"id": e["id"], "text": e["text"]}
+                       for e in judged],              # БЕЗ маркеров/source: тир — серверная тайна
         "rubric": relevance_judge.RUBRIC,
         "note": ("Фаза 2 гейта: оцени КАЖДОГО кандидата по рубрике 0-3 — ЧЕСТНО, строго "
                  "«отвечает ли текст на сам ВОПРОС» (не «полезен ли») — и вызови "
@@ -381,35 +402,44 @@ def _append_judge_audit(adv_dir, record):
 
 def _gate_verdict(advisor_dir, nonce, ratings=None):
     """Фаза 2 host-протокола: применить оценки хоста В КОДЕ и собрать финальные цитаты.
-    Детерминированно, ноль LLM. Nonce single-use (pop) + TTL; advisor_dir обязан совпасть
-    с фазой 1 (иначе nonce сжигается и ответ — честный 🟡, как пустой cite)."""
+    Детерминированно, ноль LLM. Nonce single-use + TTL. M-1 (review): advisor-матч
+    валидируется ДО pop (под локом) — чужой advisor_dir получает 🟡, но НЕ сжигает nonce
+    (иначе self-DoS-грифинг); сжигаем только при валидном заборе законным советником."""
     adv_res = _resolve(advisor_dir)
     now = time.time()
+    key = str(nonce or "")
     with _VERDICT_LOCK:
-        st = _PENDING_VERDICTS.pop(str(nonce or ""), None)   # single-use: сжигаем всегда
-        _purge_expired_verdicts(now)
-    bad = (st is None or st["ts"] + _VERDICT_TTL_S < now
-           or os.path.realpath(st["advisor_dir"]) != os.path.realpath(adv_res))
-    if bad:
+        _purge_expired_verdicts(now)                   # TTL: протухшие недоступны ниже
+        st = _PENDING_VERDICTS.get(key)
+        if st is not None and os.path.realpath(st["advisor_dir"]) == os.path.realpath(adv_res):
+            _PENDING_VERDICTS.pop(key, None)           # single-use: сжигаем ТОЛЬКО валидный забор
+        else:
+            st = None
+    if st is None:
         return {"quotes": [], "best": None, "marker": "🟡",
-                "note": ("Вердикт не принят: nonce неизвестен, истёк или уже использован. "
-                         "Сертифицированных цитат нет — иди 🟡, НЕ выдумывай. Нужны цитаты — "
-                         "вызови cite заново (новая сессия судейства).")}
+                "note": ("Вердикт не принят: nonce неизвестен, истёк, уже использован или не "
+                         "соответствует советнику. Сертифицированных цитат нет — иди 🟡, НЕ "
+                         "выдумывай. Нужны цитаты — вызови cite заново (новая сессия судейства).")}
     rmap = ratings if isinstance(ratings, dict) else {}
     norm = {e["id"]: _coerce_rating(rmap.get(e["id"]))       # нет оценки → 0 (fail-closed)
             for e in st["candidates"] if not e["auto_keep"]}
     ranked, kept_ids = [], set()
-    for e in st["candidates"]:                               # порядок фазы 1 = 🔵-приоритет + косинус
+    for e in st["candidates"]:                               # СЕРВЕРНЫЙ тир-порядок (🔵-приоритет),
+                                                             # НЕ display-порядок фазы 1 (тот слепой)
         if len(ranked) >= st["limit"]:
             break
         if e["auto_keep"] or norm.get(e["id"], 0) >= st["rel_threshold"]:
             ranked.append({"text": e["text"], "source": e["source"], "marker": e["marker"]})
             kept_ids.add(e["id"])
+    # I-2 (review): аудит самодостаточен для будущего выборочного ре-аудита ollam-ой —
+    # nonce-стейт popped, значит ЧТО судили (text+source) обязано жить в самой записи.
+    # Корпуса PD, файл под advisors/*/build (гитигнор) — утечки в репо нет.
     record = {"ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
               "kind": "host_judge_verdict", "nonce": nonce,
               "question": st["question"], "advisor_dir": st["advisor_dir"],
               "rel_threshold": st["rel_threshold"], "dropped_over_cap": st["dropped"],
-              "candidates": [{"id": e["id"], "marker": e["marker"], "auto_keep": e["auto_keep"],
+              "candidates": [{"id": e["id"], "text": e["text"], "source": e["source"],
+                              "marker": e["marker"], "auto_keep": e["auto_keep"],
                               "rating": None if e["auto_keep"] else norm.get(e["id"], 0),
                               "kept": e["id"] in kept_ids} for e in st["candidates"]]}
     out = _cite_result(ranked, st.get("lang"))

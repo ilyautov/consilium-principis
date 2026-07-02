@@ -72,8 +72,11 @@ def test_host_cite_returns_judgment_request_without_markers(host_env):
     assert r["question"] == "q"
     assert r["candidates"], "кандидаты должны быть"
     for c in r["candidates"]:
-        assert set(c) == {"id", "text", "source"}      # НИКАКИХ маркеров/тиров в фазе 1
-    assert "🔵" not in json.dumps(r, ensure_ascii=False)  # тир не утекает вообще
+        # НИКАКИХ маркеров/тиров/скоров/source в фазе 1 (I-1: source коррелирует с тиром —
+        # первоисточник vs комментарий; для оценки «отвечает ли текст» провенанс не нужен)
+        assert set(c) == {"id", "text"}
+    dumped = json.dumps(r, ensure_ascii=False)
+    assert "🔵" not in dumped and "🟢" not in dumped   # тир не утекает вообще
     assert "quotes" not in r                           # цитат до вердикта НЕТ
     assert "gate_verdict" in r["note"]
 
@@ -91,8 +94,9 @@ def test_candidates_capped_and_drop_count_logged(host_env):
     r = mcp_server._cite(adv, "q", use_kernels=False, limit=4)
     assert len(r["candidates"]) == mcp_server._HOST_JUDGE_CAP == 12
     assert r["candidates_dropped"] == 8
-    # кап — top-N по primary-косинусу (порядок пула убывающий)
+    # кап — top-N по primary-косинусу (порядок пула убывающий); id — ординалы этого порядка
     assert [c["text"] for c in r["candidates"]] == [p["text"] for p in pool[:12]]
+    assert [c["id"] for c in r["candidates"]] == ["c%02d" % i for i in range(1, 13)]
 
 
 def test_lexical_no_band_all_verbatim_candidates_judged(monkeypatch, host_env):
@@ -166,18 +170,44 @@ def test_threshold_applied_in_code_not_by_host(host_env):
     assert v["best"]["quote"]["text"] == pool[1]["text"]
 
 
-def test_markers_come_from_server_tier_and_blue_inclusion_priority(monkeypatch, host_env):
-    # 🔵 глубоко в хвосте по косинусу всё равно ПЕРВЫЙ (инклюжн-приоритет, как в early-exit);
-    # маркеры в вердикте — из серверного стейта, хост их не подаёт и подать не может
+def test_phase1_display_order_is_tier_blind(monkeypatch, host_env):
+    # I-1: blues-first порядок фазы 1 был ОРАКУЛОМ ТИРА (низкий id ⇒ вероятно 🔵 ⇒
+    # мотивированный хост селективно инфлейтит именно их). Порядок подачи и ординалы id —
+    # слепые к тиру: чистый primary-косинус desc. Глубокий 🔵 НЕ всплывает первым.
     pool, adv = host_env
-    monkeypatch.setattr(mcp_server, "_fidelity_check", _fidelity_by_blue_set(("passage-15",)))
+    six = _pool(6)
+    monkeypatch.setattr(_eval, "retrieve", lambda q, a, top_k=8: list(six))
+    monkeypatch.setattr(mcp_server, "_fidelity_check", _fidelity_by_blue_set(("passage-05",)))
     r = _phase1(adv, limit=2)
-    assert [c["text"] for c in r["candidates"]][0] == "passage-15 body of the candidate"
+    assert [c["text"] for c in r["candidates"]] == [p["text"] for p in six]  # косинус, не тир
+    assert [c["id"] for c in r["candidates"]] == ["c%02d" % i for i in range(1, 7)]
+
+
+def test_markers_come_from_server_tier_and_blue_inclusion_priority(monkeypatch, host_env):
+    # инклюжн-приоритет 🔵 живёт в СЕРВЕРНОМ стейте (тир-порядок), не в display-порядке:
+    # 🔵 последний по косинусу — в вердикте всё равно ПЕРВЫЙ; маркеры хост не подаёт
+    pool, adv = host_env
+    six = _pool(6)
+    monkeypatch.setattr(_eval, "retrieve", lambda q, a, top_k=8: list(six))
+    monkeypatch.setattr(mcp_server, "_fidelity_check", _fidelity_by_blue_set(("passage-05",)))
+    r = _phase1(adv, limit=2)
     v = mcp_server._gate_verdict(adv, r["nonce"], {c["id"]: 3 for c in r["candidates"]})
-    assert _texts(v) == ["passage-15 body of the candidate",
+    assert _texts(v) == ["passage-05 body of the candidate",
                          "passage-00 body of the candidate"]
     assert [q["marker"] for q in v["quotes"]] == ["🔵", "🟢"]
     assert v["best"]["marker"] == "🔵"
+
+
+def test_tier_blind_cap_drops_deep_blue(monkeypatch, host_env):
+    # цена анти-оракула (задокументирована): кап тоже слепой — 🔵 глубже капа по косинусу
+    # отбрасывается (не судился — не цитата), тир НЕ протаскивает его в обход слепоты
+    pool, adv = host_env                               # 20 кандидатов, кап 12
+    monkeypatch.setattr(mcp_server, "_fidelity_check", _fidelity_by_blue_set(("passage-15",)))
+    r = _phase1(adv, limit=4)
+    assert "passage-15 body of the candidate" not in [c["text"] for c in r["candidates"]]
+    assert r["candidates_dropped"] == 8
+    v = mcp_server._gate_verdict(adv, r["nonce"], {c["id"]: 3 for c in r["candidates"]})
+    assert all(q["marker"] == "🟢" for q in v["quotes"])   # глубокий 🔵 не всплыл и в вердикте
 
 
 def test_missing_ratings_are_zero_fail_closed(host_env):
@@ -222,12 +252,18 @@ def test_nonce_expires_by_ttl(host_env):
     assert v["quotes"] == [] and v["marker"] == "🟡"
 
 
-def test_advisor_dir_mismatch_is_yellow(host_env, tmp_path):
+def test_advisor_dir_mismatch_is_yellow_and_does_not_burn_nonce(host_env, tmp_path):
+    # M-1: чужой advisor_dir → 🟡, но nonce НЕ сжигается (иначе self-DoS-грифинг);
+    # законный советник забирает вердикт ровно один раз
     pool, adv = host_env
     r = _phase1(adv)
+    good = {c["id"]: 3 for c in r["candidates"]}
     other = str(tmp_path / "other-adv")
-    v = mcp_server._gate_verdict(other, r["nonce"], {c["id"]: 3 for c in r["candidates"]})
+    v = mcp_server._gate_verdict(other, r["nonce"], good)
     assert v["quotes"] == [] and v["marker"] == "🟡"
+    assert mcp_server._gate_verdict(adv, r["nonce"], good)["quotes"]   # цел для законного
+    v3 = mcp_server._gate_verdict(adv, r["nonce"], good)               # single-use держится
+    assert v3["quotes"] == [] and v3["marker"] == "🟡"
 
 
 def test_audit_jsonl_written_with_ratings_and_decisions(host_env):
@@ -244,6 +280,10 @@ def test_audit_jsonl_written_with_ratings_and_decisions(host_env):
     assert by_id[ids[0]]["rating"] == 3 and by_id[ids[0]]["kept"] is True
     assert by_id[ids[1]]["rating"] == 1 and by_id[ids[1]]["kept"] is False
     assert by_id[ids[2]]["rating"] == 0                 # неоценённый залогирован нулём
+    # I-2: аудит самодостаточен для будущего ре-аудита (nonce-стейт popped) —
+    # ЧТО судили обязано быть в записи: text + source per candidate
+    assert by_id[ids[0]]["text"] == pool[0]["text"] and by_id[ids[0]]["source"] == "src"
+    assert all(c.get("text") for c in rec["candidates"])
     assert rec["rel_threshold"] == 2 and rec["dropped_over_cap"] == 8
 
 

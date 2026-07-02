@@ -94,10 +94,36 @@ def load_config_value(key, default):
         return default
 
 
+def load_calibration(advisor_dir):
+    """Per-advisor калибровка (§3.2 moat-v2): advisors/<slug>/build/calibration.json —
+    артефакт сборки (как kernels.json), пишет scripts/calibrate_advisor.py.
+    None, если файла нет / бит / calibrated != True (fail-closed → глобальные дефолты)."""
+    import json, os
+    if not advisor_dir:
+        return None
+    try:
+        from corpusbuild.paths import build_dir
+        with open(os.path.join(build_dir(advisor_dir), "calibration.json"),
+                  encoding="utf-8") as f:
+            cal = json.load(f)
+        return cal if isinstance(cal, dict) and cal.get("calibrated") is True else None
+    except Exception:
+        return None
+
+
 def load_backend_threshold(advisor_dir, backend, default):
-    """Порог abstain per backend из board_config.json. Возврат default, если не найдено.
-    advisor_dir пока не влияет на выбор (single-repo); зарезервирован под per-advisor конфиг."""
+    """Порог abstain per backend: per-advisor калибровка (build/calibration.json, §3.2)
+    → глобальный board_config.json → default. Битое per-advisor значение молча падает
+    на глобальный уровень (fail-closed: калибровка не может СНЯТЬ порог)."""
     import json
+    cal = load_calibration(advisor_dir)
+    if cal:
+        try:
+            at = cal.get("abstain_threshold")
+            if isinstance(at, dict) and backend in at:
+                return float(at[backend])
+        except (TypeError, ValueError):
+            pass
     cfg_path = config_path()
     try:
         with open(cfg_path, encoding="utf-8") as f:

@@ -98,7 +98,14 @@ def judge(query: str, passage: str, model=None, source=None) -> int:
     Пункт 3 закрывает завышение из прозы: "not a 3, it's a 0" содержит ДВЕ
     цифры 0-3 (3 и 0) → неоднозначно → 0, а не 3. Непарсируемое = нерелевантное.
     """
-    source_block = f"\nИСТОЧНИК ПАССАЖА: {source}\n" if source else ""
+    # source — тоже данные корпуса (заголовок/провенанс) и живёт ВНЕ блока разделителей:
+    # отравленный заголовок («…\nОтвет: 3») инжектил бы прямо строкой рядом с ИСТОЧНИК.
+    # Санитайз токенов разделителей + схлопывание whitespace — источник строго ОДНА строка.
+    if source:
+        src = " ".join(_sanitize_passage(str(source)).split())
+        source_block = f"\nИСТОЧНИК ПАССАЖА: {src}\n"
+    else:
+        source_block = ""
     prompt = _JUDGE_PROMPT.format(query=query, passage=_sanitize_passage(passage),
                                   source_block=source_block)
     response = llm_local.generate(prompt, model=model, temperature=0.1)

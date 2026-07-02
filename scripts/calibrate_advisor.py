@@ -21,16 +21,22 @@
     глобальный 0.65 поверх наблюдённого потолка 0.612), кап 0.95.
 
 Куда пишется: advisors/<slug>/build/calibration.json (артефакт сборки, гитигнор —
-как kernels.json). Резолюция per-advisor → глобальный фоллбэк:
-  • engine.load_backend_threshold читает calibration.json ПЕРЕД board_config;
-  • relevance_gate._gate_config оверлеит band_lo/band_hi из calibration.json;
-  • doctor показывает флаг calibrated per советник (нет файла = false, глоб. дефолты).
+как kernels.json). Резолюция per-advisor → глобальный фоллбэк, с ДВУМЯ инвариантами:
+  • ОДНОНАПРАВЛЕННОСТЬ (tighten-only, review I-1): калибровка может только УЖЕСТОЧИТЬ —
+    engine.load_backend_threshold применяет max(calibrated, глобальный порог);
+    relevance_gate._gate_config берёт band_lo как есть (шире судимая зона — безопасно),
+    а band_hi = max(calibrated, глобальный): авто-оценка из 12 камуфляж-вопросов не
+    имеет права СУЗИТЬ валидированный не-судимый регион (>band_hi = auto-keep без судьи);
+  • STALENESS (review I-2): calibration.json несёт corpus_sha256; резолюция
+    (engine.load_calibration) игнорирует калибровку при мисматче с текущим корпусом
+    ИЛИ отсутствии поля (fail-closed) — пересобрал корпус → перезапусти калибровку;
+  • doctor: не калиброван / калиброван (raw + РЕЗОЛВНУТЫЕ значения, когда floor
+    активен) / калиброван-но-УСТАРЕЛ.
 
 Требует semantic-тира (ollama+bge-m3). Нет → честный skip: файл НЕ пишется,
 calibrated=false в doctor, глобальные дефолты продолжают действовать.
 """
 import json
-import hashlib
 import os
 import random
 import re
@@ -177,12 +183,10 @@ def calibration_file(advisor_dir):
 
 
 def _corpus_sha256(advisor_dir):
-    from corpusbuild.paths import corpus_path
-    try:
-        with open(corpus_path(advisor_dir), "rb") as f:
-            return hashlib.sha256(f.read()).hexdigest()
-    except Exception:
-        return None
+    """Единый кэшированный хэшер — engine.corpus_sha256 (review: не форкать).
+    По этому хэшу резолюция инвалидирует УСТАРЕВШУЮ калибровку (review I-2)."""
+    import engine
+    return engine.corpus_sha256(advisor_dir)
 
 
 def write_calibration(advisor_dir, result):
@@ -226,7 +230,11 @@ def calibrate(advisor_dir, n_ans=N_ANS_DEFAULT, seed=0, retrieve_fn=None, write=
         "abstain_threshold": {"semantic": comp["abstain_threshold"]},
         "relevance_gate": {"band_lo": comp["band_lo"], "band_hi": comp["band_hi"]},
         "rule": (f"threshold = best_operating_point (max youden); band_lo = threshold - "
-                 f"{LO_MARGIN}; band_hi = max(camouflage OOC) + {HI_MARGIN}, cap {HI_CAP}"),
+                 f"{LO_MARGIN}; band_hi = max(camouflage OOC) + {HI_MARGIN}, cap {HI_CAP}; "
+                 "резолюция ОДНОНАПРАВЛЕННА (tighten-only): threshold и band_hi применяются "
+                 "как max(calibrated, глобальный) — ослабить валидированные значения "
+                 "калибровка не может; при мисматче corpus_sha256 с текущим корпусом "
+                 "калибровка игнорируется целиком (staleness, fail-closed)"),
         # Честная оговорка метода: answerable-прóбы (verbatim-предложения корпуса, даже с
         # отброшенным self-hit) скорят ВЫШЕ реальных парафраз-вопросов → порог фактически
         # садится чуть выше камуфляж-потолка. Направление ошибки fail-closed (лишний 🟡,

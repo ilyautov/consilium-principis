@@ -116,8 +116,15 @@ def _gate_config(advisor_dir=None):
         # полосы (fail-OPEN направление). Откатываем ОБА оверрайда к калиброванным дефолтам.
         cfg["band_lo"] = BAND_LO
         cfg["band_hi"] = BAND_HI
-    # §3.2: per-advisor полоса из build/calibration.json (приоритетнее глобальной —
-    # она посчитана по РАСПРЕДЕЛЕНИЮ ЭТОГО корпуса). Валидна только пара lo < hi.
+    # §3.2: per-advisor полоса из build/calibration.json (посчитана по распределению
+    # ЭТОГО корпуса; staleness по corpus_sha256 валидирует engine.load_calibration).
+    # ОДНОНАПРАВЛЕННО — калибровка может только УЖЕСТОЧИТЬ (review I-1):
+    #   • band_lo применяется как есть (ниже lo → шире судимая зона → безопасно);
+    #   • band_hi может только ПОДНЯТЬСЯ над значением, действующим без калибровки
+    #     (глобальный дефолт/оверрайд board_config — cfg["band_hi"] на этой строке):
+    #     выше band_hi = auto-keep БЕЗ судьи (gate_quote и host-фаза-1), и сузить этот
+    #     не-судимый регион 12-вопросная камуфляж-оценка + 0.05 запаса права не имеет
+    #     (глобальный 0.65 существует ПОТОМУ, что камуфляж пробивал 0.612 при hi 0.60).
     try:
         import engine as _engine
         cal = _engine.load_calibration(advisor_dir)
@@ -129,7 +136,8 @@ def _gate_config(advisor_dir=None):
             try:
                 lo, hi = float(rg["band_lo"]), float(rg["band_hi"])
                 if lo < hi:
-                    cfg["band_lo"], cfg["band_hi"] = lo, hi
+                    cfg["band_lo"] = lo
+                    cfg["band_hi"] = max(hi, cfg["band_hi"])   # tighten-only floor
             except (KeyError, TypeError, ValueError):
                 pass                                   # битая калибровка → глобальная полоса
     return cfg

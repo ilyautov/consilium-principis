@@ -70,12 +70,9 @@ def prompt_hash():
 
 
 def corpus_hash(advisor_dir):
-    from corpusbuild.paths import corpus_path
-    try:
-        with open(corpus_path(advisor_dir), "rb") as f:
-            return _sha(f.read())
-    except Exception:
-        return None
+    """Единый кэшированный хэшер — engine.corpus_sha256 (review: не форкать)."""
+    import engine
+    return engine.corpus_sha256(advisor_dir)
 
 
 # ───────────────────────── батарея ───────────────────────────────────────────

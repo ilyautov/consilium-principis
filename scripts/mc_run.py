@@ -49,6 +49,25 @@ from decision_map import KIND_EVENT, DIRECTION_MIN, validate_map
 from safe_expr import SafeExprEvalError, compile_expr
 
 N_DEFAULT = 10_000
+HISTOGRAM_BINS = 20    # фикс-число бинов opt-in гистограммы (детерминизм подачи)
+
+
+def _histogram(o_values, option_ids, bins=HISTOGRAM_BINS):
+    """Opt-in гистограмма исходов (Ф3, рендер-слой): равные бины по ОБЩЕМУ min/max
+    совместных сэмплов всех вариантов — бины сравнимы между вариантами (тот же принцип,
+    что один env на сценарий). Детерминирована (чистая функция от o_values). Вырожденный
+    случай hi==lo (все исходы — одна точка) → всё в первом бине, не деление на ноль."""
+    lo = min(min(o_values[oid]) for oid in option_ids)
+    hi = max(max(o_values[oid]) for oid in option_ids)
+    width = (hi - lo) / bins
+    counts = {}
+    for oid in option_ids:
+        c = [0] * bins
+        for v in o_values[oid]:
+            i = int((v - lo) / width) if width > 0.0 else 0
+            c[min(max(i, 0), bins - 1)] += 1          # v == hi → последний бин, не выход за край
+        counts[oid] = c
+    return {"bins": bins, "lo": lo, "hi": hi, "counts": counts}
 
 
 def _percentile(sorted_vals, q):
@@ -74,11 +93,14 @@ def _pearson(xs, ys):
     return abs(cov / math.sqrt(vx * vy))
 
 
-def mc_run(m, seed, n=N_DEFAULT):
+def mc_run(m, seed, n=N_DEFAULT, histogram=False):
     """Прогоняет валидную карту решения n раз с сидом → dict результата (спека §3).
 
     Fail-closed: невалидная карта, нечисловые seed/n, деление на ноль в формуле →
     ValueError с RU-текстом, никаких частичных чисел.
+
+    histogram=True (Ф3, opt-in) ДОБАВЛЯЕТ ключ `histogram` (детерминированные бины
+    по совместным сэмплам) — дефолтный выход остаётся байт-в-байт прежним.
     """
     if not isinstance(seed, int) or isinstance(seed, bool):
         raise ValueError("Сид расчёта должен быть целым числом — получено: %r." % (seed,))
@@ -173,7 +195,7 @@ def mc_run(m, seed, n=N_DEFAULT):
             "Расчёт остановлен (fail-closed): агрегаты переполнились — магнитуды "
             "модели за пределами разумного, проверьте диапазоны и формулы.")
 
-    return {
+    out = {
         "options": options_out,
         "pairwise": {a: {b: pair_wins[a][b] / n for b in pair_wins[a]}
                      for a in option_ids},
@@ -185,3 +207,6 @@ def mc_run(m, seed, n=N_DEFAULT):
         "label": {"n_uncertainties": len(uncertainties), "seed": seed, "n": n,
                   "confirmed": True},
     }
+    if histogram:                                     # opt-in: дефолтный выход не тронут
+        out["histogram"] = _histogram(o_values, option_ids)
+    return out

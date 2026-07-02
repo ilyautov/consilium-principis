@@ -65,6 +65,8 @@ def check_calibration(root="."):
     try:
         from corpusbuild.paths import corpus_path
         import engine
+        import relevance_gate
+        from engine.semantic import SemanticEngine
         adv_root = os.path.join(root, "advisors")
         parts = []
         if os.path.isdir(adv_root):
@@ -72,14 +74,39 @@ def check_calibration(root="."):
                 p = os.path.join(adv_root, d)
                 if not (os.path.isdir(p) and os.path.isfile(corpus_path(p))):
                     continue
-                cal = engine.load_calibration(p)
-                if cal:
-                    t = (cal.get("abstain_threshold") or {}).get("semantic")
-                    rg = cal.get("relevance_gate") or {}
-                    parts.append(f"{d}: калиброван (t={t}, полоса "
-                                 f"[{rg.get('band_lo')}, {rg.get('band_hi')}])")
-                else:
+                raw = engine.load_calibration(p, validate_corpus=False)
+                if not raw:
                     parts.append(f"{d}: не калиброван (глобальные дефолты)")
+                    continue
+                if engine.load_calibration(p) is None:  # staleness (review I-2)
+                    parts.append(f"{d}: калиброван, но УСТАРЕЛ (корпус пересобран) — "
+                                 "действуют глобальные дефолты; перезапусти calibrate_advisor")
+                    continue
+                t_raw = (raw.get("abstain_threshold") or {}).get("semantic")
+                rg_raw = raw.get("relevance_gate") or {}
+                s = (f"{d}: калиброван (t={t_raw}, полоса "
+                     f"[{rg_raw.get('band_lo')}, {rg_raw.get('band_hi')}]")
+                # РЕЗОЛВНУТЫЕ значения ≠ сырым → активен tighten-only floor (review I-1):
+                # калибровка не может ослабить валидированные пороги — показываем оба.
+                floors = []
+                try:
+                    t_res = engine.load_backend_threshold(
+                        p, "semantic", SemanticEngine.DEFAULT_THRESHOLD)
+                    if isinstance(t_raw, (int, float)) and abs(t_res - float(t_raw)) > 1e-9:
+                        floors.append(f"t→{t_res} (floor)")
+                except Exception:
+                    pass
+                try:
+                    cfg = relevance_gate._gate_config(p)
+                    hi_raw = rg_raw.get("band_hi")
+                    if isinstance(hi_raw, (int, float)) and \
+                            abs(cfg["band_hi"] - float(hi_raw)) > 1e-9:
+                        floors.append(f"band_hi→{cfg['band_hi']} (floor)")
+                except Exception:
+                    pass
+                if floors:
+                    s += "; действует: " + ", ".join(floors)
+                parts.append(s + ")")
         detail = "; ".join(parts) if parts else "нет собранных советников"
         return {"name": "calibration", "ok": True, "detail": detail}
     except Exception as e:                             # диагностика не роняет doctor

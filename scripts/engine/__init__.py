@@ -94,10 +94,43 @@ def load_config_value(key, default):
         return default
 
 
-def load_calibration(advisor_dir):
+_CORPUS_SHA_CACHE = {}  # abspath(corpus.jsonl) -> (mtime_ns, size, sha256)
+
+
+def corpus_sha256(advisor_dir):
+    """sha256 содержимого corpus.jsonl советника (полный hex). ЕДИНЫЙ хэшер для
+    калибровки/moat-check (не форкать). Кэш по (mtime_ns, size) — резолюция конфига
+    зовёт часто, а корпус меняется только пересборкой. None при ошибке/нет корпуса."""
+    import hashlib, os
+    try:
+        from corpusbuild.paths import corpus_path
+        cp = corpus_path(advisor_dir)
+        st = os.stat(cp)
+        key = os.path.abspath(cp)
+        hit = _CORPUS_SHA_CACHE.get(key)
+        if hit and hit[0] == st.st_mtime_ns and hit[1] == st.st_size:
+            return hit[2]
+        h = hashlib.sha256()
+        with open(cp, "rb") as f:
+            for block in iter(lambda: f.read(1 << 20), b""):
+                h.update(block)
+        sha = h.hexdigest()
+        _CORPUS_SHA_CACHE[key] = (st.st_mtime_ns, st.st_size, sha)
+        return sha
+    except Exception:
+        return None
+
+
+def load_calibration(advisor_dir, validate_corpus=True):
     """Per-advisor калибровка (§3.2 moat-v2): advisors/<slug>/build/calibration.json —
     артефакт сборки (как kernels.json), пишет scripts/calibrate_advisor.py.
-    None, если файла нет / бит / calibrated != True (fail-closed → глобальные дефолты)."""
+    None, если файла нет / бит / calibrated != True (fail-closed → глобальные дефолты).
+
+    STALENESS (review I-2): калибровка валидна только для корпуса, на котором посчитана.
+    validate_corpus=True (дефолт — ВСЕ резолюционные пути): stored corpus_sha256 !=
+    текущий хэш корпуса ЛИБО поля нет (легаси) → None (fail-closed: устаревшие пороги
+    молча не применяются — действуют глобальные дефолты). validate_corpus=False —
+    сырой файл для диагностики (doctor показывает «калиброван, но УСТАРЕЛ»)."""
     import json, os
     if not advisor_dir:
         return None
@@ -106,31 +139,42 @@ def load_calibration(advisor_dir):
         with open(os.path.join(build_dir(advisor_dir), "calibration.json"),
                   encoding="utf-8") as f:
             cal = json.load(f)
-        return cal if isinstance(cal, dict) and cal.get("calibrated") is True else None
+        if not (isinstance(cal, dict) and cal.get("calibrated") is True):
+            return None
+        if validate_corpus:
+            stored = cal.get("corpus_sha256")
+            if not stored or stored != corpus_sha256(advisor_dir):
+                return None                            # stale / легаси без хэша → fail-closed
+        return cal
     except Exception:
         return None
 
 
 def load_backend_threshold(advisor_dir, backend, default):
     """Порог abstain per backend: per-advisor калибровка (build/calibration.json, §3.2)
-    → глобальный board_config.json → default. Битое per-advisor значение молча падает
-    на глобальный уровень (fail-closed: калибровка не может СНЯТЬ порог)."""
+    поверх глобального board_config.json / default.
+
+    ОДНОНАПРАВЛЕННОЕ ПРАВИЛО (review I-1): калибровка может только ПОДНЯТЬ порог
+    (ужесточить abstention) над значением, которое действовало бы БЕЗ неё (глобальный
+    конфиг или default) — возврат max(calibrated, base). Авто-порог из ~24 проб не
+    имеет права ОПУСТИТЬ рук-валидированный пол: ниже порог = шире не-abstain зона =
+    fail-open. Битое per-advisor значение молча падает на глобальный уровень."""
     import json
+    try:
+        with open(config_path(), encoding="utf-8") as f:
+            at = json.load(f).get("abstain_threshold")
+        base = _pick_threshold(at, backend, default)
+    except Exception:
+        base = default
     cal = load_calibration(advisor_dir)
     if cal:
         try:
             at = cal.get("abstain_threshold")
             if isinstance(at, dict) and backend in at:
-                return float(at[backend])
+                return max(float(at[backend]), base)   # tighten-only floor
         except (TypeError, ValueError):
             pass
-    cfg_path = config_path()
-    try:
-        with open(cfg_path, encoding="utf-8") as f:
-            at = json.load(f).get("abstain_threshold")
-    except Exception:
-        return default
-    return _pick_threshold(at, backend, default)
+    return base
 
 
 # --- резолвер: детект → кэш per advisor → деградация ---

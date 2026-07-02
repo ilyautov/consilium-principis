@@ -309,3 +309,67 @@ def test_save_journal_line_flows_into_nudge(board_root):
     s = _synth_session(calculation={"journal_line": saved["journal_line"]})
     n = dispatch("render_session", {"session": s, "surface": "md"})["outcome_nudge"]
     assert saved["path"] in n and "Прогноз: 📐" in n
+
+
+# ── INSTRUCTIONS: правило «КАРТА РЕШЕНИЯ» (хост видит ТОЛЬКО их) ─────────────
+
+def _instr():
+    from mcp_server import INSTRUCTIONS
+    return INSTRUCTIONS
+
+
+def test_instructions_carry_decision_map_rule():
+    I = _instr()
+    assert "КАРТА РЕШЕНИЯ" in I and "📐" in I
+    low = I.lower()
+    # (а) детект вопроса-РЕШЕНИЯ, предложить (не навязать), отказ = обычный Режим B
+    assert "вопрос-решение" in low and "не навязывай" in low
+    # (б) тройки «худший реалистичный / типичный / лучший» + анти-анкоринг + provenance чисел
+    assert "худший реалистичный" in low and "типичный" in low
+    assert "не называет числа первым" in low
+    assert "confirmed_by_user" in I and "elicited" in I
+    # (в) формула: слова + выражение, юзер визирует, словесная версия — вслух перед расчётом
+    assert "визиру" in low and "перед расчётом" in low
+    # (г) статус-кво обязателен
+    assert "статус-кво" in low and "status_quo" in I
+    # (е) лейбл рядом с мнениями, никогда не смешивать; расчёт без карты не существует
+    assert "не смешива" in low
+    assert "не существует" in low
+
+
+def test_instructions_wire_decision_tools_flow():
+    I = _instr()
+    for tool in ("validate_decision_map", "run_calculation", "save_decision_map"):
+        assert tool in I
+    assert "label_text" in I                   # рамка — обязательная часть подачи
+    assert "2×2" in I                          # top_uncertainties → назвать оси (Ф3 позже)
+    assert "journal_line" in I                 # мост в запись §4.3
+
+
+def test_instructions_rule0_lists_save_as_mutating():
+    I = _instr()
+    rule0 = I.split("1. ТИХАЯ")[0]             # преамбула + правило 0
+    assert "save_decision_map" in rule0        # запись артефакта = мутирующий тул
+
+
+def test_fewshot_formulas_selfconsistent_with_safe_expr():
+    # самосогласованность: КАЖДЫЙ few-shot пример из INSTRUCTIONS компилируется нашим AST —
+    # формула в правиле не может протухнуть относительно синтаксиса safe_expr
+    import mcp_server
+    from safe_expr import compile_expr
+    models = mcp_server._FEWSHOT_MODELS
+    assert len(models) >= 3                    # EV, cost-benefit+альт.стоимость, гонка+событие
+    for m in models:
+        names = set(re.findall(r"[A-Za-z_][A-Za-z0-9_]*", m["expr"])) - {"if", "else", "min", "max"}
+        fn = compile_expr(m["expr"], names)    # SafeExprError → тест падает
+        assert callable(fn)
+        assert m["expr"] in _instr()           # формула дошла до хоста дословно
+        assert m["words"] and _has_cyrillic(m["words"])   # словесная версия — образец визирования
+
+
+def test_fewshot_covers_three_model_families():
+    import mcp_server
+    joined = " ".join(m["name"].lower() for m in mcp_server._FEWSHOT_MODELS)
+    assert "ev" in joined                      # EV-сравнение
+    assert "альтернативн" in joined            # cost-benefit с альтернативной стоимостью
+    assert "гонка" in joined                   # гонка-за-рынок с событием-риском

@@ -996,6 +996,75 @@ def _run_calculation(map, seed=_CALC_SEED_DEFAULT, n=None):
     return res
 
 
+_DECISIONS_DIR = "decisions"     # артефакты карт — в корне доски, рядом с principis.md
+_SLUG_RE = r"[a-z0-9][a-z0-9-]{0,62}"   # строгий слаг: fail-closed отказ (не тихая санация) —
+                                        # '../x', абсолютный путь, юникод НЕ превращаем в «похожий»
+
+
+def _decision_predicted(map, res):
+    """RU-сводка прогноза из результата МК: лучший вариант по P(лучший) + ожидание метрики.
+    Это `predicted` записи §4.3/§6 — при резолюции ⏳→✅/❌ сравнивается с фактом."""
+    best = max(res["p_best"], key=res["p_best"].get)
+    name = next((o.get("name") or o["id"] for o in map["options"] if o.get("id") == best), best)
+    return ("лучший вариант — «%s»: P(лучший) %.2f, ожидание %.4g (%s)"
+            % (name, res["p_best"][best], res["options"][best]["mean"],
+               map["stakes"]["metric"]))
+
+
+def _save_decision_map(map, slug=None, seed=_CALC_SEED_DEFAULT, n=None):
+    """Артефакт карты decisions/<дата>-<slug>.json под _root() — МУТИРУЮЩИЙ тул, зовётся
+    ТОЛЬКО с явного согласия юзера (правило 0). Внутри файла — карта + МК-сводка (predicted);
+    наружу — journal_line («Прогноз: 📐 …») для записи журнала §4.3. Fail-closed: невалидная
+    карта / кривой слаг / путь вне корня → отказ ДО любой записи."""
+    import re
+    from decision_map import validate_map
+    from mc_run import N_DEFAULT, mc_run
+    errors = validate_map(map)
+    if errors:
+        return {"error": "Карта решения не проходит гейты честности — сохранять нечего "
+                         "(fail-closed).",
+                "errors": errors, "hint": _RELAY_AS_QUESTIONS_HINT}
+    if slug is not None:
+        if not isinstance(slug, str) or not re.fullmatch(_SLUG_RE, slug):
+            return {"error": "Слаг карты должен быть из строчной латиницы, цифр и дефисов "
+                             "(a-z0-9-), без путей и юникода — например ship-or-wait.",
+                    "hint": "Дай простой латинский слаг или опусти его — я построю сам."}
+        s = slug
+    else:
+        s = re.sub(r"[^a-z0-9]+", "-",
+                   str(map.get("question") or "").lower()).strip("-")[:40] or "decision"
+    n_eff = N_DEFAULT if n is None else n
+    try:
+        res = mc_run(map, seed, n_eff)                # сводка в файле = тот же детерминизм
+    except ValueError as e:
+        return {"error": str(e)}
+    day = time.strftime("%Y-%m-%d")
+    base = os.path.join(_DECISIONS_DIR, "%s-%s" % (day, s))
+    p, err = _resolve_under_root(base + ".json")      # write-side traversal-гард (пояс+подтяжки)
+    if err:
+        return err
+    i = 1
+    while os.path.exists(p):                          # коллизия имени → суффикс, не перезапись
+        i += 1
+        p, err = _resolve_under_root("%s-%d.json" % (base, i))
+        if err:
+            return err
+    predicted = _decision_predicted(map, res)
+    rel = os.path.relpath(p, os.path.realpath(_root())).replace(os.sep, "/")
+    os.makedirs(os.path.dirname(p), exist_ok=True)
+    with open(p, "w", encoding="utf-8") as f:
+        json.dump({"kind": "decision_map", "saved": day, "map": map,
+                   "calculation": {"seed": seed, "n": n_eff,
+                                   "predicted": predicted, "result": res}},
+                  f, ensure_ascii=False, indent=2)
+    return {"ok": True, "path": rel, "predicted": predicted,
+            "journal_line": "- Прогноз: 📐 %s (карта: %s)" % (predicted, rel),
+            "note": ("Карта сохранена (этот тул зовут ТОЛЬКО с согласия юзера). journal_line — "
+                     "готовая строка прогноза: при записи решения в журнал (§4.3) вставь её в "
+                     "запись перед строкой ИСХОД, либо передай блок calculation={journal_line} "
+                     "в render_session — outcome_nudge сам расширится прогнозом.")}
+
+
 def _render_session(session, surface="md", depth="plain", kind="session"):
     """Ход заседания → строка под surface. Контур/гейт 🔵 проходят ДО рендера; тут чистая презентация.
     kind: session (любой ход — реакции+вопросы ИЛИ синтез, авто по наличию synthesis) | opening
@@ -1412,6 +1481,20 @@ TOOLS = {
                                         "n": {"type": "integer"}},
                          "required": ["map"]},
         "handler": _run_calculation,
+    },
+    "save_decision_map": {
+        "description": "Сохранить карту решения артефактом decisions/<дата>-<slug>.json в корне "
+                       "доски (внутри — карта + МК-сводка с predicted). МУТИРУЮЩИЙ тул: зови ТОЛЬКО "
+                       "с явного согласия юзера (правило 0) — предложи ОДИН РАЗ после расчёта. "
+                       "Возвращает path + journal_line («Прогноз: 📐 …») — готовую строку прогноза "
+                       "для записи в журнал решений (§4.3). slug — латиница/цифры/дефисы.",
+        "input_schema": {"type": "object",
+                         "properties": {"map": {"type": "object"},
+                                        "slug": {"type": "string"},
+                                        "seed": {"type": "integer"},
+                                        "n": {"type": "integer"}},
+                         "required": ["map"]},
+        "handler": _save_decision_map,
     },
     "render_session": {
         "description": "ОБЯЗАТЕЛЬНЫЙ финал заседания совета в Cowork: отрисовать canon-объект "

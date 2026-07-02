@@ -158,3 +158,87 @@ def test_run_calculation_bad_seed_fails_ru():
 def test_run_calculation_bad_n_fails_ru():
     r = dispatch("run_calculation", {"map": _valid_map(), "n": 0})
     assert "error" in r and _has_cyrillic(r["error"])
+
+
+# ── save_decision_map: артефакт карты (traversal-гард) + journal_line ───────
+
+@pytest.fixture
+def board_root(tmp_path, monkeypatch):
+    """Корень доски → tmp (write-гард и артефакты не трогают репо)."""
+    import mcp_server
+    monkeypatch.setattr(mcp_server, "_root", lambda: str(tmp_path))
+    return tmp_path
+
+
+def test_save_decision_map_registered():
+    assert "save_decision_map" in {t["name"] for t in list_tools()}
+
+
+def test_save_decision_map_writes_artifact(board_root):
+    r = dispatch("save_decision_map",
+                 {"map": _valid_map(), "slug": "ship-or-wait", "n": 200})
+    assert r["ok"] is True
+    assert re.fullmatch(r"decisions/\d{4}-\d{2}-\d{2}-ship-or-wait\.json", r["path"])
+    doc = json.loads((board_root / r["path"]).read_text(encoding="utf-8"))
+    assert doc["map"]["question"] == _valid_map()["question"]     # карта в файле целиком
+    # МК-сводка (predicted) — в самом файле: при резолюции сравнивается с фактом (§6)
+    assert doc["calculation"]["predicted"]
+    assert doc["calculation"]["result"]["p_best"]
+    assert doc["calculation"]["seed"] == 2026 and doc["calculation"]["n"] == 200
+
+
+def test_save_returns_journal_line_for_43_record(board_root):
+    r = dispatch("save_decision_map", {"map": _valid_map(), "slug": "x", "n": 100})
+    jl = r["journal_line"]
+    assert jl.startswith("- Прогноз: 📐")             # готовая строка записи §4.3
+    assert "(карта: decisions/" in jl and r["path"] in jl
+    assert r["predicted"] in jl
+
+
+def test_save_only_on_consent_directive(board_root):
+    r = dispatch("save_decision_map", {"map": _valid_map(), "slug": "y", "n": 100})
+    assert "соглас" in r["note"].lower()              # директива: только с согласия юзера
+
+
+def test_save_without_slug_falls_back(board_root):
+    # кириллический question не даёт латинского слага → детерминированный fallback
+    r = dispatch("save_decision_map", {"map": _valid_map(), "n": 100})
+    assert r["ok"] and re.fullmatch(r"decisions/\d{4}-\d{2}-\d{2}-decision\.json", r["path"])
+
+
+def test_save_collision_gets_suffix_not_overwrite(board_root):
+    a = dispatch("save_decision_map", {"map": _valid_map(), "slug": "same", "n": 100})
+    b = dispatch("save_decision_map", {"map": _valid_map(), "slug": "same", "n": 100})
+    assert a["path"] != b["path"]
+    assert (board_root / a["path"]).is_file() and (board_root / b["path"]).is_file()
+
+
+def test_save_refuses_invalid_map_no_write(board_root):
+    m = _valid_map()
+    m["uncertainties"][0]["confirmed_by_user"] = False
+    r = dispatch("save_decision_map", {"map": m, "slug": "bad", "n": 100})
+    assert "error" in r and r["errors"]
+    assert not (board_root / "decisions").exists()    # fail-closed: ничего не записано
+
+
+@pytest.mark.parametrize("bad", [
+    "../x",                       # traversal
+    "..",                         # traversal (чистый)
+    "/etc/cron.d/pwn",            # абсолютный путь
+    "\\windows\\x",               # windows-сепараторы
+    "карта-решения",              # unicode вне [a-z0-9-]
+    "Ship-Or-Wait",               # верхний регистр
+    "a b",                        # пробел
+    "a_b",                        # подчёркивание
+    "",                           # пустой
+    "-lead",                      # ведущий дефис (флаго-подобный)
+])
+def test_save_slug_attacks_rejected(board_root, bad):
+    r = dispatch("save_decision_map", {"map": _valid_map(), "slug": bad, "n": 100})
+    assert "error" in r and _has_cyrillic(r["error"])
+    assert not (board_root / "decisions").exists()    # отказ ДО любой записи
+
+
+def test_save_slug_non_string_rejected(board_root):
+    r = dispatch("save_decision_map", {"map": _valid_map(), "slug": 42, "n": 100})
+    assert "error" in r and not (board_root / "decisions").exists()

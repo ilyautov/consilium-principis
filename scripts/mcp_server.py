@@ -1649,7 +1649,7 @@ def _rpc_error(req_id, code, message):
     return {"jsonrpc": "2.0", "id": req_id, "error": {"code": code, "message": message}}
 
 
-# Few-shot модели правила 12 — ЕДИНЫЙ источник: интерполируются в INSTRUCTIONS, а
+# Few-shot модели правила 13 — ЕДИНЫЙ источник: интерполируются в INSTRUCTIONS, а
 # self-consistency-тест компилирует КАЖДУЮ через safe_expr — формула в правиле не может
 # протухнуть относительно синтаксиса движка. words — образец словесной версии (визирует юзер).
 _FEWSHOT_MODELS = [

@@ -109,6 +109,19 @@ def test_gov_anchor_unregistered_is_warning_not_fail(tmp_path):
     assert "не зарегистрирован" in c["detail"] and "freeze" in c["detail"]
 
 
+def test_gov_anchor_malformed_registry_is_loud_failure(tmp_path):
+    # Битый gov_heads.json → доктор кричит (детект подмены отключён), НЕ мягкое «не зарегистрирован».
+    from doctor import check_gov_anchors
+    from governance import registry_path
+    root = str(tmp_path)
+    _build_under(root, "sage", "Корпус при битом реестре.\n")
+    with open(registry_path(root), "w", encoding="utf-8") as f:
+        f.write('{"advisors/sage": ')                         # усечённый JSON
+    c = check_gov_anchors(root)
+    assert c["ok"] is False
+    assert "поврежд" in c["detail"] and "gov_heads.json" in c["detail"]
+
+
 def test_gov_anchor_match_is_quiet_ok(tmp_path):
     from doctor import check_gov_anchors
     from governance import freeze

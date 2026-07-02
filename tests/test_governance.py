@@ -6,6 +6,7 @@
 доказательства → повышение отклонено (остаёшься на текущем тире); понижение — всегда можно.
 """
 import os, sys
+import pytest
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "scripts"))
 from governance import (
@@ -187,12 +188,60 @@ def test_freeze_registers_anchor_one_shot(tmp_path):
     assert res["ok"] and res["anchor_match"] is True
 
 
-def test_corrupt_registry_treated_as_missing(tmp_path):
-    # Кривой gov_heads.json (не-JSON / не-dict) → как отсутствующий: предупреждение, не крэш.
+def test_malformed_registry_is_loud_failure_not_migration_warning(tmp_path):
+    # Битый gov_heads.json ≠ отсутствующий: truncated/не-JSON — это ПОРЧА (оборванная запись/
+    # подмена), обязана быть ГРОМКИМ провалом (ok=False, registry_malformed), а не молчаливым
+    # отключением детекта под видом «ещё не мигрировали».
     from governance import verify_advisor, registry_path
     root = str(tmp_path)
     adv = _built_advisor(root, "sage", "Корпус при сломанном реестре.\n")
     with open(registry_path(root), "w", encoding="utf-8") as f:
-        f.write("НЕ JSON ВООБЩЕ {")
+        f.write('{"advisors/sage": {"gov_head": "abc"')     # усечённый JSON (оборванная запись)
     res = verify_advisor(adv, root=root)
-    assert res["ok"] is True and res["anchor_registered"] is False
+    assert res["registry_malformed"] is True
+    assert res["ok"] is False                                # fail-closed, не мягкое предупреждение
+    assert res["anchor_registered"] is False
+
+
+def test_non_dict_registry_is_malformed(tmp_path):
+    from governance import verify_advisor, registry_path
+    root = str(tmp_path)
+    adv = _built_advisor(root, "sage", "Корпус.\n")
+    with open(registry_path(root), "w", encoding="utf-8") as f:
+        f.write('["not", "a", "dict"]')
+    res = verify_advisor(adv, root=root)
+    assert res["registry_malformed"] is True and res["ok"] is False
+
+
+def test_absent_registry_is_migration_warning_not_malformed(tmp_path):
+    # Отсутствие реестра (внешний каталог, реестр не создавался) — мягкая миграция, НЕ порча.
+    from governance import verify_advisor
+    adv = _built_advisor(str(tmp_path), "legacy", "Корпус без реестра.\n")
+    res = verify_advisor(adv, root=str(tmp_path))
+    assert res["registry_malformed"] is False
+    assert res["anchor_registered"] is False and res["ok"] is True
+
+
+def test_register_head_atomic_no_partial_file_on_failure(tmp_path, monkeypatch):
+    # Симулируем падение json.dump В ПРОЦЕССЕ записи: gov_heads.json НЕ должен остаться усечённым,
+    # временный .tmp не должен утечь. os.replace атомарен → читатель видит всё-или-ничего.
+    import json as _json
+    import governance
+    from governance import register_head, registry_path, _read_registry
+    root = str(tmp_path)
+    register_head(os.path.join(root, "advisors", "a"), "HEAD_ONE", n=1, root=root)  # валидный старт
+    assert _read_registry(root)[0] == "ok"
+
+    orig_dump = _json.dump
+    def boom(obj, fp, **kw):
+        fp.write('{"partial": ')                             # частично записали...
+        raise IOError("disk full")                           # ...и упали
+    monkeypatch.setattr(governance.json, "dump", boom)
+    with pytest.raises(IOError):
+        register_head(os.path.join(root, "advisors", "b"), "HEAD_TWO", n=1, root=root)
+    monkeypatch.setattr(governance.json, "dump", orig_dump)
+    # старый валидный контент цел (os.replace не выполнился), .tmp-огрызки убраны
+    status, reg = _read_registry(root)
+    assert status == "ok" and reg["advisors/a"]["gov_head"] == "HEAD_ONE"
+    leftovers = [f for f in os.listdir(root) if f.startswith(".gov_heads.")]
+    assert leftovers == []

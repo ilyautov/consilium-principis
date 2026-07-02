@@ -42,6 +42,7 @@ if HERE not in sys.path:
 BAND_LO = 0.45
 BAND_HI = 0.65
 REL_THRESHOLD = 2
+JUDGE_BACKEND_DEFAULT = "auto"          # §2.2: host|ollama|api|auto (резолюция — judge_backend.py)
 
 
 def _root():
@@ -72,12 +73,22 @@ def _coerce_enabled(val):
         return True
 
 
+def _coerce_backend(val):
+    """judge_backend: только host|ollama|api|auto; любой мусор → ValueError → дефолт auto
+    (fail-closed: опечатка в конфиге не должна молча отключить резолюцию)."""
+    v = str(val).strip().lower()
+    if v in ("host", "ollama", "api", "auto"):
+        return v
+    raise ValueError(val)
+
+
 def _gate_config(advisor_dir=None):
     """Дефолты + опциональные оверрайды из board_config.json ключа `relevance_gate`.
-    Форма: {"enabled":bool, "band_lo":float, "band_hi":float, "rel_threshold":int}.
-    По умолчанию enabled=True. Любая ошибка чтения → дефолты (гейт активен, fail-closed)."""
+    Форма: {"enabled":bool, "band_lo":float, "band_hi":float, "rel_threshold":int,
+    "judge_backend":str}. По умолчанию enabled=True, judge_backend=auto. Любая ошибка
+    чтения → дефолты (гейт активен, fail-closed)."""
     cfg = {"enabled": True, "band_lo": BAND_LO, "band_hi": BAND_HI,
-           "rel_threshold": REL_THRESHOLD}
+           "rel_threshold": REL_THRESHOLD, "judge_backend": JUDGE_BACKEND_DEFAULT}
     try:
         with open(_config_path(), encoding="utf-8") as f:
             raw = json.load(f).get("relevance_gate")
@@ -88,7 +99,7 @@ def _gate_config(advisor_dir=None):
         # до _in_band и валить retrieve/cite TypeError'ом. Провал коэрса → default (fail-closed
         # = гейт активен). enabled — через _coerce_enabled (bool() тупо на строках: "false" → True).
         _coerce = {"enabled": _coerce_enabled, "band_lo": float, "band_hi": float,
-                   "rel_threshold": int}
+                   "rel_threshold": int, "judge_backend": _coerce_backend}
         for k, fn in _coerce.items():
             if k in raw:
                 try:

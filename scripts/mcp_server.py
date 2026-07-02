@@ -68,6 +68,112 @@ def _fidelity_check(quote, advisor_dir):
     return {"status": "🟡", "verbatim": False, "source": ""}
 
 
+# ── межсоветническая атрибуция (§1.1 moat-v2) ──
+# Ров верифицирует цитату против корпуса ОДНОГО советника; сессию собирает хост и может
+# вставить 🔵-цитату Марка в мнение Макиавелли (цитата дословная, маркер честный — автор
+# перепутан). Валидация на render_session: grounded-цитата обязана верифицироваться
+# корпусом СВОЕГО советника. Детерминированно, без LLM, fail-closed.
+
+_GROUNDED_SESSION_MARKERS = ("blue", "green")   # session-словарь маркеров, заявляющих грунт
+
+
+def _advisor_dirs():
+    """Каталоги-кандидаты советников: advisors/* и lenses/* (грунтованные линзы тоже цитируют)."""
+    out = []
+    for base in ("advisors", "lenses"):
+        broot = os.path.join(_root(), base)
+        if not os.path.isdir(broot):
+            continue
+        for d in sorted(os.listdir(broot)):
+            p = os.path.join(broot, d)
+            if os.path.isdir(p):
+                out.append(p)
+    return out
+
+
+def _persona_names(adv_dir):
+    """name + aliases из front-matter persona.md (регекс, без yaml-депа). Нет/битый → []."""
+    import re
+    pp = os.path.join(adv_dir, "persona.md")
+    if not os.path.isfile(pp):
+        return []
+    try:
+        head = open(pp, encoding="utf-8").read(4000)
+    except Exception:
+        return []
+    names = []
+    m = re.search(r"(?m)^name:\s*(.+)$", head)
+    if m:
+        names.append(m.group(1).strip())
+    m = re.search(r"(?m)^aliases:\s*\[(.*?)\]", head)
+    if m:
+        names += [a.strip() for a in m.group(1).split(",") if a.strip()]
+    return names
+
+
+def _resolve_advisor_dir(name):
+    """Имя советника из сессионного объекта → каталог: slug (basename) ИЛИ persona.md
+    name/aliases, без регистра. Не нашли / неоднозначно → None (fail-closed у вызывающего)."""
+    key = (name or "").strip().lower()
+    if not key:
+        return None
+    dirs = _advisor_dirs()
+    slug_hits = [d for d in dirs if os.path.basename(d).lower() == key]
+    if slug_hits:
+        return slug_hits[0]
+    alias_hits = [d for d in dirs
+                  if key in (n.lower() for n in _persona_names(d))]
+    return alias_hits[0] if len(alias_hits) == 1 else None
+
+
+def _validate_session_attribution(session):
+    """(session', violations). Для каждой opinion.quote с grounded-маркером (blue/green):
+    fidelity-гейт против корпуса ЕГО советника; не верифицируется → маркер понижен до
+    violation + явная причина (в argument, чтобы дошла до любого surface). Вход не мутируем
+    (хост пере-рендерит тот же объект). Нерезолвящийся советник → понижение (fail-closed)."""
+    if not isinstance(session, dict) or not isinstance(session.get("advisors"), list):
+        return session, []
+    violations, new_advisors = [], []
+    for a in session["advisors"]:
+        if not isinstance(a, dict) or not isinstance(a.get("opinions"), list):
+            new_advisors.append(a)
+            continue
+        adv_dir, resolved = None, False
+        new_ops = []
+        for op in a["opinions"]:
+            q = op.get("quote") if isinstance(op, dict) else None
+            qtext = (q or {}).get("text") if isinstance(q, dict) else None
+            if not (isinstance(op, dict) and op.get("marker") in _GROUNDED_SESSION_MARKERS
+                    and qtext):
+                new_ops.append(op)
+                continue
+            if not resolved:                          # лениво и один раз на советника
+                explicit = a.get("advisor_dir")
+                adv_dir = _resolve(explicit) if explicit else _resolve_advisor_dir(a.get("name"))
+                resolved = True
+            if adv_dir is None:
+                reason = "советник не резолвится"
+            elif _fidelity_check(qtext, adv_dir)["verbatim"]:
+                new_ops.append(op)                    # цитата своя — маркер честен
+                continue
+            else:
+                reason = "цитата не из корпуса этого советника"
+            nop = dict(op)
+            nop["marker"] = "violation"
+            nop["attribution_reason"] = reason
+            nop["argument"] = f"{op.get('argument', '')} [⛔ {reason}]".strip()
+            new_ops.append(nop)
+            violations.append({"advisor": a.get("name"), "quote": qtext[:80], "reason": reason})
+        na = dict(a)
+        na["opinions"] = new_ops
+        new_advisors.append(na)
+    if not violations:
+        return session, []
+    ns = dict(session)
+    ns["advisors"] = new_advisors
+    return ns, violations
+
+
 def _retrieve(query, advisor_dir, top_k=3):
     import eval as _eval                     # ленивый импорт (тянет corpusbuild/engine)
     import relevance_gate
@@ -553,15 +659,27 @@ def _render_session(session, surface="md", depth="plain", kind="session"):
     grounded?}], invitation?, questions?, chips?}). widget = show_widget (Cowork), md/html — портативны.
     depth: plain (дефолт) | expert. Любой ход совета в Cowork рендерь виджетом, не прозой."""
     import session_render as SR
+    violations = []
+    if kind != "opening":                             # атрибуция (§1.1): ДО рендера, раз на объект
+        session, violations = _validate_session_attribution(session)
+
+    def _attach(out):
+        if violations:
+            out["attribution_violations"] = violations
+            out["note"] = ("⛔ атрибуция: %d цитат(ы) не верифицируются корпусом СВОЕГО советника — "
+                           "маркер понижен до нарушения. Убери цитату или верни её законному автору "
+                           "(cite по advisor_dir этого советника)." % len(violations))
+        return out
+
     if surface == "widget":
         content = SR.render_opening(session) if kind == "opening" else SR.render_widget(session, depth=depth)
-        return {"surface": "widget", "content": content,
-                "next_action": ("ОТОБРАЗИ СЕЙЧАС: вызови mcp__visualize__show_widget с этим `content`. "
-                                "НЕ пересказывай этот ход совета прозой — виджет И ЕСТЬ ответ.")}
+        return _attach({"surface": "widget", "content": content,
+                        "next_action": ("ОТОБРАЗИ СЕЙЧАС: вызови mcp__visualize__show_widget с этим `content`. "
+                                        "НЕ пересказывай этот ход совета прозой — виджет И ЕСТЬ ответ.")})
     fn = {"html": SR.render_html, "md": SR.render_md}.get(surface)
     if fn is None:
         return {"error": f"неизвестный surface: {surface} (md|widget|html)"}
-    return {"surface": surface, "content": fn(session)}
+    return _attach({"surface": surface, "content": fn(session)})
 
 
 def _validate_manifest(advisor_dir):
@@ -896,7 +1014,10 @@ TOOLS = {
                        "вернувшийся `content` в mcp__visualize__show_widget — вердикт прозой НЕ пиши. "
                        "surface: widget (Cowork, дефолт-выбор, кликабельный sendPrompt) | md "
                        "(только если show_widget недоступен) | html (фолбэк). Контур/гейт 🔵 "
-                       "пройдены ризонингом ДО рендера. depth=plain по умолчанию. См. session_render.py.",
+                       "пройдены ризонингом ДО рендера. Рендер ДОПОЛНИТЕЛЬНО валидирует атрибуцию: "
+                       "🔵/🟢-цитата, не верифицируемая корпусом СВОЕГО советника, понижается до "
+                       "нарушения (не переставляй цитаты между советниками). depth=plain по "
+                       "умолчанию. См. session_render.py.",
         "input_schema": {"type": "object",
                          "properties": {"session": {"type": "object"}, "surface": {"type": "string"},
                                         "depth": {"type": "string", "enum": ["plain", "expert"]},

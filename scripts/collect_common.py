@@ -11,7 +11,7 @@ collect_common.py — общая база для сборщиков корпус
     только с явным подтверждением personal-use + дисклеймер «персона = симуляция».
   - большие тексты пишутся В ФАЙЛ, наружу печатается только сводка.
 """
-import os, re, sys, json, urllib.request, urllib.error, datetime
+import os, re, sys, json, datetime
 import socket, ipaddress, ssl, http.client
 from urllib.parse import urlparse, urljoin
 
@@ -169,16 +169,17 @@ def _fetch_once(url, timeout, max_bytes=MAX_FETCH_BYTES):
         raw_sock.close()
 
 
-def fetch(url, timeout=30, public_only=True, allow_http=False, max_bytes=MAX_FETCH_BYTES):
-    """GET → текст. Слои защиты (что каждый даёт и чего НЕ даёт — честно):
+def fetch(url, timeout=30, allow_http=False, max_bytes=MAX_FETCH_BYTES):
+    """GET → текст, ВСЕГДА через слои защиты (что каждый даёт и чего НЕ даёт — честно):
 
       1. https-only по умолчанию: http-URL → отказ, если не allow_http=True явно; даунгрейд
          https→http на редиректе запрещён всегда. Защищает от MITM-подмены текста по пути.
          НЕ защищает от вредоносного КОНТЕНТА на легитимном https-хосте.
-      2. SSRF-гард: host обязан резолвиться в ПУБЛИЧНЫЙ IP (private/loopback/link-local/
-         reserved → отказ). Защищает метадату облака и внутренние сервисы от фетча по
-         инъецированному URL. НЕ покрывает OLLAMA_HOST (env-only, осознанно: localhost там
-         легитимен) и публичные хосты под контролем атакующего.
+      2. SSRF-гард: host обязан резолвиться в ПУБЛИЧНЫЙ IP (аллоулист по is_global +
+         извлечение встроенного v4 из туннелей; CGNAT/private/loopback/link-local → отказ).
+         Защищает метадату облака и внутренние сервисы от фетча по инъецированному URL. НЕ
+         покрывает OLLAMA_HOST (env-only, осознанно: localhost там легитимен) и публичные
+         хосты под контролем атакующего.
       3. IP-pinning: host резолвится ОДИН раз, коннект идёт ровно к проверенному IP; TLS
          SNI/серт валидируются по ИМЕНИ хоста. Закрывает DNS-rebinding окно «проверил одно,
          соединился с другим». НЕ защищает, если сам легитимный DNS-ответ уже указывает на
@@ -190,13 +191,9 @@ def fetch(url, timeout=30, public_only=True, allow_http=False, max_bytes=MAX_FET
          счётчик (лживый заголовок не обходит). Защищает от заливки диска/памяти. НЕ
          защищает от медленного стрима (это режет timeout).
 
-    public_only=False — явный небезопасный путь БЕЗ слоёв 2-3 (не используется продом)."""
-    p0 = urlparse(url or "")
-    _check_scheme(p0.scheme, None, allow_http)                    # слой 1 — ДО любого DNS/коннекта
-    if not public_only:                                            # явный небезопасный путь (не юзается)
-        req = urllib.request.Request(url, headers={"User-Agent": UA})
-        with urllib.request.urlopen(req, timeout=timeout) as r:
-            return _decode(_read_capped(r, max_bytes) if hasattr(r, "getheader") else r.read())
+    Небезопасного bypass-пути (сырой urlopen без слоёв 2-3) НЕТ намеренно — единственный
+    путь наружу проходит все гарды."""
+    _check_scheme(urlparse(url or "").scheme, None, allow_http)   # слой 1 — ДО любого DNS/коннекта
     cur, prev_scheme = url, None
     for _ in range(6):                                            # лимит редиректов
         _check_scheme(urlparse(cur).scheme, prev_scheme, allow_http)  # ре-валидация КАЖДОГО хопа

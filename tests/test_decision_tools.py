@@ -92,3 +92,69 @@ def test_validate_tool_accumulates_all_errors():
 def test_validate_tool_non_dict_map():
     r = dispatch("validate_decision_map", {"map": "не карта"})
     assert r["valid"] is False and r["errors"]
+
+
+# ── run_calculation: валидация → МК-ядро + «📐 рамка» ───────────────────────
+
+def test_run_calculation_registered():
+    assert "run_calculation" in {t["name"] for t in list_tools()}
+
+
+def test_run_calculation_returns_core_result_with_frame():
+    r = dispatch("run_calculation", {"map": _valid_map(), "seed": 7, "n": 400})
+    assert set(r["p_best"]) == {"ship_public", "status_quo"}
+    assert "options" in r and "tornado" in r and "top_uncertainties" in r
+    lt = r["label_text"]                             # готовая «📐 рамка» одной строкой
+    assert lt.startswith("📐") and "3 величин" in lt
+    assert "подтверждены тобой" in lt and "сид 7" in lt and "400 сценариев" in lt
+    assert "не истина" in lt.lower()
+
+
+def test_run_calculation_note_is_point_of_use_directive():
+    r = dispatch("run_calculation", {"map": _valid_map(), "seed": 1, "n": 200})
+    note = r["note"]
+    assert "label_text" in note                      # показывать ТОЛЬКО с рамкой
+    assert "2×2" in note                             # top_uncertainties → оси 2×2 (Ф3 — назвать)
+    assert "save_decision_map" in note               # финал — предложить сохранить карту
+    assert "🔵" in note and "📐" in note              # лейблы рядом, не смешивать
+
+
+def test_run_calculation_deterministic_same_seed():
+    a = dispatch("run_calculation", {"map": _valid_map(), "seed": 11, "n": 300})
+    b = dispatch("run_calculation", {"map": _valid_map(), "seed": 11, "n": 300})
+    assert json.dumps(a, sort_keys=True) == json.dumps(b, sort_keys=True)
+
+
+def test_run_calculation_default_seed_is_fixed():
+    # без seed → фикс-дефолт (повторный вызов воспроизводим байт-в-байт)
+    a = dispatch("run_calculation", {"map": _valid_map(), "n": 200})
+    b = dispatch("run_calculation", {"map": _valid_map(), "n": 200})
+    assert json.dumps(a, sort_keys=True) == json.dumps(b, sort_keys=True)
+    assert "сид" in a["label_text"]
+
+
+def test_run_calculation_refuses_invalid_map_fail_closed():
+    m = _valid_map()
+    del m["stakes"]
+    r = dispatch("run_calculation", {"map": m, "n": 100})
+    assert "error" in r and r["errors"]              # отказ с гейт-ошибками
+    assert all(_has_cyrillic(e) for e in r["errors"])
+    assert "hint" in r and "вопрос" in r["hint"].lower()
+    assert "p_best" not in r and "label_text" not in r   # никаких частичных чисел
+
+
+def test_run_calculation_unconfirmed_number_refused():
+    m = _valid_map()
+    m["uncertainties"][2].pop("confirmed_by_user")
+    r = dispatch("run_calculation", {"map": m, "n": 100})
+    assert "error" in r and any("upside_hours" in e for e in r["errors"])
+
+
+def test_run_calculation_bad_seed_fails_ru():
+    r = dispatch("run_calculation", {"map": _valid_map(), "seed": "семь"})
+    assert "error" in r and "сид" in r["error"].lower()
+
+
+def test_run_calculation_bad_n_fails_ru():
+    r = dispatch("run_calculation", {"map": _valid_map(), "n": 0})
+    assert "error" in r and _has_cyrillic(r["error"])

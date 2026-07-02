@@ -961,6 +961,41 @@ def _validate_decision_map(map):
             "hint": "Карта проходит гейты — можно считать: run_calculation(map)."}
 
 
+_CALC_SEED_DEFAULT = 2026    # фикс-дефолт сида: вызов без seed воспроизводим байт-в-байт
+
+
+def _calc_label_text(label):
+    """Готовая «📐 рамка» (RU, одной строкой) из label-блока mc_run — хост показывает
+    расчёт ТОЛЬКО с ней (честный лейбл: модель юзера, не истина)."""
+    return ("📐 расчёт по ТВОЕЙ модели: %d величин (подтверждены тобой), сид %d, "
+            "%d сценариев. Это не истина — это твоя модель, прогнанная %d раз."
+            % (label["n_uncertainties"], label["seed"], label["n"], label["n"]))
+
+
+def _run_calculation(map, seed=_CALC_SEED_DEFAULT, n=None):
+    """Валидация (fail-closed, errors → вопросы совета) → mc_run (считает ТОЛЬКО код,
+    детерминированно) → результат ядра + label_text («📐 рамка») + point-of-use директива."""
+    from decision_map import validate_map
+    from mc_run import N_DEFAULT, mc_run
+    errors = validate_map(map)
+    if errors:
+        return {"error": "Карта решения не проходит гейты честности — расчёт не запущен "
+                         "(fail-closed).",
+                "errors": errors, "hint": _RELAY_AS_QUESTIONS_HINT}
+    try:
+        res = mc_run(map, seed, N_DEFAULT if n is None else n)
+    except ValueError as e:
+        return {"error": str(e)}
+    res["label_text"] = _calc_label_text(res["label"])
+    res["note"] = (
+        "Показывай расчёт юзеру ТОЛЬКО вместе с рамкой label_text — без неё «📐» не существует. "
+        "Лейбл «📐 расчёт» ставь РЯДОМ с мнениями советников (🔵/🟢/🟡), НЕ смешивая: расчёт — "
+        "не цитата и не истина. top_uncertainties — величины, которые реально решают исход: "
+        "предложи юзеру разыграть 2×2, назвав их осями (сам формат 2×2 — заседание совета, "
+        "не счёт). В конце ОДИН РАЗ предложи сохранить карту — согласился → save_decision_map.")
+    return res
+
+
 def _render_session(session, surface="md", depth="plain", kind="session"):
     """Ход заседания → строка под surface. Контур/гейт 🔵 проходят ДО рендера; тут чистая презентация.
     kind: session (любой ход — реакции+вопросы ИЛИ синтез, авто по наличию synthesis) | opening
@@ -1363,6 +1398,20 @@ TOOLS = {
         "input_schema": {"type": "object", "properties": {"map": {"type": "object"}},
                          "required": ["map"]},
         "handler": _validate_decision_map,
+    },
+    "run_calculation": {
+        "description": "Детерминированный Монте-Карло по ВАЛИДНОЙ карте решения (ноль LLM в счёте: "
+                       "считает код, сид фиксирован, тот же сид → тот же результат). Невалидная "
+                       "карта → отказ с errors (fail-closed, доноси их вопросами совета). Возвращает "
+                       "на вариант mean/median/p10/p90, P(лучший), expected_regret, торнадо, "
+                       "top_uncertainties + label_text — готовую «📐 рамку»: показывай расчёт ТОЛЬКО "
+                       "с ней, лейбл «📐» — рядом с 🔵/🟢/🟡, НИКОГДА не смешивая.",
+        "input_schema": {"type": "object",
+                         "properties": {"map": {"type": "object"},
+                                        "seed": {"type": "integer"},
+                                        "n": {"type": "integer"}},
+                         "required": ["map"]},
+        "handler": _run_calculation,
     },
     "render_session": {
         "description": "ОБЯЗАТЕЛЬНЫЙ финал заседания совета в Cowork: отрисовать canon-объект "

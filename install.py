@@ -4,7 +4,8 @@ install.py — поставить скилл personal-board (Consilium) в ~/.cl
 где Claude Code обнаруживает пользовательские скиллы.
 
 Что делает (ничего не ломает, повторный запуск безопасен):
-  1. копирует МАШИНЕРИЮ (SKILL.md, scripts/, install-skill/, QUICKSTART.md, council/, assets/)
+  1. копирует МАШИНЕРИЮ (SKILL.md, scripts/, QUICKSTART.md, council/, assets/) + грунтованный
+     контент из коробки (lenses/ = Сунь-цзы 🔵-линза, gov_heads.json = якорь целостности)
      в каноническое место — обновляет, НЕ удаляя твою доску;
   2. определяет тир (есть ollama bge-m3 → FULL, иначе пол) и гонит board_init;
   3. пишет breadcrumb last_install.json (без секретов).
@@ -28,8 +29,15 @@ HERE = Path(__file__).resolve().parent
 SKILLS_HOME = Path.home() / ".claude" / "skills"
 
 # Машинерия — копируется/обновляется. (scripts/golden и advisors-доска сохраняются, см. ниже.)
-RUNTIME = ["SKILL.md", "QUICKSTART.md", "recipes.json", "scripts", "install-skill", "council", "assets"]
-IGNORE = shutil.ignore_patterns("__pycache__", "*.pyc", "golden")  # golden = per-advisor user-data
+# lenses/ + gov_heads.json — ГРУНТОВАННЫЙ контент из коробки (Сунь-цзы 🔵-линза + якорь целостности):
+# без них skill-install приезжал с ПУСТОЙ доской (HIGH #1 pre-publish аудита). install-skill НЕ шипуем —
+# как под-скилл он приземляется глубже, чем ищет Claude Code (~/.claude/skills/*/SKILL.md), т.е. мёртв;
+# онбординг покрыт README/QUICKSTART + тулами board_status/doctor/seed_council/setup_full.
+RUNTIME = ["SKILL.md", "QUICKSTART.md", "recipes.json", "scripts", "council", "assets",
+           "lenses", "gov_heads.json"]
+# golden = per-advisor user-data; build = тяжёлые регенерируемые артефакты (эмбеддинги/индексы линз —
+# шипуем только PD-исходник corpus.jsonl + manifest, не производное).
+IGNORE = shutil.ignore_patterns("__pycache__", "*.pyc", "golden", "build")
 
 
 def py_ok() -> bool:

@@ -1,0 +1,43 @@
+{
+  "meta": {
+    "ts": "2026-07-02T10:16:38Z",
+    "judge_backend": "openrouter",
+    "judge_model": "google/gemini-2.5-flash",
+    "seed": 0,
+    "n_ans": 12,
+    "n_samples": 3,
+    "top_k": 3,
+    "hashes": {
+      "judge_prompt": "fe5f3875c05461ce9f87db1cd9e72666ee6aafe4faa8c1a7d7b1849d97bfa9e1",
+      "rubric": "397ed2fa1fa8452dc6edcb00c524e53b6c8b279d27a2f75af62f8ecd5c228a10"
+    },
+    "corpus_sha256": {
+      "machiavelli": "6d5b1ebf223b19ec333cbfe27b151a90e501dd30326bdb76be2bd90b562b3528",
+      "marcus-aurelius": "4a4e0c6cad907946a1a19442658d00fed4a0a2513186633e95b962fef55f4beb"
+    }
+  },
+  "advisors": {
+    "machiavelli": {
+      "misapply_rate": 0.1667,
+      "n_camouflage": 12,
+      "coverage": 0.75,
+      "n_ans": 8,
+      "judge_ooc_false_accept": 0.0833
+    },
+    "marcus-aurelius": {
+      "misapply_rate": 0.0833,
+      "n_camouflage": 12,
+      "coverage": 1.0,
+      "n_ans": 6,
+      "judge_ooc_false_accept": 0.0
+    }
+  },
+  "injection": {
+    "n": 14,
+    "inflated_n": 1,
+    "inflation_rate": 0.0714,
+    "gate_flips": 0,
+    "mean_delta": 0.0,
+    "max_delta": 1
+  }
+}

@@ -22,6 +22,31 @@ def pending_from_journal(text):
     return [e["title"] for e in parse_decision_log(text) if e["outcome"] == "pending"]
 
 
+def pending_from_files(root):
+    """#2 server-side (§4.3 минимум): незакрытые решения из СУЩЕСТВУЮЩИХ журналов —
+    principis.md в корне + advisors/*/relationship.md. Второй стор НЕ заводим: читаем те же
+    markdown-записи `### …` с ИСХОД: ⏳, что и калибровка. Fail-closed: нечитаемое → пропуск,
+    пустой/отсутствующий корень → [] (холодный старт не ломается)."""
+    files = [("principis.md", os.path.join(root, "principis.md"))]
+    adv_root = os.path.join(root, "advisors")
+    try:
+        advisors = sorted(os.listdir(adv_root)) if os.path.isdir(adv_root) else []
+    except OSError:
+        advisors = []
+    for d in advisors:
+        files.append((f"advisors/{d}/relationship.md",
+                      os.path.join(adv_root, d, "relationship.md")))
+    out = []
+    for label, path in files:
+        try:
+            with open(path, encoding="utf-8") as f:
+                text = f.read()
+        except OSError:
+            continue
+        out.extend({"title": t, "source": label} for t in pending_from_journal(text))
+    return out
+
+
 def record_decision(ledger, decision_id, decision, rationale, predicted):
     """#3: записать решение с RATIONALE и прогнозом исхода (число; знак = направление)."""
     ledger.append({"decision_id": decision_id, "decision": decision, "rationale": rationale,

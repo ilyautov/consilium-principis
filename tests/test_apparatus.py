@@ -415,6 +415,45 @@ def test_scan_notes_in_prose_creates_no_candidate_no_noise():
     assert r["needs_host_review"] is False
 
 
+def test_scan_allcaps_author_line_the_end_is_gated_not_cut():
+    # MINOR (item-C цель): ДРАМАТИЧНАЯ авторская строка капсом «THE END OF EVERYTHING HE KNEW»
+    # в хвостовых 30% раньше молча срезалась (all-caps ветка _heading_like + «THE END» в _BACK_RE).
+    # Теперь слабый back-маркер требует надёжного аппаратного слова ИЛИ голого «THE END» —
+    # не просто капса. Строка уходит в host-review, авторский хвост не режется.
+    lines = (
+        ["Preface by the translator himself, at some length indeed."] * 4 +
+        ["I. LAYING PLANS"] +
+        ["Sun Tzu said: the wise general wins before the battle is joined."] * 10 +
+        ["THE END OF EVERYTHING HE KNEW CAME AT DAWN THAT MORNING.",
+         "Sun Tzu said: and so even endings must be planned for in advance."]
+    )
+    r = ap.scan("\n".join(lines))
+    assert r["signals"]["back_confident"] is False
+    assert r["signals"]["back_from"] is None
+    assert r["signals"]["back_suspect"] is True
+    assert "back_weak_marker" in r["review_reasons"]
+    assert r["needs_host_review"] is True
+    recs = [(("line", i), ln) for i, ln in enumerate(lines)]
+    out = ap.tier_records(recs, front_until=r["signals"]["front_until"],
+                          back_from=r["signals"]["back_from"],
+                          front_confident=r["signals"]["front_confident"],
+                          back_confident=r["signals"]["back_confident"])
+    blue = " ".join(t["text"] for t in out if t["tier"] == "P1")
+    assert "endings must be planned for" in blue          # авторский хвост НЕ потерян
+    assert "THE END OF EVERYTHING" in blue                 # и сама драматичная строка тоже цела
+
+
+def test_scan_bare_the_end_heading_still_cut():
+    # Голый заголовок «THE END» (+пунктуация) — настоящий аппарат: по-прежнему режется уверенно.
+    lines = (["Intro prose by the editor of this edition here."] * 4 +
+             ["I. LAYING PLANS"] +
+             ["Sun Tzu said: supreme excellence is breaking resistance without fighting."] * 10 +
+             ["THE END.", "Printed notes of the publisher follow below this line."])
+    r = ap.scan("\n".join(lines))
+    assert r["signals"]["back_confident"] is True
+    assert r["signals"]["back_from"].upper().startswith("THE END")
+
+
 def test_scan_trailing_uppercase_appendix_still_confident():
     # Регрессия: настоящий заголовок APPENDIX в хвосте по-прежнему автодетектится (не отвалился
     # от ужесточения) — уже покрыто выше, здесь пин формы заголовка с нумерацией.

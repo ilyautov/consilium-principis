@@ -41,15 +41,33 @@ _BACK_HEADING_WORDS_RE = re.compile(
     r"^(appendix|bibliography|index|footnotes|notes|endnotes|glossary|the\s+end)"
     r"[\s.:;,\-—ivxlcd\d]*$", re.I)
 
+# НАДЁЖНЫЕ аппаратные слова: строка, ОТКРЫВАЮЩАЯСЯ одним из них, — аппарат, что бы за ним ни
+# шло («APPENDIX I. THE COMMENTATORS»). «THE END» сюда НЕ входит — это частая проза («The end
+# of everything…»), поэтому засчитывается лишь в голой форме через _BACK_HEADING_WORDS_RE.
+_RELIABLE_BACK_WORD_RE = re.compile(
+    r"^\s*(APPENDIX|BIBLIOGRAPHY|INDEX|FOOTNOTES|NOTES|ENDNOTES|GLOSSARY)\b", re.I)
+
 
 def _heading_like(line):
     """Строка ПОХОЖА на заголовок секции: короткая И (все буквы капсом ИЛИ маркер-слово с
-    нумерацией). Слабый матч (_BACK_RE в обычной прозе) больше НЕ режет хвост автоматически."""
+    нумерацией). Используется на этапе ОТБОРА кандидата (_back_candidate) — терпимо; строгость
+    уверенного среза даёт _weak_marker_is_heading (капса самого по себе уже недостаточно)."""
     s = (line or "").strip()
     if not s or len(s) > 60:
         return False
     letters = [ch for ch in s if ch.isalpha()]
     if letters and all(ch.isupper() for ch in letters):
+        return True
+    return bool(_BACK_HEADING_WORDS_RE.match(s))
+
+
+def _weak_marker_is_heading(marker):
+    """Слабый (не-PG) back-кандидат засчитывается УВЕРЕННЫМ только если это надёжное аппаратное
+    слово-заголовок (APPENDIX/BIBLIOGRAPHY/…, что бы за ним ни следовало) ЛИБО строка целиком
+    «THE END» (+нумерация). Голый капс НЕ проходит: драматичная авторская строка капсом
+    «THE END OF EVERYTHING HE KNEW» → host-review, а не молчаливый срез (fail-open к вопросу)."""
+    s = (marker or "").strip()
+    if _RELIABLE_BACK_WORD_RE.match(s):
         return True
     return bool(_BACK_HEADING_WORDS_RE.match(s))
 
@@ -243,9 +261,9 @@ def scan(text):
     front_ok = front_marker is not None and start > 3      # тело реально начинается ниже шапки
     back_cut = back_marker is not None and end < len(lines)     # срез вообще нашёлся
     back_trailing = back_cut and _is_trailing(end, len(lines))  # и лежит в хвосте файла
-    # #55: уверенный срез = хвостовой И заголовочный/PG-strong. Слабый (прозаический) матч
-    # в хвосте раньше резал автоматически — теперь host-gated: fail-open к ВОПРОСУ, не к ножницам.
-    back_ok = back_trailing and (back_strong or _heading_like(back_marker))
+    # #55: уверенный срез = хвостовой И (PG-strong ИЛИ надёжное аппаратное слово / голый «THE END»).
+    # Слабый прозаический матч — в т.ч. авторская строка КАПСОМ — host-gated: fail-open к ВОПРОСУ.
+    back_ok = back_trailing and (back_strong or _weak_marker_is_heading(back_marker))
     back_suspect = back_cut and not back_ok         # mid-file ИЛИ слабый маркер → не режем, сигналим
     front_unresolved_apparatus = front_marker is None and toc is not None
     bracket = bracket_ratio >= 0.25 or commentator_hits >= 5

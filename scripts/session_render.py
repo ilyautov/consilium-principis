@@ -24,7 +24,7 @@ fidelity-гейт (best_match) ОДИН раз; surface'ы — чистая пр
     "advisors": [ {
         "name": str,
         "opinions": [ {
-            "marker": "blue" | "yellow" | "violation" | None,
+            "marker": "blue" | "green" | "yellow" | "violation" | None,
             "argument": str,                           # довод на языке юзера
             "quote": {"text": str, "source": str|None, "translation": str|None} | None,
         } ],
@@ -56,6 +56,7 @@ def _disagreement(s):
 # marker → (глиф, семантическая переменная Cowork, self-contained цвет-фолбэк)
 _MARK = {
     "blue":      ("🔵", "--color-text-info",    "#2f6fed"),
+    "green":     ("🟢", "--color-text-success", "#1D9E75"),   # дословно из комментария (S-тир)
     "yellow":    ("🟡", "--color-text-warning", "#d98a00"),
     "violation": ("⛔", "--color-text-danger",  "#d64545"),
 }
@@ -121,6 +122,7 @@ _AVATAR = ["#534AB7", "#D85A30", "#185FA5", "#1D9E75", "#D4537E", "#BA7517"]
 # marker → (подпись, css-bg, css-text, fallback-hex, tabler-иконка)
 _PILL = {
     "blue":      ("дословно",     "--color-background-info",    "--color-text-info",    "#185FA5", "ti-quote"),
+    "green":     ("комментарий",  "--color-background-success", "--color-text-success", "#1D9E75", "ti-book"),
     "yellow":    ("в духе автора", "--color-background-warning", "--color-text-warning", "#854F0B", "ti-bulb"),
     "violation": ("нарушение",    "--color-background-danger",  "--color-text-danger",  "#A32D2D", "ti-alert-triangle"),
 }

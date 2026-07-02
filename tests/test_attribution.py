@@ -15,14 +15,18 @@ from mcp_server import dispatch
 
 QUOTE_A = "The universe is change; our life is what our thoughts make it."
 QUOTE_B = "Men judge generally more by the eye than by the hand."
+QUOTE_S = "The commentator notes the emperor wrote these meditations for himself alone."
 
 
-def _mk_advisor(root, slug, text, persona=None):
+def _mk_advisor(root, slug, text, persona=None, extra_chunks=()):
     d = os.path.join(root, "advisors", slug)
     os.makedirs(d, exist_ok=True)
     with open(os.path.join(d, "corpus.jsonl"), "w", encoding="utf-8") as f:
         f.write(json.dumps({"text": text, "tier": "P1", "source": f"{slug}-src"},
                            ensure_ascii=False) + "\n")
+        for txt, tier in extra_chunks:
+            f.write(json.dumps({"text": txt, "tier": tier, "source": f"{slug}-{tier}"},
+                               ensure_ascii=False) + "\n")
     if persona:
         with open(os.path.join(d, "persona.md"), "w", encoding="utf-8") as f:
             f.write(persona)
@@ -31,10 +35,12 @@ def _mk_advisor(root, slug, text, persona=None):
 
 @pytest.fixture()
 def board(tmp_path, monkeypatch):
-    """Изолированная доска: два советника с РАЗНЫМИ корпусами + alias в persona.md."""
+    """Изолированная доска: два советника с РАЗНЫМИ корпусами + alias в persona.md.
+    У aurelius есть и S1-чанк (комментарий) — для тир-реконсиляции маркеров."""
     import mcp_server
     _mk_advisor(str(tmp_path), "aurelius", QUOTE_A,
-                persona="---\nname: Марк Аврелий\naliases: [Марк Аврелий, Marcus, Marcus Aurelius]\n---\n")
+                persona="---\nname: Марк Аврелий\naliases: [Марк Аврелий, Marcus, Marcus Aurelius]\n---\n",
+                extra_chunks=[(QUOTE_S, "S1")])
     _mk_advisor(str(tmp_path), "machiavelli-b", QUOTE_B)
     monkeypatch.setattr(mcp_server, "_root", lambda: str(tmp_path))
     return str(tmp_path)
@@ -114,3 +120,56 @@ def test_input_session_object_not_mutated(board):
     s = _session("machiavelli-b", QUOTE_A)
     dispatch("render_session", {"session": s, "surface": "md"})
     assert s["advisors"][0]["opinions"][0]["marker"] == "blue"
+
+
+# ── тир-реконсиляция маркеров (review HIGH-2): verbatim ≠ карт-бланш на маркер ──
+
+def test_blue_marker_on_commentary_tier_demoted_to_green(board):
+    # хост назвал 🟢-тир (S1-комментарий) «blue» → рендерим green + явная причина.
+    # Тир-инфляция: цитата дословная, но НЕ первоисточник — 🔵 был бы нечестным.
+    r = dispatch("render_session", {"session": _session("aurelius", QUOTE_S, marker="blue"),
+                                    "surface": "md"})
+    assert "attribution_violations" not in r          # это реконсиляция, не violation
+    rec = r["marker_reconciliations"]
+    assert len(rec) == 1 and rec[0]["from"] == "blue" and rec[0]["to"] == "green"
+    assert "не первоисточник" in rec[0]["reason"]
+    assert "🔵 довод" not in r["content"]              # blue не дожил до рендера
+    assert "🟢 довод" in r["content"]                  # честный green-глиф
+    assert "не первоисточник" in r["content"]          # причина видна на surface
+
+
+def test_green_marker_on_primary_tier_kept(board):
+    # обратный случай — хост занизил (green при 🔵-тире): само-занижение безопасно, не трогаем
+    r = dispatch("render_session", {"session": _session("aurelius", QUOTE_A, marker="green"),
+                                    "surface": "md"})
+    assert "marker_reconciliations" not in r and "attribution_violations" not in r
+    assert "🟢 довод" in r["content"]                  # остался как заявлен
+
+
+def test_correct_blue_stays_blue_with_s_tier_present(board):
+    # P1-цитата с маркером blue при наличии S1-чанков в корпусе — без реконсиляции
+    r = dispatch("render_session", {"session": _session("aurelius", QUOTE_A, marker="blue"),
+                                    "surface": "md"})
+    assert "marker_reconciliations" not in r
+    assert "🔵 довод" in r["content"]
+
+
+# ── явный advisor_dir: root-гард (review minor a) ──
+
+def test_explicit_advisor_dir_outside_root_fails_closed(board):
+    # advisor_dir от хоста = данные (возможна инъекция): путь вне корня → fail-closed понижение
+    s = _session("aurelius", QUOTE_A)
+    s["advisors"][0]["advisor_dir"] = "../../../../etc"
+    r = dispatch("render_session", {"session": s, "surface": "md"})
+    assert r["attribution_violations"][0]["reason"] == "советник не резолвится"
+    assert "⛔" in r["content"]
+
+
+# ── канал advisor_dir задокументирован хосту (review minor c) ──
+
+def test_advisor_dir_channel_documented_for_host():
+    from mcp_server import INSTRUCTIONS, TOOLS
+    # правило хосту: клади advisor_dir в каждый advisors[]-блок (надёжный канал атрибуции)
+    assert "advisor_dir` каждому советнику" in INSTRUCTIONS
+    assert "канал атрибуции" in INSTRUCTIONS
+    assert "advisor_dir" in TOOLS["render_session"]["description"]

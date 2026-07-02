@@ -294,3 +294,14 @@ def test_gate_verdict_registered():
     assert "gate_verdict" in names
     schema = next(t for t in list_tools() if t["name"] == "gate_verdict")["input_schema"]
     assert set(schema["required"]) == {"advisor_dir", "nonce", "ratings"}
+
+
+def test_instructions_cover_two_phase_flow():
+    # хост видит ТОЛЬКО INSTRUCTIONS (не SKILL.md) — правило host-флоу обязано быть там:
+    # judgment_request → честные оценки по рубрике → gate_verdict; маркеры от сервера;
+    # никогда не выдумывать оценки ради цитат
+    from mcp_server import INSTRUCTIONS
+    assert "judgment_request" in INSTRUCTIONS and "gate_verdict" in INSTRUCTIONS
+    assert "не выдумывай оценки" in INSTRUCTIONS.lower()
+    assert "рубрик" in INSTRUCTIONS.lower()
+    assert "сервер" in INSTRUCTIONS.split("judgment_request", 1)[1][:600].lower()

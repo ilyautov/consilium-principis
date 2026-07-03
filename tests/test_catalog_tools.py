@@ -20,3 +20,21 @@ def test_catalog_search_tool(monkeypatch):
     monkeypatch.setattr("collect_common.fetch", lambda url, **k: gutendex)
     out = mcp_server.dispatch("catalog_search", {"author": "Spinoza"})
     assert out["ok"] and out["candidates"][0]["gutenberg_id"] == 3800
+
+def test_catalog_add_builds_real_corpus_offline(tmp_path, monkeypatch):
+    import catalog
+    raw = "*** START OF THE PROJECT GUTENBERG EBOOK X ***\n" + ("Добродетель есть знание. " * 60) + \
+          "\n*** END OF THE PROJECT GUTENBERG EBOOK X ***\n"
+    sha = catalog.text_sha256(catalog.strip_for_signature(raw))
+    (tmp_path / "catalog").mkdir()
+    (tmp_path / "catalog" / "pd_figures.json").write_text(json.dumps({"version": 1, "figures": [
+        {"id": "epictetus", "name": "Эпиктет", "seat": "стоик",
+         "source": {"platform": "gutenberg", "ref": "45109", "edition": "e",
+                    "url": "https://www.gutenberg.org/cache/epub/45109/pg45109.txt",
+                    "pd_basis": "PG (US-PD)", "expected": {"sha256": sha}}}]}, ensure_ascii=False),
+        encoding="utf-8")
+    monkeypatch.setattr("mcp_server._root", lambda: str(tmp_path))
+    monkeypatch.setattr("collect_common.fetch", lambda url, **k: raw)
+    out = mcp_server.dispatch("catalog_add", {"ref": "epictetus"})
+    assert out["ok"]
+    assert (tmp_path / "advisors" / "epictetus" / "build" / "corpus.jsonl").exists()

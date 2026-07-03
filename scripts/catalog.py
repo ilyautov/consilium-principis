@@ -166,6 +166,39 @@ def _decode(raw):
     return raw if isinstance(raw, str) else raw.decode("utf-8", "replace")
 
 
+def verify_catalog(root, *, fetch, seed=False):
+    """Обойти каталог: fetch → strip → сверить подпись/PD-basis. seed=True → записать sha256 в записи.
+    → {ok, entries:[{id, status: ok|drift|unseeded|seeded|error, ...}]}. Ритуал целостности (как moat-check)."""
+    data = load_catalog(root)
+    entries, all_ok = [], True
+    changed = False
+    for fig in data.get("figures", []):
+        src = fig.get("source", {})
+        try:
+            stripped = strip_for_signature(_decode(fetch(src["url"])))
+        except Exception as e:
+            entries.append({"id": fig.get("id"), "status": "error", "detail": str(e)}); all_ok = False
+            continue
+        actual = text_sha256(stripped)
+        if seed:
+            src["expected"] = {"sha256": actual, "bytes": len(stripped.encode("utf-8"))}
+            changed = True
+            entries.append({"id": fig.get("id"), "status": "seeded", "sha256": actual})
+            continue
+        exp = (src.get("expected") or {}).get("sha256")
+        if not exp:
+            entries.append({"id": fig.get("id"), "status": "unseeded"}); all_ok = False
+        elif exp != actual:
+            entries.append({"id": fig.get("id"), "status": "drift", "expected": exp, "actual": actual})
+            all_ok = False
+        else:
+            entries.append({"id": fig.get("id"), "status": "ok"})
+    if changed:
+        with open(os.path.join(root, "catalog", "pd_figures.json"), "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    return {"ok": all_ok, "entries": entries}
+
+
 def search_gutenberg(author, *, fetch):
     """Кандидаты-издания из gutendex.com (JSON API PG). Хвост вне каталога. Оффлайн → error, не краш."""
     url = "https://gutendex.com/books?search=" + urllib.parse.quote(author)

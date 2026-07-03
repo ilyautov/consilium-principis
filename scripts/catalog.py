@@ -1,9 +1,24 @@
 """Каталог PD-фигур (указатели, ноль текста) + оркестрация сборки советника из общественного
 достояния. Сеть/сборка инъектируются (fetch=/build=) → всё оффлайн-тестируемо. Логика в сервере,
 хост только предлагает и рисует. Firewall: каталог = указатели, корпус — локально в advisors/*."""
-import os, json, hashlib
+import os, json, hashlib, re
+import urllib.parse
 
 ALLOWED_PLATFORMS = {"gutenberg", "standardebooks", "wikisource"}
+
+_SAFE_FID = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
+
+
+def _safe_advisor_dir(root, fid):
+    """→ (adv_dir, None) если fid безопасен и путь реально под root/advisors; иначе (None, error-строка).
+    Fail-closed: charset-гард + realpath-assert (defense-in-depth, как _resolve_under_root)."""
+    if not fid or not _SAFE_FID.match(fid) or ".." in fid:
+        return None, f"небезопасный id/fid: {fid!r}"
+    base = os.path.realpath(os.path.join(root, "advisors"))
+    adv = os.path.realpath(os.path.join(base, fid))
+    if adv != base and not adv.startswith(base + os.sep):
+        return None, "путь вне advisors/ (traversal)"
+    return adv, None
 
 
 def load_catalog(root):
@@ -25,6 +40,9 @@ def validate_catalog(data):
         tag = fig.get("id", f"#{i}")
         if not fig.get("id") or not fig.get("name"):
             errs.append(f"{tag}: нет id или name")
+        fid = fig.get("id")
+        if fid and (".." in fid or not _SAFE_FID.match(fid)):
+            errs.append(f"{tag}: небезопасный id")
         if fig.get("id") in seen:
             errs.append(f"{tag}: дублирующийся id")
         seen.add(fig.get("id"))
@@ -85,6 +103,7 @@ def build_preview(*, name, edition, pd_basis, url, raw):
     if not pd_ok:
         warnings.append("хост не в PD-whitelist — потребуется явный license=public-domain")
     return {
+        "ok": True,
         "kind": "pd_preview", "figure": name, "edition": edition, "pd_basis": pd_basis,
         "bytes": len(stripped.encode("utf-8")), "sha256": text_sha256(stripped),
         "sample": sample, "pd_host_ok": pd_ok, "warnings": warnings,
@@ -99,7 +118,9 @@ def _resolve_ref(ref, root):
     fig = get_figure(load_catalog(root), ref)
     if not fig:
         return None
-    s = fig["source"]
+    s = fig.get("source")
+    if not fig.get("name") or not isinstance(s, dict) or not s.get("url"):
+        return None  # кривая запись → как «нет в каталоге» (callers отдают error-dict)
     return {"name": fig["name"], "edition": s.get("edition", ""), "pd_basis": s.get("pd_basis", ""),
             "url": s["url"], "expected": s.get("expected")}
 
@@ -107,7 +128,7 @@ def _resolve_ref(ref, root):
 def preview_source(ref, *, root, fetch):
     r = _resolve_ref(ref, root)
     if r is None:
-        return {"error": f"нет фигуры '{ref}' в каталоге"}
+        return {"ok": False, "error": f"нет фигуры '{ref}' в каталоге"}
     raw = _decode(fetch(r["url"]))
     return build_preview(name=r["name"], edition=r["edition"], pd_basis=r["pd_basis"],
                          url=r["url"], raw=raw)
@@ -127,8 +148,13 @@ def add_from_catalog(ref, *, root, license, fetch, build):
     ok, actual, reason = verify_signature(stripped, r["expected"])
     if not ok:
         return {"ok": False, "error": reason, "actual_sha256": actual}
-    fid = ref if not ref.startswith("http") else cc.slugify(r["name"])
-    adv_dir = os.path.join(root, "advisors", fid)
+    is_url = ref.startswith("http://") or ref.startswith("https://")
+    fid = cc.slugify(r["name"]) if is_url else ref
+    adv_dir, err = _safe_advisor_dir(root, fid)
+    if err:
+        return {"ok": False, "error": err}
+    if len(stripped.strip()) < 200:
+        return {"ok": False, "error": "источник пуст/слишком короткий — не собираю мусор"}
     os.makedirs(os.path.join(adv_dir, "sources"), exist_ok=True)
     cc.land_to_sources(adv_dir, fid, stripped, url=r["url"],
                        license_note=r["pd_basis"] or "public-domain")
@@ -142,15 +168,17 @@ def _decode(raw):
 
 def search_gutenberg(author, *, fetch):
     """Кандидаты-издания из gutendex.com (JSON API PG). Хвост вне каталога. Оффлайн → error, не краш."""
-    url = "https://gutendex.com/books?search=" + author.replace(" ", "%20")
+    url = "https://gutendex.com/books?search=" + urllib.parse.quote(author)
     try:
         data = json.loads(_decode(fetch(url)))
     except Exception as e:
         return {"ok": False, "error": f"поиск недоступен (оффлайн?): {e}", "candidates": []}
+    if not isinstance(data, dict):
+        return {"ok": False, "error": "неожиданный ответ поиска", "candidates": []}
     out = []
     for b in data.get("results", [])[:8]:
         txt = next((v for k, v in (b.get("formats") or {}).items()
-                    if "text/plain" in k and v.endswith(".txt")), None)
+                    if "text/plain" in k and isinstance(v, str) and v.endswith(".txt")), None)
         if txt:
             out.append({"gutenberg_id": b.get("id"), "title": b.get("title"),
                         "authors": [a.get("name") for a in b.get("authors", [])],

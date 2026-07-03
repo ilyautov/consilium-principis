@@ -38,3 +38,7 @@ def test_catalog_add_builds_real_corpus_offline(tmp_path, monkeypatch):
     out = mcp_server.dispatch("catalog_add", {"ref": "epictetus"})
     assert out["ok"]
     assert (tmp_path / "advisors" / "epictetus" / "build" / "corpus.jsonl").exists()
+
+def test_install_ships_catalog():
+    import install
+    assert any("catalog" in str(x) for x in install.RUNTIME), "catalog/ не в RUNTIME install.py"

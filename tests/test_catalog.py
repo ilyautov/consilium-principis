@@ -34,3 +34,24 @@ def test_load_missing_catalog_is_empty_failclosed():
     with tempfile.TemporaryDirectory() as root:
         data = catalog.load_catalog(root)
         assert data == {"version": 1, "figures": []}
+
+def test_strip_and_signature_deterministic():
+    raw = ("*** START OF THE PROJECT GUTENBERG EBOOK X ***\n"
+           "Настоящий текст произведения.\n"
+           "*** END OF THE PROJECT GUTENBERG EBOOK X ***\n")
+    stripped = catalog.strip_for_signature(raw)
+    assert "PROJECT GUTENBERG" not in stripped
+    assert "Настоящий текст" in stripped
+    sha = catalog.text_sha256(stripped)
+    assert sha == catalog.text_sha256(catalog.strip_for_signature(raw))
+
+def test_verify_signature_failclosed_on_drift():
+    stripped = "abc"
+    ok, actual, _ = catalog.verify_signature(stripped, {"sha256": catalog.text_sha256("abc")})
+    assert ok
+    ok2, _, reason = catalog.verify_signature(stripped, {"sha256": "deadbeef"})
+    assert not ok2 and "подпись" in reason.lower()
+
+def test_verify_signature_absent_expected_warns_not_fails():
+    ok, actual, reason = catalog.verify_signature("abc", None)
+    assert ok and "не посеяна" in reason.lower()

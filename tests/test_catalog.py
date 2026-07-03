@@ -119,3 +119,66 @@ def test_add_nonpd_url_requires_license():
     res = catalog.add_from_catalog("http://randomsite.example/book.txt", root=root, license=None,
                                    fetch=lambda url, **k: PD_RAW, build=lambda *a, **k: None)
     assert not res["ok"] and "license" in res["error"].lower()
+
+# --- адверсариальное ревью (FIX 1-7) ---
+
+def test_add_from_catalog_rejects_traversal_id():
+    # FIX 1: id="../../evil" не должен вырваться из advisors/ в трекаемое пространство
+    import tempfile
+    root = tempfile.mkdtemp()
+    _write_catalog(root, [{"id": "../../evil", "name": "Evil", "seat": "x",
+        "source": {"platform": "gutenberg", "ref": "0", "edition": "e",
+                   "url": GUT, "pd_basis": "PG (US-PD)"}}])
+    built = {}
+    res = catalog.add_from_catalog("../../evil", root=root, license=None,
+                                   fetch=lambda url, **k: PD_RAW,
+                                   build=lambda adv_dir, **k: built.setdefault("dir", adv_dir))
+    assert not res["ok"]
+    assert "id" in res["error"].lower() or "traversal" in res["error"].lower()
+    assert "dir" not in built  # build не вызван
+    # ничего не записано вне advisors/
+    escaped = os.path.realpath(os.path.join(root, "advisors", "..", "..", "evil"))
+    assert not os.path.exists(escaped)
+
+def test_validate_catalog_rejects_unsafe_id():
+    # FIX 2
+    bad = {"version": 1, "figures": [
+        {"id": "../x", "name": "X", "source": {"platform": "gutenberg", "url": "http://x"}}]}
+    errs = catalog.validate_catalog(bad)
+    assert any("небезопасный id" in e for e in errs)
+
+def test_search_gutenberg_null_json_no_crash():
+    # FIX 3
+    res = catalog.search_gutenberg("x", fetch=lambda url, **k: "null")
+    assert res["ok"] is False and res["candidates"] == []
+
+def test_search_gutenberg_list_json_no_crash():
+    # FIX 3
+    res = catalog.search_gutenberg("x", fetch=lambda url, **k: "[]")
+    assert res["ok"] is False and res["candidates"] == []
+
+def test_resolve_ref_malformed_source_no_crash():
+    # FIX 4: фигура без source → preview_source отдаёт error-dict, не бросает
+    import tempfile
+    root = tempfile.mkdtemp()
+    _write_catalog(root, [{"id": "broken", "name": "Broken"}])  # нет source
+    pv = catalog.preview_source("broken", root=root, fetch=lambda url, **k: PD_RAW)
+    assert "error" in pv and pv.get("ok") is False
+
+def test_preview_source_ok_shape():
+    # FIX 5
+    root = _catalog_root()
+    pv = catalog.preview_source("marcus-aurelius", root=root, fetch=lambda url, **k: PD_RAW)
+    assert pv["ok"] is True and pv["kind"] == "pd_preview"
+    bad = catalog.preview_source("nope", root=root, fetch=lambda url, **k: PD_RAW)
+    assert bad["ok"] is False
+
+def test_add_from_catalog_rejects_too_short_body():
+    # FIX 6: короткое тело (без expected) → не собираем мусор, build не вызван
+    root = _catalog_root()
+    built = {}
+    res = catalog.add_from_catalog("marcus-aurelius", root=root, license=None,
+                                   fetch=lambda url, **k: "x" * 50,
+                                   build=lambda adv_dir, **k: built.setdefault("dir", adv_dir))
+    assert not res["ok"] and "короткий" in res["error"].lower()
+    assert "dir" not in built

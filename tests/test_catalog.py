@@ -182,3 +182,24 @@ def test_add_from_catalog_rejects_too_short_body():
                                    build=lambda adv_dir, **k: built.setdefault("dir", adv_dir))
     assert not res["ok"] and "короткий" in res["error"].lower()
     assert "dir" not in built
+
+# --- финальный ревью (FIX 2): preview/add честная оффлайн-ошибка вместо краша ---
+
+def _raising_fetch(url, **k):
+    raise ConnectionError("network unreachable")
+
+def test_preview_source_offline_error_not_crash():
+    root = _catalog_root()
+    pv = catalog.preview_source("marcus-aurelius", root=root, fetch=_raising_fetch)
+    assert pv["ok"] is False
+    assert "оффлайн" in pv["error"].lower() or "недоступ" in pv["error"].lower()
+
+def test_add_from_catalog_offline_error_not_crash():
+    root = _catalog_root()
+    built = {}
+    res = catalog.add_from_catalog("marcus-aurelius", root=root, license=None,
+                                   fetch=_raising_fetch,
+                                   build=lambda adv_dir, **k: built.setdefault("dir", adv_dir))
+    assert res["ok"] is False
+    assert "оффлайн" in res["error"].lower() or "недоступ" in res["error"].lower()
+    assert "dir" not in built

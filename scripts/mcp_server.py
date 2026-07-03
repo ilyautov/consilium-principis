@@ -1279,7 +1279,7 @@ def _catalog_list():
     bad = {e.split(":")[0] for e in errs}
     figs = [{"id": f["id"], "name": f["name"], "seat": f.get("seat", ""),
              "edition": f["source"].get("edition", ""), "pd_basis": f["source"].get("pd_basis", "")}
-            for f in data.get("figures", []) if f.get("id") not in bad]
+            for f in data.get("figures", []) if f.get("id") and f.get("id") not in bad]
     return {"figures": figs, "catalog_errors": errs}
 
 
@@ -1302,7 +1302,7 @@ def _catalog_add(ref, license=None):
 
 def _catalog_verify():
     import catalog, collect_common as cc
-    return catalog.verify_catalog(_root(), fetch=cc.fetch)   # verify_catalog implemented in Task 7
+    return catalog.verify_catalog(_root(), fetch=cc.fetch)
 
 
 # ───────────────────────── реестр тулов ─────────────────────────

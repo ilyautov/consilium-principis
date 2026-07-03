@@ -129,7 +129,10 @@ def preview_source(ref, *, root, fetch):
     r = _resolve_ref(ref, root)
     if r is None:
         return {"ok": False, "error": f"нет фигуры '{ref}' в каталоге"}
-    raw = _decode(fetch(r["url"]))
+    try:
+        raw = _decode(fetch(r["url"]))
+    except Exception as e:
+        return {"ok": False, "error": f"источник недоступен (оффлайн?): {e}"}
     return build_preview(name=r["name"], edition=r["edition"], pd_basis=r["pd_basis"],
                          url=r["url"], raw=raw)
 
@@ -143,7 +146,10 @@ def add_from_catalog(ref, *, root, license, fetch, build):
         return {"ok": False, "error": f"нет фигуры '{ref}' в каталоге"}
     if not cc.is_pd_host(r["url"]) and license != "public-domain":
         return {"ok": False, "error": "не-PD хост требует license=public-domain (подтверди PD-статус сам)"}
-    raw = _decode(fetch(r["url"]))
+    try:
+        raw = _decode(fetch(r["url"]))
+    except Exception as e:
+        return {"ok": False, "error": f"источник недоступен (оффлайн?): {e}"}
     stripped = strip_for_signature(raw)
     ok, actual, reason = verify_signature(stripped, r["expected"])
     if not ok:
@@ -155,7 +161,6 @@ def add_from_catalog(ref, *, root, license, fetch, build):
         return {"ok": False, "error": err}
     if len(stripped.strip()) < 200:
         return {"ok": False, "error": "источник пуст/слишком короткий — не собираю мусор"}
-    os.makedirs(os.path.join(adv_dir, "sources"), exist_ok=True)
     cc.land_to_sources(adv_dir, fid, stripped, url=r["url"],
                        license_note=r["pd_basis"] or "public-domain")
     build(adv_dir, built_at=cc.today())

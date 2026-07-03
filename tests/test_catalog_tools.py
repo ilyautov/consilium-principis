@@ -42,3 +42,9 @@ def test_catalog_add_builds_real_corpus_offline(tmp_path, monkeypatch):
 def test_install_ships_catalog():
     import install
     assert any("catalog" in str(x) for x in install.RUNTIME), "catalog/ не в RUNTIME install.py"
+
+def test_instructions_mention_catalog_flow():
+    assert "catalog_preview" in mcp_server.INSTRUCTIONS
+    assert "catalog_add" in mcp_server.INSTRUCTIONS
+    # порядок consent: превью упоминается ПЕРЕД сборкой
+    assert mcp_server.INSTRUCTIONS.index("catalog_preview") < mcp_server.INSTRUCTIONS.index("catalog_add")

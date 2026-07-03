@@ -2,22 +2,55 @@
   "version": 1,
   "figures": [
     {
-      "id": "marcus-aurelius", "name": "Марк Аврелий", "seat": "стоик / этика решений", "lang": "en",
-      "source": {"platform": "gutenberg", "ref": "2680", "edition": "пер. George Long, 1862",
-                 "url": "https://www.gutenberg.org/cache/epub/2680/pg2680.txt",
-                 "pd_basis": "Project Gutenberg (US-PD)"}
+      "id": "marcus-aurelius",
+      "name": "Марк Аврелий",
+      "seat": "стоик / этика решений",
+      "lang": "en",
+      "source": {
+        "platform": "gutenberg",
+        "ref": "2680",
+        "edition": "пер. George Long, 1862",
+        "url": "https://www.gutenberg.org/cache/epub/2680/pg2680.txt",
+        "pd_basis": "Project Gutenberg (US-PD)",
+        "expected": {
+          "sha256": "a65002ee97271a5b7bb172db35d8ae000f6339c18d0862107e2657119397b75e",
+          "bytes": 405526
+        }
+      }
     },
     {
-      "id": "epictetus", "name": "Эпиктет", "seat": "стоик / контроль контролируемого", "lang": "en",
-      "source": {"platform": "gutenberg", "ref": "45109", "edition": "Enchiridion, пер. Long",
-                 "url": "https://www.gutenberg.org/cache/epub/45109/pg45109.txt",
-                 "pd_basis": "Project Gutenberg (US-PD)"}
+      "id": "epictetus",
+      "name": "Эпиктет",
+      "seat": "стоик / контроль контролируемого",
+      "lang": "en",
+      "source": {
+        "platform": "gutenberg",
+        "ref": "45109",
+        "edition": "Enchiridion, пер. Long",
+        "url": "https://www.gutenberg.org/cache/epub/45109/pg45109.txt",
+        "pd_basis": "Project Gutenberg (US-PD)",
+        "expected": {
+          "sha256": "9bdcb8cda6e1ca076b412169ed5dfa9f2635483de795a25df75674fda646c3d7",
+          "bytes": 71804
+        }
+      }
     },
     {
-      "id": "sun-tzu", "name": "Сунь-Цзы", "seat": "стратег / конфликт", "lang": "en",
-      "source": {"platform": "gutenberg", "ref": "132", "edition": "The Art of War, пер. Lionel Giles 1910",
-                 "url": "https://www.gutenberg.org/cache/epub/132/pg132.txt",
-                 "pd_basis": "Project Gutenberg (US-PD)"}
+      "id": "sun-tzu",
+      "name": "Сунь-Цзы",
+      "seat": "стратег / конфликт",
+      "lang": "en",
+      "source": {
+        "platform": "gutenberg",
+        "ref": "132",
+        "edition": "The Art of War, пер. Lionel Giles 1910",
+        "url": "https://www.gutenberg.org/cache/epub/132/pg132.txt",
+        "pd_basis": "Project Gutenberg (US-PD)",
+        "expected": {
+          "sha256": "0cad92d6aad6a1fffee9ac628307b9ab0ccb39ce0e48b3ceef6998615509f0d6",
+          "bytes": 322309
+        }
+      }
     }
   ]
 }

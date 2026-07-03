@@ -10,8 +10,10 @@
 Через MCP доступен **полный жизненный цикл без терминала**: `doctor` (готовность машины),
 `seed_council` (стартовый совет), `build_advisor` (советник под ключ), `ingest_telegram`
 (корпус Принцепса), `setup_full` (FULL-тир), `render_session`/`list_recipes` (виджеты для Cowork),
-плюс тулы линз/жизненного цикла (`build_lens`/`add_source`/`cite`/`config_*`/`ollama_*`) и контур-тулы
-(`fidelity_check`/`retrieve`/…). Всего 33 тула.
+контур-тулы (`fidelity_check`/`cite`/`gate_verdict`/`retrieve` — двухфазный судья-гейт цитат),
+decision-calc (`validate_decision_map`/`run_calculation`/`save_decision_map` — 📐 карта решения и
+Монте-Карло), петля исхода (`loop_status`/`pending_outcomes`/`advisor_weights`) плюс тулы линз/
+жизненного цикла (`build_lens`/`add_source`/`config_*`/`ollama_*`). **Всего 37 тулов.**
 
 ## Подключение за 3 шага (Claude Desktop / Cowork)
 

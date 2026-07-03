@@ -39,6 +39,23 @@ def test_catalog_add_builds_real_corpus_offline(tmp_path, monkeypatch):
     assert out["ok"]
     assert (tmp_path / "advisors" / "epictetus" / "build" / "corpus.jsonl").exists()
 
+def test_catalog_list_survives_one_malformed_entry(tmp_path, monkeypatch):
+    # FIX 1: одна кривая запись (без id) не должна гасить весь catalog_list (KeyError → RPC-ошибка).
+    (tmp_path / "catalog").mkdir()
+    (tmp_path / "catalog" / "pd_figures.json").write_text(json.dumps({"version": 1, "figures": [
+        {"id": "good", "name": "Good Figure", "seat": "тест",
+         "source": {"platform": "gutenberg", "ref": "1", "edition": "e",
+                    "url": "https://www.gutenberg.org/cache/epub/1/pg1.txt",
+                    "pd_basis": "PG (US-PD)"}},
+        {"name": "No Id Figure",
+         "source": {"platform": "gutenberg", "ref": "2", "edition": "e",
+                    "url": "https://www.gutenberg.org/cache/epub/2/pg2.txt",
+                    "pd_basis": "PG (US-PD)"}},
+    ]}, ensure_ascii=False), encoding="utf-8")
+    monkeypatch.setattr("mcp_server._root", lambda: str(tmp_path))
+    out = mcp_server.dispatch("catalog_list", {})
+    assert any(f["id"] == "good" for f in out["figures"])
+
 def test_install_ships_catalog():
     import install
     assert any("catalog" in str(x) for x in install.RUNTIME), "catalog/ не в RUNTIME install.py"

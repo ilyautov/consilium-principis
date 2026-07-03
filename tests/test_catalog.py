@@ -55,3 +55,22 @@ def test_verify_signature_failclosed_on_drift():
 def test_verify_signature_absent_expected_warns_not_fails():
     ok, actual, reason = catalog.verify_signature("abc", None)
     assert ok and "не посеяна" in reason.lower()
+
+def test_build_preview_shape_and_ocr_warn():
+    raw = "*** START OF THE PROJECT GUTENBERG EBOOK X ***\n" + ("Ясный текст. " * 40) + \
+          "\n*** END OF THE PROJECT GUTENBERG EBOOK X ***\n"
+    pv = catalog.build_preview(name="Марк Аврелий", edition="Long 1862",
+                               pd_basis="PG (US-PD)", url="https://www.gutenberg.org/x", raw=raw)
+    assert pv["kind"] == "pd_preview"
+    assert pv["figure"] == "Марк Аврелий" and pv["pd_basis"] == "PG (US-PD)"
+    assert "PROJECT GUTENBERG" not in pv["sample"]
+    assert pv["bytes"] > 0 and len(pv["sha256"]) == 64
+    assert pv["pd_host_ok"] is True
+    assert pv["warnings"] == []
+
+def test_build_preview_flags_ocr_noise_and_nonpd_host():
+    noisy = "@#$%^&*<>|~`" * 60 + " a"
+    pv = catalog.build_preview(name="X", edition="e", pd_basis="?",
+                               url="http://randomsite.example/x", raw=noisy)
+    assert pv["pd_host_ok"] is False
+    assert any("шум" in w.lower() or "качество" in w.lower() for w in pv["warnings"])

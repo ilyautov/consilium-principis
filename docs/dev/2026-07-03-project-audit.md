@@ -69,7 +69,7 @@ HEPHAESTUS_ENGINE=/nonexistent OLLAMA_HOST=http://127.0.0.1:59999 python3 -m pyt
 
 | Проверка | Результат |
 |----------|-----------|
-| Приватные имена в трекаемых **именах файлов** (***/***/***/***/***/***/***) | НЕТ ✅ |
+| Приватные имена в трекаемых **именах файлов** (каталоги из локального `advisors/*`) | НЕТ ✅ |
 | Приватные имена в **теле** трекаемых файлов (`git grep -li`) | НЕТ ✅ |
 | Секреты `sk-or-v1-` в трекаемых файлах | НЕТ ✅ |
 | `.env` трекается | НЕТ ✅ |
@@ -80,7 +80,7 @@ HEPHAESTUS_ENGINE=/nonexistent OLLAMA_HOST=http://127.0.0.1:59999 python3 -m pyt
 
 **Что реально шипуется** (fresh clone видит): `lenses/strategist/{corpus.jsonl,lens.md,corpus.lock.json,sources/manifest.json}`,
 пять `lenses/*.md` (cfo/marketer/sales/mckinsey-strategy/strategist), `advisors/README.md`, `gov_heads.json`, весь `scripts/`, SKILL.md, docs.
-Приватные советники (***…) **и** PD-советники (machiavelli/marcus-aurelius/sun-tzu) равно gitignored под `advisors/*` — в паблик едет **только линза «Стратег»**.
+Приватные советники (собранные локально из чужих корпусов) **и** PD-советники (machiavelli/marcus-aurelius/sun-tzu) равно gitignored под `advisors/*` — в паблик едет **только линза «Стратег»**.
 
 ### Предлагаемый ритуал «firewall-check» (по образцу moat-check)
 
@@ -90,14 +90,24 @@ HEPHAESTUS_ENGINE=/nonexistent OLLAMA_HOST=http://127.0.0.1:59999 python3 -m pyt
 ```sh
 #!/bin/sh
 # firewall_check.sh — БЛОКИРУЕТ push, если приватные данные попали в трекаемые git-файлы.
+# Имена приватных советников НЕ хардкодятся: выводятся из локального (gitignored) advisors/,
+# чтобы сам скрипт не носил реальных имён живых людей в публичный репозиторий.
+# Скрипт исключает себя из скана, иначе его собственные паттерны дадут ложный FAIL.
 set -e
-PRIV='***|***|***|***|***|***|***'
+self='scripts/firewall_check.sh'
 fail=0
-# 1. приватные имена в именах ИЛИ теле трекаемых файлов
-if git ls-files | grep -iE "$PRIV"; then echo "FAIL: приватное имя в имени трекаемого файла"; fail=1; fi
-if git grep -liE "$PRIV" -- . ; then echo "FAIL: приватное имя в теле трекаемого файла"; fail=1; fi
-# 2. секреты
-if git grep -lE 'sk-or-v1-|sk-ant-|AKIA[0-9A-Z]{16}' -- . ; then echo "FAIL: похоже на секрет"; fail=1; fi
+# PD-фигуры — их имена легитимно стоят в трекаемых доках/тестах. Остальное в advisors/ = приватное
+# (fail-closed: новый советник запрещён в git, пока имя не внесено в PD-allowlist).
+PD_ALLOW='machiavelli|marcus-aurelius|sun-tzu|epictetus|seneca|aristotle'
+# Список приватных имён = каталоги в advisors/ минус README минус PD-allowlist.
+PRIV=$(ls advisors 2>/dev/null | grep -v '^README.md$' | grep -ivE "^($PD_ALLOW)$" | paste -sd'|' -)
+# 1. приватные имена в именах ИЛИ теле трекаемых файлов (если локально есть советники)
+if [ -n "$PRIV" ]; then
+  if git ls-files | grep -iE "$PRIV"; then echo "FAIL: приватное имя в имени трекаемого файла"; fail=1; fi
+  if git grep -liE "$PRIV" -- . ":!$self"; then echo "FAIL: приватное имя в теле трекаемого файла"; fail=1; fi
+fi
+# 2. секреты — паттерн ловит РЕАЛЬНЫЙ ключ (префикс+хвост), не голый префикс из доков
+if git grep -lE 'sk-or-v1-[A-Za-z0-9]{20,}|sk-ant-[A-Za-z0-9-]{20,}|AKIA[0-9A-Z]{16}' -- . ":!$self"; then echo "FAIL: похоже на секрет"; fail=1; fi
 # 3. файлы, которые НИКОГДА не должны трекаться
 for f in .env gov_heads.local.json principis.md relationship.md board_config.json; do
   if git ls-files --error-unmatch "$f" >/dev/null 2>&1; then echo "FAIL: $f трекается"; fail=1; fi

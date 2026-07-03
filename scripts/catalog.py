@@ -63,3 +63,30 @@ def verify_signature(stripped, expected):
     if actual != expected["sha256"]:
         return False, actual, "подпись не сошлась: издание на источнике изменилось (fail-closed)"
     return True, actual, "ok"
+
+
+def _ocr_noise_ratio(text):
+    if not text:
+        return 1.0
+    junk = sum(1 for c in text if not (c.isalnum() or c.isspace() or c in ".,;:!?—-–'\"()«»"))
+    return junk / len(text)
+
+
+def build_preview(*, name, edition, pd_basis, url, raw):
+    """Render-agnostic превью-объект: один dict → адаптеры рендера (Cowork-виджет/текст/чужой агент)."""
+    import collect_common as cc
+    stripped = strip_for_signature(raw)
+    sample = stripped[:400]
+    warnings = []
+    ratio = _ocr_noise_ratio(stripped[:2000])
+    if ratio > 0.15:
+        warnings.append(f"возможен OCR-шум/низкое качество (доля не-текст. символов {ratio:.0%})")
+    pd_ok = cc.is_pd_host(url)
+    if not pd_ok:
+        warnings.append("хост не в PD-whitelist — потребуется явный license=public-domain")
+    return {
+        "kind": "pd_preview", "figure": name, "edition": edition, "pd_basis": pd_basis,
+        "bytes": len(stripped.encode("utf-8")), "sha256": text_sha256(stripped),
+        "sample": sample, "pd_host_ok": pd_ok, "warnings": warnings,
+        "confirm_hint": "Собрать советника локально из этого издания?",
+    }

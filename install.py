@@ -33,8 +33,10 @@ SKILLS_HOME = Path.home() / ".claude" / "skills"
 # без них skill-install приезжал с ПУСТОЙ доской (HIGH #1 pre-publish аудита). install-skill НЕ шипуем —
 # как под-скилл он приземляется глубже, чем ищет Claude Code (~/.claude/skills/*/SKILL.md), т.е. мёртв;
 # онбординг покрыт README/QUICKSTART + тулами board_status/doctor/seed_council/setup_full.
+# catalog/ — указатели PD-фигур (pd_figures.json) для catalog_add/search/preview: без него
+# эти тулы на установленном скилле бьют по несуществующему файлу.
 RUNTIME = ["SKILL.md", "QUICKSTART.md", "recipes.json", "scripts", "council", "assets",
-           "lenses", "gov_heads.json"]
+           "lenses", "gov_heads.json", "catalog"]
 # golden = per-advisor user-data; build = тяжёлые регенерируемые артефакты (эмбеддинги/индексы линз —
 # шипуем только PD-исходник corpus.jsonl + manifest, не производное).
 IGNORE = shutil.ignore_patterns("__pycache__", "*.pyc", "golden", "build")

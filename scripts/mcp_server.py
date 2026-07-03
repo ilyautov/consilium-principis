@@ -1270,6 +1270,41 @@ def _setup_full(consent=True):
     return run_setup(consent=consent)
 
 
+# ── PD-онбординг корпуса: каталог общественного достояния ──
+
+def _catalog_list():
+    import catalog
+    data = catalog.load_catalog(_root())
+    errs = catalog.validate_catalog(data)
+    bad = {e.split(":")[0] for e in errs}
+    figs = [{"id": f["id"], "name": f["name"], "seat": f.get("seat", ""),
+             "edition": f["source"].get("edition", ""), "pd_basis": f["source"].get("pd_basis", "")}
+            for f in data.get("figures", []) if f.get("id") and f.get("id") not in bad]
+    return {"figures": figs, "catalog_errors": errs}
+
+
+def _catalog_search(author):
+    import catalog, collect_common as cc
+    return catalog.search_gutenberg(author, fetch=cc.fetch)
+
+
+def _catalog_preview(ref):
+    import catalog, collect_common as cc
+    return catalog.preview_source(ref, root=_root(), fetch=cc.fetch)
+
+
+def _catalog_add(ref, license=None):
+    import catalog, collect_common as cc
+    from corpusbuild import pipeline
+    return catalog.add_from_catalog(ref, root=_root(), license=license, fetch=cc.fetch,
+                                    build=lambda adv_dir, **k: pipeline.build(adv_dir, **k))
+
+
+def _catalog_verify():
+    import catalog, collect_common as cc
+    return catalog.verify_catalog(_root(), fetch=cc.fetch)
+
+
 # ───────────────────────── реестр тулов ─────────────────────────
 
 def _obj(props, required):
@@ -1302,6 +1337,38 @@ TOOLS = {
                                         "back_from": {"type": "string", "description": "хост-оверрайд: маркер начала приложений"}},
                          "required": ["advisor_dir"]},
         "handler": _add_source,
+    },
+    "catalog_list": {
+        "description": "Список PD-фигур каталога (общественное достояние) — id/имя/место/издание/PD-basis. "
+                       "Без фетча. Чужой выбирает, кого собрать в совет.",
+        "input_schema": _obj({}, []),
+        "handler": _catalog_list,
+    },
+    "catalog_search": {
+        "description": "Поиск PD-издания фигуры ВНЕ каталога (Gutenberg через gutendex). Возвращает "
+                       "кандидатов с PD-basis. Оффлайн → честная ошибка.",
+        "input_schema": _obj({"author": "string"}, ["author"]),
+        "handler": _catalog_search,
+    },
+    "catalog_preview": {
+        "description": "Превью PD-издания перед сборкой: сэмпл текста + подпись + PD-host + warnings. "
+                       "НЕ собирает. Это consent-карточка — покажи юзеру ПЕРЕД catalog_add. ref = id "
+                       "каталога ИЛИ прямой url.",
+        "input_schema": _obj({"ref": "string"}, ["ref"]),
+        "handler": _catalog_preview,
+    },
+    "catalog_add": {
+        "description": "Собрать PD-советника ЛОКАЛЬНО из каталога/url. ПОДТВЕРДИ у юзера (Rule 0) — "
+                       "покажи catalog_preview первым. Fetch→сверка подписи (fail-closed на дрейфе)→"
+                       "сборка в advisors/<id>. Не-PD хост требует license=public-domain.",
+        "input_schema": _obj({"ref": "string", "license": "string"}, ["ref"]),
+        "handler": _catalog_add,
+    },
+    "catalog_verify": {
+        "description": "Ритуал целостности каталога (как moat-check): обойти записи, сверить подпись/"
+                       "PD-basis, репортить дрейф. Без сборки.",
+        "input_schema": _obj({}, []),
+        "handler": _catalog_verify,
     },
     "config_get": {
         "description": "Прочитать board_config.json (тюнинг без правки файла): весь конфиг или один "
@@ -1776,6 +1843,11 @@ Consilium-Principis — личный совет AI-персон реальных
    Тихо вызови board_status (и list_recipes, если юзер не знает, что спросить) и веди простым языком,
    по одному шагу. У board_status есть поле `hint`, у next_step — `say`: они УЖЕ написаны человеческим
    языком, опирайся на них, а не на сырой preflight.
+   ПУСТАЯ ДОСКА / МАЛО СОВЕТНИКОВ: предложи собрать из общественного достояния. Покажи catalog_list →
+   юзер называет фигуру → catalog_preview(ref) (карточка: издание, PD-basis, сэмпл, warnings) → ПОКАЖИ
+   её и спроси согласие → ТОЛЬКО потом catalog_add(ref) (собирает локально, Rule 0). Фигуры вне каталога:
+   catalog_search(автор) → выбери издание → preview → add(url, license=public-domain). Никогда не собирай
+   без показанного превью. Текст никуда не отправляется — сборка на машине юзера, корпус локальный.
 
 10. ПЕРЕВОДИ СЛУЖЕБКУ В ЧЕЛОВЕЧЕСКИЙ ЯЗЫК (для не-технического юзера). НИКОГДА не показывай ему сырые
    поля JSON и технслова: тиры (P1/S1/🔵-eligible), хеши/«голову», пути, traversal, SSRF, manifest,

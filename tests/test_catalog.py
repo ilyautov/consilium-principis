@@ -74,3 +74,48 @@ def test_build_preview_flags_ocr_noise_and_nonpd_host():
                                url="http://randomsite.example/x", raw=noisy)
     assert pv["pd_host_ok"] is False
     assert any("шум" in w.lower() or "качество" in w.lower() for w in pv["warnings"])
+
+GUT = "https://www.gutenberg.org/cache/epub/2680/pg2680.txt"
+PD_RAW = ("*** START OF THE PROJECT GUTENBERG EBOOK X ***\n" + ("Мысль. " * 50) +
+          "\n*** END OF THE PROJECT GUTENBERG EBOOK X ***\n")
+
+def _catalog_root():
+    import tempfile
+    root = tempfile.mkdtemp()
+    _write_catalog(root, [{"id": "marcus-aurelius", "name": "Марк Аврелий", "seat": "стоик",
+        "source": {"platform": "gutenberg", "ref": "2680", "edition": "Long 1862",
+                   "url": GUT, "pd_basis": "PG (US-PD)"}}])
+    return root
+
+def test_preview_source_by_id_uses_injected_fetch():
+    root = _catalog_root()
+    pv = catalog.preview_source("marcus-aurelius", root=root, fetch=lambda url, **k: PD_RAW)
+    assert pv["kind"] == "pd_preview" and pv["figure"] == "Марк Аврелий"
+
+def test_add_from_catalog_verifies_sig_and_builds():
+    root = _catalog_root()
+    expected_sha = catalog.text_sha256(catalog.strip_for_signature(PD_RAW))
+    data = catalog.load_catalog(root); data["figures"][0]["source"]["expected"] = {"sha256": expected_sha}
+    with open(os.path.join(root, "catalog", "pd_figures.json"), "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False)
+    built = {}
+    res = catalog.add_from_catalog("marcus-aurelius", root=root, license=None,
+                                   fetch=lambda url, **k: PD_RAW,
+                                   build=lambda adv_dir, **k: built.setdefault("dir", adv_dir))
+    assert res["ok"] and res["advisor"].endswith("marcus-aurelius")
+    assert built["dir"].endswith("marcus-aurelius")
+
+def test_add_from_catalog_failclosed_on_signature_drift():
+    root = _catalog_root()
+    data = catalog.load_catalog(root); data["figures"][0]["source"]["expected"] = {"sha256": "deadbeef"}
+    with open(os.path.join(root, "catalog", "pd_figures.json"), "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False)
+    res = catalog.add_from_catalog("marcus-aurelius", root=root, license=None,
+                                   fetch=lambda url, **k: PD_RAW, build=lambda *a, **k: None)
+    assert not res["ok"] and "подпись" in res["error"].lower()
+
+def test_add_nonpd_url_requires_license():
+    root = _catalog_root()
+    res = catalog.add_from_catalog("http://randomsite.example/book.txt", root=root, license=None,
+                                   fetch=lambda url, **k: PD_RAW, build=lambda *a, **k: None)
+    assert not res["ok"] and "license" in res["error"].lower()

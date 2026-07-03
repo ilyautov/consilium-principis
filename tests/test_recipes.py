@@ -63,3 +63,12 @@ def test_match_finds_single_advisor():
 
 def test_match_none_on_gibberish():
     assert match_recipe("qwerty asdfgh zxcvb", load_recipes()) is None
+
+
+def test_calibrate_recipe_present():
+    rs = load_recipes()
+    ids = [r["id"] for r in rs]
+    assert "calibrate" in ids
+    r = next(r for r in rs if r["id"] == "calibrate")
+    assert set(r.keys()) == {"id", "title", "short", "triggers", "does", "reads"}
+    assert r["triggers"] and isinstance(r["triggers"], list)

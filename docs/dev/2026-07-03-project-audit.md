@@ -142,6 +142,14 @@ if git show HEAD:gov_heads.json | grep -q '"advisors/'; then echo "FAIL: при�
   ожидаемо внутренние. Но **ситуационная карта и calibrate/mirror/stability — это фичи с тестами, которые «горят вхолостую»**:
   код есть, проводки к хосту нет. Либо провести в INSTRUCTIONS/recipes, либо явно пометить как internal/CLI-only.
   Доказательство: сверка `mcp_server.list_tools()` × `INSTRUCTIONS` (10 тулов «OUT»), и `grep` по `recipes.json@HEAD` → 0 упоминаний.
+  - **РЕЗОЛЮЦИЯ 2026-07-03 (RESOLVED).** Пересчёт вскрыл **13** тёмных тулов, а не 10 (аудит недосчитал: `premortem`
+    уже был проведён, `catalog_verify` добавился позже). Закрыто так: **6 проведены в INSTRUCTIONS** — ситуационная
+    тройка (`capture_situation` / `situation_analyze` / `situation_stress_test`) в Rule 14, `advisor_weights` +
+    `mirror_report` в Rule 12, `scaffold_principis` в Rule 9; **1 проведён рецептом** — `calibrate` в `recipes.json`;
+    **6 объявлены намеренно-внутренними** (`validate_manifest`, `job_status`, `ollama_ensure`, `stability`,
+    `atomic_grounding`, `catalog_verify`) — см. `docs/dev/internal-tools.md`. Регрессия закрыта гардом
+    `tests/test_no_dark_tools.py`: тул обязан быть проведён (INSTRUCTIONS / описание сиблинга / рецепт) либо явно помечен
+    внутренним — иначе тест падает.
 - **Орфанов/мёртвого кода не найдено** — все тулы имеют handler; все «OUT»-тулы имеют тесты (`test_mirror.py`,
   `test_stability.py`, `test_atomic.py`, `test_extractor.py` и т.д.), т.е. это не dead code, а недо-экспонированные фичи.
 - **Незакоммиченная правка в рабочем дереве:** `recipes.json` (M) — заменяет триггер `"Мангер против Naval"` →

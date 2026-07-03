@@ -90,3 +90,69 @@ def build_preview(*, name, edition, pd_basis, url, raw):
         "sample": sample, "pd_host_ok": pd_ok, "warnings": warnings,
         "confirm_hint": "Собрать советника локально из этого издания?",
     }
+
+
+def _resolve_ref(ref, root):
+    """id из каталога → (name, edition, pd_basis, url, expected); голый url → минимальная запись."""
+    if ref.startswith("http://") or ref.startswith("https://"):
+        return {"name": ref, "edition": "", "pd_basis": "", "url": ref, "expected": None}
+    fig = get_figure(load_catalog(root), ref)
+    if not fig:
+        return None
+    s = fig["source"]
+    return {"name": fig["name"], "edition": s.get("edition", ""), "pd_basis": s.get("pd_basis", ""),
+            "url": s["url"], "expected": s.get("expected")}
+
+
+def preview_source(ref, *, root, fetch):
+    r = _resolve_ref(ref, root)
+    if r is None:
+        return {"error": f"нет фигуры '{ref}' в каталоге"}
+    raw = _decode(fetch(r["url"]))
+    return build_preview(name=r["name"], edition=r["edition"], pd_basis=r["pd_basis"],
+                         url=r["url"], raw=raw)
+
+
+def add_from_catalog(ref, *, root, license, fetch, build):
+    """Мутирующий: fetch → strip → verify подпись (fail-closed) → land → build. Rule 0 (согласие) —
+    на уровне хоста (превью-карточка перед вызовом). Собирает в <root>/advisors/<id> локально."""
+    import collect_common as cc
+    r = _resolve_ref(ref, root)
+    if r is None:
+        return {"ok": False, "error": f"нет фигуры '{ref}' в каталоге"}
+    if not cc.is_pd_host(r["url"]) and license != "public-domain":
+        return {"ok": False, "error": "не-PD хост требует license=public-domain (подтверди PD-статус сам)"}
+    raw = _decode(fetch(r["url"]))
+    stripped = strip_for_signature(raw)
+    ok, actual, reason = verify_signature(stripped, r["expected"])
+    if not ok:
+        return {"ok": False, "error": reason, "actual_sha256": actual}
+    fid = ref if not ref.startswith("http") else cc.slugify(r["name"])
+    adv_dir = os.path.join(root, "advisors", fid)
+    os.makedirs(os.path.join(adv_dir, "sources"), exist_ok=True)
+    cc.land_to_sources(adv_dir, fid, stripped, url=r["url"],
+                       license_note=r["pd_basis"] or "public-domain")
+    build(adv_dir, built_at=cc.today())
+    return {"ok": True, "advisor": adv_dir, "sha256": actual, "note": reason}
+
+
+def _decode(raw):
+    return raw if isinstance(raw, str) else raw.decode("utf-8", "replace")
+
+
+def search_gutenberg(author, *, fetch):
+    """Кандидаты-издания из gutendex.com (JSON API PG). Хвост вне каталога. Оффлайн → error, не краш."""
+    url = "https://gutendex.com/books?search=" + author.replace(" ", "%20")
+    try:
+        data = json.loads(_decode(fetch(url)))
+    except Exception as e:
+        return {"ok": False, "error": f"поиск недоступен (оффлайн?): {e}", "candidates": []}
+    out = []
+    for b in data.get("results", [])[:8]:
+        txt = next((v for k, v in (b.get("formats") or {}).items()
+                    if "text/plain" in k and v.endswith(".txt")), None)
+        if txt:
+            out.append({"gutenberg_id": b.get("id"), "title": b.get("title"),
+                        "authors": [a.get("name") for a in b.get("authors", [])],
+                        "url": txt, "pd_basis": "Project Gutenberg (US-PD)"})
+    return {"ok": True, "candidates": out}

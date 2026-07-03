@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "figures": [
+    {
+      "id": "marcus-aurelius", "name": "Марк Аврелий", "seat": "стоик / этика решений", "lang": "en",
+      "source": {"platform": "gutenberg", "ref": "2680", "edition": "пер. George Long, 1862",
+                 "url": "https://www.gutenberg.org/cache/epub/2680/pg2680.txt",
+                 "pd_basis": "Project Gutenberg (US-PD)"}
+    },
+    {
+      "id": "epictetus", "name": "Эпиктет", "seat": "стоик / контроль контролируемого", "lang": "en",
+      "source": {"platform": "gutenberg", "ref": "45109", "edition": "Enchiridion, пер. Long",
+                 "url": "https://www.gutenberg.org/cache/epub/45109/pg45109.txt",
+                 "pd_basis": "Project Gutenberg (US-PD)"}
+    },
+    {
+      "id": "sun-tzu", "name": "Сунь-Цзы", "seat": "стратег / конфликт", "lang": "en",
+      "source": {"platform": "gutenberg", "ref": "132", "edition": "The Art of War, пер. Lionel Giles 1910",
+                 "url": "https://www.gutenberg.org/cache/epub/132/pg132.txt",
+                 "pd_basis": "Project Gutenberg (US-PD)"}
+    }
+  ]
+}

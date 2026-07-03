@@ -1,7 +1,7 @@
 """Каталог PD-фигур (указатели, ноль текста) + оркестрация сборки советника из общественного
 достояния. Сеть/сборка инъектируются (fetch=/build=) → всё оффлайн-тестируемо. Логика в сервере,
 хост только предлагает и рисует. Firewall: каталог = указатели, корпус — локально в advisors/*."""
-import os, json
+import os, json, hashlib
 
 ALLOWED_PLATFORMS = {"gutenberg", "standardebooks", "wikisource"}
 
@@ -42,3 +42,24 @@ def get_figure(data, fid):
         if fig.get("id") == fid:
             return fig
     return None
+
+
+def strip_for_signature(raw):
+    """Текст ПОСЛЕ снятия Gutenberg-обёртки — детерминированная основа подписи и сборки."""
+    import collect_pd
+    return collect_pd.strip_gutenberg(raw).strip()
+
+
+def text_sha256(text):
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def verify_signature(stripped, expected):
+    """→ (ok, actual_sha, reason). expected None → bootstrap (ok, но помечаем «не посеяна»).
+    Есть expected.sha256 и не сошлось → fail-closed (текст уплыл — не собираем молча)."""
+    actual = text_sha256(stripped)
+    if not expected or not expected.get("sha256"):
+        return True, actual, "подпись не посеяна (bootstrap) — прогони catalog_verify --seed"
+    if actual != expected["sha256"]:
+        return False, actual, "подпись не сошлась: издание на источнике изменилось (fail-closed)"
+    return True, actual, "ok"

@@ -13,6 +13,9 @@ def _root(root=None):
 
 
 def _load_mcp():
+    # Тулы/правила интроспектируются из ЖИВОГО импортированного mcp_server ПО ДИЗАЙНУ (само-док
+    # документирует РАБОТАЮЩИЙ сервер, не foreign-root копию); `root` в остальных extract_* правит
+    # только файловыми источниками (recipes.json, internal-tools.md, scripts/, tests/, GLOSSARY.md).
     if HERE not in sys.path:
         sys.path.insert(0, HERE)
     import mcp_server
@@ -77,21 +80,116 @@ def extract_recipes(root=None):
     return json.loads(_recipes_raw(root))
 
 
-def build(root=None):
-    """Собирает полный индекс {tools, rules, recipes} для docs/selfdoc/index.json."""
+def _subsystem_of(rel_path):
+    """Подсистема по каталогу/имени файла."""
+    parts = rel_path.replace("\\", "/").split("/")
+    if "corpusbuild" in parts:
+        return "corpusbuild"
+    base = parts[-1]
+    for key in ("mcp_server", "collect", "engine", "tier", "build_advisor", "install", "doctor",
+                "catalog", "seed_council", "eval", "diversity", "situation", "calibrate"):
+        if base.startswith(key) or key in base:
+            return key.split("_")[0]
+    return "other"
+
+
+def _first_docline(path):
+    """Первая непустая строка docstring модуля (или '')."""
+    try:
+        src = open(path, encoding="utf-8").read()
+    except Exception:
+        return ""
+    m = re.search(r'^\s*(?:"""|\'\'\')(.*?)(?:"""|\'\'\')', src, re.S | re.M)
+    if not m:
+        return ""
+    for ln in m.group(1).strip().splitlines():
+        if ln.strip():
+            return ln.strip()[:200]
+    return ""
+
+
+def extract_scripts(root=None):
+    d = os.path.join(_root(root), "scripts")
+    out = []
+    for name in sorted(os.listdir(d)):
+        if not name.endswith(".py"):
+            continue
+        rel = os.path.join("scripts", name)
+        full = os.path.join(d, name)
+        out.append({"path": rel, "subsystem": _subsystem_of(rel), "doc": _first_docline(full)})
+    return out
+
+
+def extract_tests(root=None):
+    d = os.path.join(_root(root), "tests")
+    out = []
+    for name in sorted(os.listdir(d)):
+        if not (name.startswith("test_") and name.endswith(".py")):
+            continue
+        covers = name[len("test_"):-len(".py")].replace("_", " ")
+        out.append({"path": os.path.join("tests", name), "covers": covers})
+    return out
+
+
+def extract_glossary(root=None):
+    """Термины '**Термин** — определение' из docs/GLOSSARY.md (многострочные до пустой строки)."""
+    path = os.path.join(_root(root), "docs", "GLOSSARY.md")
+    if not os.path.exists(path):
+        return []
+    lines = open(path, encoding="utf-8").read().splitlines()
+    out, cur = [], None
+    term_re = re.compile(r"^\*\*(.+?)\*\*\s+—\s+(.*)$")
+    for ln in lines:
+        mo = term_re.match(ln)
+        if mo:
+            if cur:
+                out.append(cur)
+            cur = {"term": mo.group(1).strip(), "definition": mo.group(2).strip()}
+        elif cur is not None:
+            if ln.strip() == "":
+                out.append(cur); cur = None
+            else:
+                cur["definition"] = (cur["definition"] + " " + ln.strip()).strip()
+    if cur:
+        out.append(cur)
+    return out
+
+
+def build_index(root=None):
+    # тулы/правила — из ЖИВОГО импортированного mcp_server (само-док документирует работающий сервер);
+    # root управляет только файловыми источниками (recipes/registry/scripts/tests/glossary).
+    tools = extract_tools(root)
+    rules = extract_rules(root)
+    recipes = extract_recipes(root)
+    scripts = extract_scripts(root)
+    tests = extract_tests(root)
+    glossary = extract_glossary(root)
     return {
-        "tools": extract_tools(root),
-        "rules": extract_rules(root),
-        "recipes": extract_recipes(root),
+        "meta": {"tool_count": len(tools), "rule_count": len(rules), "recipe_count": len(recipes),
+                 "script_count": len(scripts), "test_count": len(tests), "glossary_count": len(glossary)},
+        "tools": tools, "rules": rules, "recipes": recipes,
+        "scripts": scripts, "tests": tests, "glossary": glossary,
     }
 
 
-if __name__ == "__main__":
-    index = build()
-    out_dir = os.path.join(ROOT, "docs", "selfdoc")
-    os.makedirs(out_dir, exist_ok=True)
-    out_path = os.path.join(out_dir, "index.json")
-    with open(out_path, "w", encoding="utf-8") as f:
-        json.dump(index, f, ensure_ascii=False, indent=2)
+def write_index(idx, path):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(idx, f, ensure_ascii=False, indent=2, sort_keys=False)
         f.write("\n")
-    print(f"wrote {out_path}")
+
+
+INDEX_PATH = os.path.join(ROOT, "docs", "selfdoc", "index.json")
+
+
+def main():
+    idx = build_index()
+    write_index(idx, INDEX_PATH)
+    print("selfdoc index: %d тулов, %d правил, %d рецептов, %d скриптов, %d тестов, %d терминов → %s"
+          % (idx["meta"]["tool_count"], idx["meta"]["rule_count"], idx["meta"]["recipe_count"],
+             idx["meta"]["script_count"], idx["meta"]["test_count"], idx["meta"]["glossary_count"],
+             os.path.relpath(INDEX_PATH, ROOT)))
+
+
+if __name__ == "__main__":
+    main()

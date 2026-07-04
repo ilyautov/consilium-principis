@@ -1,4 +1,4 @@
-import os, sys
+import os, sys, json
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 import gen_selfdoc as g
 
@@ -23,3 +23,39 @@ def test_extract_recipes_roundtrips():
     recs = g.extract_recipes()
     assert any(r["id"] == "calibrate" for r in recs)
     assert all({"id", "title", "short", "triggers", "does", "reads"} <= set(r.keys()) for r in recs)
+
+def test_scripts_inventory_module_level():
+    scripts = g.extract_scripts()
+    paths = {s["path"] for s in scripts}
+    assert any(p.endswith("mcp_server.py") for p in paths)
+    assert any(p.endswith("gen_selfdoc.py") for p in paths)
+    s = next(s for s in scripts if s["path"].endswith("mcp_server.py"))
+    assert s["subsystem"] and isinstance(s["doc"], str)
+
+def test_tests_inventory():
+    tests = g.extract_tests()
+    assert any(t["path"].endswith("test_gen_selfdoc.py") for t in tests)
+
+def test_glossary_parsed():
+    terms = g.extract_glossary()
+    names = {t["term"] for t in terms}
+    assert "Consilium" in names
+    assert all(t["definition"] for t in terms)
+
+def test_build_index_shape_and_meta():
+    idx = g.build_index()
+    for k in ("meta", "tools", "rules", "recipes", "scripts", "tests", "glossary"):
+        assert k in idx
+    assert idx["meta"]["tool_count"] == len(idx["tools"]) > 0
+    assert idx["meta"]["rule_count"] == len(idx["rules"])
+    assert idx["meta"]["glossary_count"] == len(idx["glossary"])
+
+def test_write_index_roundtrip(tmp_path):
+    idx = g.build_index()
+    p = tmp_path / "index.json"
+    g.write_index(idx, str(p))
+    assert json.loads(p.read_text(encoding="utf-8"))["meta"]["tool_count"] == idx["meta"]["tool_count"]
+
+def test_build_index_deterministic():
+    # гард Task 8 сверяет регенерацию с коммитом — build_index обязан быть byte-детерминирован
+    assert g.build_index() == g.build_index()

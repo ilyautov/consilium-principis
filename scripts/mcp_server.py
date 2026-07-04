@@ -1305,6 +1305,11 @@ def _catalog_verify():
     return catalog.verify_catalog(_root(), fetch=cc.fetch)
 
 
+def _explain_self(topic=None):
+    import selfdoc_query
+    return selfdoc_query.explain(topic, root=_root())
+
+
 # ───────────────────────── реестр тулов ─────────────────────────
 
 def _obj(props, required):
@@ -1369,6 +1374,14 @@ TOOLS = {
                        "PD-basis, репортить дрейф. Без сборки.",
         "input_schema": _obj({}, []),
         "handler": _catalog_verify,
+    },
+    "explain_self": {
+        "description": "Объяснить устройство самого проекта: что это, как работает конкретный тул/"
+                       "правило/концепт (моат/firewall/архитектура), термин глоссария. Возвращает ФАКТЫ "
+                       "с source_ref — проговори их юзеру. topic: пусто|overview | tool:<имя> | rule:<N> | "
+                       "recipe:<id> | concept:moat|firewall|architecture|extend | term:<слово> | свободный текст.",
+        "input_schema": _obj({"topic": "string"}, []),
+        "handler": _explain_self,
     },
     "config_get": {
         "description": "Прочитать board_config.json (тюнинг без правки файла): весь конфиг или один "

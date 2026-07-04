@@ -227,7 +227,7 @@ python scripts/gen_selfdoc.py
 
 ### Инвентарь кода
 
-Скрипты (65) по подсистемам:
+Скрипты (67) по подсистемам:
 
 - **build**: `build_advisor.py`
 - **calibrate**: `calibrate_advisor.py`
@@ -238,15 +238,15 @@ python scripts/gen_selfdoc.py
 - **eval**: `bootstrap_eval.py`, `diagnose_retrieval.py`, `eval.py`, `poison_eval.py`, `serving_gate_eval.py`, `synth_eval.py`
 - **install**: `mcp_install.py`
 - **mcp**: `mcp_server.py`
-- **other**: `abstention_curve.py`, `adversarial_loop.py`, `advisor_calibration.py`, `atomic.py`, `board.py`, `board_init.py`, `build_orchestrator.py`, `calc_render.py`, `calibration.py`, `decision_map.py`, `diagnose_multiquery.py`, `exp_bridge.py`, `exp_graph.py`, `exp_kernels.py`, `exp_kernels_finer.py`, `extractor.py`, `gen_golden.py`, `gen_selfdoc.py`, `golden_meta.py`, `governance.py`, `ingest_telegram.py`, `judge_backend.py`, `lang_check.py`, `lens_builder.py`, `lenses.py`, `llm_local.py`, `manifest_builder.py`, `mc_run.py`, `mdmeta.py`, `mirror.py`, `moat_check.py`, `outcome_loop.py`, `perturbation.py`, `preflight.py`, `premortem.py`, `principis.py`, `recipes.py`, `relevance_gate.py`, `relevance_judge.py`, `safe_expr.py`, `scaffold.py`, `seed.py`, `session_render.py`, `setup_full.py`, `stability.py`
+- **other**: `abstention_curve.py`, `adversarial_loop.py`, `advisor_calibration.py`, `atomic.py`, `board.py`, `board_init.py`, `build_manual.py`, `build_orchestrator.py`, `calc_render.py`, `calibration.py`, `decision_map.py`, `diagnose_multiquery.py`, `exp_bridge.py`, `exp_graph.py`, `exp_kernels.py`, `exp_kernels_finer.py`, `extractor.py`, `gen_golden.py`, `gen_selfdoc.py`, `golden_meta.py`, `governance.py`, `ingest_telegram.py`, `judge_backend.py`, `lang_check.py`, `lens_builder.py`, `lenses.py`, `llm_local.py`, `manifest_builder.py`, `mc_run.py`, `mdmeta.py`, `mirror.py`, `moat_check.py`, `outcome_loop.py`, `perturbation.py`, `preflight.py`, `premortem.py`, `principis.py`, `recipes.py`, `relevance_gate.py`, `relevance_judge.py`, `safe_expr.py`, `scaffold.py`, `seed.py`, `selfdoc_query.py`, `session_render.py`, `setup_full.py`, `stability.py`
 - **situation**: `situation.py`
 - **tier**: `tier_full.py`
 
-Тестов: 89.
+Тестов: 93.
 
 ## Слой 3 — Справочник
 
-### Тулы (42)
+### Тулы (43)
 
 - 🌐 **`add_source`** — Затянуть источник в sources/ советника БЕЗ шелла: url (фетч + авто-strip Gutenberg) | text (вставка) | path (локальный текст-файл). Проставляет тир (P1=🔵 первоисточник). Скачивание — ПОДТВЕРДИ у юзера; не-PD хост требует license=public-domain. Потом build_advisor для сборки корпуса. · rule:0, rule:11
 - 🌐 **`advisor_weights`** — Калибровка совета по ИСХОДУ (петля U1): кто был прав ДЛЯ ТЕБЯ → вес голоса. records=[{advisor,outcome,endorsed}]. Laplace: без данных вес нейтрален. · rule:12
@@ -265,6 +265,7 @@ python scripts/gen_selfdoc.py
 - 🌐 **`config_get`** — Прочитать board_config.json (тюнинг без правки файла): весь конфиг или один ключ (retrieval_mode, abstain_threshold, hybrid_alpha…). · rule:10
 - 🌐 **`config_set`** — Записать ключ в board_config.json (тюнинг из хоста, persistent). ПОДТВЕРДИ у юзера перед вызовом. Напр. retrieval_mode=auto|hybrid, abstain_threshold=0.5. · rule:0, rule:10
 - 🌐 **`doctor`** — Health-check машины БЕЗ выхода из агента: Python, скилл установлен, какой тир (ollama?), самотест рва (P1→🔵, фейк→None). Read-only. Зови, чтобы понять, готова ли эта машина собирать. · rule:0, rule:10
+- 🌐 **`explain_self`** — Объяснить устройство самого проекта: что это, как работает конкретный тул/правило/концепт (моат/firewall/архитектура), термин глоссария. Возвращает ФАКТЫ с source_ref — проговори их юзеру. topic: пусто|overview | tool:<имя> | rule:<N> | recipe:<id> | concept:moat|firewall|architecture|extend | term:<слово> | свободный текст. · rule:10
 - 🌐 **`fidelity_check`** — Протокол-гейт контура: проверить, дословна ли цитата в корпусе советника → 🔵 (P1/P2) / 🟢 (S1/S2) / 🟡 (не найдено). Помечать 🔵 ТОЛЬКО при 🔵 отсюда. · rule:0, rule:1
 - 🌐 **`gate_verdict`** — Фаза 2 судейства cite (host-режим): передай nonce из judgment_request и свои ЧЕСТНЫЕ оценки релевантности ratings={id: 0-3} по приложенной рубрике — для КАЖДОГО кандидата. Порог и маркеры применяет СЕРВЕР (решение в коде), оценки логируются. Оценки гейтят ТОЛЬКО релевантность; завышение ради цитат ломает контур. Кривой/истёкший/повторный nonce или пропущенные оценки → fail-closed (🟡/0). · rule:0, rule:5
 - 🌐 **`governance_verify`** — Целостность корпуса (Барсик hash-chain): подмена рвёт цепь. Даёт отпечаток-хеш + гистограмму тиров. path = каталог советника/линзы или путь к .jsonl. · rule:0, rule:10

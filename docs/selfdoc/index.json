@@ -1,10 +1,10 @@
 {
   "meta": {
-    "tool_count": 42,
+    "tool_count": 43,
     "rule_count": 15,
     "recipe_count": 10,
-    "script_count": 65,
-    "test_count": 89,
+    "script_count": 67,
+    "test_count": 93,
     "glossary_count": 110
   },
   "tools": [
@@ -425,6 +425,23 @@
       "status": "surfaced",
       "referenced_in": [
         "rule:0",
+        "rule:10"
+      ]
+    },
+    {
+      "name": "explain_self",
+      "description": "Объяснить устройство самого проекта: что это, как работает конкретный тул/правило/концепт (моат/firewall/архитектура), термин глоссария. Возвращает ФАКТЫ с source_ref — проговори их юзеру. topic: пусто|overview | tool:<имя> | rule:<N> | recipe:<id> | concept:moat|firewall|architecture|extend | term:<слово> | свободный текст.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "topic": {
+            "type": "string"
+          }
+        },
+        "required": []
+      },
+      "status": "surfaced",
+      "referenced_in": [
         "rule:10"
       ]
     },
@@ -1012,7 +1029,7 @@
     {
       "n": 10,
       "title": "ПЕРЕВОДИ СЛУЖЕБКУ В ЧЕЛОВЕЧЕСКИЙ ЯЗЫК",
-      "text": "ПЕРЕВОДИ СЛУЖЕБКУ В ЧЕЛОВЕЧЕСКИЙ ЯЗЫК (для не-технического юзера). НИКОГДА не показывай ему сырые\n   поля JSON и технслова: тиры (P1/S1/🔵-eligible), хеши/«голову», пути, traversal, SSRF, manifest,\n   ollama/bge-m3, чанки, abstain_threshold/hybrid_alpha. Диагностические тулы (board_status, doctor,\n   governance_verify, ollama_status, config_get) несут готовое поле `hint` — показывай ЕГО, не сырой\n   dict. Если тул вернул ошибку с техслова́рём (traversal/SSRF/path/ollama/манифест) — перескажи СМЫСЛ\n   + следующий шаг простыми словами («этот файл вне проекта — вставь текст»; «умный поиск ещё не\n   включён — сказать, как включить?»), само слово не показывай. Настройки (config_set) юзер словами\n   не зовёт по имени — он говорит «совет выдумывает» / «поиск мимо», ты сам решаешь, что подкрутить."
+      "text": "ПЕРЕВОДИ СЛУЖЕБКУ В ЧЕЛОВЕЧЕСКИЙ ЯЗЫК (для не-технического юзера). НИКОГДА не показывай ему сырые\n   поля JSON и технслова: тиры (P1/S1/🔵-eligible), хеши/«голову», пути, traversal, SSRF, manifest,\n   ollama/bge-m3, чанки, abstain_threshold/hybrid_alpha. Диагностические тулы (board_status, doctor,\n   governance_verify, ollama_status, config_get) несут готовое поле `hint` — показывай ЕГО, не сырой\n   dict. Если тул вернул ошибку с техслова́рём (traversal/SSRF/path/ollama/манифест) — перескажи СМЫСЛ\n   + следующий шаг простыми словами («этот файл вне проекта — вставь текст»; «умный поиск ещё не\n   включён — сказать, как включить?»), само слово не показывай. Настройки (config_set) юзер словами\n   не зовёт по имени — он говорит «совет выдумывает» / «поиск мимо», ты сам решаешь, что подкрутить.\n   Мета-вопросы «как ты работаешь / что делает X / как устроен проект» — зови explain_self(topic)\n   (topic: tool:<имя> | rule:<N> | concept:moat|firewall|architecture|extend | term:<слово> | свободный\n   текст), получи факты с source_ref и перескажи их человеку; не выдумывай устройство от себя."
     },
     {
       "n": 11,
@@ -1209,6 +1226,11 @@
       "path": "scripts/build_advisor.py",
       "subsystem": "build",
       "doc": "build_advisor.py — ingest-конвейер слоя 0 для скилла «Личный совет директоров»."
+    },
+    {
+      "path": "scripts/build_manual.py",
+      "subsystem": "other",
+      "doc": "build_manual.py — сшивает docs/selfdoc/index.json + narrative/*.md → docs/MANUAL.md."
     },
     {
       "path": "scripts/build_orchestrator.py",
@@ -1461,6 +1483,11 @@
       "doc": "Стартовый совет в один шаг — курированный набор public-domain мудрецов для cold-start."
     },
     {
+      "path": "scripts/selfdoc_query.py",
+      "subsystem": "other",
+      "doc": "selfdoc_query.py — детерминированный движок explain_self. Читает docs/selfdoc/index.json +"
+    },
+    {
       "path": "scripts/serving_gate_eval.py",
       "subsystem": "eval",
       "doc": "serving_gate_eval.py — eval серверной поверхности Consilium-Principis MCP."
@@ -1528,6 +1555,10 @@
     {
       "path": "tests/test_bootstrap_eval.py",
       "covers": "bootstrap eval"
+    },
+    {
+      "path": "tests/test_build_manual.py",
+      "covers": "build manual"
     },
     {
       "path": "tests/test_build_orchestrator.py",
@@ -1664,6 +1695,10 @@
     {
       "path": "tests/test_engine_threshold.py",
       "covers": "engine threshold"
+    },
+    {
+      "path": "tests/test_explain_self.py",
+      "covers": "explain self"
     },
     {
       "path": "tests/test_extractor.py",
@@ -1828,6 +1863,14 @@
     {
       "path": "tests/test_seed.py",
       "covers": "seed"
+    },
+    {
+      "path": "tests/test_selfdoc_fresh.py",
+      "covers": "selfdoc fresh"
+    },
+    {
+      "path": "tests/test_selfdoc_narrative.py",
+      "covers": "selfdoc narrative"
     },
     {
       "path": "tests/test_serving_gate_eval.py",

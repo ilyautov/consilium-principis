@@ -61,3 +61,11 @@ def test_tool_hit_without_referenced_in_no_crash(tmp_path):
     (d / "index.json").write_text(_json.dumps(idx), encoding="utf-8")
     r = q.explain("tool:foo", root=str(tmp_path))
     assert r["kind"] == "self_explanation" and r["sections"]   # не KeyError на referenced_in
+
+def test_explain_self_not_dark():
+    instr = m.INSTRUCTIONS
+    all_descs = " ".join(t.get("description", "") for t in m.TOOLS.values())
+    assert "explain_self" in instr or "explain_self" in all_descs
+
+def test_explain_self_wired_in_instructions_rule():
+    assert "explain_self" in m.INSTRUCTIONS

@@ -31,3 +31,11 @@ def test_regenerated_index_matches_committed():
     fresh = g.build_index(root=ROOT)
     committed = _committed()
     assert fresh == committed, "index.json дрейфит от кода — запусти scripts/gen_selfdoc.py и закоммить"
+
+def test_manual_matches_committed():
+    import build_manual as bm
+    committed = open(os.path.join(ROOT, "docs", "MANUAL.md"), encoding="utf-8").read()
+    idx = _committed()
+    narr = bm._load_narrative(ROOT)
+    rebuilt = bm.assemble(idx, narr)
+    assert rebuilt == committed, "docs/MANUAL.md дрейфит — запусти scripts/build_manual.py и закоммить"

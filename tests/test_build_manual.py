@@ -23,3 +23,11 @@ def test_build_writes_manual(tmp_path):
     out = tmp_path / "MANUAL.md"
     b.build(root=os.path.join(os.path.dirname(__file__), ".."), out_path=str(out), pdf=False)
     assert out.exists() and "## Слой 1" in out.read_text(encoding="utf-8")
+
+def test_pdf_absent_pandoc_no_crash(tmp_path, monkeypatch):
+    import build_manual as b
+    monkeypatch.setattr(b.shutil, "which", lambda _: None)   # pandoc «не установлен»
+    out = tmp_path / "MANUAL.md"
+    res = b.build(root=os.path.join(os.path.dirname(__file__), ".."), out_path=str(out), pdf=True)
+    assert out.exists()                       # MD собран
+    assert not (tmp_path / "MANUAL.pdf").exists()  # PDF не создан, но и не упали

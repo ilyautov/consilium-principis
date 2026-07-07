@@ -219,3 +219,36 @@ def test_main_run_sets_model_and_backend(monkeypatch):
     assert rc == 0
     assert os.environ.get("LLM_API_MODEL")
     assert os.environ.get("LLM_BACKEND") == "openrouter"
+
+
+def test_bootstrap_ci_none_below_two():
+    assert probe._bootstrap_ci([0.5]) is None
+    assert probe._bootstrap_ci([]) is None
+
+
+def test_bootstrap_ci_deterministic_and_brackets_mean():
+    deltas = [0.2, 0.3, 0.25, 0.35, 0.28]
+    ci1 = probe._bootstrap_ci(deltas)
+    ci2 = probe._bootstrap_ci(deltas)
+    assert ci1 == ci2  # детерминизм (сид)
+    lo, hi = ci1
+    m = sum(deltas) / len(deltas)
+    assert lo <= m <= hi
+
+
+def test_paired_deltas_pairs_by_id_skips_none():
+    base = [_scored("a", "c", "baseline", 0.2, 0.0, 0.5),
+            _scored("b", "c", "baseline", None, 0.0, 0.5)]
+    treat = [_scored("a", "c", "with_rule15", 0.5, 0.0, 0.5),
+             _scored("b", "c", "with_rule15", 0.4, 0.0, 0.5)]
+    d = probe._paired_deltas(base, treat, "sycophancy")
+    assert len(d) == 1 and abs(d[0] - 0.3) < 1e-9  # b пропущен (base None); a: 0.5-0.2=0.3 (допуск float)
+
+
+def test_compare_signal_flag_when_ci_excludes_zero():
+    base = [_scored(f"s{i}", "c", "baseline", 0.1, 0.0, 0.5) for i in range(6)]
+    treat = [_scored(f"s{i}", "c", "with_rule15", 0.9, 0.0, 0.5) for i in range(6)]
+    out = probe.compare(base, treat)
+    assert out["overall"]["sycophancy"]["signal"] is True   # все дельты +0.8 → CI не включает 0
+    assert out["overall"]["theater"]["signal"] is False     # все дельты 0 → CI включает 0
+    assert out["overall"]["sycophancy"]["n_paired"] == 6

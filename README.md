@@ -9,6 +9,12 @@
 Несколько мыслителей за одним столом. Говорят их голосами, по их же текстам.
 Спорят с тобой и между собой. И **не выдумывают цитаты** — это вшито в основу.
 
+[![CI](https://github.com/ilyautov/consilium-principis/actions/workflows/ci.yml/badge.svg)](https://github.com/ilyautov/consilium-principis/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)
+![Works offline · no keys](https://img.shields.io/badge/works-offline%20%C2%B7%20no%20keys-success)
+![MCP ready](https://img.shields.io/badge/MCP-ready-purple)
+
 </div>
 
 ---
@@ -119,8 +125,16 @@ Public-domain мудрецы (стоики, Сунь-цзы…) собирают
 [`docs/MANUAL.md`](docs/MANUAL.md). Он сгенерирован из кода (`scripts/gen_selfdoc.py` →
 `scripts/build_manual.py`); в рантайме то же самое доступно через MCP-тул `explain_self`.
 
+## Участие и безопасность
+
+PR приветствуются — но два правила нерушимы: **только public-domain тексты** (никакого копирайта,
+даже отрывками) и **не ослаблять fail-closed контур** (🔵 только по верификации кодом). Как настроить,
+прогнать оффлайн-сьют и оформить PR — [`CONTRIBUTING.md`](CONTRIBUTING.md). Нашли способ обойти
+контур верности или утечку данных — это уязвимость первого класса, сообщите приватно по
+[`SECURITY.md`](SECURITY.md). История изменений — [`CHANGELOG.md`](CHANGELOG.md).
+
 ---
 
 <div align="center">
-<sub>Consilium Principis · ранний доступ · <a href="LICENSE">MIT</a></sub>
+<sub>Consilium Principis · ранний доступ (v0.1.0) · <a href="LICENSE">MIT</a> · <a href="CONTRIBUTING.md">Contributing</a> · <a href="SECURITY.md">Security</a></sub>
 </div>

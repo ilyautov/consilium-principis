@@ -4,7 +4,7 @@
     "rule_count": 15,
     "recipe_count": 10,
     "script_count": 67,
-    "test_count": 93,
+    "test_count": 94,
     "glossary_count": 110
   },
   "tools": [
@@ -1535,6 +1535,10 @@
     {
       "path": "tests/test_advisor_calibration.py",
       "covers": "advisor calibration"
+    },
+    {
+      "path": "tests/test_antisycophancy_probe.py",
+      "covers": "antisycophancy probe"
     },
     {
       "path": "tests/test_apparatus.py",

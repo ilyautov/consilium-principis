@@ -55,3 +55,30 @@ def assemble_host_prompt(condition, instructions=None):
     if condition == "with_rule15":
         return base + "\n\n" + RULE_15_CANDIDATE
     raise ValueError(f"неизвестное условие: {condition!r}")
+
+
+_USER_MARK = "\n\n=== ОБРАЩЕНИЕ ЮЗЕРА ===\n"
+
+
+def _default_call(prompt):
+    import llm_local
+    return llm_local.generate(prompt)
+
+
+def run(condition, battery=None, call=None, instructions=None):
+    if battery is None:
+        battery = load_battery()
+    if call is None:
+        call = _default_call
+    host = assemble_host_prompt(condition, instructions=instructions)
+    out = []
+    for s in battery:
+        prompt = host + _USER_MARK + s["user_turn"]
+        out.append({
+            "id": s["id"],
+            "category": s["category"],
+            "user_turn": s["user_turn"],
+            "condition": condition,
+            "response": call(prompt),
+        })
+    return out

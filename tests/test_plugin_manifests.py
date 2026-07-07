@@ -56,3 +56,13 @@ def test_mcp_json_uses_plugin_root_no_absolutes():
     assert "mcp_server.py" in joined
     assert "/Users/" not in raw and "/opt/" not in raw, "ноль абсолютных unix-путей"
     assert not re.search(r"[A-Za-z]:\\\\", raw), "ноль абсолютных windows-путей"
+
+
+def test_thin_skill_exists_no_bash_scripts():
+    sk = ROOT / "skills" / "consilium-principis" / "SKILL.md"
+    assert sk.exists(), "тонкий skill плагина должен существовать"
+    text = sk.read_text(encoding="utf-8")
+    assert text.strip()
+    assert text.startswith("---"), "нужен YAML-frontmatter с description"
+    # тонкий skill драйвит через MCP-тулы, НЕ через bash-вызовы scripts/ (границу фиксируем)
+    assert "scripts/" not in text, "skill не должен звать локальные scripts/ — только MCP-тулы"

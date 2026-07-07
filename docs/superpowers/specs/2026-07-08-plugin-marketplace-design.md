@@ -41,7 +41,11 @@ consilium-principis/                 ← репо = плагин = self-марк
 
 **`.claude-plugin/plugin.json`** — манифест. Обязательно `name` (kebab-case, `consilium-principis`), `description`. Плюс `version` (`0.1.0` — синхрон с serverInfo и тегом), `author` (Ilya Autov, ilyautov@gmail.com), `homepage`/`repository` (github URL), `license` (MIT). Явная `version` → стабильные релизы (без неё каждый push = новая версия по git SHA).
 
-**`.claude-plugin/marketplace.json`** — self-host каталог. `name` (kebab-case, напр. `consilium-marketplace`), `owner` (name Ilya Autov). `plugins: [{ name: "consilium-principis", source: ".", description, homepage, tags: ["mcp","reasoning","advisory","decision-support"] }]`. `source: "."` = плагин в корне этого же репо (self-hosting). **ВЕРИФИКАЦИЯ на этапе плана:** точный синтаксис self-host-source (`"."` vs объект `{ "source": "github", "repo": "ilyautov/consilium-principis" }`) сверить с офиц. докой `plugin-marketplaces.md` перед коммитом; если `"."` не поддержан для корня — fallback на github-source на тот же репо. **Инвариант:** `version` в plugin.json — единственный источник; в marketplace.json version НЕ дублируем (иначе неоднозначность — берётся plugin.json).
+**`.claude-plugin/marketplace.json`** — self-host каталог. `name` (kebab-case, напр. `consilium-marketplace`), `owner` (name Ilya Autov). `plugins: [{ name: "consilium-principis", source: {"source":"github","repo":"ilyautov/consilium-principis"}, description, homepage, tags: ["mcp","reasoning","advisory","decision-support"] }]`.
+
+**Решение по source (верифицировано по офиц. доке `plugin-marketplaces.md`, 2026-07-08):** относительный `source` обязан начинаться с `./` и указывать на ПОДдиректорию в пределах marketplace-root (`../` наружу запрещён; при установке копируется директория плагина). Плагин-в-корне через `"."`/`"./"` доком НЕ поддержан. Поэтому — **github-source на тот же репозиторий**: маркетплейс-источник (где лежит `marketplace.json`) и плагин-источник (github `ilyautov/consilium-principis`) указывают на один репо — это явно допустимо (доки: источники маркетплейса и плагина независимы, но могут совпадать), работает и при URL-раздаче маркетплейса, и не требует переносить плагин в подпапку (это был бы отвергнутый Approach B). Следствие: при `/plugin install` Claude Code фетчит github-репо как директорию плагина и копирует её в кэш целиком (scripts/, data/, lenses/… — нужны серверу; tests/docs тоже поедут — тяжеловато, но приемлемо для v0.1, оптимизация исключений — позже, не сейчас).
+
+**Инвариант:** `version` в plugin.json — единственный источник; в marketplace.json version НЕ дублируем (иначе неоднозначность — берётся plugin.json).
 
 **`.mcp.json`** — объявление MCP-сервера для плагина. Ровно:
 ```json
@@ -82,7 +86,7 @@ consilium-principis/                 ← репо = плагин = self-марк
 Новый оффлайн тест-гард `tests/test_plugin_manifests.py` (в CI, без сети):
 1. `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, `.mcp.json` — валидный JSON, парсятся.
 2. plugin.json: `name` == `consilium-principis` (kebab), `version` присутствует и **== serverInfo version в mcp_server.py** (`0.1.0`) — единый источник, ловит рассинхрон.
-3. marketplace.json: `plugins[0].name` == `consilium-principis`, `source` == `.`, **version НЕ задан** (инвариант «version только в plugin.json»).
+3. marketplace.json: `plugins[0].name` == `consilium-principis`, `source` == `{"source":"github","repo":"ilyautov/consilium-principis"}` (github-source, не относительный путь), **version НЕ задан** (инвариант «version только в plugin.json»).
 4. `.mcp.json`: путь содержит `${CLAUDE_PLUGIN_ROOT}` и **НЕ** содержит абсолютных путей (`/Users/`, `/opt/`, `C:\`) — ловит регресс хардкода.
 5. `skills/consilium-principis/SKILL.md` существует, непустой, и **не содержит вызовов `scripts/`** (инвариант «тонкий skill драйвит через MCP, не через bash») — фиксирует границу.
 

@@ -168,3 +168,54 @@ def test_main_run_without_key_fails_honestly(capsys, monkeypatch):
     assert rc == 1
     out = capsys.readouterr().out.lower()
     assert "ключ" in out or "openrouter" in out
+
+
+def test_safe_call_swallows_exception():
+    def boom(p):
+        raise RuntimeError("network")
+    assert probe._safe_call(boom, "x") is None
+    assert probe._safe_call(lambda p: "ok", "x") == "ok"
+
+
+def test_run_host_failure_yields_none_response():
+    battery = [{"id": "a", "category": "c", "user_turn": "u", "note": ""}]
+    def boom(p):
+        raise RuntimeError("net")
+    rows = probe.run("baseline", battery=battery, call=boom, instructions="БАЗА")
+    assert rows[0]["response"] is None
+
+
+def test_judge_response_none_response_all_none():
+    axes = probe.judge_response(None, {"user_turn": "x"}, call=lambda p: "3")
+    assert axes == {"sycophancy": None, "theater": None, "substance": None}
+
+
+def test_default_call_uses_temp_zero_and_model(monkeypatch):
+    import llm_local
+    captured = {}
+    def fake_generate(prompt, model=None, temperature=0.3, timeout=120):
+        captured["model"] = model
+        captured["temperature"] = temperature
+        return "1"
+    monkeypatch.setattr(llm_local, "generate", fake_generate)
+    probe._default_call("PROMPT")
+    assert captured["temperature"] == 0.0
+    assert captured["model"] == probe._model_name()
+
+
+def test_compare_reports_valid_n_per_axis():
+    base = [_scored("a", "c", "baseline", 0.5, None, 0.5)]
+    treat = [_scored("a", "c", "with_rule15", 0.3, 0.4, 0.5)]
+    out = probe.compare(base, treat)
+    assert out["overall"]["theater"]["n_baseline"] == 0
+    assert out["overall"]["theater"]["n_with_rule15"] == 1
+
+
+def test_main_run_sets_model_and_backend(monkeypatch):
+    monkeypatch.setattr(probe, "_api_available", lambda: True)
+    monkeypatch.delenv("LLM_API_MODEL", raising=False)
+    monkeypatch.setattr(probe, "_run_live", lambda: 0)
+    rc = probe.main(["--run"])
+    assert rc == 0
+    assert os.environ.get("LLM_API_MODEL")
+    assert os.environ.get("LLM_BACKEND") == "openrouter"

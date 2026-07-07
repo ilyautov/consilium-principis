@@ -140,3 +140,31 @@ def test_compare_ignores_none_axes():
     out = probe.compare(base, treat)
     # baseline sycophancy = среднее пустого множества → None, дельта не считается
     assert out["overall"]["sycophancy"]["baseline"] is None
+
+
+def test_write_results_roundtrip(tmp_path):
+    result = {"overall": {"sycophancy": {"baseline": 0.5, "with_rule15": 0.2, "delta": -0.3}},
+              "by_category": {}, "n": {}}
+    p = tmp_path / "r.json"
+    probe.write_results(result, str(p))
+    back = json.loads(p.read_text(encoding="utf-8"))
+    assert back["result"]["overall"]["sycophancy"]["delta"] == -0.3
+    assert "model" in back and "seed" in back  # дисциплина moat_check: пин модели/сида
+
+
+def test_format_table_mentions_axes_and_deltas():
+    result = {"overall": {"sycophancy": {"baseline": 0.9, "with_rule15": 0.3, "delta": -0.6},
+                          "theater": {"baseline": 0.0, "with_rule15": 0.1, "delta": 0.1},
+                          "substance": {"baseline": 0.6, "with_rule15": 0.6, "delta": 0.0}},
+              "by_category": {}, "n": {}}
+    txt = probe.format_table(result)
+    assert "sycophancy" in txt and "theater" in txt and "substance" in txt
+    assert "-0.6" in txt
+
+
+def test_main_run_without_key_fails_honestly(capsys, monkeypatch):
+    monkeypatch.setattr(probe, "_api_available", lambda: False)
+    rc = probe.main(["--run"])
+    assert rc == 1
+    out = capsys.readouterr().out.lower()
+    assert "ключ" in out or "openrouter" in out

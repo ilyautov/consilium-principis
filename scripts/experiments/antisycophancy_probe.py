@@ -8,6 +8,7 @@ import os
 import sys
 import json
 import re
+import random
 
 # Модуль в scripts/experiments/, а зависит от scripts/llm_local.py и scripts/mcp_server.py.
 _SCRIPTS = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -154,6 +155,7 @@ def run(condition, battery=None, call=None, instructions=None):
 
 
 _AXIS_NAMES = ("sycophancy", "theater", "substance")
+SEED = 20260707  # пин для bootstrap и (ниже) live-прогонов — детерминизм CI и результатов
 
 
 def _mean(vals):
@@ -165,15 +167,47 @@ def _delta(b, t):
     return None if (b is None or t is None) else t - b
 
 
+def _paired_deltas(base_rows, treat_rows, axis):
+    base_by = {r["id"]: r["axes"][axis] for r in base_rows}
+    treat_by = {r["id"]: r["axes"][axis] for r in treat_rows}
+    deltas = []
+    for id_, b in base_by.items():
+        t = treat_by.get(id_)
+        if b is not None and t is not None:
+            deltas.append(t - b)
+    return deltas
+
+
+def _bootstrap_ci(deltas, n_boot=2000, seed=SEED, alpha=0.05):
+    if len(deltas) < 2:
+        return None
+    rng = random.Random(seed)
+    n = len(deltas)
+    means = []
+    for _ in range(n_boot):
+        s = 0.0
+        for _ in range(n):
+            s += deltas[rng.randrange(n)]
+        means.append(s / n)
+    means.sort()
+    lo = means[int((alpha / 2) * n_boot)]
+    hi = means[int((1 - alpha / 2) * n_boot)]
+    return (lo, hi)
+
+
 def _axis_block(base_rows, treat_rows):
     block = {}
     for axis in _AXIS_NAMES:
         bvals = [r["axes"][axis] for r in base_rows]
         tvals = [r["axes"][axis] for r in treat_rows]
         b, t = _mean(bvals), _mean(tvals)
+        d = _paired_deltas(base_rows, treat_rows, axis)
+        ci = _bootstrap_ci(d)
+        signal = ci is not None and (ci[0] > 0 or ci[1] < 0)  # CI не включает 0
         block[axis] = {"baseline": b, "with_rule15": t, "delta": _delta(b, t),
                        "n_baseline": sum(1 for v in bvals if v is not None),
-                       "n_with_rule15": sum(1 for v in tvals if v is not None)}
+                       "n_with_rule15": sum(1 for v in tvals if v is not None),
+                       "delta_ci": ci, "signal": signal, "n_paired": len(d)}
     return block
 
 
@@ -191,7 +225,6 @@ def compare(base_scored, treat_scored):
 import argparse
 import datetime
 
-SEED = 20260707
 RESULTS_DIR = os.path.join(HERE, "results")
 DEFAULT_MODEL = "google/gemini-2.5-flash"
 
@@ -226,6 +259,10 @@ def format_table(result):
         nb, nt = c.get("n_baseline"), c.get("n_with_rule15")
         if nb is not None or nt is not None:
             line += f"   (валидных b={nb} t={nt})"
+        ci = c.get("delta_ci")
+        if ci is not None:
+            sig = "сигнал" if c.get("signal") else "шум"
+            line += f"   CI95[{ci[0]:+.3f},{ci[1]:+.3f}] {sig}"
         lines.append(line)
     for cat, block in result["by_category"].items():
         lines.append(f"— {cat} (n={result['n'].get(cat, 0)}) —")

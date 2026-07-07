@@ -1,0 +1,44 @@
+# Consilium-Principis — метаданные проекта и конфигурация инструментов.
+#
+# ЭТО НЕ PyPI-пакет. Скилл ставится копированием в ~/.claude/skills/ через `python3 install.py`
+# (или как MCP-сервер, см. CONNECT-MCP.md), а НЕ через `pip install`. Здесь [project] служит
+# единым источником версии/метаданных, а [tool.*] — конфигом pytest/ruff. [build-system] намеренно
+# отсутствует: собирать wheel из этого репозитория не нужно.
+
+[project]
+name = "consilium-principis"
+version = "0.1.0"
+description = "Личный совет директоров из AI-персон реальных мыслителей, заземлённый в public-domain текстах, с защитным контуром верности (дословные цитаты, fail-closed воздержание)."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [{ name = "Ilya Autov" }]
+keywords = [
+    "ai-advisory-board", "council", "persona-agents", "decision-support",
+    "rag", "citation-verification", "fail-closed", "claude-code-skill", "mcp",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+# Ядро контура — чистый stdlib (работает офлайн, без ключей). Ниже — опциональные слои.
+[project.optional-dependencies]
+semantic = ["numpy"]          # эмбеддинги для кросс-язычного поиска (опц., деградирует до лексического)
+dev = ["pytest", "numpy"]     # то, что ставит CI: `pip install pytest numpy`
+
+[project.urls]
+Homepage = "https://github.com/ilyautov/consilium-principis"
+Repository = "https://github.com/ilyautov/consilium-principis"
+Manual = "https://github.com/ilyautov/consilium-principis/blob/master/docs/MANUAL.md"
+Security = "https://github.com/ilyautov/consilium-principis/blob/master/SECURITY.md"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Оффлайн-инвариант CI задаётся окружением, а не здесь:
+#   HEPHAESTUS_ENGINE=/nonexistent OLLAMA_HOST=http://127.0.0.1:59999 python3 -m pytest tests/ -q

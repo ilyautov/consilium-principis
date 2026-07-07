@@ -66,8 +66,10 @@ GEN_TEMPERATURE = 0.0  # пин: меряем эффект правила, не 
 def _safe_call(call, prompt):
     try:
         return call(prompt)
-    except Exception:
-        return None  # сеть/таймаут → withheld, не роняем платный прогон
+    except Exception as e:  # сеть/таймаут → withheld, не роняем платный прогон
+        # варнинг в stderr: отличить «вызов упал» от «судья вернул мусор» (None без исключения)
+        print(f"[antisycophancy] вызов withheld: {type(e).__name__}: {e}", file=sys.stderr)
+        return None
 
 
 def _default_call(prompt):

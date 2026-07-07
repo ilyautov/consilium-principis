@@ -66,3 +66,13 @@ def test_thin_skill_exists_no_bash_scripts():
     assert text.startswith("---"), "нужен YAML-frontmatter с description"
     # тонкий skill драйвит через MCP-тулы, НЕ через bash-вызовы scripts/ (границу фиксируем)
     assert "scripts/" not in text, "skill не должен звать локальные scripts/ — только MCP-тулы"
+
+
+def test_example_mcp_json_neutral_no_machine_path():
+    # Реальный mcp.json — личный, в .gitignore (машинный абсолют не течёт в git). В репо трекается
+    # ТОЛЬКО mcp.example.json — гардим, что в НЁМ нет ничьего локального пути (нейтральный плейсхолдер).
+    raw = (ROOT / "mcp.example.json").read_text(encoding="utf-8")
+    assert "/Users/" not in raw, "ничей локальный путь в трекаемом mcp.example.json"
+    assert "/opt/" not in raw
+    m = json.loads(raw)  # валидный JSON
+    assert "consilium-principis" in m["mcpServers"]

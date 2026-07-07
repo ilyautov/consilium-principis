@@ -1,0 +1,9 @@
+{
+  "name": "consilium-principis",
+  "description": "Личный совет директоров из AI-персон реальных мыслителей, заземлённый в public-domain текстах, с защитным контуром верности (дословные цитаты, fail-closed воздержание).",
+  "version": "0.1.0",
+  "author": { "name": "Ilya Autov", "email": "ilyautov@gmail.com" },
+  "homepage": "https://github.com/ilyautov/consilium-principis",
+  "repository": "https://github.com/ilyautov/consilium-principis",
+  "license": "MIT"
+}

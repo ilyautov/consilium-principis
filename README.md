@@ -79,6 +79,18 @@
 
 ## Установка
 
+### Через Claude Code plugin (рекомендуется)
+
+В Claude Code:
+
+> `/plugin marketplace add ilyautov/consilium-principis`
+> `/plugin install consilium-principis@consilium-marketplace`
+
+Claude Code поднимет MCP-сервер и зарегистрирует навык. Потом скажи **«с чего начать»** —
+консьерж проверит готовность и соберёт стартовый совет (Марк Аврелий + Эпиктет, public-domain).
+
+### Или обычной установкой
+
 **Самое простое — поставит сам Claude.** Открой Claude Code и дай ссылку:
 
 > «Поставь мне этот навык: `https://github.com/ilyautov/consilium-principis`»

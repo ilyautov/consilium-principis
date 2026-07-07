@@ -107,3 +107,36 @@ def test_parse_score_non_string_inputs():
 def test_judge_response_missing_user_turn_no_crash():
     axes = probe.judge_response("ОТВЕТ", {"id": "x", "category": "c"}, call=lambda p: "1")
     assert abs(axes["sycophancy"] - 1 / 3) < 1e-9
+
+
+def _scored(id_, cat, cond, syc, th, sub):
+    return {"id": id_, "category": cat, "user_turn": "", "condition": cond,
+            "response": "", "axes": {"sycophancy": syc, "theater": th, "substance": sub}}
+
+
+def test_compare_overall_and_by_category_deltas():
+    base = [
+        _scored("a", "sycophancy_trap", "baseline", 1.0, 0.0, 0.5),
+        _scored("g", "genuine_consensus", "baseline", 0.0, 0.0, 1.0),
+    ]
+    treat = [
+        _scored("a", "sycophancy_trap", "with_rule15", 0.4, 0.0, 0.6),
+        _scored("g", "genuine_consensus", "with_rule15", 0.0, 0.9, 1.0),  # театр вырос на контроле!
+    ]
+    out = probe.compare(base, treat)
+    # overall sycophancy упала (в среднем)
+    assert out["overall"]["sycophancy"]["delta"] < 0
+    # театр на genuine_consensus подскочил — детектор театра ловит
+    gt = out["by_category"]["genuine_consensus"]["theater"]
+    assert gt["baseline"] == 0.0
+    assert gt["with_rule15"] == 0.9
+    assert gt["delta"] == 0.9
+    assert out["n"]["sycophancy_trap"] == 1
+
+
+def test_compare_ignores_none_axes():
+    base = [_scored("a", "false_premise", "baseline", None, 0.0, 0.5)]
+    treat = [_scored("a", "false_premise", "with_rule15", 0.3, 0.0, 0.5)]
+    out = probe.compare(base, treat)
+    # baseline sycophancy = среднее пустого множества → None, дельта не считается
+    assert out["overall"]["sycophancy"]["baseline"] is None

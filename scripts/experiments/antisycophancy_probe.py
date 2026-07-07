@@ -169,3 +169,79 @@ def compare(base_scored, treat_scored):
         result["by_category"][cat] = _axis_block(b, t)
         result["n"][cat] = max(len(b), len(t))
     return result
+
+
+import argparse
+import datetime
+
+SEED = 20260707
+RESULTS_DIR = os.path.join(HERE, "results")
+
+
+def _api_available():
+    import llm_local
+    return llm_local.api_available()
+
+
+def _model_name():
+    return os.getenv("LLM_API_MODEL", "google/gemini-2.5-flash")
+
+
+def write_results(result, path):
+    payload = {"result": result, "model": _model_name(), "seed": SEED,
+               "battery": os.path.basename(DEFAULT_BATTERY)}
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, indent=2)
+
+
+def format_table(result):
+    lines = ["=== A/B анти-сикофантика (0..1; syc низ th низ sub верх лучше) ===",
+             f"{'ось':<12}{'baseline':>10}{'rule15':>10}{'дельта':>10}"]
+
+    def fmt(x):
+        return "  —" if x is None else f"{x:.3f}"
+
+    for axis in _AXIS_NAMES:
+        c = result["overall"][axis]
+        lines.append(f"{axis:<12}{fmt(c['baseline']):>10}{fmt(c['with_rule15']):>10}{fmt(c['delta']):>10}")
+    for cat, block in result["by_category"].items():
+        lines.append(f"— {cat} (n={result['n'].get(cat, 0)}) —")
+        for axis in _AXIS_NAMES:
+            c = block[axis]
+            lines.append(f"  {axis:<10}{fmt(c['baseline']):>10}{fmt(c['with_rule15']):>10}{fmt(c['delta']):>10}")
+    return "\n".join(lines)
+
+
+def _run_live():
+    battery = load_battery()
+    scored = {}
+    for cond in ("baseline", "with_rule15"):
+        rows = run(cond, battery=battery)
+        for r in rows:
+            r["axes"] = judge_response(r["response"], r)
+        scored[cond] = rows
+    result = compare(scored["baseline"], scored["with_rule15"])
+    stamp = datetime.date.today().isoformat()
+    write_results(result, os.path.join(RESULTS_DIR, f"antisycophancy-{stamp}.json"))
+    print(format_table(result))
+    return 0
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description="A/B анти-сикофантики (Фаза 1, изолировано)")
+    parser.add_argument("--run", action="store_true", help="живой прогон через OpenRouter (нужен ключ)")
+    args = parser.parse_args(argv)
+    if args.run:
+        if not _api_available():
+            print("Нет OPENROUTER_API_KEY — живой прогон невозможен. Задай ключ в .env и "
+                  "LLM_BACKEND=openrouter, LLM_API_MODEL=<модель>.")
+            return 1
+        os.environ.setdefault("LLM_BACKEND", "openrouter")
+        return _run_live()
+    parser.print_help()
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

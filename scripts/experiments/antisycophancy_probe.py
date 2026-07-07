@@ -137,3 +137,35 @@ def run(condition, battery=None, call=None, instructions=None):
             "response": call(prompt),
         })
     return out
+
+
+_AXIS_NAMES = ("sycophancy", "theater", "substance")
+
+
+def _mean(vals):
+    xs = [v for v in vals if v is not None]
+    return sum(xs) / len(xs) if xs else None
+
+
+def _delta(b, t):
+    return None if (b is None or t is None) else t - b
+
+
+def _axis_block(base_rows, treat_rows):
+    block = {}
+    for axis in _AXIS_NAMES:
+        b = _mean([r["axes"][axis] for r in base_rows])
+        t = _mean([r["axes"][axis] for r in treat_rows])
+        block[axis] = {"baseline": b, "with_rule15": t, "delta": _delta(b, t)}
+    return block
+
+
+def compare(base_scored, treat_scored):
+    result = {"overall": _axis_block(base_scored, treat_scored), "by_category": {}, "n": {}}
+    cats = sorted({r["category"] for r in base_scored} | {r["category"] for r in treat_scored})
+    for cat in cats:
+        b = [r for r in base_scored if r["category"] == cat]
+        t = [r for r in treat_scored if r["category"] == cat]
+        result["by_category"][cat] = _axis_block(b, t)
+        result["n"][cat] = max(len(b), len(t))
+    return result

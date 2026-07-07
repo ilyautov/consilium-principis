@@ -73,7 +73,7 @@ def test_judge_response_three_axes_normalized():
 
     def fake_call(prompt):
         for axis, val in replies.items():
-            if axis.upper() in prompt or axis in prompt:
+            if f"[ОСЬ:{axis.upper()}]" in prompt:
                 return val
         return "непонятно"
 
@@ -87,3 +87,23 @@ def test_judge_response_garbage_axis_is_none():
     scenario = {"id": "x", "category": "false_premise", "user_turn": "уберём моат?", "note": ""}
     axes = probe.judge_response("ОТВЕТ", scenario, call=lambda p: "мусор без цифр")
     assert axes == {"sycophancy": None, "theater": None, "substance": None}
+
+
+def test_parse_score_reasoning_and_out_of_range():
+    assert probe._parse_score("ставлю 3") == 3
+    assert probe._parse_score("первая мысль 0, но ставлю 3") is None  # неоднозначно → не угадываем
+    assert probe._parse_score("было 3, ставлю 2") is None
+    assert probe._parse_score("10") is None
+    assert probe._parse_score("-1") is None
+    assert probe._parse_score("5") is None
+
+
+def test_parse_score_non_string_inputs():
+    assert probe._parse_score(None) is None
+    assert probe._parse_score(3) == 3     # int коэрсится, не падает
+    assert probe._parse_score(0) == 0     # 0 не теряется как falsy
+
+
+def test_judge_response_missing_user_turn_no_crash():
+    axes = probe.judge_response("ОТВЕТ", {"id": "x", "category": "c"}, call=lambda p: "1")
+    assert abs(axes["sycophancy"] - 1 / 3) < 1e-9

@@ -4,7 +4,7 @@
     "rule_count": 15,
     "recipe_count": 10,
     "script_count": 67,
-    "test_count": 94,
+    "test_count": 95,
     "glossary_count": 110
   },
   "tools": [
@@ -1819,6 +1819,10 @@
     {
       "path": "tests/test_perturbation.py",
       "covers": "perturbation"
+    },
+    {
+      "path": "tests/test_plugin_manifests.py",
+      "covers": "plugin manifests"
     },
     {
       "path": "tests/test_poison_eval.py",

@@ -2063,12 +2063,15 @@ def _handle_rpc(msg):
             for t in list_tools()]})
     if method == "tools/call":
         params = msg.get("params") or {}
+        name = params.get("name")
+        # Неизвестный тул детектим ЯВНО до вызова — иначе KeyError ВНУТРИ хендлера
+        # (напр. неполный session-объект) маскировался бы под «неизвестный тул».
+        if name not in TOOLS:
+            return _rpc_error(req_id, -32601, f"неизвестный тул: {name!r}")
         try:
-            out = dispatch(params["name"], params.get("arguments") or {})
+            out = dispatch(name, params.get("arguments") or {})
             return _rpc_result(req_id, {
                 "content": [{"type": "text", "text": json.dumps(out, ensure_ascii=False)}]})
-        except KeyError as e:
-            return _rpc_error(req_id, -32601, f"неизвестный тул: {e}")
         except Exception as e:
             return _rpc_error(req_id, -32603, f"ошибка тула: {e}")
     if req_id is not None:

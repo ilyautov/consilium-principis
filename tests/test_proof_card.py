@@ -20,7 +20,9 @@ def test_verbatim_blue_quote_makes_card(tmp_path):
     r = _proof_card("Confine thyself to the present.", adv)
     assert r["verified"] is True
     assert "Meditations 7.29" in r["content"]
-    assert "посимвольно" in r["content"]
+    # честный бейдж: «дословно — сверено с первоисточником» (не оверклейм «посимвольно»)
+    assert "первоисточник" in r["content"]
+    assert "посимвольно" not in r["content"]
     assert r["content"].startswith("<!doctype html>")
     assert "<script" not in r["content"].lower()
 

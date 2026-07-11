@@ -41,7 +41,37 @@ def test_share_footer_attribution_present():
     for surface in ("md", "html"):
         out = export_session(SESSION, surface=surface)["content"]
         assert "Consilium-Principis" in out
-        assert "посимвольно" in out
+        # честная формулировка: «дословная цитата, сверено с первоисточником» (не «посимвольно»)
+        assert "первоисточник" in out
+        assert "посимвольно" not in out
+
+
+def test_missing_synthesis_fails_closed():
+    # Режим B (круглый стол до синтеза): экспорт незавершённого заседания → {error}, не краш
+    s = {k: v for k, v in SESSION.items() if k != "synthesis"}
+    r = export_session(s, surface="md")
+    assert "error" in r and "content" not in r
+
+
+def test_abstentions_string_not_split_per_char():
+    s = dict(SESSION, abstentions="одна строка целиком")
+    out = export_session(s, surface="md")["content"]
+    assert "- одна строка целиком" in out          # одним буллетом, не по символам
+    assert "- о\n- д\n- н" not in out
+
+
+def test_abstentions_non_str_items_safe():
+    # dict/int-элементы не крашат _e (приводятся к str)
+    s = dict(SESSION, abstentions=[{"a": 1}, 5])
+    r = export_session(s, surface="html")
+    assert "content" in r and "<script" not in r["content"].lower()
+
+
+def test_malformed_advisor_fails_closed():
+    # советник без name / opinion без argument → {error}, не unhandled KeyError
+    s = dict(SESSION, advisors=[{"opinions": [{"marker": "blue"}]}])
+    r = export_session(s, surface="md")
+    assert "error" in r and "content" not in r
 
 
 def test_html_surface_is_safe_and_self_contained():

@@ -6,10 +6,9 @@
 
 # Consilium Principis
 
-**A personal board of directors made of great minds — for your decisions.**
+**You ask one AI — you get one confident answer. Sometimes it's off. And to sound smart, it'll even invent a quote.**
 
-Several thinkers at one table. They speak in their own voices, from their own texts.
-They argue with you and with each other. And they **don't fabricate quotes** — that's built into the foundation.
+**A personal board of directors made of great minds — for your decisions.** Several thinkers at one table, each through their own lens: they argue with you and with each other. And unlike "ask an AI to roleplay a sage," they **prove the quote or honestly stay silent** — no fabrication.
 
 Every 🔵 quote is checked against the author's genuine text **character-by-character**; what's not
 in the corpus, the advisor **does not say**. This can be verified, not just taken on faith.
@@ -38,6 +37,26 @@ author's genuine corpus character-by-character, and outside the corpus the advis
 silent instead of making things up** (fail-closed). This is a decision tool, not a roleplay game or
 an aphorism generator. It needs no extra keys or payment — it runs on the agent you already have;
 the honesty contour itself needs no network. Full offline only with local models.
+
+## How it differs from other councils
+
+The "several AIs deliberate" mechanic is already common. What sets Consilium apart isn't the number
+of voices, but that a claim can be **re-verified** (and where it can't, the council honestly stays silent):
+
+| | "Roleplay a sage" (one AI) | LLM-Council-style board | **Consilium** |
+|---|:---:|:---:|:---:|
+| Different lenses, disagreement as a feature | ± | ✅ | ✅ |
+| Verbatim quote with a source | ✗ | ✗ | ✅ |
+| **Quote checked character-by-character** | ✗ | ✗ | **✅** |
+| **Honestly silent outside the corpus (fail-closed)** | ✗ | ✗ | **✅** |
+| Quantifiable question → Monte Carlo (📐) | ✗ | ✗ | ✅ |
+| No extra keys or payment | ± | ✗ | ✅ |
+
+<sub>The topic isn't snake-oil: a "personal board of directors" is a mainstream HBR concept; the bet
+on grounding and citation transparency was validated by Delphi ($16M from Sequoia for exactly this),
+and disagreement-as-a-feature by academia (multi-persona debate, the ALCE benchmark). We differ from
+the grift by rigor: a verifiable quote and an honest refusal — not "invent an aphorism in the spirit
+of a great mind."</sub>
 
 ## How it looks
 

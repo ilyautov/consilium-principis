@@ -2,7 +2,7 @@
 import os, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "scripts"))
-from federation.queue import RoleTask, Claim, QueueBackend
+from federation.queue import RoleTask, Claim, QueueBackend, SqliteBackend
 
 
 def test_roletask_and_claim_shapes():
@@ -155,3 +155,44 @@ def test_aba_old_token_stale_after_reclaim(tmp_path):
     assert c2.claim_token != c1.claim_token
     assert q.ack(c1.task_id, "w1", c1.claim_token, {"x": 1}).get("stale") is True
     assert q.ack(c2.task_id, "w1", c2.claim_token, {"x": 2})["ok"] is True
+
+
+def _claim_worker(db_path, worker_id, out_q):
+    # запускается в ОТДЕЛЬНОМ процессе (spawn) — реальный file-lock, не GIL
+    import sys, os
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "scripts"))
+    from federation.queue import SqliteBackend
+    q = SqliteBackend(db_path)
+    got = []
+    for _ in range(50):
+        c = q.claim(worker_id)
+        if c:
+            got.append(c.task_id)
+    out_q.put(got)
+
+
+def test_cross_process_claim_each_task_once(tmp_path):
+    import multiprocessing as mp
+    db = str(tmp_path / "race.sqlite3")
+    q = SqliteBackend(db)
+    N = 30
+    for i in range(N):
+        q.enqueue(RoleTask("s1", "r", "advisors/r", "Q%d" % i))
+    ctx = mp.get_context("spawn")
+    out = ctx.Queue()
+    procs = [ctx.Process(target=_claim_worker, args=(db, "w%d" % k, out)) for k in range(4)]
+    for p in procs:
+        p.start()
+    collected = []
+    for _ in procs:
+        collected += out.get(timeout=30)
+    for p in procs:
+        p.join(timeout=30)
+    # каждый таск заклеймлен РОВНО один раз (single-writer сериализация)
+    assert len(collected) == N
+    assert len(set(collected)) == N
+
+
+def test_returning_version_flag_present():
+    from federation.queue import _HAS_RETURNING
+    assert isinstance(_HAS_RETURNING, bool)

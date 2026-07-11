@@ -505,3 +505,50 @@ def render_html(s, title="Заседание совета"):
         ".legend{margin-top:22px;font-size:.82rem;opacity:.7}"
         "</style>" + "".join(body) + "</html>"
     )
+
+
+# ---------- export_session (шеримый пруф заседания) ----------
+
+_SHARE_FOOTER = ("Собрано в Consilium-Principis — совет заземлён в public-domain текстах; "
+                 "🔵 = сверено посимвольно с источником. Перед тем как делиться — проверь, "
+                 "что в тексте нет ничего личного.")
+
+
+def _abstentions_md(items):
+    if not items:
+        return []
+    out = ["", "## Что совет НЕ стал выдумывать",
+           "Вне корпуса совет ушёл в 🟡/отказ вместо фейк-цитаты — здесь:"]
+    out += [f"- {_e(x)}" for x in items]
+    return out
+
+
+def _abstentions_html(items):
+    if not items:
+        return ""
+    lis = "".join(f"<li>{_e(x)}</li>" for x in items)
+    return ('<section class=abstain><h3>Что совет НЕ стал выдумывать</h3>'
+            '<p>Вне корпуса совет ушёл в 🟡/отказ вместо фейк-цитаты:</p>'
+            f'<ul>{lis}</ul></section>')
+
+
+def export_session(session, surface="md", include_abstentions=True):
+    """Шеримый пруф заседания. surface: md (дефолт) | html. Добавляет к базовому рендеру
+    панель абстеншенов (session['abstentions'], если есть и include_abstentions) + share-футер.
+    Приватность: работает ТОЛЬКО с переданным объектом; файлов не читает/не пишет. Нет
+    question → fail-closed {error}."""
+    if not isinstance(session, dict) or not session.get("question"):
+        return {"error": "нужен объект заседания с полем question"}
+    items = session.get("abstentions") if include_abstentions else None
+    if surface == "html":
+        base = render_html(session)
+        extra = _abstentions_html(items)
+        extra += f'<p class=share>{_e(_SHARE_FOOTER)}</p>'
+        content = base[: -len("</html>")] + extra + "</html>"
+    else:
+        surface = "md"
+        lines = [render_md(session)]
+        lines += _abstentions_md(items)
+        lines += ["", "---", _SHARE_FOOTER]
+        content = "\n".join(lines)
+    return {"content": content, "surface": surface}

@@ -947,6 +947,11 @@ def _scaffold_principis(answers):
     return {"markdown": scaffold_principis(answers)}
 
 
+def _export_session(session, surface="md", include_abstentions=True):
+    from session_render import export_session
+    return export_session(session, surface=surface, include_abstentions=include_abstentions)
+
+
 def _list_recipes(surface="data"):
     from recipes import load_recipes
     rs = load_recipes()
@@ -1650,6 +1655,19 @@ TOOLS = {
                          "required": ["session"]},
         "handler": _render_session,
     },
+    "export_session": {
+        "description": "Шеримый пруф заседания (по ЯВНОМУ запросу юзера — правило 0). Отдаёт "
+                       "самодостаточный md (дефолт) | html артефакт: вопрос → советники → "
+                       "🔵-цитаты с источником → синтез + панель «что совет НЕ стал выдумывать» "
+                       "(session.abstentions) + атрибуция. Приватность: только текущее заседание "
+                       "(переданный объект), файлов не пишет — верни `content` юзеру, сохраняет он.",
+        "input_schema": {"type": "object",
+                         "properties": {"session": {"type": "object"},
+                                        "surface": {"type": "string", "enum": ["md", "html"]},
+                                        "include_abstentions": {"type": "boolean"}},
+                         "required": ["session"]},
+        "handler": _export_session,
+    },
     "validate_manifest": {
         "description": "МОАТ-гейт сборки: проверить тир-манифест советника — region-маркеры реально "
                        "есть в источнике (иначе тиры съедут, 🔵 не на тех словах), тиры валидны, файлы "
@@ -1901,6 +1919,9 @@ Consilium-Principis — личный совет AI-персон реальных
    легло?»); не подхватил — в этой сессии больше не поднимай. (б) СИНТЕЗ выдан —
    render_session вернёт outcome_nudge: один раз предложи занести решение в журнал и, если
    юзер согласился, допиши запись по шаблону из нуджа в principis.md (раздел «Журнал решений»).
+   Если юзер ЯВНО просит поделиться заседанием («сохрани/экспортируй/пришли артефакт») — зови
+   export_session(session, surface=md|html): вернёт самодостаточный `content` с панелью «что совет
+   НЕ стал выдумывать» и атрибуцией; отдай текст юзеру (файлов сам не пишет, сохраняет он).
    (в) РЕЗОЛЮЦИЯ: юзер рассказал, чем кончилось → в его записи ИСХОД ⏳ → ✅/❌ + «Одобрено:
    да/нет» (одобрил бы задним числом?). Если запись несёт строку «Прогноз: 📐 …»
    (pending-item отдаёт её полем predicted) — сравни ВСЛУХ прогноз и факт: расхождение —

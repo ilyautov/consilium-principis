@@ -3,6 +3,7 @@ Idempotency: per-claim claim_token — ack/nack/heartbeat валидны тол�
 поздний ответ реклейменного таска отбрасывается ({stale}). Domain-agnostic: ноль совет-логики."""
 import abc
 import os
+import random
 import sqlite3
 import time
 import uuid
@@ -92,6 +93,10 @@ class SqliteBackend(QueueBackend):
                       "attempts,max_attempts,created_at,priority) VALUES(?,?,?,?,?,'pending',0,?,?,?)",
                       (tid, task.session_id, task.role, task.advisor_dir, task.question,
                        task.max_attempts, time.time(), task.priority))
+        try:
+            self._notifier().notify()
+        except Exception:
+            pass                                    # notify не критичен (poll — истина)
         return tid
 
     def _claim_once(self, worker_id, roles):
@@ -122,8 +127,30 @@ class SqliteBackend(QueueBackend):
         finally:
             c.close()
 
+    def _notifier(self):
+        if getattr(self, "_notif", None) is None:
+            from federation.notify import make_notifier
+            self._notif = make_notifier(os.path.dirname(self.db_path) or ".")
+        return self._notif
+
     def claim(self, worker_id, roles=None, block=False, timeout=0.0):
-        return self._claim_once(worker_id, roles)
+        c = self._claim_once(worker_id, roles)
+        if c is not None or not block:
+            return c
+        deadline = time.time() + timeout
+        base, cap, n = 0.05, 0.5, 0                 # full-jitter backoff (кэп 0.5с в MVP)
+        notif = self._notifier()
+        while True:
+            remaining = deadline - time.time()
+            if remaining <= 0:
+                return None
+            backoff = min(cap, base * (2 ** n))
+            notif.wait(min(remaining, random.uniform(0, backoff)))   # notify будит раньше; poll-потолок
+            n += 1
+            c = self._claim_once(worker_id, roles)
+            if c is not None:
+                n = 0                                # активность → сброс backoff
+                return c
 
     def _guard(self, c, task_id, worker_id, claim_token):
         """Возвращает row если (claimed этим воркером с этим токеном), иначе None (stale)."""

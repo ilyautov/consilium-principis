@@ -961,6 +961,36 @@ def _proof_card(quote, advisor_dir):
     return {"verified": True, "content": render_proof_card(quote, fc["source"])}
 
 
+def _quote_of_day(advisor_dir=None, date=None):
+    """Детерминированная 🔵-verbatim-цитата дня из P1/P2-корпуса собранного советника. Pull-only.
+    advisor_dir не задан → первый собранный. date (ISO) — инъекция для детерминизма; иначе сегодня."""
+    from engine.fidelity import _iter_chunks
+    from corpusbuild.paths import corpus_path
+    import hashlib, datetime
+    if advisor_dir:
+        adv = _resolve(advisor_dir)
+        adv_list = [adv] if os.path.isfile(corpus_path(adv)) else []
+    else:
+        adv_list = [d for d in _advisor_dirs() if os.path.isfile(corpus_path(d))]
+    if not adv_list:
+        return {"note": "нет собранных советников с корпусом"}
+    adv = adv_list[0]
+    pool = [(ch.get("text", ""), ch.get("source") or ch.get("citation") or "")
+            for ch in _iter_chunks(adv) if ch.get("tier") in ("P1", "P2") and ch.get("text")]
+    if not pool:
+        return {"note": "нет P1/P2-цитат в корпусе (нечего цитировать дословно)"}
+    ds = date or datetime.date.today().isoformat()
+    start = int(hashlib.sha256(ds.encode("utf-8")).hexdigest()[:8], 16) % len(pool)
+    # детерминированный обход от выбранного индекса; берём первый, что реально проходит 🔵-гейт
+    for k in range(len(pool)):
+        text, src = pool[(start + k) % len(pool)]
+        fc = _fidelity_check(text, adv)
+        if fc["status"] == "🔵":
+            return {"text": text, "source": fc["source"] or src,
+                    "advisor": os.path.basename(adv), "marker": "🔵"}
+    return {"note": "P1/P2-цитаты не прошли verbatim-гейт"}
+
+
 def _list_recipes(surface="data"):
     from recipes import load_recipes
     rs = load_recipes()
@@ -1685,6 +1715,17 @@ TOOLS = {
         "input_schema": _obj({"quote": "string", "advisor_dir": "string"}, ["quote", "advisor_dir"]),
         "handler": _proof_card,
     },
+    "quote_of_day": {
+        "description": "Ретеншн-крючок (PULL-ONLY, по запросу): одна 🔵-verbatim-цитата дня из "
+                       "P1/P2-корпуса собранного советника + источник. Детерминирована по дате "
+                       "(в течение дня стабильна). advisor_dir опционален (нет → первый собранный). "
+                       "Нет P1/P2-цитат → {note} (не выдумывает generic-мудрость).",
+        "input_schema": {"type": "object",
+                         "properties": {"advisor_dir": {"type": "string"},
+                                        "date": {"type": "string"}},
+                         "required": []},
+        "handler": _quote_of_day,
+    },
     "validate_manifest": {
         "description": "МОАТ-гейт сборки: проверить тир-манифест советника — region-маркеры реально "
                        "есть в источнике (иначе тиры съедут, 🔵 не на тех словах), тиры валидны, файлы "
@@ -1941,6 +1982,8 @@ Consilium-Principis — личный совет AI-персон реальных
    НЕ стал выдумывать» и атрибуцией; отдай текст юзеру (файлов сам не пишет, сохраняет он).
    Просит пруф ОДНОЙ цитаты («докажи/покажи пруф цитаты») — зови proof_card(quote, advisor_dir):
    не дословна в 🔵-корпусе → карточки нет (fail-closed); иначе отдай html-карточку юзеру.
+   Просит «цитату дня / мысль дня» (PULL-ONLY, только по запросу — сам не навязывай) — зови
+   quote_of_day(): одна 🔵-verbatim-цитата с источником; нет дословных P1/P2 → честно скажи (не выдумывай).
    (в) РЕЗОЛЮЦИЯ: юзер рассказал, чем кончилось → в его записи ИСХОД ⏳ → ✅/❌ + «Одобрено:
    да/нет» (одобрил бы задним числом?). Если запись несёт строку «Прогноз: 📐 …»
    (pending-item отдаёт её полем predicted) — сравни ВСЛУХ прогноз и факт: расхождение —

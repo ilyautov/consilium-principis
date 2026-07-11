@@ -196,3 +196,37 @@ def test_cross_process_claim_each_task_once(tmp_path):
 def test_returning_version_flag_present():
     from federation.queue import _HAS_RETURNING
     assert isinstance(_HAS_RETURNING, bool)
+
+
+def test_no_connection_fd_leak_under_gc_disabled(tmp_path):
+    # с выключенным GC utечка fd проявляется детерминированно; закрытие conn должно её снять
+    import gc, os as _os, glob
+    q = SqliteBackend(str(tmp_path / "leak.sqlite3"))
+    gc.disable()
+    try:
+        def _fdcount():
+            try:
+                return len(_os.listdir("/dev/fd"))
+            except OSError:
+                return len(glob.glob("/proc/self/fd/*"))
+        for i in range(60):
+            q.enqueue(RoleTask("s1", "r", "advisors/r", "Q%d" % i))
+            c = q.claim("w1")
+            if c:
+                q.ack(c.task_id, "w1", c.claim_token, {"ok": True})
+            q.status("s1")
+        base = _fdcount()
+        for i in range(200):
+            q.enqueue(RoleTask("s2", "r", "advisors/r", "Q%d" % i))
+            q.status("s2")
+        grown = _fdcount() - base
+        assert grown < 40, "fd растёт (утечка connection): +%d" % grown
+    finally:
+        gc.enable()
+
+
+def test_empty_roles_claims_nothing(tmp_path):
+    q = SqliteBackend(str(tmp_path / "er.sqlite3"))
+    q.enqueue(RoleTask("s1", "aurelius", "advisors/aurelius", "Q?"))
+    assert q.claim("w1", roles=[]) is None       # [] = нет подходящих ролей, не «любая»
+    assert q.claim("w1", roles=None) is not None # None = любая, берёт таск

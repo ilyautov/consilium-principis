@@ -4,7 +4,7 @@
     "rule_count": 15,
     "recipe_count": 12,
     "script_count": 67,
-    "test_count": 97,
+    "test_count": 98,
     "glossary_count": 110
   },
   "tools": [
@@ -1625,6 +1625,10 @@
     {
       "path": "tests/test_catalog_verify.py",
       "covers": "catalog verify"
+    },
+    {
+      "path": "tests/test_citation_rate_eval.py",
+      "covers": "citation rate eval"
     },
     {
       "path": "tests/test_cite_early_exit.py",

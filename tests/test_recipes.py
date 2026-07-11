@@ -72,3 +72,19 @@ def test_calibrate_recipe_present():
     r = next(r for r in rs if r["id"] == "calibrate")
     assert set(r.keys()) == {"id", "title", "short", "triggers", "does", "reads"}
     assert r["triggers"] and isinstance(r["triggers"], list)
+
+
+def test_moat_fit_recipes_present():
+    # exec-brief (фикс-делеверабл) + red-team (адвокат дьявола) — moat-fit пробелы, добавлены 2026-07-11
+    rs = load_recipes()
+    ids = [r["id"] for r in rs]
+    for rid in ("exec-brief", "red-team"):
+        assert rid in ids, f"{rid} рецепт пропал"
+        r = next(r for r in rs if r["id"] == rid)
+        assert set(r.keys()) == {"id", "title", "short", "triggers", "does", "reads"}
+        assert r["triggers"] and isinstance(r["triggers"], list)
+
+
+def test_match_finds_red_team():
+    r = match_recipe("разнеси мой план по запуску", load_recipes())
+    assert r is not None and r["id"] == "red-team"

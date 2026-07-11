@@ -4,7 +4,7 @@
     "rule_count": 15,
     "recipe_count": 15,
     "script_count": 67,
-    "test_count": 102,
+    "test_count": 103,
     "glossary_count": 110
   },
   "tools": [
@@ -1868,6 +1868,10 @@
     {
       "path": "tests/test_extractor.py",
       "covers": "extractor"
+    },
+    {
+      "path": "tests/test_federation_notify.py",
+      "covers": "federation notify"
     },
     {
       "path": "tests/test_federation_queue.py",

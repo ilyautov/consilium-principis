@@ -56,6 +56,9 @@ class QueueBackend(abc.ABC):
     @abc.abstractmethod
     def status(self, session_id: str) -> dict: ...
 
+    @abc.abstractmethod
+    def results(self, session_id: str, status="done") -> list: ...
+
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS tasks (
@@ -235,6 +238,31 @@ class SqliteBackend(QueueBackend):
         for r in rows:
             out[r["status"]] = r["n"]
         return out
+
+    def results(self, session_id, status="done"):
+        """Строки тасков сессии (result распарсен из json). status=None → все состояния.
+        role/advisor_dir/question берутся из строки таска (их писал enqueuer — доверенно)."""
+        import contextlib
+        with contextlib.closing(self._conn()) as c:
+            if status is None:
+                cur = c.execute(
+                    "SELECT id, role, advisor_dir, question, status, claimed_by, result_json "
+                    "FROM tasks WHERE session_id=? ORDER BY created_at", (session_id,))
+            else:
+                cur = c.execute(
+                    "SELECT id, role, advisor_dir, question, status, claimed_by, result_json "
+                    "FROM tasks WHERE session_id=? AND status=? ORDER BY created_at",
+                    (session_id, status))
+            out = []
+            for row in cur.fetchall():
+                rj = row["result_json"]
+                out.append({
+                    "task_id": row["id"], "role": row["role"],
+                    "advisor_dir": row["advisor_dir"], "question": row["question"],
+                    "status": row["status"], "worker_id": row["claimed_by"],
+                    "result": json.loads(rj) if rj else None,
+                })
+            return out
 
     def close(self):
         n = getattr(self, "_notif", None)

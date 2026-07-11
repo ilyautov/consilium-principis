@@ -230,3 +230,33 @@ def test_empty_roles_claims_nothing(tmp_path):
     q.enqueue(RoleTask("s1", "aurelius", "advisors/aurelius", "Q?"))
     assert q.claim("w1", roles=[]) is None       # [] = нет подходящих ролей, не «любая»
     assert q.claim("w1", roles=None) is not None # None = любая, берёт таск
+
+
+def test_results_returns_done_with_parsed_result(tmp_path):
+    q = SqliteBackend(str(tmp_path / "res.sqlite3"))
+    q.enqueue(RoleTask("s1", "aurelius", "advisors/aurelius", "Q?"))
+    c = q.claim("w1")
+    q.ack(c.task_id, "w1", c.claim_token, {"argument": "A", "quotes": [{"text": "t"}]})
+    rows = q.results("s1")                       # дефолт status="done"
+    assert len(rows) == 1
+    r = rows[0]
+    assert r["role"] == "aurelius"
+    assert r["advisor_dir"] == "advisors/aurelius"   # доверенный dir из строки таска
+    assert r["question"] == "Q?"
+    assert r["status"] == "done"
+    assert r["result"] == {"argument": "A", "quotes": [{"text": "t"}]}  # распарсенный json
+
+
+def test_results_status_none_returns_all_states(tmp_path):
+    q = SqliteBackend(str(tmp_path / "res2.sqlite3"))
+    q.enqueue(RoleTask("s1", "r1", "advisors/r1", "Q1"))
+    q.enqueue(RoleTask("s1", "r2", "advisors/r2", "Q2"))
+    q.claim("w1")                                # один pending→claimed, второй pending
+    rows = q.results("s1", status=None)          # все состояния
+    assert len(rows) == 2
+    assert {r["role"] for r in rows} == {"r1", "r2"}
+
+
+def test_results_empty_session_is_empty(tmp_path):
+    q = SqliteBackend(str(tmp_path / "res3.sqlite3"))
+    assert q.results("nope") == []

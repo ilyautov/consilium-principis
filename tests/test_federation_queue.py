@@ -61,3 +61,54 @@ def test_status_counts_by_state(tmp_path):
     q.claim("w1")
     st = q.status("s1")
     assert st["pending"] == 1 and st["claimed"] == 1 and st["done"] == 0
+
+
+def test_ack_with_valid_token_marks_done(tmp_path):
+    from federation.queue import RoleTask
+    q = _mk(tmp_path)
+    q.enqueue(RoleTask("s1", "aurelius", "advisors/aurelius", "Q?"))
+    c = q.claim("w1")
+    r = q.ack(c.task_id, "w1", c.claim_token, {"argument": "хм"})
+    assert r["ok"] is True
+    assert q.status("s1")["done"] == 1
+
+
+def test_ack_stale_token_rejected(tmp_path):
+    from federation.queue import RoleTask
+    q = _mk(tmp_path)
+    q.enqueue(RoleTask("s1", "aurelius", "advisors/aurelius", "Q?"))
+    c = q.claim("w1")
+    r = q.ack(c.task_id, "w1", "не-тот-токен", {"argument": "мусор"})
+    assert r.get("stale") is True and r.get("ok") is not True
+    assert q.status("s1")["done"] == 0
+
+
+def test_ack_wrong_worker_rejected(tmp_path):
+    from federation.queue import RoleTask
+    q = _mk(tmp_path)
+    q.enqueue(RoleTask("s1", "aurelius", "advisors/aurelius", "Q?"))
+    c = q.claim("w1")
+    r = q.ack(c.task_id, "w2", c.claim_token, {"x": 1})
+    assert r.get("stale") is True
+
+
+def test_nack_requeues_until_retry_cap_then_dead(tmp_path):
+    from federation.queue import RoleTask
+    q = _mk(tmp_path)
+    q.enqueue(RoleTask("s1", "aurelius", "advisors/aurelius", "Q?", max_attempts=2))
+    c = q.claim("w1")
+    assert q.nack(c.task_id, "w1", c.claim_token, "boom")["ok"] is True
+    assert q.status("s1")["pending"] == 1
+    c = q.claim("w1")
+    r = q.nack(c.task_id, "w1", c.claim_token, "boom2")
+    assert r.get("dead") is True
+    assert q.status("s1")["dead"] == 1
+
+
+def test_heartbeat_valid_token_ok_stale_rejected(tmp_path):
+    from federation.queue import RoleTask
+    q = _mk(tmp_path)
+    q.enqueue(RoleTask("s1", "aurelius", "advisors/aurelius", "Q?"))
+    c = q.claim("w1")
+    assert q.heartbeat(c.task_id, "w1", c.claim_token)["ok"] is True
+    assert q.heartbeat(c.task_id, "w1", "плохой-токен").get("stale") is True

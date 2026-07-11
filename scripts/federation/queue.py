@@ -125,14 +125,50 @@ class SqliteBackend(QueueBackend):
     def claim(self, worker_id, roles=None, block=False, timeout=0.0):
         return self._claim_once(worker_id, roles)
 
+    def _guard(self, c, task_id, worker_id, claim_token):
+        """Возвращает row если (claimed этим воркером с этим токеном), иначе None (stale)."""
+        r = c.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
+        if not r or r["status"] != "claimed" or r["claimed_by"] != worker_id \
+                or r["claim_token"] != claim_token:
+            return None
+        return r
+
     def ack(self, task_id, worker_id, claim_token, result):
-        raise NotImplementedError  # Task 3
+        with self._conn() as c:
+            c.execute("BEGIN IMMEDIATE")
+            if self._guard(c, task_id, worker_id, claim_token) is None:
+                c.execute("COMMIT")
+                return {"stale": True}
+            c.execute("UPDATE tasks SET status='done', result_json=? WHERE id=?",
+                      (json.dumps(result, ensure_ascii=False), task_id))
+            c.execute("COMMIT")
+        return {"ok": True}
 
     def nack(self, task_id, worker_id, claim_token, error):
-        raise NotImplementedError  # Task 3
+        with self._conn() as c:
+            c.execute("BEGIN IMMEDIATE")
+            r = self._guard(c, task_id, worker_id, claim_token)
+            if r is None:
+                c.execute("COMMIT")
+                return {"stale": True}
+            if r["attempts"] >= r["max_attempts"]:
+                c.execute("UPDATE tasks SET status='dead', error=? WHERE id=?", (error, task_id))
+                c.execute("COMMIT")
+                return {"dead": True}
+            c.execute("UPDATE tasks SET status='pending', claimed_by=NULL, claim_token=NULL, "
+                      "claimed_at=NULL, error=? WHERE id=?", (error, task_id))
+            c.execute("COMMIT")
+        return {"ok": True}
 
     def heartbeat(self, task_id, worker_id, claim_token):
-        raise NotImplementedError  # Task 4
+        with self._conn() as c:
+            c.execute("BEGIN IMMEDIATE")
+            if self._guard(c, task_id, worker_id, claim_token) is None:
+                c.execute("COMMIT")
+                return {"stale": True}
+            c.execute("UPDATE tasks SET claimed_at=? WHERE id=?", (time.time(), task_id))
+            c.execute("COMMIT")
+        return {"ok": True}
 
     def sweep(self, lease_seconds):
         raise NotImplementedError  # Task 4

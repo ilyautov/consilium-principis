@@ -12,12 +12,24 @@
 [![CI](https://github.com/ilyautov/consilium-principis/actions/workflows/ci.yml/badge.svg)](https://github.com/ilyautov/consilium-principis/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)
-![Works offline · no keys](https://img.shields.io/badge/works-offline%20%C2%B7%20no%20keys-success)
+![no extra keys · no extra cost](https://img.shields.io/badge/no%20extra%20keys%20%C2%B7%20no%20extra%20cost-success)
 ![MCP ready](https://img.shields.io/badge/MCP-ready-purple)
 
 </div>
 
 ---
+
+## Что это
+
+**Consilium Principis — навык для Claude Code (и MCP-сервер).** Ты ставишь его в свой AI-агент, и
+по любому вопросу-решению он созывает **совет из AI-персон реальных мыслителей** — Сунь-цзы, Марк
+Аврелий, Макиавелли, Эпиктет и кого добавишь сам. Каждый говорит своей линзой, по своим текстам,
+спорит с тобой и с другими; в конце — синтез и один шаг к действию. Считаемый вопрос («что выгоднее —
+X или Y») совет не решает на глаз, а раскладывает на числа и прогоняет Монте-Карло.
+
+Чем отличается от «попроси ИИ сыграть мудреца»: **дословные цитаты проверяются по подлинному корпусу
+автора посимвольно, а вне корпуса советник честно молчит, а не выдумывает** (fail-closed). Это
+инструмент решений, не ролевая игра и не генератор афоризмов. Не требует своих ключей и оплаты — работает на агенте, который у тебя уже есть; сам контур честности не нуждается в сети. Полный офлайн — только на локальных моделях.
 
 ## Как это выглядит
 

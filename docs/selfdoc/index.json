@@ -4,7 +4,7 @@
     "rule_count": 15,
     "recipe_count": 10,
     "script_count": 67,
-    "test_count": 95,
+    "test_count": 96,
     "glossary_count": 110
   },
   "tools": [
@@ -1847,6 +1847,10 @@
     {
       "path": "tests/test_reader_migration.py",
       "covers": "reader migration"
+    },
+    {
+      "path": "tests/test_readme_honest_claims.py",
+      "covers": "readme honest claims"
     },
     {
       "path": "tests/test_recipes.py",

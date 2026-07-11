@@ -18,3 +18,46 @@ def test_queuebackend_is_abstract():
     import pytest
     with pytest.raises(TypeError):
         QueueBackend()
+
+
+import tempfile
+
+
+def _mk(tmp_path):
+    from federation.queue import SqliteBackend
+    return SqliteBackend(str(tmp_path / "q.sqlite3"))
+
+
+def test_enqueue_then_claim_returns_task(tmp_path):
+    from federation.queue import RoleTask
+    q = _mk(tmp_path)
+    tid = q.enqueue(RoleTask("s1", "aurelius", "advisors/aurelius", "Q?"))
+    assert isinstance(tid, str) and tid
+    c = q.claim("w1")
+    assert c is not None and c.task_id == tid and c.role == "aurelius"
+    assert c.claim_token
+    assert c.question == "Q?"
+
+
+def test_claim_empty_queue_returns_none(tmp_path):
+    q = _mk(tmp_path)
+    assert q.claim("w1") is None
+
+
+def test_claim_filters_by_role(tmp_path):
+    from federation.queue import RoleTask
+    q = _mk(tmp_path)
+    q.enqueue(RoleTask("s1", "aurelius", "advisors/aurelius", "Q?"))
+    assert q.claim("w1", roles=["machiavelli"]) is None
+    c = q.claim("w1", roles=["aurelius"])
+    assert c is not None and c.role == "aurelius"
+
+
+def test_status_counts_by_state(tmp_path):
+    from federation.queue import RoleTask
+    q = _mk(tmp_path)
+    q.enqueue(RoleTask("s1", "aurelius", "advisors/aurelius", "Q?"))
+    q.enqueue(RoleTask("s1", "machiavelli", "advisors/machiavelli", "Q?"))
+    q.claim("w1")
+    st = q.status("s1")
+    assert st["pending"] == 1 and st["claimed"] == 1 and st["done"] == 0

@@ -4,7 +4,7 @@
     "rule_count": 15,
     "recipe_count": 10,
     "script_count": 67,
-    "test_count": 96,
+    "test_count": 97,
     "glossary_count": 110
   },
   "tools": [
@@ -1652,6 +1652,10 @@
     {
       "path": "tests/test_corpus_pipeline.py",
       "covers": "corpus pipeline"
+    },
+    {
+      "path": "tests/test_cross_model_probe.py",
+      "covers": "cross model probe"
     },
     {
       "path": "tests/test_dark_tools_wired.py",

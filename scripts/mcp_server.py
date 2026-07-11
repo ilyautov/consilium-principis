@@ -957,7 +957,7 @@ def _proof_card(quote, advisor_dir):
     fc = _fidelity_check(quote, advisor_dir)
     if not fc["verbatim"] or fc["status"] != "🔵":
         return {"verified": False, "content": None,
-                "note": "не сверено посимвольно как первоисточник — 🔵-карточку не рисую"}
+                "note": "не сверено дословно как первоисточник — 🔵-карточку не рисую"}
     return {"verified": True, "content": render_proof_card(quote, fc["source"])}
 
 
@@ -1709,7 +1709,7 @@ TOOLS = {
     },
     "proof_card": {
         "description": "Виирал-ассет «show your work»: самодостаточная html-карточка ОДНОЙ цитаты "
-                       "с источником + бейдж «🔵 сверено посимвольно». Fail-closed: если цитата НЕ "
+                       "с источником + бейдж «🔵 дословно, с первоисточником». Fail-closed: если цитата НЕ "
                        "дословна в P1/P2-корпусе советника → {verified:false, content:null} (карточки "
                        "нет — суть рва). advisor_dir = advisors/{имя} или lenses/{имя}.",
         "input_schema": _obj({"quote": "string", "advisor_dir": "string"}, ["quote", "advisor_dir"]),

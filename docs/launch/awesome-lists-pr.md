@@ -10,16 +10,16 @@ Typical entry format: `- [name](url) - description`
 
 **Entry:**
 ```
-- [consilium-principis](https://github.com/ilyautov/consilium-principis) - A council of AI personas grounded in real thinkers' public-domain texts (Sun Tzu, Marcus Aurelius, Machiavelli, Epictetus). Verifies every quote character-by-character against the source corpus and honestly refuses to answer when the corpus doesn't cover the question, instead of fabricating a citation.
+- [consilium-principis](https://github.com/ilyautov/consilium-principis) - A council of AI personas grounded in real thinkers' public-domain texts (Sun Tzu, Marcus Aurelius, Machiavelli, Epictetus). Verifies every quote word-for-word against the source corpus and honestly refuses to answer when the corpus doesn't cover the question, instead of fabricating a citation.
 ```
 
 Shorter alternate, if the list enforces a strict line-length cap:
 ```
-- [consilium-principis](https://github.com/ilyautov/consilium-principis) - Council of AI advisors grounded in public-domain texts; verifies quotes character-by-character and refuses to bluff when it can't cite a source.
+- [consilium-principis](https://github.com/ilyautov/consilium-principis) - Council of AI advisors grounded in public-domain texts; verifies quotes word-for-word and refuses to bluff when it can't cite a source.
 ```
 
 **PR body:**
-> Adds Consilium Principis, an MCP server (+ Claude Code skill) that runs a council of AI personas grounded in real public-domain texts. Its differentiator vs. other multi-agent "council" servers is verifiable grounding: every verbatim quote is checked character-by-character against the source corpus, and the advisor stays silent (fail-closed) rather than fabricate a citation when the corpus doesn't cover the question. Free, open source, MIT licensed.
+> Adds Consilium Principis, an MCP server (+ Claude Code skill) that runs a council of AI personas grounded in real public-domain texts. Its differentiator vs. other multi-agent "council" servers is verifiable grounding: every verbatim quote is checked word-for-word against the source corpus, and the advisor stays silent (fail-closed) rather than fabricate a citation when the corpus doesn't cover the question. Free, open source, MIT licensed.
 
 ---
 
@@ -29,16 +29,16 @@ Typical entry format: `- [Name](url) - Description` (check current section — l
 
 **Entry:**
 ```
-- [Consilium Principis](https://github.com/ilyautov/consilium-principis) - Claude Code skill that convenes a council of AI personas of real thinkers (Sun Tzu, Marcus Aurelius, Machiavelli, Epictetus, plus your own), grounded in public-domain texts. Verifies quotes character-by-character against the source and honestly stays silent instead of fabricating when the corpus doesn't cover the question.
+- [Consilium Principis](https://github.com/ilyautov/consilium-principis) - Claude Code skill that convenes a council of AI personas of real thinkers (Sun Tzu, Marcus Aurelius, Machiavelli, Epictetus, plus your own), grounded in public-domain texts. Verifies quotes word-for-word against the source and honestly stays silent instead of fabricating when the corpus doesn't cover the question.
 ```
 
 Shorter alternate:
 ```
-- [Consilium Principis](https://github.com/ilyautov/consilium-principis) - AI advisory council skill grounded in public-domain texts; proves its quotes character-by-character or honestly refuses to bluff.
+- [Consilium Principis](https://github.com/ilyautov/consilium-principis) - AI advisory council skill grounded in public-domain texts; proves its quotes word-for-word or honestly refuses to bluff.
 ```
 
 **PR body:**
-> Adds Consilium Principis, a Claude Code skill + MCP server that runs a council of AI personas grounded in real thinkers' public-domain writings. Unlike other "AI council" tools, it verifies every verbatim quote character-by-character against the source corpus and fails closed — the advisor honestly declines to answer rather than inventing a citation when the corpus doesn't cover the question. Install via `/plugin marketplace add ilyautov/consilium-principis`; free, open source, MIT licensed.
+> Adds Consilium Principis, a Claude Code skill + MCP server that runs a council of AI personas grounded in real thinkers' public-domain writings. Unlike other "AI council" tools, it verifies every verbatim quote word-for-word against the source corpus and fails closed — the advisor honestly declines to answer rather than inventing a citation when the corpus doesn't cover the question. Install via `/plugin marketplace add ilyautov/consilium-principis`; free, open source, MIT licensed.
 
 ---
 

@@ -1,6 +1,6 @@
 # X/Twitter launch thread — Consilium Principis (EN)
 
-Beat structure: pain → fabricated-quote problem → the council → the differentiated aha (proves or refuses) → char-by-char verification → also-disagreement/Monte Carlo → free/local → install → CTA.
+Beat structure: pain → fabricated-quote problem → the council → the differentiated aha (proves or refuses) → word-for-word verification → also-disagreement/Monte Carlo → free/local → install → CTA.
 
 Each tweet is written to fit under 280 characters. Visual notes are suggestions, not requirements.
 
@@ -30,7 +30,7 @@ So I built a council instead of a chatbot: Consilium Principis, a Claude Code sk
 ---
 
 **4/**
-Here's the part every other AI council skips: every verbatim quote gets checked character-by-character against the real corpus before it's shown to you. Match → 🔵. No match → it doesn't ship as a quote.
+Here's the part every other AI council skips: every verbatim quote gets checked word-for-word against the real corpus before it's shown to you. Match → 🔵. No match → it doesn't ship as a quote.
 
 [GIF: 🔵 badge appearing next to a verified quote, char-diff flashing]
 

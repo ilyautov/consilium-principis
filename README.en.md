@@ -10,7 +10,7 @@
 
 **A personal board of directors made of great minds — for your decisions.** Several thinkers at one table, each through their own lens: they argue with you and with each other. And unlike "ask an AI to roleplay a sage," they **prove the quote or honestly stay silent** — no fabrication.
 
-Every 🔵 quote is checked against the author's genuine text **character-by-character**; what's not
+Every 🔵 quote is checked against the author's genuine text **word-for-word**; what's not
 in the corpus, the advisor **does not say**. This can be verified, not just taken on faith.
 
 [![CI](https://github.com/ilyautov/consilium-principis/actions/workflows/ci.yml/badge.svg)](https://github.com/ilyautov/consilium-principis/actions/workflows/ci.yml)
@@ -33,7 +33,7 @@ one concrete next step. A quantifiable question ("which is more worthwhile — X
 doesn't eyeball — it breaks it into numbers and runs a Monte Carlo.
 
 How this differs from "ask an AI to roleplay a sage": **verbatim quotes are checked against the
-author's genuine corpus character-by-character, and outside the corpus the advisor honestly stays
+author's genuine corpus word-for-word, and outside the corpus the advisor honestly stays
 silent instead of making things up** (fail-closed). This is a decision tool, not a roleplay game or
 an aphorism generator. It needs no extra keys or payment — it runs on the agent you already have;
 the honesty contour itself needs no network. Full offline only with local models.
@@ -47,7 +47,7 @@ of voices, but that a claim can be **re-verified** (and where it can't, the coun
 |---|:---:|:---:|:---:|
 | Different lenses, disagreement as a feature | ± | ✅ | ✅ |
 | Verbatim quote with a source | ✗ | ✗ | ✅ |
-| **Quote checked character-by-character** | ✗ | ✗ | **✅** |
+| **Quote checked verbatim against the source** | ✗ | ✗ | **✅** |
 | **Honestly silent outside the corpus (fail-closed)** | ✗ | ✗ | **✅** |
 | Quantifiable question → Monte Carlo (📐) | ✗ | ✗ | ✅ |
 | No extra keys or payment | ± | ✗ | ✅ |
@@ -93,13 +93,13 @@ No need to learn commands — say **"what can you do?"** and the board will show
 This isn't "a chatbot playing sage." Every word is tagged by a **protective contour**:
 
 The real proof isn't in the tone but in verifiability: **a verbatim quote (🔵) is checked against
-the author's genuine corpus by code, character-by-character**, and carries a source. If the exact
+the author's genuine corpus by code, word-for-word**, and carries a source. If the exact
 line isn't found, the advisor honestly stays silent (fail-closed) instead of making it up. This is
 what separates a decision tool from "roleplay a sage": every claim can be re-checked.
 
 | Marker | What it means |
 |:---:|---|
-| 🔵 | **verbatim quote** from the author's genuine corpus — verified character-by-character, with a source |
+| 🔵 | **verbatim quote** from the author's genuine corpus — verified word-for-word, with a source |
 | 🟢 | **verbatim, but from commentary/interpretation** (not in the author's own voice) — with the commentator named |
 | 🟡 | **in the spirit of the author**, but not their exact words — honestly marked |
 | 📐 | **calculation**: your own numbers, run through Monte Carlo — not truth, not a quote, just your own model run N times |

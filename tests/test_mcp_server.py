@@ -215,6 +215,30 @@ def test_initialize_exposes_instructions_to_host():
     assert "дефект корпуса" in instr.lower()                       # запрет конфабуляции дефекта гейта
 
 
+def test_handler_keyerror_not_mislabeled_as_unknown_tool(monkeypatch):
+    # KeyError ВНУТРИ хендлера (напр. неполный объект) → -32603 «ошибка тула», НЕ -32601
+    from mcp_server import _handle_rpc, TOOLS
+
+    def _boom(**kw):
+        raise KeyError("synthesis")
+
+    monkeypatch.setitem(TOOLS, "_probe_boom", {
+        "name": "_probe_boom", "description": "x",
+        "input_schema": {"type": "object", "properties": {}, "required": []},
+        "handler": _boom})
+    r = _handle_rpc({"jsonrpc": "2.0", "id": 5, "method": "tools/call",
+                     "params": {"name": "_probe_boom", "arguments": {}}})
+    assert r["error"]["code"] == -32603
+    assert "неизвестный тул" not in r["error"]["message"]
+
+
+def test_unknown_tool_reports_unknown():
+    from mcp_server import _handle_rpc
+    r = _handle_rpc({"jsonrpc": "2.0", "id": 6, "method": "tools/call",
+                     "params": {"name": "no_such_tool", "arguments": {}}})
+    assert r["error"]["code"] == -32601 and "неизвестн" in r["error"]["message"]
+
+
 def test_retrieve_attaches_verbatim_quoting_hint():
     # point-of-use: выдача retrieve несёт директиву «цитируй text дословно», гасит конфабуляцию 🟡
     import os

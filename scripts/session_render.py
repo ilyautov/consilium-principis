@@ -509,7 +509,11 @@ def render_html(s, title="Заседание совета"):
 
 def render_proof_card(quote, source):
     """Самодостаточная html-карточка одной 🔵-verbatim-цитаты + источник + бейдж-пруф.
-    Только для уже верифицированной 🔵-цитаты (проверку делает вызывающий)."""
+    Только для уже верифицированной 🔵-цитаты (проверку делает вызывающий). `quote` — текст,
+    что передал вызывающий (в проде — верифицированная cite-цитата из корпуса). Бейдж говорит
+    «дословно, сверено с первоисточником» — честно к тому, что делает гейт (нормализованный
+    verbatim: слова автора, регистр/пунктуация не важны), НЕ «посимвольно» (это было бы
+    сильнее реального механизма)."""
     src = f'<p class=src>— {_e(source)}</p>' if source else ""
     return (
         "<!doctype html><html lang=ru><meta charset=utf-8>"
@@ -526,15 +530,27 @@ def render_proof_card(quote, source):
         "background:color-mix(in srgb,#185FA5 20%,transparent)}"
         "</style>"
         f'<div class=card><blockquote>«{_e(quote)}»</blockquote>{src}'
-        '<span class=badge>🔵 сверено посимвольно с источником</span></div></html>'
+        '<span class=badge>🔵 дословно — сверено с первоисточником</span></div></html>'
     )
 
 
 # ---------- export_session (шеримый пруф заседания) ----------
 
 _SHARE_FOOTER = ("Собрано в Consilium-Principis — совет заземлён в public-domain текстах; "
-                 "🔵 = сверено посимвольно с источником. Перед тем как делиться — проверь, "
-                 "что в тексте нет ничего личного.")
+                 "🔵 = дословная цитата, сверено с первоисточником. Перед тем как делиться — "
+                 "проверь, что в тексте нет ничего личного.")
+
+
+def _norm_abstentions(items):
+    """Нормализует abstentions в список строк (fail-safe). Строка → [строка] (не итерируем по
+    символам); не-список/не-строка → None; элементы приводятся к str (не крашим _e на dict/int)."""
+    if items is None:
+        return None
+    if isinstance(items, str):
+        items = [items]
+    elif not isinstance(items, (list, tuple)):
+        return None
+    return [str(x) for x in items]
 
 
 def _abstentions_md(items):
@@ -558,20 +574,26 @@ def _abstentions_html(items):
 def export_session(session, surface="md", include_abstentions=True):
     """Шеримый пруф заседания. surface: md (дефолт) | html. Добавляет к базовому рендеру
     панель абстеншенов (session['abstentions'], если есть и include_abstentions) + share-футер.
-    Приватность: работает ТОЛЬКО с переданным объектом; файлов не читает/не пишет. Нет
-    question → fail-closed {error}."""
+    Приватность: работает ТОЛЬКО с переданным объектом; файлов не читает/не пишет. Экспорт —
+    для ЗАВЕРШЁННОГО заседания (нужны question + synthesis); неполный объект → fail-closed
+    {error}, а не краш (Режим B до синтеза, битые advisors и т.п.)."""
     if not isinstance(session, dict) or not session.get("question"):
         return {"error": "нужен объект заседания с полем question"}
-    items = session.get("abstentions") if include_abstentions else None
-    if surface == "html":
-        base = render_html(session)
-        extra = _abstentions_html(items)
-        extra += f'<p class=share>{_e(_SHARE_FOOTER)}</p>'
-        content = base[: -len("</html>")] + extra + "</html>"
-    else:
-        surface = "md"
-        lines = [render_md(session)]
-        lines += _abstentions_md(items)
-        lines += ["", "---", _SHARE_FOOTER]
-        content = "\n".join(lines)
+    if not session.get("synthesis"):
+        return {"error": "заседание без синтеза — экспортируй завершённое заседание (сначала синтез)"}
+    items = _norm_abstentions(session.get("abstentions") if include_abstentions else None)
+    try:
+        if surface == "html":
+            base = render_html(session)
+            extra = _abstentions_html(items)
+            extra += f'<p class=share>{_e(_SHARE_FOOTER)}</p>'
+            content = base[: -len("</html>")] + extra + "</html>"
+        else:
+            surface = "md"
+            lines = [render_md(session)]
+            lines += _abstentions_md(items)
+            lines += ["", "---", _SHARE_FOOTER]
+            content = "\n".join(lines)
+    except (KeyError, TypeError, AttributeError) as e:
+        return {"error": f"заседание неполное для экспорта ({e})"}
     return {"content": content, "surface": surface}

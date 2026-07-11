@@ -112,3 +112,46 @@ def test_heartbeat_valid_token_ok_stale_rejected(tmp_path):
     c = q.claim("w1")
     assert q.heartbeat(c.task_id, "w1", c.claim_token)["ok"] is True
     assert q.heartbeat(c.task_id, "w1", "плохой-токен").get("stale") is True
+
+
+def test_sweep_reclaims_expired_claim(tmp_path):
+    from federation.queue import RoleTask
+    q = _mk(tmp_path)
+    q.enqueue(RoleTask("s1", "aurelius", "advisors/aurelius", "Q?"))
+    c = q.claim("w1")
+    assert q.status("s1")["claimed"] == 1
+    n = q.sweep(lease_seconds=0)
+    assert n == 1
+    assert q.status("s1")["pending"] == 1
+    assert q.ack(c.task_id, "w1", c.claim_token, {"x": 1}).get("stale") is True
+
+
+def test_sweep_kills_when_retry_exhausted(tmp_path):
+    from federation.queue import RoleTask
+    q = _mk(tmp_path)
+    q.enqueue(RoleTask("s1", "aurelius", "advisors/aurelius", "Q?", max_attempts=1))
+    q.claim("w1")
+    n = q.sweep(lease_seconds=0)
+    assert n == 1
+    assert q.status("s1")["dead"] == 1
+
+
+def test_sweep_leaves_fresh_claims(tmp_path):
+    from federation.queue import RoleTask
+    q = _mk(tmp_path)
+    q.enqueue(RoleTask("s1", "aurelius", "advisors/aurelius", "Q?"))
+    q.claim("w1")
+    assert q.sweep(lease_seconds=9999) == 0
+    assert q.status("s1")["claimed"] == 1
+
+
+def test_aba_old_token_stale_after_reclaim(tmp_path):
+    from federation.queue import RoleTask
+    q = _mk(tmp_path)
+    q.enqueue(RoleTask("s1", "aurelius", "advisors/aurelius", "Q?"))
+    c1 = q.claim("w1")
+    q.sweep(lease_seconds=0)
+    c2 = q.claim("w1")
+    assert c2.claim_token != c1.claim_token
+    assert q.ack(c1.task_id, "w1", c1.claim_token, {"x": 1}).get("stale") is True
+    assert q.ack(c2.task_id, "w1", c2.claim_token, {"x": 2})["ok"] is True

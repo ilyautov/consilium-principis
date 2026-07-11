@@ -170,6 +170,23 @@ Personal/attended/себе-в-пользу: «твои подписки для �
 - **degrade (улучш. 5):** роль пуста → host_single_brain с лейблом + `diversity:reduced`; опция abstain → пусто.
 - executor claim/submit(stale claim_token → отклонён)/heartbeat круг.
 
+## Заимствования из awesome-llm-apps `advisor-orchestrator-worker` (2026-07-12)
+
+Внешняя валидация: 118k★-репа независимо пришла к трёхуровневому скелету (оркестратор/воркер/
+критик + централизованная верификация + stateless-брифы + честный бюджет). Совпадение шаблона
+снимает риск «мы одни так думаем»; их гейт — по acceptance-criteria (качество), НЕ verbatim-верность
+по PD-корпусу — наш ров цел. Три практических заимствования в Часть B:
+
+1. **Worker-brief как temp-file, не shell-интерполяция** (их `references/worker-brief.md`): бриф
+   исполнителю передаётся как self-contained данные, НИКОГДА не вклеивается в shell-строку —
+   защита от инъекции/утечки контекста. Прямо усиливает trust-boundary исполнителя (улучш. 4):
+   `federation_claim` отдаёт структурный `Claim`, не собираемую команду.
+2. **Явные состояния судьи `PASS / FIX / ESCALATE`** (вместо неявных): FIX = редиспатч с названным
+   провалом (наш `nack`→requeue с `error`), ESCALATE = честный отчёт/вопрос (наш degrade/abstain),
+   «no silent partial passes». Завести именование в рубрику судьи Части B.
+3. **Формат ответа критика** (их `references/advisor-consult.md`): «verdict, ranked risks, concrete
+   fixes, <300 слов, только на границах коммита» — образец для нашего best-of-N судьи-рубрики.
+
 ## Границы (out of scope MVP)
 - Кросс-машинность / Redis/HTTP/Postgres-бэкенды — шов готов, реализация за MVP (team/corp).
 - LLM-судья — за флагом+ключом; MVP rule-based.

@@ -507,6 +507,29 @@ def render_html(s, title="Заседание совета"):
     )
 
 
+def render_proof_card(quote, source):
+    """Самодостаточная html-карточка одной 🔵-verbatim-цитаты + источник + бейдж-пруф.
+    Только для уже верифицированной 🔵-цитаты (проверку делает вызывающий)."""
+    src = f'<p class=src>— {_e(source)}</p>' if source else ""
+    return (
+        "<!doctype html><html lang=ru><meta charset=utf-8>"
+        "<meta name=viewport content='width=device-width,initial-scale=1'>"
+        "<title>Пруф цитаты</title><style>"
+        ":root{color-scheme:light dark}"
+        "body{font:16px/1.6 system-ui,sans-serif;margin:0;min-height:100vh;display:flex;"
+        "align-items:center;justify-content:center;background:Canvas;color:CanvasText;padding:24px}"
+        ".card{max-width:600px;border:1px solid color-mix(in srgb,CanvasText 15%,transparent);"
+        "border-radius:16px;padding:32px}"
+        "blockquote{font-size:1.4rem;line-height:1.4;margin:0 0 16px;font-weight:500}"
+        ".src{opacity:.7;font-size:.95rem;margin:0 0 20px}"
+        ".badge{display:inline-block;font-size:.85rem;padding:6px 12px;border-radius:999px;"
+        "background:color-mix(in srgb,#185FA5 20%,transparent)}"
+        "</style>"
+        f'<div class=card><blockquote>«{_e(quote)}»</blockquote>{src}'
+        '<span class=badge>🔵 сверено посимвольно с источником</span></div></html>'
+    )
+
+
 # ---------- export_session (шеримый пруф заседания) ----------
 
 _SHARE_FOOTER = ("Собрано в Consilium-Principis — совет заземлён в public-domain текстах; "

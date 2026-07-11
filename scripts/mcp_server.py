@@ -952,6 +952,15 @@ def _export_session(session, surface="md", include_abstentions=True):
     return export_session(session, surface=surface, include_abstentions=include_abstentions)
 
 
+def _proof_card(quote, advisor_dir):
+    from session_render import render_proof_card
+    fc = _fidelity_check(quote, advisor_dir)
+    if not fc["verbatim"] or fc["status"] != "🔵":
+        return {"verified": False, "content": None,
+                "note": "не сверено посимвольно как первоисточник — 🔵-карточку не рисую"}
+    return {"verified": True, "content": render_proof_card(quote, fc["source"])}
+
+
 def _list_recipes(surface="data"):
     from recipes import load_recipes
     rs = load_recipes()
@@ -1668,6 +1677,14 @@ TOOLS = {
                          "required": ["session"]},
         "handler": _export_session,
     },
+    "proof_card": {
+        "description": "Виирал-ассет «show your work»: самодостаточная html-карточка ОДНОЙ цитаты "
+                       "с источником + бейдж «🔵 сверено посимвольно». Fail-closed: если цитата НЕ "
+                       "дословна в P1/P2-корпусе советника → {verified:false, content:null} (карточки "
+                       "нет — суть рва). advisor_dir = advisors/{имя} или lenses/{имя}.",
+        "input_schema": _obj({"quote": "string", "advisor_dir": "string"}, ["quote", "advisor_dir"]),
+        "handler": _proof_card,
+    },
     "validate_manifest": {
         "description": "МОАТ-гейт сборки: проверить тир-манифест советника — region-маркеры реально "
                        "есть в источнике (иначе тиры съедут, 🔵 не на тех словах), тиры валидны, файлы "
@@ -1922,6 +1939,8 @@ Consilium-Principis — личный совет AI-персон реальных
    Если юзер ЯВНО просит поделиться заседанием («сохрани/экспортируй/пришли артефакт») — зови
    export_session(session, surface=md|html): вернёт самодостаточный `content` с панелью «что совет
    НЕ стал выдумывать» и атрибуцией; отдай текст юзеру (файлов сам не пишет, сохраняет он).
+   Просит пруф ОДНОЙ цитаты («докажи/покажи пруф цитаты») — зови proof_card(quote, advisor_dir):
+   не дословна в 🔵-корпусе → карточки нет (fail-closed); иначе отдай html-карточку юзеру.
    (в) РЕЗОЛЮЦИЯ: юзер рассказал, чем кончилось → в его записи ИСХОД ⏳ → ✅/❌ + «Одобрено:
    да/нет» (одобрил бы задним числом?). Если запись несёт строку «Прогноз: 📐 …»
    (pending-item отдаёт её полем predicted) — сравни ВСЛУХ прогноз и факт: расхождение —

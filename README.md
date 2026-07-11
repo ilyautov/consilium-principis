@@ -1,3 +1,5 @@
+[English](README.en.md) · **Русский**
+
 <div align="center">
 
 <img src="assets/logo-consilium-principis.png" width="300" alt="Consilium Principis" />

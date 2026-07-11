@@ -30,8 +30,10 @@ class FifoNotifier(Notifier):
     def __init__(self, dir_path):
         os.makedirs(dir_path, exist_ok=True)
         self.path = os.path.join(dir_path, "federation.wake")
-        if not os.path.exists(self.path):
+        try:
             os.mkfifo(self.path)
+        except FileExistsError:
+            pass                                # сосед-процесс создал первым — норм, открываем существующий
         # держим свой RW-дескриптор на чтение (O_RDWR не блокируется на open даже без писателей)
         self._rfd = os.open(self.path, os.O_RDWR | os.O_NONBLOCK)
 
@@ -60,6 +62,12 @@ class FifoNotifier(Notifier):
         try:
             os.close(self._rfd)
         except OSError:
+            pass
+
+    def __del__(self):
+        try:
+            self.close()
+        except Exception:
             pass
 
 

@@ -2,6 +2,7 @@
 Idempotency: per-claim claim_token — ack/nack/heartbeat валидны только с текущим токеном,
 поздний ответ реклейменного таска отбрасывается ({stale}). Domain-agnostic: ноль совет-логики."""
 import abc
+import contextlib
 import os
 import random
 import sqlite3
@@ -88,11 +89,12 @@ class SqliteBackend(QueueBackend):
 
     def enqueue(self, task):
         tid = uuid.uuid4().hex
-        with self._conn() as c:
-            c.execute("INSERT INTO tasks(id,session_id,role,advisor_dir,question,status,"
-                      "attempts,max_attempts,created_at,priority) VALUES(?,?,?,?,?,'pending',0,?,?,?)",
-                      (tid, task.session_id, task.role, task.advisor_dir, task.question,
-                       task.max_attempts, time.time(), task.priority))
+        with contextlib.closing(self._conn()) as c:
+            with c:
+                c.execute("INSERT INTO tasks(id,session_id,role,advisor_dir,question,status,"
+                          "attempts,max_attempts,created_at,priority) VALUES(?,?,?,?,?,'pending',0,?,?,?)",
+                          (tid, task.session_id, task.role, task.advisor_dir, task.question,
+                           task.max_attempts, time.time(), task.priority))
         try:
             self._notifier().notify()
         except Exception:
@@ -100,6 +102,8 @@ class SqliteBackend(QueueBackend):
         return tid
 
     def _claim_once(self, worker_id, roles):
+        if roles is not None and len(roles) == 0:
+            return None                          # пустой список ролей = нечего клеймить (не «любую»)
         token = uuid.uuid4().hex
         now = time.time()
         role_ok = "1=1" if not roles else "role IN (%s)" % ",".join("?" * len(roles))
@@ -133,6 +137,9 @@ class SqliteBackend(QueueBackend):
             self._notif = make_notifier(os.path.dirname(self.db_path) or ".")
         return self._notif
 
+    # NB: под экстрим-контеншеном (>busy_timeout=5s) sqlite может бросить OperationalError
+    # "database is locked" — намеренно НЕ глотаем (fail-loud): таск самоисцелится через sweep
+    # по истечении lease, дубля/порчи нет. Ретрай-обёртку не добавляем (лишняя сложность).
     def claim(self, worker_id, roles=None, block=False, timeout=0.0):
         c = self._claim_once(worker_id, roles)
         if c is not None or not block:
@@ -161,65 +168,78 @@ class SqliteBackend(QueueBackend):
         return r
 
     def ack(self, task_id, worker_id, claim_token, result):
-        with self._conn() as c:
-            c.execute("BEGIN IMMEDIATE")
-            if self._guard(c, task_id, worker_id, claim_token) is None:
+        with contextlib.closing(self._conn()) as c:
+            with c:
+                c.execute("BEGIN IMMEDIATE")
+                if self._guard(c, task_id, worker_id, claim_token) is None:
+                    c.execute("COMMIT")
+                    return {"stale": True}
+                c.execute("UPDATE tasks SET status='done', result_json=? WHERE id=?",
+                          (json.dumps(result, ensure_ascii=False), task_id))
                 c.execute("COMMIT")
-                return {"stale": True}
-            c.execute("UPDATE tasks SET status='done', result_json=? WHERE id=?",
-                      (json.dumps(result, ensure_ascii=False), task_id))
-            c.execute("COMMIT")
         return {"ok": True}
 
     def nack(self, task_id, worker_id, claim_token, error):
-        with self._conn() as c:
-            c.execute("BEGIN IMMEDIATE")
-            r = self._guard(c, task_id, worker_id, claim_token)
-            if r is None:
+        with contextlib.closing(self._conn()) as c:
+            with c:
+                c.execute("BEGIN IMMEDIATE")
+                r = self._guard(c, task_id, worker_id, claim_token)
+                if r is None:
+                    c.execute("COMMIT")
+                    return {"stale": True}
+                if r["attempts"] >= r["max_attempts"]:
+                    c.execute("UPDATE tasks SET status='dead', error=? WHERE id=?", (error, task_id))
+                    c.execute("COMMIT")
+                    return {"dead": True}
+                c.execute("UPDATE tasks SET status='pending', claimed_by=NULL, claim_token=NULL, "
+                          "claimed_at=NULL, error=? WHERE id=?", (error, task_id))
                 c.execute("COMMIT")
-                return {"stale": True}
-            if r["attempts"] >= r["max_attempts"]:
-                c.execute("UPDATE tasks SET status='dead', error=? WHERE id=?", (error, task_id))
-                c.execute("COMMIT")
-                return {"dead": True}
-            c.execute("UPDATE tasks SET status='pending', claimed_by=NULL, claim_token=NULL, "
-                      "claimed_at=NULL, error=? WHERE id=?", (error, task_id))
-            c.execute("COMMIT")
         return {"ok": True}
 
     def heartbeat(self, task_id, worker_id, claim_token):
-        with self._conn() as c:
-            c.execute("BEGIN IMMEDIATE")
-            if self._guard(c, task_id, worker_id, claim_token) is None:
+        with contextlib.closing(self._conn()) as c:
+            with c:
+                c.execute("BEGIN IMMEDIATE")
+                if self._guard(c, task_id, worker_id, claim_token) is None:
+                    c.execute("COMMIT")
+                    return {"stale": True}
+                c.execute("UPDATE tasks SET claimed_at=? WHERE id=?", (time.time(), task_id))
                 c.execute("COMMIT")
-                return {"stale": True}
-            c.execute("UPDATE tasks SET claimed_at=? WHERE id=?", (time.time(), task_id))
-            c.execute("COMMIT")
         return {"ok": True}
 
     def sweep(self, lease_seconds):
         cutoff = time.time() - lease_seconds
-        with self._conn() as c:
-            c.execute("BEGIN IMMEDIATE")
-            rows = c.execute("SELECT id, attempts, max_attempts FROM tasks "
-                             "WHERE status='claimed' AND claimed_at < ?", (cutoff,)).fetchall()
-            n = 0
-            for r in rows:
-                if r["attempts"] >= r["max_attempts"]:
-                    c.execute("UPDATE tasks SET status='dead', error='lease-expired,retry-exhausted' "
-                              "WHERE id=?", (r["id"],))
-                else:
-                    c.execute("UPDATE tasks SET status='pending', claimed_by=NULL, "
-                              "claim_token=NULL, claimed_at=NULL WHERE id=?", (r["id"],))
-                n += 1
-            c.execute("COMMIT")
+        with contextlib.closing(self._conn()) as c:
+            with c:
+                c.execute("BEGIN IMMEDIATE")
+                rows = c.execute("SELECT id, attempts, max_attempts FROM tasks "
+                                 "WHERE status='claimed' AND claimed_at < ?", (cutoff,)).fetchall()
+                n = 0
+                for r in rows:
+                    if r["attempts"] >= r["max_attempts"]:
+                        c.execute("UPDATE tasks SET status='dead', error='lease-expired,retry-exhausted' "
+                                  "WHERE id=?", (r["id"],))
+                    else:
+                        c.execute("UPDATE tasks SET status='pending', claimed_by=NULL, "
+                                  "claim_token=NULL, claimed_at=NULL WHERE id=?", (r["id"],))
+                    n += 1
+                c.execute("COMMIT")
         return n
 
     def status(self, session_id):
-        with self._conn() as c:
-            rows = c.execute("SELECT status, COUNT(*) n FROM tasks WHERE session_id=? "
-                             "GROUP BY status", (session_id,)).fetchall()
+        with contextlib.closing(self._conn()) as c:
+            with c:
+                rows = c.execute("SELECT status, COUNT(*) n FROM tasks WHERE session_id=? "
+                                 "GROUP BY status", (session_id,)).fetchall()
         out = {"pending": 0, "claimed": 0, "done": 0, "dead": 0}
         for r in rows:
             out[r["status"]] = r["n"]
         return out
+
+    def close(self):
+        n = getattr(self, "_notif", None)
+        if n is not None:
+            try:
+                n.close()
+            finally:
+                self._notif = None

@@ -103,3 +103,23 @@ def _block_worker(db_path, worker_id, target_n, out_q):
             break                               # очередь исчерпана (таймаут без таска)
         got.append(c.task_id)
     out_q.put(got)
+
+
+def test_fifo_notifier_ok_when_path_preexists(tmp_path):
+    if not hasattr(os, "mkfifo"):
+        import pytest; pytest.skip("нет mkfifo")
+    from federation.notify import FifoNotifier
+    # симулируем «сосед создал первым»: FIFO уже на месте
+    p = os.path.join(str(tmp_path), "federation.wake")
+    os.mkfifo(p)
+    n = FifoNotifier(str(tmp_path))              # не должен упасть/деградировать на EEXIST
+    assert isinstance(n, FifoNotifier)
+    n.close()
+
+
+def test_backend_close_releases_notifier(tmp_path):
+    from federation.queue import SqliteBackend
+    q = SqliteBackend(str(tmp_path / "c.sqlite3"))
+    q._notifier()                                # материализуем notifier
+    q.close()                                    # не должен падать; повторный вызов тоже
+    q.close()

@@ -88,3 +88,29 @@ def test_moat_fit_recipes_present():
 def test_match_finds_red_team():
     r = match_recipe("разнеси мой план по запуску", load_recipes())
     assert r is not None and r["id"] == "red-team"
+
+
+def test_moat_fit_share_recipes_present():
+    # share-session / quote-of-day / proof-card — новые moat-fit рецепты (3 тула), 2026-07-11
+    rs = load_recipes()
+    ids = [r["id"] for r in rs]
+    for rid in ("share-session", "quote-of-day", "proof-card"):
+        assert rid in ids, f"{rid} рецепт пропал"
+        r = next(r for r in rs if r["id"] == rid)
+        assert set(r.keys()) == {"id", "title", "short", "triggers", "does", "reads"}
+        assert r["triggers"] and isinstance(r["triggers"], list)
+
+
+def test_match_finds_share_session():
+    r = match_recipe("поделись заседанием совета", load_recipes())
+    assert r is not None and r["id"] == "share-session"
+
+
+def test_match_finds_quote_of_day():
+    r = match_recipe("дай цитату дня", load_recipes())
+    assert r is not None and r["id"] == "quote-of-day"
+
+
+def test_debate_synonym_routes_to_clash():
+    r = match_recipe("устрой дебаты двух советников", load_recipes())
+    assert r is not None and r["id"] == "clash-two"

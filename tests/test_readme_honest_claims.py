@@ -7,6 +7,16 @@
 from pathlib import Path
 
 README = Path(__file__).resolve().parent.parent / "README.md"
+README_EN = Path(__file__).resolve().parent.parent / "README.en.md"
+
+# Оверклейм механизма верности: гейт делает НОРМАЛИЗОВАННЫЙ verbatim-матч (регистр/пунктуация/
+# пробелы игнорируются, substring по корпусу) — это «дословно / слово-в-слово», НЕ «посимвольно»
+# и тем более не «побайтно». Слова автора дословны (не пересказ) — правда и это ров; но
+# «character-by-character / byte-exact» сильнее реального механизма. На витрине — честная форма.
+CHAR_EXACT_OVERCLAIM = (
+    "посимвольн", "побайтн",
+    "character-by-character", "char-by-char", "byte-by-byte", "byte-exact",
+)
 
 # Квалификаторы, рядом с которыми упоминание офлайна честно (в той же строке).
 QUALIFIERS = ("контур", "локальн", "агент, который у тебя уже есть")
@@ -58,6 +68,17 @@ def test_every_offline_mention_is_qualified():
         "Неквалифицированное упоминание офлайна (заузь на контур/локальные модели/хост): "
         + " | ".join(offenders)
     )
+
+
+def test_no_char_exact_fidelity_overclaim():
+    """Верность не заявляем как char-exact/побайтную — матч нормализованный (дословно/слово-в-слово)."""
+    for path in (README, README_EN):
+        low = path.read_text(encoding="utf-8").lower()
+        hits = [p for p in CHAR_EXACT_OVERCLAIM if p.lower() in low]
+        assert not hits, (
+            f"{path.name} оверклеймит механизм верности как char-exact/побайтный: {hits}. "
+            "Гейт делает нормализованный verbatim — формулируй «дословно / слово-в-слово / word-for-word»."
+        )
 
 
 def test_no_unproven_antisycophancy_overclaim():

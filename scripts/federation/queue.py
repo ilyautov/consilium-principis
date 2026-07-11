@@ -171,7 +171,22 @@ class SqliteBackend(QueueBackend):
         return {"ok": True}
 
     def sweep(self, lease_seconds):
-        raise NotImplementedError  # Task 4
+        cutoff = time.time() - lease_seconds
+        with self._conn() as c:
+            c.execute("BEGIN IMMEDIATE")
+            rows = c.execute("SELECT id, attempts, max_attempts FROM tasks "
+                             "WHERE status='claimed' AND claimed_at < ?", (cutoff,)).fetchall()
+            n = 0
+            for r in rows:
+                if r["attempts"] >= r["max_attempts"]:
+                    c.execute("UPDATE tasks SET status='dead', error='lease-expired,retry-exhausted' "
+                              "WHERE id=?", (r["id"],))
+                else:
+                    c.execute("UPDATE tasks SET status='pending', claimed_by=NULL, "
+                              "claim_token=NULL, claimed_at=NULL WHERE id=?", (r["id"],))
+                n += 1
+            c.execute("COMMIT")
+        return n
 
     def status(self, session_id):
         with self._conn() as c:

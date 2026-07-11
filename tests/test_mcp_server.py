@@ -445,3 +445,12 @@ def test_outcome_loop_round_trip_record_status_resolve(tmp_path, monkeypatch):
 def test_outcome_loop_in_instructions():
     from mcp_server import INSTRUCTIONS
     assert "outcome_nudge" in INSTRUCTIONS and "loop_status" in INSTRUCTIONS
+
+
+def test_instructions_has_ondemand_citation_transparency():
+    """Rule 7 несёт on-demand прозрачность: по запросу юзера показать source_ref + честное воздержание."""
+    from mcp_server import INSTRUCTIONS
+    assert "ПРОЗРАЧНОСТЬ ПО ЗАПРОСУ" in INSTRUCTIONS
+    assert "покажи, что проверено" in INSTRUCTIONS
+    assert "source_ref" in INSTRUCTIONS
+    assert "НЕ выдумывай" in INSTRUCTIONS or "не выдумывай источники" in INSTRUCTIONS

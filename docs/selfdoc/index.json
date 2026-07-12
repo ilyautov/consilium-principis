@@ -4,7 +4,7 @@
     "rule_count": 16,
     "recipe_count": 15,
     "script_count": 67,
-    "test_count": 111,
+    "test_count": 112,
     "glossary_count": 110
   },
   "tools": [
@@ -1977,6 +1977,10 @@
     {
       "path": "tests/test_decision_tools.py",
       "covers": "decision tools"
+    },
+    {
+      "path": "tests/test_devils_advocate_probe.py",
+      "covers": "devils advocate probe"
     },
     {
       "path": "tests/test_doctor.py",

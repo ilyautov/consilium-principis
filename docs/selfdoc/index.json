@@ -4,7 +4,7 @@
     "rule_count": 16,
     "recipe_count": 15,
     "script_count": 67,
-    "test_count": 108,
+    "test_count": 109,
     "glossary_count": 110
   },
   "tools": [
@@ -2029,6 +2029,10 @@
     {
       "path": "tests/test_federation_coordinator.py",
       "covers": "federation coordinator"
+    },
+    {
+      "path": "tests/test_federation_demo.py",
+      "covers": "federation demo"
     },
     {
       "path": "tests/test_federation_docs.py",

@@ -181,3 +181,11 @@ def test_assemble_mixed_some_degraded_some_full(tmp_path):
     assert by_role["machiavelli"]["degraded"] is True
     assert out["diversity"] == "reduced"                      # хоть одна деградировала
     assert out["degraded_roles"] == ["machiavelli"]
+
+
+def test_assemble_unknown_session_flagged(tmp_path):
+    q = _q(tmp_path)
+    out = assemble(q, "never-opened", verify_fn=_fake_verify)
+    assert out["unknown_session"] is True
+    assert out["complete"] is False
+    assert out["roles"] == []

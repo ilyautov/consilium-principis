@@ -88,6 +88,9 @@ def assemble(backend, session_id, verify_fn):
     идентичность моделей. verify_fn(quote, advisor_dir)->{status,source} инъектируется (наш гейт).
     diversity: reduced (роль деградировала) | partial (не все реплики сыграны) | full."""
     all_rows = backend.results(session_id, status=None)
+    if not all_rows:
+        return {"session_id": session_id, "roles": [], "degraded_roles": [],
+                "diversity": "reduced", "complete": False, "unknown_session": True}
     done = [r for r in all_rows if r["status"] == "done"]
     order, meta, total = [], {}, {}
     for r in all_rows:

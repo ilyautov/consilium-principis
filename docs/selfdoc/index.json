@@ -1,10 +1,10 @@
 {
   "meta": {
-    "tool_count": 46,
+    "tool_count": 52,
     "rule_count": 15,
     "recipe_count": 15,
     "script_count": 67,
-    "test_count": 106,
+    "test_count": 107,
     "glossary_count": 110
   },
   "tools": [
@@ -474,6 +474,145 @@
       "referenced_in": [
         "rule:12"
       ]
+    },
+    {
+      "name": "federation_assemble",
+      "description": "Собрать совет: сгруппировать кандидатов по роли, СЕРВЕР сверяет верность цитат централизованно (воркер не сертифицирует 🔵), сохранить дивергенцию (не best-of-N) + идентичность моделей. Пустая роль → host_single_brain (diversity reduced). verdict PASS/FIX/ESCALATE.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id"
+        ]
+      },
+      "status": "surfaced",
+      "referenced_in": []
+    },
+    {
+      "name": "federation_claim",
+      "description": "Исполнитель забирает роль-таск (блокирующе до timeout) → структурный бриф {task_id, claim_token, role, advisor_dir, question} или {empty}. Сыграй advisor_dir на СВОЕЙ модели, цитаты через cite, затем federation_submit.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "worker_id": {
+            "type": "string"
+          },
+          "roles": {
+            "type": "array"
+          },
+          "timeout": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "worker_id"
+        ]
+      },
+      "status": "internal",
+      "referenced_in": []
+    },
+    {
+      "name": "federation_heartbeat",
+      "description": "Исполнитель продлевает lease роль-таска (task_id, worker_id, claim_token), пока играет роль. stale → задача уже переназначена.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string"
+          },
+          "worker_id": {
+            "type": "string"
+          },
+          "claim_token": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "task_id",
+          "worker_id",
+          "claim_token"
+        ]
+      },
+      "status": "internal",
+      "referenced_in": []
+    },
+    {
+      "name": "federation_open",
+      "description": "Координатор совета-федерации: разложить план ролей в очередь по N реплик (многомозговый совет — исполнители играют роли на СВОИХ моделях). plan = [{role, advisor_dir, question, replicas?}]. Стейт локально в .consilium/. Personal/attended (см. docs/FEDERATION.md).",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string"
+          },
+          "plan": {
+            "type": "array"
+          },
+          "replicas_default": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "session_id",
+          "plan"
+        ]
+      },
+      "status": "internal",
+      "referenced_in": []
+    },
+    {
+      "name": "federation_poll",
+      "description": "Статус сессии-федерации: счётчики pending/claimed/done/dead. Опрашивай, пока роли набирают кандидатов, затем federation_assemble.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id"
+        ]
+      },
+      "status": "internal",
+      "referenced_in": []
+    },
+    {
+      "name": "federation_submit",
+      "description": "Исполнитель кладёт СЫРОГО кандидата {argument, quotes:[{text}]} + worker_model (своя модель). Валидация размер/типы/control-chars; маркеры НЕ ставь — сервер сверит на assemble. stale claim_token → отклонён.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string"
+          },
+          "worker_id": {
+            "type": "string"
+          },
+          "claim_token": {
+            "type": "string"
+          },
+          "worker_model": {
+            "type": "string"
+          },
+          "candidate": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "task_id",
+          "worker_id",
+          "claim_token",
+          "worker_model",
+          "candidate"
+        ]
+      },
+      "status": "surfaced",
+      "referenced_in": []
     },
     {
       "name": "fidelity_check",
@@ -1880,6 +2019,10 @@
     {
       "path": "tests/test_federation_judge.py",
       "covers": "federation judge"
+    },
+    {
+      "path": "tests/test_federation_mcp.py",
+      "covers": "federation mcp"
     },
     {
       "path": "tests/test_federation_notify.py",

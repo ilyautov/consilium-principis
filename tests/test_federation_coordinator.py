@@ -151,3 +151,33 @@ def test_open_session_rejects_role_name_collision_diff_advisor(tmp_path):
         open_session(q, "s1", [
             {"role": "sage", "advisor_dir": "advisors/aurelius", "question": "Q"},
             {"role": "sage", "advisor_dir": "advisors/machiavelli", "question": "Q"}])
+
+
+def test_assemble_degrades_role_with_no_done_candidates(tmp_path):
+    q = _q(tmp_path)
+    open_session(q, "s1", [{"role": "aurelius", "advisor_dir": "advisors/aurelius",
+                            "question": "Q", "replicas": 2}])
+    # ни одного submit → роль пуста
+    out = assemble(q, "s1", verify_fn=_fake_verify)
+    role0 = out["roles"][0]
+    assert role0["degraded"] is True
+    assert role0["mode"] == "host_single_brain"
+    assert role0["diversity"] == "reduced"
+    assert role0["verdict"] == "ESCALATE"
+    assert role0["representative"] is None and role0["replicas"] == []
+    assert out["diversity"] == "reduced" and "aurelius" in out["degraded_roles"]
+
+
+def test_assemble_mixed_some_degraded_some_full(tmp_path):
+    q = _q(tmp_path)
+    open_session(q, "s1", [
+        {"role": "aurelius", "advisor_dir": "advisors/aurelius", "question": "Q", "replicas": 1},
+        {"role": "machiavelli", "advisor_dir": "advisors/machiavelli", "question": "Q", "replicas": 1}])
+    _seed_done(q, "s1", "aurelius", "advisors/aurelius", "Q", "ship now", ["REAL"], "m1")
+    # machiavelli не отвечает → деградирует, aurelius полон
+    out = assemble(q, "s1", verify_fn=_fake_verify)
+    by_role = {r["role"]: r for r in out["roles"]}
+    assert by_role["aurelius"].get("degraded") is not True
+    assert by_role["machiavelli"]["degraded"] is True
+    assert out["diversity"] == "reduced"                      # хоть одна деградировала
+    assert out["degraded_roles"] == ["machiavelli"]

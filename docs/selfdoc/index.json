@@ -1,7 +1,7 @@
 {
   "meta": {
     "tool_count": 52,
-    "rule_count": 15,
+    "rule_count": 16,
     "recipe_count": 15,
     "script_count": 67,
     "test_count": 108,
@@ -368,7 +368,7 @@
         "rule:5",
         "rule:7",
         "rule:13",
-        "rule:14"
+        "rule:15"
       ]
     },
     {
@@ -492,7 +492,7 @@
       },
       "status": "surfaced",
       "referenced_in": [
-        "rule:14"
+        "rule:15"
       ]
     },
     {
@@ -517,7 +517,7 @@
       },
       "status": "surfaced",
       "referenced_in": [
-        "rule:14"
+        "rule:15"
       ]
     },
     {
@@ -544,7 +544,7 @@
       },
       "status": "surfaced",
       "referenced_in": [
-        "rule:14"
+        "rule:15"
       ]
     },
     {
@@ -570,7 +570,7 @@
       },
       "status": "surfaced",
       "referenced_in": [
-        "rule:14"
+        "rule:15"
       ]
     },
     {
@@ -589,7 +589,7 @@
       },
       "status": "surfaced",
       "referenced_in": [
-        "rule:14"
+        "rule:15"
       ]
     },
     {
@@ -624,7 +624,7 @@
       },
       "status": "surfaced",
       "referenced_in": [
-        "rule:14"
+        "rule:15"
       ]
     },
     {
@@ -1274,7 +1274,12 @@
     {
       "n": 14,
       "title": "СИТУАЦИОННАЯ КАРТА / argument-engine",
-      "text": "СИТУАЦИОННАЯ КАРТА / argument-engine. Юзер принёс конфликт / спор / переговоры («помоги выиграть\n   спор», «проверь мой аргумент», «контраргументы») — не отвечай с ходу, разбери позицию как дерево\n   ходов. Поток: capture_situation(text=<сырой дамп чата / описание>) структурирует акторов, реплики и\n   явные вопросы → situation_analyze(tree, opponent, stance) считает дерево ходов (opponent∈{self,\n   person,world}, stance∈{competitive,cooperative}), возвращает оценку, ГЛАВНУЮ ЛИНИЮ и ЧЕСТНЫЙ вердикт\n   (линии победы нет — скажи прямо, не льсти; фабрикацией grounded:false не выигрывают) →\n   situation_stress_test(tree, perturbations, stance) гоняет adversarial-возмущения мира/позиции\n   (invalidate/weaken/inject_counter) и даёт robustness + fragile_under — насколько линия устойчива и\n   где ломается. Возмущается мир, НЕ уста советников; лейблы совета (🔵/🟢/🟡) действуют как везде.\n\nФедерация (многомозговый совет, ОПЦИЯ — personal/attended, docs/FEDERATION.md). Координатор:\nfederation_open(session_id, plan) кладёт реплики ролей → federation_poll(session_id) до готовности →\nfederation_assemble(session_id) собирает (СЕРВЕР сверяет верность цитат централизованно, дивергенция\nсохранена, идентичность моделей видна, пустая роль → host_single_brain). Исполнитель (твоя ОТДЕЛЬНАЯ\nзапущенная сессия): federation_claim(worker_id, roles) → сыграй advisor_dir на СВОЕЙ модели, цитаты\nчерез cite → federation_submit(worker_model=своя модель) → повтор; federation_heartbeat пока играешь.\nМаркеры 🔵 НЕ ставит воркер — их вычисляет сервер. Тихо (Rule 1)."
+      "text": "СИТУАЦИОННАЯ КАРТА / argument-engine. Юзер принёс конфликт / спор / переговоры («помоги выиграть\n   спор», «проверь мой аргумент», «контраргументы») — не отвечай с ходу, разбери позицию как дерево\n   ходов. Поток: capture_situation(text=<сырой дамп чата / описание>) структурирует акторов, реплики и\n   явные вопросы → situation_analyze(tree, opponent, stance) считает дерево ходов (opponent∈{self,\n   person,world}, stance∈{competitive,cooperative}), возвращает оценку, ГЛАВНУЮ ЛИНИЮ и ЧЕСТНЫЙ вердикт\n   (линии победы нет — скажи прямо, не льсти; фабрикацией grounded:false не выигрывают) →\n   situation_stress_test(tree, perturbations, stance) гоняет adversarial-возмущения мира/позиции\n   (invalidate/weaken/inject_counter) и даёт robustness + fragile_under — насколько линия устойчива и\n   где ломается. Возмущается мир, НЕ уста советников; лейблы совета (🔵/🟢/🟡) действуют как везде."
+    },
+    {
+      "n": 15,
+      "title": "Федерация",
+      "text": "Федерация (многомозговый совет, ОПЦИЯ — personal/attended, docs/FEDERATION.md). Координатор:\nfederation_open(session_id, plan) кладёт реплики ролей → federation_poll(session_id) до готовности →\nfederation_assemble(session_id) собирает (СЕРВЕР сверяет верность цитат централизованно, дивергенция\nсохранена, идентичность моделей видна, пустая роль → host_single_brain). Исполнитель (твоя ОТДЕЛЬНАЯ\nзапущенная сессия): federation_claim(worker_id, roles) → сыграй advisor_dir на СВОЕЙ модели, цитаты\nчерез cite → federation_submit(worker_model=своя модель) → повтор; federation_heartbeat пока играешь.\nМаркеры 🔵 НЕ ставит воркер — их вычисляет сервер. federation_open/submit ПИШУТ стейт — коротко\nпроговори, что делаешь (Rule 0); federation_poll/assemble read-only — тихо (Rule 1)."
     }
   ],
   "recipes": [

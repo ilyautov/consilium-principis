@@ -2145,13 +2145,14 @@ Consilium-Principis — личный совет AI-персон реальных
    (invalidate/weaken/inject_counter) и даёт robustness + fragile_under — насколько линия устойчива и
    где ломается. Возмущается мир, НЕ уста советников; лейблы совета (🔵/🟢/🟡) действуют как везде.
 
-Федерация (многомозговый совет, ОПЦИЯ — personal/attended, docs/FEDERATION.md). Координатор:
+15. Федерация (многомозговый совет, ОПЦИЯ — personal/attended, docs/FEDERATION.md). Координатор:
 federation_open(session_id, plan) кладёт реплики ролей → federation_poll(session_id) до готовности →
 federation_assemble(session_id) собирает (СЕРВЕР сверяет верность цитат централизованно, дивергенция
 сохранена, идентичность моделей видна, пустая роль → host_single_brain). Исполнитель (твоя ОТДЕЛЬНАЯ
 запущенная сессия): federation_claim(worker_id, roles) → сыграй advisor_dir на СВОЕЙ модели, цитаты
 через cite → federation_submit(worker_model=своя модель) → повтор; federation_heartbeat пока играешь.
-Маркеры 🔵 НЕ ставит воркер — их вычисляет сервер. Тихо (Rule 1).
+Маркеры 🔵 НЕ ставит воркер — их вычисляет сервер. federation_open/submit ПИШУТ стейт — коротко
+проговори, что делаешь (Rule 0); federation_poll/assemble read-only — тихо (Rule 1).
 """ % _FEWSHOT_TEXT
 
 

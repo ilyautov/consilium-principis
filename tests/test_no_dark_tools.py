@@ -61,3 +61,11 @@ def test_federation_tools_surfaced_in_instructions():
     for name in ("federation_open", "federation_poll", "federation_assemble",
                  "federation_claim", "federation_submit", "federation_heartbeat"):
         assert name in m.INSTRUCTIONS, "%s не проведён в INSTRUCTIONS (тёмный федерация-тул)" % name
+
+
+def test_federation_block_numbered_and_write_consent():
+    nums = [int(n) for n in re.findall(r"(?m)^(\d+)\.\s", m.INSTRUCTIONS)]
+    assert 15 in nums, "федерация-блок не пронумерован (ожидалось правило 15)"
+    # write-тулы не прячем: рядом с federation в инструкциях есть отсылка к Rule 0 (запись проговори)
+    fed_seg = m.INSTRUCTIONS[m.INSTRUCTIONS.index("federation_open"):]
+    assert "Rule 0" in fed_seg, "федерация-блок не проводит write-consent (Rule 0) для пишущих тулов"

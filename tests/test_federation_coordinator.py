@@ -87,3 +87,67 @@ def test_assemble_agreeing_replicas_low_divergence(tmp_path):
     out = assemble(q, "s1", verify_fn=_fake_verify)
     assert out["roles"][0]["divergence"]["level"] == "low"
     assert out["diversity"] == "full"
+
+
+def test_assemble_partial_completion_not_reported_full(tmp_path):
+    q = _q(tmp_path)
+    open_session(q, "s1", [{"role": "aurelius", "advisor_dir": "advisors/aurelius",
+                            "question": "Q", "replicas": 3}])
+    _seed_done(q, "s1", "aurelius", "advisors/aurelius", "Q", "ship now", ["REAL"], "m1")
+    out = assemble(q, "s1", verify_fn=_fake_verify)      # 1 из 3 сыграна
+    role0 = out["roles"][0]
+    assert role0["replicas_done"] == 1 and role0["replicas_total"] == 3
+    assert role0["complete"] is False
+    assert out["complete"] is False
+    assert out["diversity"] != "full"                    # не «full» пока не все реплики сыграны
+
+
+def test_assemble_empty_arguments_do_not_fake_consensus(tmp_path):
+    q = _q(tmp_path)
+    open_session(q, "s1", [{"role": "aurelius", "advisor_dir": "advisors/aurelius",
+                            "question": "Q", "replicas": 4}])
+    _seed_done(q, "s1", "aurelius", "advisors/aurelius", "Q", "", ["REAL"], "m1")
+    _seed_done(q, "s1", "aurelius", "advisors/aurelius", "Q", "ship the mvp now today fast", ["REAL"], "m2")
+    _seed_done(q, "s1", "aurelius", "advisors/aurelius", "Q", "abandon everything immediately legal risk", ["REAL"], "m3")
+    _seed_done(q, "s1", "aurelius", "advisors/aurelius", "Q", "", [], "m4")
+    out = assemble(q, "s1", verify_fn=_fake_verify)
+    role0 = out["roles"][0]
+    assert role0["divergence"]["level"] == "high" and role0["divergence"]["flagged"] is True
+    assert len(role0["replicas"]) == 4                   # структурно всё сохранено (анти-best-of-N)
+
+
+def test_assemble_malformed_row_does_not_crash_whole_session(tmp_path):
+    q = _q(tmp_path)
+    open_session(q, "s1", [
+        {"role": "aurelius", "advisor_dir": "advisors/aurelius", "question": "Q", "replicas": 1},
+        {"role": "machiavelli", "advisor_dir": "advisors/machiavelli", "question": "Q", "replicas": 1}])
+    _seed_done(q, "s1", "aurelius", "advisors/aurelius", "Q", "ship now", ["REAL"], "m1")
+    # напрямую портим machiavelli-строку в обход валидации submit (прямой ack)
+    b = claim_brief(q, "wbad", roles=["machiavelli"], timeout=1.0)
+    q.ack(b["task_id"], "wbad", b["claim_token"], {"argument": 123, "quotes": "not-a-list"})
+    out = assemble(q, "s1", verify_fn=_fake_verify)      # НЕ должен упасть
+    by_role = {r["role"]: r for r in out["roles"]}
+    assert by_role["aurelius"]["representative"]["argument"] == "ship now"   # здоровая роль цела
+    mach = by_role["machiavelli"]
+    assert mach.get("errors") or mach["replicas"] == []  # плохая строка изолирована, не уронила сессию
+
+
+def test_assemble_reports_grounded_replica_count(tmp_path):
+    q = _q(tmp_path)
+    open_session(q, "s1", [{"role": "aurelius", "advisor_dir": "advisors/aurelius",
+                            "question": "Q", "replicas": 3}])
+    _seed_done(q, "s1", "aurelius", "advisors/aurelius", "Q", "a", ["REAL"], "m1")   # 🔵
+    _seed_done(q, "s1", "aurelius", "advisors/aurelius", "Q", "b", ["FAKE"], "m2")   # 🟡
+    _seed_done(q, "s1", "aurelius", "advisors/aurelius", "Q", "c", [], "m3")         # нет цитат
+    out = assemble(q, "s1", verify_fn=_fake_verify)
+    role0 = out["roles"][0]
+    assert role0["grounded_replicas"] == 1 and role0["replicas_done"] == 3
+
+
+def test_open_session_rejects_role_name_collision_diff_advisor(tmp_path):
+    import pytest
+    q = _q(tmp_path)
+    with pytest.raises(ValueError):
+        open_session(q, "s1", [
+            {"role": "sage", "advisor_dir": "advisors/aurelius", "question": "Q"},
+            {"role": "sage", "advisor_dir": "advisors/machiavelli", "question": "Q"}])

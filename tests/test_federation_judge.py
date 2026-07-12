@@ -42,3 +42,14 @@ def test_verdict_pass_fix_escalate():
     assert verdict(_cand("a", ["🟡"])) == "FIX"           # аргумент есть, грунта нет
     assert verdict(_cand("", [])) == "FIX"                # пустой аргумент, но кандидат есть → FIX
     assert verdict(None) == "ESCALATE"                    # кандидата нет вовсе
+
+
+def test_divergence_ignores_empty_arguments():
+    from federation.judge import divergence
+    cands = [{"argument": "", "quotes": []},
+             {"argument": "ship it now", "quotes": []},
+             {"argument": "kill it now", "quotes": []},
+             {"argument": "   ", "quotes": []}]
+    d = divergence(cands)
+    # пустые/пробельные исключены → расхождение среди 2 реальных → high
+    assert d["level"] == "high"

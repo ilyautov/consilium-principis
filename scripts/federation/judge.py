@@ -31,9 +31,10 @@ def _jaccard(a, b):
 
 
 def divergence(cands):
-    """Расхождение аргументов = 1 − средняя попарная Jaccard-схожесть токенов.
-    <2 кандидатов → low. Сохраняем ЧИСЛО (не схлопываем в best-of-N)."""
-    toks = [_tokens(c.get("argument", "")) for c in cands]
+    """Расхождение аргументов = 1 − средняя попарная Jaccard-схожесть токенов. Пустые/пробельные
+    аргументы ИСКЛЮЧАЮТСЯ (не несут взгляда — иначе слот-флуд пустышками занижал бы расхождение).
+    <2 непустых → low (нечего сравнивать). Сохраняем ЧИСЛО (не схлопываем в best-of-N)."""
+    toks = [t for t in (_tokens(c.get("argument", "")) for c in cands) if t]
     if len(toks) < 2:
         return {"score": 0.0, "level": "low", "flagged": False}
     sims = []

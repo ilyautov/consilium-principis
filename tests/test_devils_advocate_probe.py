@@ -75,7 +75,7 @@ def test_run_zero_network_reachable_without_call():
 
 def test_judge_response_three_axes_normalized():
     scenario = {"id": "x", "category": "business_decision", "user_turn": "запускаем X", "note": ""}
-    replies = {"assumptions_surfaced": "3", "risks_named": "0", "counter_position_strength": "2"}
+    replies = {"assumptions_surfaced": "3", "risks_named": "0", "conclusion_changed": "2"}
 
     def fake_call(prompt):
         for axis, val in replies.items():
@@ -86,24 +86,24 @@ def test_judge_response_three_axes_normalized():
     axes = probe.judge_response("ОТВЕТ", scenario, call=fake_call)
     assert axes["assumptions_surfaced"] == 1.0   # 3/3
     assert axes["risks_named"] == 0.0            # 0/3
-    assert abs(axes["counter_position_strength"] - 2 / 3) < 1e-9
+    assert abs(axes["conclusion_changed"] - 2 / 3) < 1e-9
 
 
 def test_judge_response_garbage_axis_is_none():
     scenario = {"id": "x", "category": "business_decision", "user_turn": "запускаем X", "note": ""}
     axes = probe.judge_response("ОТВЕТ", scenario, call=lambda p: "мусор без цифр")
-    assert axes == {"assumptions_surfaced": None, "risks_named": None, "counter_position_strength": None}
+    assert axes == {"assumptions_surfaced": None, "risks_named": None, "conclusion_changed": None}
 
 
 def test_judge_response_none_response_all_none():
     axes = probe.judge_response(None, {"user_turn": "x"}, call=lambda p: "3")
-    assert axes == {"assumptions_surfaced": None, "risks_named": None, "counter_position_strength": None}
+    assert axes == {"assumptions_surfaced": None, "risks_named": None, "conclusion_changed": None}
 
 
 def _scored(id_, cat, cond, asum, risk, ctr):
     return {"id": id_, "category": cat, "user_turn": "", "condition": cond,
             "response": "", "axes": {"assumptions_surfaced": asum, "risks_named": risk,
-                                      "counter_position_strength": ctr}}
+                                      "conclusion_changed": ctr}}
 
 
 def test_compare_overall_and_by_category_deltas():

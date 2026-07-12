@@ -561,6 +561,11 @@ def render_decision_record(record, surface="md"):
         for d in dissent:
             who = f"**{_e(d['advisor'])}:** " if d.get("advisor") else ""
             out.append(f"- {who}{_e(d.get('point') or '')}")
+        # resolver — КАК снимается расхождение (не советник); показываем честной пометкой,
+        # зеркалим форму `## Где расходятся` выше. Пусто → строки нет.
+        resolver = record.get("dissent_resolver")
+        if resolver:
+            out.append(f"**Снимается:** {_e(resolver)}")
     else:
         out.append("явных возражений не зафиксировано.")
 

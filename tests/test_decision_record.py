@@ -128,11 +128,78 @@ def test_dissent_extracted_from_disagreement():
     assert len(rec["dissent"]) == 2
     points = {d["point"] for d in rec["dissent"]}
     assert points == {"рискни сейчас", "жди сигнала"}
+    # resolver НЕ атрибутируется как советник — стороны несут пустой advisor.
+    assert all(d["advisor"] == "" for d in rec["dissent"])
+
+
+def test_dissent_resolver_surfaced_separately_not_as_advisor():
+    rec = build_record(_session_mixed())
+    assert rec["dissent_resolver"] == "проверь малым шагом"
+    # resolver не просочился в advisor ни одной стороны
+    assert all(d["advisor"] != "проверь малым шагом" for d in rec["dissent"])
+
+
+def test_render_dissent_resolver_shown_as_resolution_note():
+    rec = build_record(_session_mixed())
+    md = render_decision_record(rec, surface="md")
+    assert "**Снимается:** проверь малым шагом" in md
+    # старая форма (resolver как имя советника жирным) отсутствует
+    assert "**проверь малым шагом:**" not in md
 
 
 def test_dissent_empty_when_no_disagreement():
     rec = build_record(_session_all_blue())
     assert rec["dissent"] == []
+    assert rec["dissent_resolver"] is None
+    md = render_decision_record(rec, surface="md")
+    assert "явных возражений не зафиксировано" in md
+    assert "Снимается" not in md
+
+
+# ---------- defensive: unhashable marker / status (build_record never throws) ----------
+
+def test_build_record_dict_marker_no_crash_tier_none():
+    session = {"question": "q", "advisors": [{"name": "X", "opinions": [
+        {"marker": {"fake": "blue"}, "argument": "довод"},
+    ]}]}
+    rec = build_record(session)
+    x = next(p for p in rec["positions"] if p["advisor"] == "X")
+    assert x["assumptions"][0]["text"] == "довод"
+    assert x["assumptions"][0]["tier"] is None
+    assert rec["provenance"] == {"blue": 0, "green": 0, "yellow": 0}
+
+
+def test_build_record_list_marker_no_crash_tier_none():
+    session = {"question": "q", "advisors": [{"name": "X", "opinions": [
+        {"marker": ["blue"], "argument": "довод"},
+    ]}]}
+    rec = build_record(session)
+    x = next(p for p in rec["positions"] if p["advisor"] == "X")
+    assert x["assumptions"][0]["text"] == "довод"
+    assert x["assumptions"][0]["tier"] is None
+    assert rec["provenance"] == {"blue": 0, "green": 0, "yellow": 0}
+
+
+def test_build_record_unhashable_status_defers_no_crash():
+    session = {"question": "q", "advisors": [], "decision": {"status": {"x": 1}}}
+    rec = build_record(session)
+    assert rec["decision"]["status"] == "defer"
+
+
+def test_build_record_unhashable_toplevel_status_defers_no_crash():
+    session = {"question": "q", "advisors": [], "status": ["approve"]}
+    rec = build_record(session)
+    assert rec["decision"]["status"] == "defer"
+
+
+def test_moat_dict_marker_containing_blue_word_not_counted_as_blue():
+    session = {"question": "q", "advisors": [{"name": "X", "opinions": [
+        {"marker": {"blue": 1}, "argument": "довод-с-мусорным-маркером"},
+    ]}]}
+    rec = build_record(session)
+    assert rec["provenance"]["blue"] == 0
+    all_tiers = [a["tier"] for p in rec["positions"] for a in p["assumptions"]]
+    assert "🔵" not in all_tiers
 
 
 # ---------- decision.status ----------
@@ -174,6 +241,7 @@ def test_none_session_returns_honest_skeleton():
     assert rec["question"] == ""
     assert rec["positions"] == []
     assert rec["dissent"] == []
+    assert rec["dissent_resolver"] is None
     assert rec["decision"] == {"choice": None, "status": "defer"}
     assert rec["re_review_triggers"] == []
     assert rec["provenance"] == {"blue": 0, "green": 0, "yellow": 0}

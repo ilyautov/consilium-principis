@@ -29,6 +29,7 @@ def _skeleton():
         "question": "",
         "positions": [],
         "dissent": [],
+        "dissent_resolver": None,
         "decision": {"choice": None, "status": "defer"},
         "re_review_triggers": [],
         "provenance": dict(_EMPTY_PROVENANCE),
@@ -37,7 +38,11 @@ def _skeleton():
 
 def _tier_for_marker(marker):
     """Маркер → эмодзи-тир, копируя ровно то, что стоит в session. Неизвестный/отсутствующий
-    маркер → None (не считается ни одним из трёх тиров, но текст допущения не теряется)."""
+    маркер → None (не считается ни одним из трёх тиров, но текст допущения не теряется).
+    Не-str маркер (dict/list — хост прислал мусор) обрабатывается как неизвестный → None,
+    НИКОГДА не поднимается до тира (моат)."""
+    if not isinstance(marker, str):
+        return None
     if marker == "amber":
         marker = "yellow"
     return _MARKER_TO_TIER.get(marker)
@@ -64,13 +69,12 @@ def _positions_and_provenance(advisors):
             marker = op.get("marker")
             tier = _tier_for_marker(marker)
             # provenance считает ТОЛЬКО реальные тир-маркеры источника (blue/green/yellow) —
-            # violation/None/незнакомое игнорируется, никогда не засчитывается как blue.
-            if marker == "amber":
-                marker_key = "yellow"
-            else:
-                marker_key = marker
-            if marker_key in provenance:
-                provenance[marker_key] += 1
+            # violation/None/незнакомое/не-str-мусор игнорируется, никогда не засчитывается
+            # как blue. Не-str маркер (dict/list) нельзя использовать как ключ → пропускаем.
+            if isinstance(marker, str):
+                marker_key = "yellow" if marker == "amber" else marker
+                if marker_key in provenance:
+                    provenance[marker_key] += 1
             if argument:
                 assumptions.append({"text": str(argument), "tier": tier})
                 stance_parts.append(str(argument))
@@ -86,23 +90,30 @@ def _positions_and_provenance(advisors):
 
 def _dissent(session):
     """Извлекает несогласие из _disagreement(session) (session_render), если доступно.
-    Fail-closed: любая проблема с импортом/структурой → []."""
+    Возвращает (dissent_list, resolver_or_None).
+
+    Блок disagreement НЕ несёт имён советников (schema: {axis, sides, resolver}); resolver —
+    это КАК снимается расхождение (действие/проверка), НЕ человек. Поэтому каждая сторона
+    становится точкой диссента с advisor="" (честно «без атрибуции»), а resolver выносится
+    отдельным полем dissent_resolver — не подмешивается в advisor (иначе фабрикуем советника).
+    Fail-closed: любая проблема с импортом/структурой → ([], None)."""
     try:
         from session_render import _disagreement
     except Exception:
-        return []
+        return [], None
     try:
         d = _disagreement(session)
     except Exception:
-        return []
+        return [], None
     if not d:
-        return []
-    advisor = d.get("resolver") or ""
+        return [], None
+    resolver = d.get("resolver")
+    resolver = resolver if isinstance(resolver, str) and resolver else None
     out = []
     for side in d.get("sides", []):
         if side:
-            out.append({"advisor": advisor, "point": str(side)})
-    return out
+            out.append({"advisor": "", "point": str(side)})
+    return out, resolver
 
 
 def _decision(session):
@@ -113,7 +124,9 @@ def _decision(session):
         status = raw_decision.get("status")
     elif isinstance(session.get("status"), str):
         status = session.get("status")
-    if status not in _ALLOWED_STATUSES:
+    # Не-str status (dict/list — хост прислал мусор) нельзя проверять на членство в set →
+    # честно откатываемся к "defer" (не крашим set-membership на unhashable).
+    if not isinstance(status, str) or status not in _ALLOWED_STATUSES:
         status = "defer"
     choice = synthesis if synthesis else None
     if not synthesis:
@@ -136,7 +149,8 @@ def build_record(session):
     {"question": str,
      "positions": [{"advisor": str, "stance": str,
                     "assumptions": [{"text": str, "tier": "🔵"|"🟢"|"🟡"|None}]}],
-     "dissent": [{"advisor": str, "point": str}],
+     "dissent": [{"advisor": str, "point": str}],   # advisor="" — блок несогласия без имён
+     "dissent_resolver": str|None,                  # КАК снимается расхождение (не советник)
      "decision": {"choice": str|None, "status": "approve"|"approve_with_conditions"|
                   "defer"|"redesign"|"reject"},
      "re_review_triggers": [str, ...],
@@ -149,7 +163,7 @@ def build_record(session):
 
     question = session.get("question")
     positions, provenance = _positions_and_provenance(session.get("advisors"))
-    dissent = _dissent(session)
+    dissent, dissent_resolver = _dissent(session)
     decision = _decision(session)
     re_review = _re_review_triggers(session)
 
@@ -157,6 +171,7 @@ def build_record(session):
         "question": str(question) if question else "",
         "positions": positions,
         "dissent": dissent,
+        "dissent_resolver": dissent_resolver,
         "decision": decision,
         "re_review_triggers": re_review,
         "provenance": provenance,

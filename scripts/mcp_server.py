@@ -954,6 +954,13 @@ def _export_session(session, surface="md", include_abstentions=True):
     return export_session(session, surface=surface, include_abstentions=include_abstentions)
 
 
+def _decision_record(session, surface="md"):
+    from decision_record import build_record
+    from session_render import render_decision_record
+    record = build_record(session)
+    return {"record": record, "content": render_decision_record(record, surface=surface)}
+
+
 def _proof_card(quote, advisor_dir):
     from session_render import render_proof_card
     fc = _fidelity_check(quote, advisor_dir)
@@ -1752,6 +1759,20 @@ TOOLS = {
                          "required": ["session"]},
         "handler": _export_session,
     },
+    "decision_record": {
+        "description": "Протокол заседания (decision-record / минуты) — по ЯВНОМУ запросу юзера "
+                       "(«протокол», «минуты», «оформи решение»). Собирает канонический ВЫХОД "
+                       "совета: позиции советников с допущениями, диссент (из disagreement), "
+                       "решение+статус, триггеры пересмотра, provenance-счётчики маркеров. "
+                       "МОАТ: тиры (🔵/🟢/🟡) копируются as-is из session.advisors[].opinions[].marker "
+                       "(гейт проставил их раньше) — тул НИКОГДА не поднимает и не изобретает 🔵. "
+                       "Ноль LLM, чистая агрегация переданного объекта.",
+        "input_schema": {"type": "object",
+                         "properties": {"session": {"type": "object"},
+                                        "surface": {"type": "string", "enum": ["md"]}},
+                         "required": ["session"]},
+        "handler": _decision_record,
+    },
     "proof_card": {
         "description": "Виирал-ассет «show your work»: самодостаточная html-карточка ОДНОЙ цитаты "
                        "с источником + бейдж «🔵 дословно, с первоисточником». Fail-closed: если цитата НЕ "
@@ -2086,6 +2107,9 @@ Consilium-Principis — личный совет AI-персон реальных
    не дословна в 🔵-корпусе → карточки нет (fail-closed); иначе отдай html-карточку юзеру.
    Просит «цитату дня / мысль дня» (PULL-ONLY, только по запросу — сам не навязывай) — зови
    quote_of_day(): одна 🔵-verbatim-цитата с источником; нет дословных P1/P2 → честно скажи (не выдумывай).
+   Просит протокол/минуты/decision-record заседания («оформи решение», «протокол», «минуты») —
+   зови decision_record(session): позиции+допущения+диссент+статус решения+provenance, тиры
+   скопированы из session as-is (никогда не поднимаются).
    (в) РЕЗОЛЮЦИЯ: юзер рассказал, чем кончилось → в его записи ИСХОД ⏳ → ✅/❌ + «Одобрено:
    да/нет» (одобрил бы задним числом?). Если запись несёт строку «Прогноз: 📐 …»
    (pending-item отдаёт её полем predicted) — сравни ВСЛУХ прогноз и факт: расхождение —

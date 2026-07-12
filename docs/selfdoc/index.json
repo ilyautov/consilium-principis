@@ -4,7 +4,7 @@
     "rule_count": 16,
     "recipe_count": 15,
     "script_count": 67,
-    "test_count": 110,
+    "test_count": 111,
     "glossary_count": 110
   },
   "tools": [
@@ -2181,6 +2181,10 @@
     {
       "path": "tests/test_poison_eval.py",
       "covers": "poison eval"
+    },
+    {
+      "path": "tests/test_positioning_doc.py",
+      "covers": "positioning doc"
     },
     {
       "path": "tests/test_preflight.py",

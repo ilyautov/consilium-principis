@@ -168,8 +168,11 @@ Prefer buttons or a terminal — [`QUICKSTART.md`](QUICKSTART.md): a click-to-in
 Public-domain sages (the Stoics, Sun Tzu…) are assembled with one phrase. Modern thinkers come
 from materials you bring yourself.
 
-> ⚖️ **Boundary.** The skill does not download copyrighted books. Public domain — freely; copyright —
-> only your own legal copies. Your board (`advisors/`) and your profile are personal data — they never go into the repository.
+> ⚖️ **Boundary.** Consilium is a fidelity **engine, not a content distributor** — it ships the machinery,
+> you bring the sources. The skill does not download copyrighted books: public domain — freely; copyright —
+> only your own legal copies, which stay on your machine. The sages we ship pre-assembled are public-domain
+> figures long deceased; anyone modern you build yourself. Your board (`advisors/`) and your profile are
+> personal data — they never go into the repository.
 
 ## How it's built
 

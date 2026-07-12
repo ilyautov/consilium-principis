@@ -534,6 +534,61 @@ def render_proof_card(quote, source):
     )
 
 
+# ---------- decision-record (протокол заседания — минуты) ----------
+
+def render_decision_record(record, surface="md"):
+    """decision_record.build_record(session) → читаемые минуты заседания. surface=md (единственный
+    сейчас). Тиры в assumptions УЖЕ скопированы верно (build_record не поднимает/не изобретает —
+    см. decision_record.py); рендер только показывает их эмодзи as-is, не пересчитывает."""
+    out = ["# Протокол заседания", "", f"**Вопрос:** {_e(record.get('question') or '')}"]
+
+    positions = record.get("positions") or []
+    if positions:
+        out += ["", "## Позиции"]
+        for p in positions:
+            out += ["", f"### {_e(p.get('advisor') or '')}"]
+            stance = p.get("stance")
+            if stance:
+                out.append(_e(stance))
+            for a in p.get("assumptions") or []:
+                tier = a.get("tier")
+                glyph = f"{tier} " if tier else ""
+                out.append(f"- {glyph}{_e(a.get('text') or '')}")
+
+    out += ["", "## Диссент"]
+    dissent = record.get("dissent") or []
+    if dissent:
+        for d in dissent:
+            who = f"**{_e(d['advisor'])}:** " if d.get("advisor") else ""
+            out.append(f"- {who}{_e(d.get('point') or '')}")
+        # resolver — КАК снимается расхождение (не советник); показываем честной пометкой,
+        # зеркалим форму `## Где расходятся` выше. Пусто → строки нет.
+        resolver = record.get("dissent_resolver")
+        if resolver:
+            out.append(f"**Снимается:** {_e(resolver)}")
+    else:
+        out.append("явных возражений не зафиксировано.")
+
+    decision = record.get("decision") or {}
+    out += ["", "## Решение"]
+    choice = decision.get("choice")
+    out.append(_e(choice) if choice else "решение не зафиксировано")
+    out.append(f"**Статус:** {_e(decision.get('status') or 'defer')}")
+
+    triggers = record.get("re_review_triggers") or []
+    if triggers:
+        out += ["", "## Триггеры пересмотра"]
+        out += [f"- {_e(t)}" for t in triggers]
+
+    prov = record.get("provenance") or {}
+    blue = prov.get("blue", 0)
+    green = prov.get("green", 0)
+    yellow = prov.get("yellow", 0)
+    out += ["", "---",
+            f"Provenance: {blue}🔵 / {green}🟢 / {yellow}🟡 — сколько заземлено vs без опоры."]
+    return "\n".join(out)
+
+
 # ---------- export_session (шеримый пруф заседания) ----------
 
 _SHARE_FOOTER = ("Собрано в Consilium-Principis — совет заземлён в public-domain текстах; "

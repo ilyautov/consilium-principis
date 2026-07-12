@@ -1,10 +1,10 @@
 {
   "meta": {
-    "tool_count": 46,
-    "rule_count": 15,
-    "recipe_count": 15,
-    "script_count": 67,
-    "test_count": 101,
+    "tool_count": 53,
+    "rule_count": 16,
+    "recipe_count": 16,
+    "script_count": 68,
+    "test_count": 113,
     "glossary_count": 110
   },
   "tools": [
@@ -367,7 +367,8 @@
         "rule:3",
         "rule:5",
         "rule:7",
-        "rule:13"
+        "rule:13",
+        "rule:15"
       ]
     },
     {
@@ -413,6 +414,31 @@
       "referenced_in": [
         "rule:0",
         "rule:10"
+      ]
+    },
+    {
+      "name": "decision_record",
+      "description": "Протокол заседания (decision-record / минуты) — по ЯВНОМУ запросу юзера («протокол», «минуты», «оформи решение»). Собирает канонический ВЫХОД совета: позиции советников с допущениями, диссент (из disagreement), решение+статус, триггеры пересмотра, provenance-счётчики маркеров. МОАТ: тиры (🔵/🟢/🟡) копируются as-is из session.advisors[].opinions[].marker (гейт проставил их раньше) — тул НИКОГДА не поднимает и не изобретает 🔵. Ноль LLM, чистая агрегация переданного объекта.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "session": {
+            "type": "object"
+          },
+          "surface": {
+            "type": "string",
+            "enum": [
+              "md"
+            ]
+          }
+        },
+        "required": [
+          "session"
+        ]
+      },
+      "status": "surfaced",
+      "referenced_in": [
+        "rule:12"
       ]
     },
     {
@@ -473,6 +499,157 @@
       "status": "surfaced",
       "referenced_in": [
         "rule:12"
+      ]
+    },
+    {
+      "name": "federation_assemble",
+      "description": "Собрать совет: сгруппировать кандидатов по роли, СЕРВЕР сверяет верность цитат централизованно (воркер не сертифицирует 🔵), сохранить дивергенцию (не best-of-N) + идентичность моделей. Пустая роль → host_single_brain (diversity reduced). verdict PASS/FIX/ESCALATE.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id"
+        ]
+      },
+      "status": "surfaced",
+      "referenced_in": [
+        "rule:15"
+      ]
+    },
+    {
+      "name": "federation_claim",
+      "description": "Исполнитель забирает роль-таск (блокирующе до timeout) → структурный бриф {task_id, claim_token, role, advisor_dir, question} или {empty}. Сыграй advisor_dir на СВОЕЙ модели, цитаты через cite, затем federation_submit.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "worker_id": {
+            "type": "string"
+          },
+          "roles": {
+            "type": "array"
+          },
+          "timeout": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "worker_id"
+        ]
+      },
+      "status": "surfaced",
+      "referenced_in": [
+        "rule:15"
+      ]
+    },
+    {
+      "name": "federation_heartbeat",
+      "description": "Исполнитель продлевает lease роль-таска (task_id, worker_id, claim_token), пока играет роль. stale → задача уже переназначена.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string"
+          },
+          "worker_id": {
+            "type": "string"
+          },
+          "claim_token": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "task_id",
+          "worker_id",
+          "claim_token"
+        ]
+      },
+      "status": "surfaced",
+      "referenced_in": [
+        "rule:15"
+      ]
+    },
+    {
+      "name": "federation_open",
+      "description": "Координатор совета-федерации: разложить план ролей в очередь по N реплик (многомозговый совет — исполнители играют роли на СВОИХ моделях). plan = [{role, advisor_dir, question, replicas?}]. Стейт локально в .consilium/. Personal/attended (см. docs/FEDERATION.md).",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string"
+          },
+          "plan": {
+            "type": "array"
+          },
+          "replicas_default": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "session_id",
+          "plan"
+        ]
+      },
+      "status": "surfaced",
+      "referenced_in": [
+        "rule:15"
+      ]
+    },
+    {
+      "name": "federation_poll",
+      "description": "Статус сессии-федерации: счётчики pending/claimed/done/dead. Опрашивай, пока роли набирают кандидатов, затем federation_assemble.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id"
+        ]
+      },
+      "status": "surfaced",
+      "referenced_in": [
+        "rule:15"
+      ]
+    },
+    {
+      "name": "federation_submit",
+      "description": "Исполнитель кладёт СЫРОГО кандидата {argument, quotes:[{text}]} + worker_model (своя модель). Валидация размер/типы/control-chars; маркеры НЕ ставь — сервер сверит на assemble. stale claim_token → отклонён.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string"
+          },
+          "worker_id": {
+            "type": "string"
+          },
+          "claim_token": {
+            "type": "string"
+          },
+          "worker_model": {
+            "type": "string"
+          },
+          "candidate": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "task_id",
+          "worker_id",
+          "claim_token",
+          "worker_model",
+          "candidate"
+        ]
+      },
+      "status": "surfaced",
+      "referenced_in": [
+        "rule:15"
       ]
     },
     {
@@ -1112,7 +1289,7 @@
     {
       "n": 12,
       "title": "ПЕТЛЯ ИСХОДА",
-      "text": "ПЕТЛЯ ИСХОДА (совет — продукт, только если решения возвращаются исходами). Ненавязчиво,\n   но не теряй: (а) СТАРТ сессии — board_status/loop_status могут вернуть pending_outcomes\n   (решения с висящим ⏳): упомяни ОДИН РАЗ, одной строкой, между делом («кстати, по X — как\n   легло?»); не подхватил — в этой сессии больше не поднимай. (б) СИНТЕЗ выдан —\n   render_session вернёт outcome_nudge: один раз предложи занести решение в журнал и, если\n   юзер согласился, допиши запись по шаблону из нуджа в principis.md (раздел «Журнал решений»).\n   Если юзер ЯВНО просит поделиться заседанием («сохрани/экспортируй/пришли артефакт») — зови\n   export_session(session, surface=md|html): вернёт самодостаточный `content` с панелью «что совет\n   НЕ стал выдумывать» и атрибуцией; отдай текст юзеру (файлов сам не пишет, сохраняет он).\n   Просит пруф ОДНОЙ цитаты («докажи/покажи пруф цитаты») — зови proof_card(quote, advisor_dir):\n   не дословна в 🔵-корпусе → карточки нет (fail-closed); иначе отдай html-карточку юзеру.\n   Просит «цитату дня / мысль дня» (PULL-ONLY, только по запросу — сам не навязывай) — зови\n   quote_of_day(): одна 🔵-verbatim-цитата с источником; нет дословных P1/P2 → честно скажи (не выдумывай).\n   (в) РЕЗОЛЮЦИЯ: юзер рассказал, чем кончилось → в его записи ИСХОД ⏳ → ✅/❌ + «Одобрено:\n   да/нет» (одобрил бы задним числом?). Если запись несёт строку «Прогноз: 📐 …»\n   (pending-item отдаёт её полем predicted) — сравни ВСЛУХ прогноз и факт: расхождение —\n   не провал, а калибровка модели юзера (диапазоны системно узкие/широкие — скажи об этом).\n   (г) КАЛИБРОВКА ГОЛОСОВ: при резолюции исхода зови advisor_weights(records=[{advisor,outcome,\n   endorsed}]) — он взвешивает голос каждого советника по РЕАЛЬНЫМ исходам для этого юзера\n   («кто прав ДЛЯ ТЕБЯ», не «кто звучит мудро»); без данных вес нейтрален. (д) ЗЕРКАЛО: периодически\n   mirror_report(stated, decisions) показывает дрейф «заявляю X — выбираю Y» — отражает разрыв, не советует.\n   Запись/правка журнала — только с согласия юзера\n   (это правка ЕГО модели); отказ — не дави и не повторяй."
+      "text": "ПЕТЛЯ ИСХОДА (совет — продукт, только если решения возвращаются исходами). Ненавязчиво,\n   но не теряй: (а) СТАРТ сессии — board_status/loop_status могут вернуть pending_outcomes\n   (решения с висящим ⏳): упомяни ОДИН РАЗ, одной строкой, между делом («кстати, по X — как\n   легло?»); не подхватил — в этой сессии больше не поднимай. (б) СИНТЕЗ выдан —\n   render_session вернёт outcome_nudge: один раз предложи занести решение в журнал и, если\n   юзер согласился, допиши запись по шаблону из нуджа в principis.md (раздел «Журнал решений»).\n   Если юзер ЯВНО просит поделиться заседанием («сохрани/экспортируй/пришли артефакт») — зови\n   export_session(session, surface=md|html): вернёт самодостаточный `content` с панелью «что совет\n   НЕ стал выдумывать» и атрибуцией; отдай текст юзеру (файлов сам не пишет, сохраняет он).\n   Просит пруф ОДНОЙ цитаты («докажи/покажи пруф цитаты») — зови proof_card(quote, advisor_dir):\n   не дословна в 🔵-корпусе → карточки нет (fail-closed); иначе отдай html-карточку юзеру.\n   Просит «цитату дня / мысль дня» (PULL-ONLY, только по запросу — сам не навязывай) — зови\n   quote_of_day(): одна 🔵-verbatim-цитата с источником; нет дословных P1/P2 → честно скажи (не выдумывай).\n   Просит протокол/минуты/decision-record заседания («оформи решение», «протокол», «минуты») —\n   зови decision_record(session): позиции+допущения+диссент+статус решения+provenance, тиры\n   скопированы из session as-is (никогда не поднимаются).\n   (в) РЕЗОЛЮЦИЯ: юзер рассказал, чем кончилось → в его записи ИСХОД ⏳ → ✅/❌ + «Одобрено:\n   да/нет» (одобрил бы задним числом?). Если запись несёт строку «Прогноз: 📐 …»\n   (pending-item отдаёт её полем predicted) — сравни ВСЛУХ прогноз и факт: расхождение —\n   не провал, а калибровка модели юзера (диапазоны системно узкие/широкие — скажи об этом).\n   (г) КАЛИБРОВКА ГОЛОСОВ: при резолюции исхода зови advisor_weights(records=[{advisor,outcome,\n   endorsed}]) — он взвешивает голос каждого советника по РЕАЛЬНЫМ исходам для этого юзера\n   («кто прав ДЛЯ ТЕБЯ», не «кто звучит мудро»); без данных вес нейтрален. (д) ЗЕРКАЛО: периодически\n   mirror_report(stated, decisions) показывает дрейф «заявляю X — выбираю Y» — отражает разрыв, не советует.\n   Запись/правка журнала — только с согласия юзера\n   (это правка ЕГО модели); отказ — не дави и не повторяй."
     },
     {
       "n": 13,
@@ -1123,6 +1300,11 @@
       "n": 14,
       "title": "СИТУАЦИОННАЯ КАРТА / argument-engine",
       "text": "СИТУАЦИОННАЯ КАРТА / argument-engine. Юзер принёс конфликт / спор / переговоры («помоги выиграть\n   спор», «проверь мой аргумент», «контраргументы») — не отвечай с ходу, разбери позицию как дерево\n   ходов. Поток: capture_situation(text=<сырой дамп чата / описание>) структурирует акторов, реплики и\n   явные вопросы → situation_analyze(tree, opponent, stance) считает дерево ходов (opponent∈{self,\n   person,world}, stance∈{competitive,cooperative}), возвращает оценку, ГЛАВНУЮ ЛИНИЮ и ЧЕСТНЫЙ вердикт\n   (линии победы нет — скажи прямо, не льсти; фабрикацией grounded:false не выигрывают) →\n   situation_stress_test(tree, perturbations, stance) гоняет adversarial-возмущения мира/позиции\n   (invalidate/weaken/inject_counter) и даёт robustness + fragile_under — насколько линия устойчива и\n   где ломается. Возмущается мир, НЕ уста советников; лейблы совета (🔵/🟢/🟡) действуют как везде."
+    },
+    {
+      "n": 15,
+      "title": "Федерация",
+      "text": "Федерация (многомозговый совет, ОПЦИЯ — personal/attended, docs/FEDERATION.md). Координатор:\nfederation_open(session_id, plan) кладёт реплики ролей → federation_poll(session_id) до готовности →\nfederation_assemble(session_id) собирает (СЕРВЕР сверяет верность цитат централизованно, дивергенция\nсохранена, идентичность моделей видна, пустая роль → host_single_brain). Исполнитель (твоя ОТДЕЛЬНАЯ\nзапущенная сессия): federation_claim(worker_id, roles) → сыграй advisor_dir на СВОЕЙ модели, цитаты\nчерез cite → federation_submit(worker_model=своя модель) → повтор; federation_heartbeat пока играешь.\nМаркеры 🔵 НЕ ставит воркер — их вычисляет сервер. federation_open/submit ПИШУТ стейт — коротко\nпроговори, что делаешь (Rule 0); federation_poll/assemble read-only — тихо (Rule 1)."
     }
   ],
   "recipes": [
@@ -1333,6 +1515,20 @@
       ],
       "does": "Сделаю карточку одной цитаты с источником и бейджем «сверено с первоисточником» — «show your work».",
       "reads": "Fail-closed: если цитата не найдена дословно в первоисточнике — карточки не будет (не блефую)."
+    },
+    {
+      "id": "decision-record",
+      "title": "Протокол заседания — оформить решение",
+      "short": "Протокол заседания",
+      "triggers": [
+        "протокол заседания",
+        "минуты",
+        "оформи решение",
+        "decision record",
+        "запиши решение совета"
+      ],
+      "does": "Соберу структурированный протокол: позиции советников с допущениями по тирам, диссент, решение и статус, триггеры пересмотра.",
+      "reads": "Тиры (🔵/🟢/🟡) — как в самом заседании, ничего не поднимаю задним числом. Provenance-строка внизу показывает, сколько заземлено."
     }
   ],
   "scripts": [
@@ -1435,6 +1631,11 @@
       "path": "scripts/decision_map.py",
       "subsystem": "other",
       "doc": "Карта решения — схема и гейты честности («Principis-расчёт», спека §§1-2)."
+    },
+    {
+      "path": "scripts/decision_record.py",
+      "subsystem": "other",
+      "doc": "decision_record.py — протокол заседания (board minutes) как канонический ВЫХОД совета."
     },
     {
       "path": "scripts/diagnose_multiquery.py",
@@ -1818,8 +2019,16 @@
       "covers": "decision map"
     },
     {
+      "path": "tests/test_decision_record.py",
+      "covers": "decision record"
+    },
+    {
       "path": "tests/test_decision_tools.py",
       "covers": "decision tools"
+    },
+    {
+      "path": "tests/test_devils_advocate_probe.py",
+      "covers": "devils advocate probe"
     },
     {
       "path": "tests/test_doctor.py",
@@ -1868,6 +2077,42 @@
     {
       "path": "tests/test_extractor.py",
       "covers": "extractor"
+    },
+    {
+      "path": "tests/test_federation_coordinator.py",
+      "covers": "federation coordinator"
+    },
+    {
+      "path": "tests/test_federation_demo.py",
+      "covers": "federation demo"
+    },
+    {
+      "path": "tests/test_federation_docs.py",
+      "covers": "federation docs"
+    },
+    {
+      "path": "tests/test_federation_dogfood_doc.py",
+      "covers": "federation dogfood doc"
+    },
+    {
+      "path": "tests/test_federation_executor.py",
+      "covers": "federation executor"
+    },
+    {
+      "path": "tests/test_federation_judge.py",
+      "covers": "federation judge"
+    },
+    {
+      "path": "tests/test_federation_mcp.py",
+      "covers": "federation mcp"
+    },
+    {
+      "path": "tests/test_federation_notify.py",
+      "covers": "federation notify"
+    },
+    {
+      "path": "tests/test_federation_queue.py",
+      "covers": "federation queue"
     },
     {
       "path": "tests/test_fetch_hardening.py",
@@ -1988,6 +2233,10 @@
     {
       "path": "tests/test_poison_eval.py",
       "covers": "poison eval"
+    },
+    {
+      "path": "tests/test_positioning_doc.py",
+      "covers": "positioning doc"
     },
     {
       "path": "tests/test_preflight.py",

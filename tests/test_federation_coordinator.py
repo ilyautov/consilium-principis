@@ -28,3 +28,62 @@ def test_poll_returns_status_counts(tmp_path):
     q.claim("w1")
     p = poll_session(q, "s1")
     assert p["pending"] == 1 and p["claimed"] == 1 and p["done"] == 0
+
+
+from federation.coordinator import assemble
+from federation.executor import claim_brief, submit_candidate
+
+
+def _seed_done(q, session_id, role, advisor_dir, question, argument, quote_texts, model):
+    from federation.executor import claim_brief, submit_candidate
+    b = claim_brief(q, "w-" + model, roles=[role], timeout=1.0)
+    assert b.get("role") == role
+    cand = {"argument": argument, "quotes": [{"text": t} for t in quote_texts]}
+    submit_candidate(q, b["task_id"], b["worker_id"] if "worker_id" in b else "w-" + model,
+                     b["claim_token"], model, cand)
+
+
+def _fake_verify(quote, advisor_dir):
+    # мок централизованного гейта: только точный «REAL» в правильном корпусе → 🔵
+    if quote == "REAL" and advisor_dir == "advisors/aurelius":
+        return {"status": "🔵", "verbatim": True, "source": "Meditations 7.29"}
+    return {"status": "🟡", "verbatim": False, "source": ""}
+
+
+def test_assemble_server_reverifies_and_downgrades_fake_blue(tmp_path):
+    q = _q(tmp_path)
+    open_session(q, "s1", [{"role": "aurelius", "advisor_dir": "advisors/aurelius",
+                            "question": "Q", "replicas": 1}])
+    # воркер кладёт цитату, которую МОГ БЫ пометить 🔵 — но сервер верит только своему verify
+    _seed_done(q, "s1", "aurelius", "advisors/aurelius", "Q", "Спокойствие.", ["FAKE"], "m1")
+    out = assemble(q, "s1", verify_fn=_fake_verify)
+    role0 = out["roles"][0]
+    assert role0["representative"]["quotes"][0]["status"] == "🟡"   # фейк-🔵 понижен сервером
+
+
+def test_assemble_preserves_divergence_and_model_identity(tmp_path):
+    q = _q(tmp_path)
+    open_session(q, "s1", [{"role": "aurelius", "advisor_dir": "advisors/aurelius",
+                            "question": "Q", "replicas": 3}])
+    _seed_done(q, "s1", "aurelius", "advisors/aurelius", "Q", "ship the mvp now", ["REAL"], "claude-sonnet-5")
+    _seed_done(q, "s1", "aurelius", "advisors/aurelius", "Q", "wait gather evidence first", ["REAL"], "gemini-3")
+    _seed_done(q, "s1", "aurelius", "advisors/aurelius", "Q", "abandon project entirely instead", [], "gpt-5")
+    out = assemble(q, "s1", verify_fn=_fake_verify)
+    role0 = out["roles"][0]
+    assert len(role0["replicas"]) == 3                          # НЕ схлопнуто в best-of-N
+    assert role0["divergence"]["level"] == "high" and role0["divergence"]["flagged"] is True
+    assert set(role0["worker_models"]) == {"claude-sonnet-5", "gemini-3", "gpt-5"}  # identity
+    # репрезентант выбран рубрикой (у заземлённых 🔵 балл выше пустого)
+    assert role0["representative"]["argument"] in ("ship the mvp now", "wait gather evidence first")
+    assert role0["verdict"] == "PASS"                           # есть 🔵 → PASS
+
+
+def test_assemble_agreeing_replicas_low_divergence(tmp_path):
+    q = _q(tmp_path)
+    open_session(q, "s1", [{"role": "aurelius", "advisor_dir": "advisors/aurelius",
+                            "question": "Q", "replicas": 2}])
+    _seed_done(q, "s1", "aurelius", "advisors/aurelius", "Q", "ship the mvp now", ["REAL"], "m1")
+    _seed_done(q, "s1", "aurelius", "advisors/aurelius", "Q", "ship the mvp now", ["REAL"], "m2")
+    out = assemble(q, "s1", verify_fn=_fake_verify)
+    assert out["roles"][0]["divergence"]["level"] == "low"
+    assert out["diversity"] == "full"

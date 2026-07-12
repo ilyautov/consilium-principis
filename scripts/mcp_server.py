@@ -29,6 +29,8 @@ from situation import Move, node, analyze
 from governance import _verify_corpus
 from calibration import calibrate as _calibrate_fn, parse_decision_log
 from corpusbuild.paths import corpus_path
+from federation.coordinator import open_session as _fed_open, poll_session as _fed_poll, assemble as _fed_assemble
+from federation.executor import claim_brief as _fed_claim, submit_candidate as _fed_submit, heartbeat_task as _fed_hb
 
 
 # ───────────────────────── обёртки чистых функций ─────────────────────────
@@ -1362,6 +1364,49 @@ def _obj(props, required):
             "required": required}
 
 
+# ── Tier-2 федерация: MCP-поверхность (стейт в .consilium/, gitignored, приватно) ──
+_FED_BACKEND = None
+
+
+def _make_fed_backend(db_path):
+    from federation.queue import SqliteBackend
+    return SqliteBackend(db_path)
+
+
+def _fed_backend():
+    """Ленивый singleton бэкенда федерации в .consilium/federation.sqlite3 (никогда не шипается)."""
+    global _FED_BACKEND
+    if _FED_BACKEND is None:
+        path = os.path.join(_root(), ".consilium", "federation.sqlite3")
+        _FED_BACKEND = _make_fed_backend(path)
+    return _FED_BACKEND
+
+
+def _federation_open(session_id, plan, replicas_default=3):
+    return _fed_open(_fed_backend(), session_id, plan, replicas_default)
+
+
+def _federation_poll(session_id):
+    return _fed_poll(_fed_backend(), session_id)
+
+
+def _federation_assemble(session_id):
+    # централизованный гейт: наш _fidelity_check инъектится как verify_fn (воркер не сертифицирует)
+    return _fed_assemble(_fed_backend(), session_id, verify_fn=_fidelity_check)
+
+
+def _federation_claim(worker_id, roles=None, timeout=1.0):
+    return _fed_claim(_fed_backend(), worker_id, roles, timeout)
+
+
+def _federation_submit(task_id, worker_id, claim_token, worker_model, candidate):
+    return _fed_submit(_fed_backend(), task_id, worker_id, claim_token, worker_model, candidate)
+
+
+def _federation_heartbeat(task_id, worker_id, claim_token):
+    return _fed_hb(_fed_backend(), task_id, worker_id, claim_token)
+
+
 TOOLS = {
     "fidelity_check": {
         "description": "Протокол-гейт контура: проверить, дословна ли цитата в корпусе советника "
@@ -1780,6 +1825,63 @@ TOOLS = {
         "input_schema": {"type": "object",
                          "properties": {"consent": {"type": "boolean"}}, "required": []},
         "handler": _setup_full,
+    },
+    "federation_open": {
+        "description": "Координатор совета-федерации: разложить план ролей в очередь по N реплик "
+                       "(многомозговый совет — исполнители играют роли на СВОИХ моделях). plan = "
+                       "[{role, advisor_dir, question, replicas?}]. Стейт локально в .consilium/. "
+                       "Personal/attended (см. docs/FEDERATION.md).",
+        "input_schema": {"type": "object",
+                         "properties": {"session_id": {"type": "string"},
+                                        "plan": {"type": "array"},
+                                        "replicas_default": {"type": "integer"}},
+                         "required": ["session_id", "plan"]},
+        "handler": _federation_open,
+    },
+    "federation_poll": {
+        "description": "Статус сессии-федерации: счётчики pending/claimed/done/dead. Опрашивай, "
+                       "пока роли набирают кандидатов, затем federation_assemble.",
+        "input_schema": _obj({"session_id": "string"}, ["session_id"]),
+        "handler": _federation_poll,
+    },
+    "federation_assemble": {
+        "description": "Собрать совет: сгруппировать кандидатов по роли, СЕРВЕР сверяет верность "
+                       "цитат централизованно (воркер не сертифицирует 🔵), сохранить дивергенцию "
+                       "(не best-of-N) + идентичность моделей. Пустая роль → host_single_brain "
+                       "(diversity reduced). verdict PASS/FIX/ESCALATE.",
+        "input_schema": _obj({"session_id": "string"}, ["session_id"]),
+        "handler": _federation_assemble,
+    },
+    "federation_claim": {
+        "description": "Исполнитель забирает роль-таск (блокирующе до timeout) → структурный бриф "
+                       "{task_id, claim_token, role, advisor_dir, question} или {empty}. Сыграй "
+                       "advisor_dir на СВОЕЙ модели, цитаты через cite, затем federation_submit.",
+        "input_schema": {"type": "object",
+                         "properties": {"worker_id": {"type": "string"},
+                                        "roles": {"type": "array"},
+                                        "timeout": {"type": "number"}},
+                         "required": ["worker_id"]},
+        "handler": _federation_claim,
+    },
+    "federation_submit": {
+        "description": "Исполнитель кладёт СЫРОГО кандидата {argument, quotes:[{text}]} + worker_model "
+                       "(своя модель). Валидация размер/типы/control-chars; маркеры НЕ ставь — сервер "
+                       "сверит на assemble. stale claim_token → отклонён.",
+        "input_schema": {"type": "object",
+                         "properties": {"task_id": {"type": "string"},
+                                        "worker_id": {"type": "string"},
+                                        "claim_token": {"type": "string"},
+                                        "worker_model": {"type": "string"},
+                                        "candidate": {"type": "object"}},
+                         "required": ["task_id", "worker_id", "claim_token", "worker_model", "candidate"]},
+        "handler": _federation_submit,
+    },
+    "federation_heartbeat": {
+        "description": "Исполнитель продлевает lease роль-таска (task_id, worker_id, claim_token), "
+                       "пока играет роль. stale → задача уже переназначена.",
+        "input_schema": _obj({"task_id": "string", "worker_id": "string", "claim_token": "string"},
+                             ["task_id", "worker_id", "claim_token"]),
+        "handler": _federation_heartbeat,
     },
 }
 

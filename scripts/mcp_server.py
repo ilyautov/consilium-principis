@@ -2144,6 +2144,14 @@ Consilium-Principis — личный совет AI-персон реальных
    situation_stress_test(tree, perturbations, stance) гоняет adversarial-возмущения мира/позиции
    (invalidate/weaken/inject_counter) и даёт robustness + fragile_under — насколько линия устойчива и
    где ломается. Возмущается мир, НЕ уста советников; лейблы совета (🔵/🟢/🟡) действуют как везде.
+
+Федерация (многомозговый совет, ОПЦИЯ — personal/attended, docs/FEDERATION.md). Координатор:
+federation_open(session_id, plan) кладёт реплики ролей → federation_poll(session_id) до готовности →
+federation_assemble(session_id) собирает (СЕРВЕР сверяет верность цитат централизованно, дивергенция
+сохранена, идентичность моделей видна, пустая роль → host_single_brain). Исполнитель (твоя ОТДЕЛЬНАЯ
+запущенная сессия): federation_claim(worker_id, roles) → сыграй advisor_dir на СВОЕЙ модели, цитаты
+через cite → federation_submit(worker_model=своя модель) → повтор; federation_heartbeat пока играешь.
+Маркеры 🔵 НЕ ставит воркер — их вычисляет сервер. Тихо (Rule 1).
 """ % _FEWSHOT_TEXT
 
 

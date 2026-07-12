@@ -55,3 +55,9 @@ def test_every_tool_is_surfaced_or_declared_internal():
 def test_internal_registry_matches_expected():
     assert _internal_registry() == {"validate_manifest", "job_status", "ollama_ensure",
                                     "stability", "atomic_grounding", "catalog_verify"}
+
+
+def test_federation_tools_surfaced_in_instructions():
+    for name in ("federation_open", "federation_poll", "federation_assemble",
+                 "federation_claim", "federation_submit", "federation_heartbeat"):
+        assert name in m.INSTRUCTIONS, "%s не проведён в INSTRUCTIONS (тёмный федерация-тул)" % name

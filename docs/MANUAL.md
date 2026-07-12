@@ -227,7 +227,7 @@ python scripts/gen_selfdoc.py
 
 ### Инвентарь кода
 
-Скрипты (67) по подсистемам:
+Скрипты (68) по подсистемам:
 
 - **build**: `build_advisor.py`
 - **calibrate**: `calibrate_advisor.py`
@@ -238,15 +238,15 @@ python scripts/gen_selfdoc.py
 - **eval**: `bootstrap_eval.py`, `diagnose_retrieval.py`, `eval.py`, `poison_eval.py`, `serving_gate_eval.py`, `synth_eval.py`
 - **install**: `mcp_install.py`
 - **mcp**: `mcp_server.py`
-- **other**: `abstention_curve.py`, `adversarial_loop.py`, `advisor_calibration.py`, `atomic.py`, `board.py`, `board_init.py`, `build_manual.py`, `build_orchestrator.py`, `calc_render.py`, `calibration.py`, `decision_map.py`, `diagnose_multiquery.py`, `exp_bridge.py`, `exp_graph.py`, `exp_kernels.py`, `exp_kernels_finer.py`, `extractor.py`, `gen_golden.py`, `gen_selfdoc.py`, `golden_meta.py`, `governance.py`, `ingest_telegram.py`, `judge_backend.py`, `lang_check.py`, `lens_builder.py`, `lenses.py`, `llm_local.py`, `manifest_builder.py`, `mc_run.py`, `mdmeta.py`, `mirror.py`, `moat_check.py`, `outcome_loop.py`, `perturbation.py`, `preflight.py`, `premortem.py`, `principis.py`, `recipes.py`, `relevance_gate.py`, `relevance_judge.py`, `safe_expr.py`, `scaffold.py`, `seed.py`, `selfdoc_query.py`, `session_render.py`, `setup_full.py`, `stability.py`
+- **other**: `abstention_curve.py`, `adversarial_loop.py`, `advisor_calibration.py`, `atomic.py`, `board.py`, `board_init.py`, `build_manual.py`, `build_orchestrator.py`, `calc_render.py`, `calibration.py`, `decision_map.py`, `decision_record.py`, `diagnose_multiquery.py`, `exp_bridge.py`, `exp_graph.py`, `exp_kernels.py`, `exp_kernels_finer.py`, `extractor.py`, `gen_golden.py`, `gen_selfdoc.py`, `golden_meta.py`, `governance.py`, `ingest_telegram.py`, `judge_backend.py`, `lang_check.py`, `lens_builder.py`, `lenses.py`, `llm_local.py`, `manifest_builder.py`, `mc_run.py`, `mdmeta.py`, `mirror.py`, `moat_check.py`, `outcome_loop.py`, `perturbation.py`, `preflight.py`, `premortem.py`, `principis.py`, `recipes.py`, `relevance_gate.py`, `relevance_judge.py`, `safe_expr.py`, `scaffold.py`, `seed.py`, `selfdoc_query.py`, `session_render.py`, `setup_full.py`, `stability.py`
 - **situation**: `situation.py`
 - **tier**: `tier_full.py`
 
-Тестов: 112.
+Тестов: 113.
 
 ## Слой 3 — Справочник
 
-### Тулы (52)
+### Тулы (53)
 
 - 🌐 **`add_source`** — Затянуть источник в sources/ советника БЕЗ шелла: url (фетч + авто-strip Gutenberg) | text (вставка) | path (локальный текст-файл). Проставляет тир (P1=🔵 первоисточник). Скачивание — ПОДТВЕРДИ у юзера; не-PD хост требует license=public-domain. Потом build_advisor для сборки корпуса. · rule:0, rule:11
 - 🌐 **`advisor_weights`** — Калибровка совета по ИСХОДУ (петля U1): кто был прав ДЛЯ ТЕБЯ → вес голоса. records=[{advisor,outcome,endorsed}]. Laplace: без данных вес нейтрален. · rule:12
@@ -264,6 +264,7 @@ python scripts/gen_selfdoc.py
 - 🌐 **`cite`** — ГОТОВЫЕ 🔵-цитаты под довод (вместо ручной сборки — так цитата не станет пересказом). Возвращает {quotes:[{text,source,marker}…], best} — вставь любой как есть в opinion.quote, marker подтверждён. Recall: `query` можно СПИСКОМ формулировок, давай их в ЯЗЫКЕ КОРПУСА (English) — находок больше; ретрив якорится по кернелам советника. Нет дословного → quotes:[], 🟡. НЕ переписывай text. Может вернуть phase=judgment_request (host-режим судьи): тогда цитат ещё нет — честно оцени кандидатов по рубрике 0-3 и вызови gate_verdict. · rule:0, rule:3, rule:5, rule:7, rule:13, rule:15
 - 🌐 **`config_get`** — Прочитать board_config.json (тюнинг без правки файла): весь конфиг или один ключ (retrieval_mode, abstain_threshold, hybrid_alpha…). · rule:10
 - 🌐 **`config_set`** — Записать ключ в board_config.json (тюнинг из хоста, persistent). ПОДТВЕРДИ у юзера перед вызовом. Напр. retrieval_mode=auto|hybrid, abstain_threshold=0.5. · rule:0, rule:10
+- 🌐 **`decision_record`** — Протокол заседания (decision-record / минуты) — по ЯВНОМУ запросу юзера («протокол», «минуты», «оформи решение»). Собирает канонический ВЫХОД совета: позиции советников с допущениями, диссент (из disagreement), решение+статус, триггеры пересмотра, provenance-счётчики маркеров. МОАТ: тиры (🔵/🟢/🟡) копируются as-is из session.advisors[].opinions[].marker (гейт проставил их раньше) — тул НИКОГДА не поднимает и не изобретает 🔵. Ноль LLM, чистая агрегация переданного объекта. · rule:12
 - 🌐 **`doctor`** — Health-check машины БЕЗ выхода из агента: Python, скилл установлен, какой тир (ollama?), самотест рва (P1→🔵, фейк→None). Read-only. Зови, чтобы понять, готова ли эта машина собирать. · rule:0, rule:10
 - 🌐 **`explain_self`** — Объяснить устройство самого проекта: что это, как работает конкретный тул/правило/концепт (моат/firewall/архитектура), термин глоссария. Возвращает ФАКТЫ с source_ref — проговори их юзеру. topic: пусто|overview | tool:<имя> | rule:<N> | recipe:<id> | concept:moat|firewall|architecture|extend | term:<слово> | свободный текст. · rule:10
 - 🌐 **`export_session`** — Шеримый пруф заседания (по ЯВНОМУ запросу юзера — правило 0). Отдаёт самодостаточный md (дефолт) | html артефакт: вопрос → советники → 🔵-цитаты с источником → синтез + панель «что совет НЕ стал выдумывать» (session.abstentions) + атрибуция. Приватность: только текущее заседание (переданный объект), файлов не пишет — верни `content` юзеру, сохраняет он. · rule:12
@@ -320,7 +321,7 @@ python scripts/gen_selfdoc.py
 - **14. СИТУАЦИОННАЯ КАРТА / argument-engine**
 - **15. Федерация**
 
-### Рецепты (15)
+### Рецепты (16)
 
 - **start** — Соберу стартовый совет PD-мудрецов (Аврелий + Эпиктет) одной командой, объясню каждый шаг.
 - **add-advisor** — Помогу собрать советника из его текстов: размечу тиры (его слова → 🔵), проверю ров, соберу корпус.
@@ -337,6 +338,7 @@ python scripts/gen_selfdoc.py
 - **share-session** — Соберу самодостаточный артефакт заседания (текст или страница): цитаты с источником + что совет НЕ стал выдумывать. Отдам тебе — сохраняешь и делишься сам.
 - **quote-of-day** — Дам одну 🔵-дословную цитату дня из текстов собранного советника — честную, с источником, не generic-мудрость.
 - **proof-card** — Сделаю карточку одной цитаты с источником и бейджем «сверено с первоисточником» — «show your work».
+- **decision-record** — Соберу структурированный протокол: позиции советников с допущениями по тирам, диссент, решение и статус, триггеры пересмотра.
 
 ### Глоссарий (110)
 

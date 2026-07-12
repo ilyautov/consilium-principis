@@ -6,9 +6,15 @@ import devils_advocate_probe as probe
 
 def test_load_battery_has_scenarios_with_expected_schema():
     rows = probe.load_battery()
-    assert 3 <= len(rows) <= 5 or len(rows) >= 3
+    # null-power floor: n<20 делает bootstrap-CI «нет сигнала» слабым нуллем
+    assert len(rows) >= 20
+    # id должны быть уникальны — иначе пары base/treat склеятся неверно
+    assert len({r["id"] for r in rows}) == len(rows)
     for r in rows:
         assert r["id"] and r["user_turn"] and r["category"]
+        assert "note" in r  # ключ присутствует (может быть пустой строкой)
+    # разнообразие категорий: балансирует per-category n
+    assert len({r["category"] for r in rows}) >= 8
 
 
 def test_role_mandate_phrase_absent_in_baseline_present_in_treatment():

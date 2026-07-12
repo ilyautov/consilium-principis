@@ -4,7 +4,7 @@
     "rule_count": 16,
     "recipe_count": 15,
     "script_count": 67,
-    "test_count": 109,
+    "test_count": 110,
     "glossary_count": 110
   },
   "tools": [
@@ -2037,6 +2037,10 @@
     {
       "path": "tests/test_federation_docs.py",
       "covers": "federation docs"
+    },
+    {
+      "path": "tests/test_federation_dogfood_doc.py",
+      "covers": "federation dogfood doc"
     },
     {
       "path": "tests/test_federation_executor.py",

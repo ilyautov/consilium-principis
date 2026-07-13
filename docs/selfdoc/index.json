@@ -4,7 +4,7 @@
     "rule_count": 16,
     "recipe_count": 16,
     "script_count": 68,
-    "test_count": 114,
+    "test_count": 115,
     "glossary_count": 110
   },
   "tools": [
@@ -2221,6 +2221,10 @@
     {
       "path": "tests/test_no_dark_tools.py",
       "covers": "no dark tools"
+    },
+    {
+      "path": "tests/test_no_inducement_claims.py",
+      "covers": "no inducement claims"
     },
     {
       "path": "tests/test_outcome_loop.py",

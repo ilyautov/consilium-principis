@@ -4,7 +4,7 @@
     "rule_count": 16,
     "recipe_count": 16,
     "script_count": 68,
-    "test_count": 113,
+    "test_count": 114,
     "glossary_count": 110
   },
   "tools": [
@@ -1937,6 +1937,10 @@
     {
       "path": "tests/test_catalog.py",
       "covers": "catalog"
+    },
+    {
+      "path": "tests/test_catalog_rights.py",
+      "covers": "catalog rights"
     },
     {
       "path": "tests/test_catalog_tools.py",

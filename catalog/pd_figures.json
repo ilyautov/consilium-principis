@@ -16,6 +16,11 @@
           "sha256": "a65002ee97271a5b7bb172db35d8ae000f6339c18d0862107e2657119397b75e",
           "bytes": 405526
         }
+      },
+      "rights": {
+        "death_year": 180,
+        "text_status": "public_domain",
+        "consenter_circle": "exhausted"
       }
     },
     {
@@ -33,6 +38,11 @@
           "sha256": "9bdcb8cda6e1ca076b412169ed5dfa9f2635483de795a25df75674fda646c3d7",
           "bytes": 71804
         }
+      },
+      "rights": {
+        "death_year": 135,
+        "text_status": "public_domain",
+        "consenter_circle": "exhausted"
       }
     },
     {
@@ -50,6 +60,11 @@
           "sha256": "0cad92d6aad6a1fffee9ac628307b9ab0ccb39ce0e48b3ceef6998615509f0d6",
           "bytes": 322309
         }
+      },
+      "rights": {
+        "death_year": -496,
+        "text_status": "public_domain",
+        "consenter_circle": "exhausted"
       }
     }
   ]

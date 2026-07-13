@@ -62,6 +62,29 @@ def get_figure(data, fid):
     return None
 
 
+def rights_clear(fig):
+    """True только если СЕЯНАЯ фигура несёт полностью очищенные права (fail-closed).
+
+    Ров легальности (docs/dev/legal-posture-2026-07): публично сеем ТОЛЬКО давно-умерших на
+    public-domain текстах. rights-блок обязан нести:
+      - death_year (int) — тексты в PD (жизнь+70, ГК РФ ст.1281/1282);
+      - text_status == "public_domain";
+      - consenter_circle == "exhausted" — РФ-тест ст.152.1: круг согласителей (дети/супруг→
+        родители) исчерпан, живых родственников нет (Пленум ВС РФ №25 п.49).
+    НЕ «поднимает» неочищенное — только копирует факт из метаданных, как fidelity-маркеры.
+    bool не считаем валидным death_year (isinstance(True, int) → отсеиваем явной проверкой)."""
+    r = fig.get("rights")
+    if not isinstance(r, dict):
+        return False
+    dy = r.get("death_year")
+    return (
+        isinstance(dy, int)
+        and not isinstance(dy, bool)
+        and r.get("text_status") == "public_domain"
+        and r.get("consenter_circle") == "exhausted"
+    )
+
+
 def strip_for_signature(raw):
     """Текст ПОСЛЕ снятия Gutenberg-обёртки — детерминированная основа подписи и сборки."""
     import collect_pd

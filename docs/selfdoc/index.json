@@ -1,10 +1,10 @@
 {
   "meta": {
     "tool_count": 53,
-    "rule_count": 16,
+    "rule_count": 17,
     "recipe_count": 16,
     "script_count": 68,
-    "test_count": 115,
+    "test_count": 116,
     "glossary_count": 110
   },
   "tools": [
@@ -295,7 +295,8 @@
       },
       "status": "surfaced",
       "referenced_in": [
-        "rule:9"
+        "rule:9",
+        "rule:16"
       ]
     },
     {
@@ -983,7 +984,8 @@
         "rule:1",
         "rule:3",
         "rule:12",
-        "rule:13"
+        "rule:13",
+        "rule:16"
       ]
     },
     {
@@ -1305,6 +1307,11 @@
       "n": 15,
       "title": "Федерация",
       "text": "Федерация (многомозговый совет, ОПЦИЯ — personal/attended, docs/FEDERATION.md). Координатор:\nfederation_open(session_id, plan) кладёт реплики ролей → federation_poll(session_id) до готовности →\nfederation_assemble(session_id) собирает (СЕРВЕР сверяет верность цитат централизованно, дивергенция\nсохранена, идентичность моделей видна, пустая роль → host_single_brain). Исполнитель (твоя ОТДЕЛЬНАЯ\nзапущенная сессия): federation_claim(worker_id, roles) → сыграй advisor_dir на СВОЕЙ модели, цитаты\nчерез cite → federation_submit(worker_model=своя модель) → повтор; federation_heartbeat пока играешь.\nМаркеры 🔵 НЕ ставит воркер — их вычисляет сервер. federation_open/submit ПИШУТ стейт — коротко\nпроговори, что делаешь (Rule 0); federation_poll/assemble read-only — тихо (Rule 1)."
+    },
+    {
+      "n": 16,
+      "title": "AI-DISCLOSURE",
+      "text": "AI-DISCLOSURE (EU AI Act Art. 50 — прозрачность, НЕ маскировка). При ПЕРВОМ контакте в сессии\n(опенинг / первый ответ на созыв) сделай ЯВНЫМ и различимым, что это AI-советники — представления\nмыслителей, собранные из их публичных текстов, а НЕ сами люди (музейный принцип: не выдавать за\nподлинную личность и не «говорить с того света»). render_session(kind=opening) УЖЕ несёт плашку-\nдисклеймер на занавесе — не дублируй её прозой; но если опенинг-виджет недоступен (markdown-фолбэк)\n— скажи это сам одной честной строкой. НИКОГДА не утверждай, что советник «и есть» автор; формулируй\n«представление / линза, заземлённая на его текстах». Дисклеймер — прозрачность, НЕ щит: он не\nразрешает выдумывать (контур верности, Rule 5, действует всегда). В opening-объект по возможности\nклади per-persona provenance (advisors[].provenance = издание/источник корпуса, то же, что показывал\ncatalog_preview) — плашка происхождения под именем советника."
     }
   ],
   "recipes": [
@@ -2033,6 +2040,10 @@
     {
       "path": "tests/test_devils_advocate_probe.py",
       "covers": "devils advocate probe"
+    },
+    {
+      "path": "tests/test_disclosure_plate.py",
+      "covers": "disclosure plate"
     },
     {
       "path": "tests/test_doctor.py",

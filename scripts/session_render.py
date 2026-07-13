@@ -285,6 +285,14 @@ _STAGE_STYLE = (
  '.cp-stage .seat .who{flex:1;min-width:0;padding-top:3px}'
  '.cp-stage .seat .nm{margin:0 0 3px}'
  '.cp-stage .seat .dom{font-size:14px;line-height:1.5;color:var(--color-text-secondary,#888)}'
+ '.cp-stage .seat .src{font-size:12px;line-height:1.45;color:var(--color-text-secondary,#999);'
+ 'opacity:.8;margin-top:3px;display:flex;align-items:baseline;gap:5px}'
+ '.cp-stage .seat .src .ti{font-size:11px;opacity:.7}'
+ '.cp-stage .disclosure{display:flex;align-items:baseline;gap:8px;margin:22px auto 0;max-width:52ch;'
+ 'padding:11px 14px;border-radius:10px;background:color-mix(in srgb,var(--color-text-info,#185FA5) 7%,transparent);'
+ 'font-size:12.5px;line-height:1.5;color:var(--color-text-secondary,#888);text-align:left}'
+ '.cp-stage .disclosure .ti{font-size:13px;opacity:.75;flex:none;position:relative;top:2px}'
+ '.cp-stage .disclosure b{font-weight:600;color:var(--color-text-primary,#ddd)}'
  '.cp-stage .invite{text-align:center;font-size:18px;line-height:1.46;margin:22px auto 2px;max-width:34ch}'
  '.cp-stage .asks{margin:14px auto 0;max-width:34ch;text-align:center}'
  '.cp-stage .asks .q{font-style:italic;font-size:15px;line-height:1.5;'
@@ -294,6 +302,16 @@ _STAGE_STYLE = (
  '.cp-stage .qask .q::before{content:"";position:absolute;left:0;top:8px;width:6px;height:6px;'
  'border-radius:50%;background:var(--color-text-info,#185FA5);opacity:.65}'
  '</style>')
+
+
+# AI-disclosure на занавесе (EU AI Act Art.50(1)/(5): ясно и различимо при ПЕРВОМ контакте;
+# музейный Lister-GPT паттерн — открытое отрицание буквальной идентичности; NO FAKES: прозрачность,
+# не щит). Несёт: что это (AI-представление) · метод (заземлено на публичных текстах) · что
+# гарантирует 🔵 и чего НЕ гарантирует (не сами люди / 🟡 — не их слова).
+_DISCLOSURE_PLATE = (
+    '<div class="disclosure"><i class="ti ti-info-circle" aria-hidden="true"></i>'
+    '<span>Это AI-советники — представления мыслителей, заземлённые на их публичных текстах, '
+    'а не сами люди. <b>🔵</b> — дословно из корпуса; <b>🟡</b> — экстраполяция, не их слова.</span></div>')
 
 
 def render_opening(o, actions=None):
@@ -308,8 +326,11 @@ def render_opening(o, actions=None):
                 if a.get("grounded", True) else 'opacity:.8')
         med = f'background:color-mix(in srgb,{accent} 18%,transparent);color:{accent};{glow}'
         dom = f'<div class="dom">{_e(a["domain"])}</div>' if a.get("domain") else ""
+        # Per-persona provenance (издание/источник корпуса) — под именем, если хост передал.
+        prov = f'<div class="src"><i class="ti ti-book" aria-hidden="true"></i>{_e(a["provenance"])}</div>' \
+            if a.get("provenance") else ""
         seats.append(f'<div class="seat"><div class="med" style="{med}">{_e(_initials(a["name"]))}</div>'
-                     f'<div class="who"><div class="nm">{_e(a["name"])}</div>{dom}</div></div>')
+                     f'<div class="who"><div class="nm">{_e(a["name"])}</div>{dom}{prov}</div></div>')
     invite = f'<p class="invite">{_e(o["invitation"])}</p>' if o.get("invitation") else ""
     qs = o.get("questions") or []
     asks = ('<div class="asks">' + "".join(f'<p class="q">{_e(q)}</p>' for q in qs) + '</div>') if qs else ""
@@ -324,7 +345,7 @@ def render_opening(o, actions=None):
             '<div class="eyebrow"><i class="ti ti-masks-theater" aria-hidden="true"></i>Совет в сборе</div>'
             f'<div class="roster">{"".join(seats)}</div>'
             '<div class="rule"><i class="ti ti-diamond" aria-hidden="true"></i></div>'
-            f'{invite}{asks}{btns}</div>')
+            f'{invite}{asks}{btns}{_DISCLOSURE_PLATE}</div>')
 
 
 def _pull_quote(q, marker):

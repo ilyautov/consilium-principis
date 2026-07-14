@@ -66,6 +66,14 @@ of a great mind."</sub>
 
 ## How it looks
 
+<div align="center">
+
+<img src="assets/demo-refusal-en.gif" width="760" alt="Consilium refuses a fabricated quote and confirms a real one word-for-word" />
+
+<sub>A live recording of the fidelity gate: a fabricated "Aurelius quote" is refused, a real line is confirmed 🔵 word-for-word with its source. The 🔵/🟡 verdict is computed by code on every run, not scripted. Public-domain figure (Meditations, public domain).</sub>
+
+</div>
+
 You ask in plain words:
 
 > **"I'm juggling four directions at once. What should I focus on?"**

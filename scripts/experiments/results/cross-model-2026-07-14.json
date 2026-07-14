@@ -1,0 +1,143 @@
+{
+  "result": {
+    "overall": {
+      "blindspot_catch": {
+        "mean": 0.2333333333333333,
+        "n": 10,
+        "ci": [
+          0.1,
+          0.4
+        ],
+        "signal": true,
+        "n_ci": 10
+      },
+      "fidelity_hold": {
+        "mean": 1.0,
+        "n": 10,
+        "ci": [
+          1.0,
+          1.0
+        ],
+        "signal": true,
+        "n_ci": 10
+      },
+      "genuine_diff": {
+        "mean": 0.3333333333333333,
+        "n": 10,
+        "ci": [
+          0.16666666666666666,
+          0.5
+        ],
+        "signal": true,
+        "n_ci": 10
+      }
+    },
+    "by_category": {
+      "consensus_trap": {
+        "blindspot_catch": {
+          "mean": 0.25,
+          "n": 4,
+          "ci": [
+            0.0,
+            0.5
+          ],
+          "signal": false,
+          "n_ci": 4
+        },
+        "fidelity_hold": {
+          "mean": 1.0,
+          "n": 4,
+          "ci": [
+            1.0,
+            1.0
+          ],
+          "signal": true,
+          "n_ci": 4
+        },
+        "genuine_diff": {
+          "mean": 0.25,
+          "n": 4,
+          "ci": [
+            0.0,
+            0.5
+          ],
+          "signal": false,
+          "n_ci": 4
+        }
+      },
+      "factual_trap": {
+        "blindspot_catch": {
+          "mean": 0.2222222222222222,
+          "n": 3,
+          "ci": [
+            0.0,
+            0.3333333333333333
+          ],
+          "signal": false,
+          "n_ci": 3
+        },
+        "fidelity_hold": {
+          "mean": 1.0,
+          "n": 3,
+          "ci": [
+            1.0,
+            1.0
+          ],
+          "signal": true,
+          "n_ci": 3
+        },
+        "genuine_diff": {
+          "mean": 0.4444444444444444,
+          "n": 3,
+          "ci": [
+            0.3333333333333333,
+            0.6666666666666666
+          ],
+          "signal": true,
+          "n_ci": 3
+        }
+      },
+      "reasoning_trap": {
+        "blindspot_catch": {
+          "mean": 0.2222222222222222,
+          "n": 3,
+          "ci": [
+            0.0,
+            0.6666666666666666
+          ],
+          "signal": false,
+          "n_ci": 3
+        },
+        "fidelity_hold": {
+          "mean": 1.0,
+          "n": 3,
+          "ci": [
+            1.0,
+            1.0
+          ],
+          "signal": true,
+          "n_ci": 3
+        },
+        "genuine_diff": {
+          "mean": 0.3333333333333333,
+          "n": 3,
+          "ci": [
+            0.0,
+            0.6666666666666666
+          ],
+          "signal": false,
+          "n_ci": 3
+        }
+      }
+    },
+    "n": {
+      "consensus_trap": 4,
+      "factual_trap": 3,
+      "reasoning_trap": 3
+    }
+  },
+  "host_model": "openai/gpt-4.1",
+  "other_model": "z-ai/glm-5.2",
+  "seed": 20260707,
+  "battery": "cross_model_battery.jsonl"
+}

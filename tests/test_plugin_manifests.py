@@ -44,7 +44,60 @@ def test_marketplace_manifest_valid():
 
 def test_versions_in_sync():
     p = _load_json(".claude-plugin/plugin.json")
-    assert p["version"] == _pyproject_version() == _serverinfo_version()
+    mcpb = _load_json("manifest.json")
+    reg = _load_json("server.json")
+    assert (
+        p["version"]
+        == _pyproject_version()
+        == _serverinfo_version()
+        == mcpb["version"]
+        == reg["version"]
+    ), "версия рассинхронизирована между plugin.json/pyproject/serverInfo/manifest.json/server.json"
+
+
+def test_mcpb_manifest_valid():
+    # mcpb-манифест бандла (формат Anthropic, формерли DXT) — источник для `mcpb pack`.
+    m = _load_json("manifest.json")
+    assert m["manifest_version"] == "0.3", "текущая mcpb-схема — 0.3"
+    assert m["name"] == "consilium-principis"
+    srv = m["server"]
+    assert srv["type"] == "python", "сервер запускается как python-бандл"
+    assert srv["entry_point"] == "scripts/mcp_server.py"
+    cfg = srv["mcp_config"]
+    assert cfg["command"] == "python3"
+    joined = " ".join(cfg["args"])
+    assert "${__dirname}" in joined, "путь к энтрипоинту через переменную бандла, не абсолют"
+    assert "mcp_server.py" in joined
+    assert "/Users/" not in joined and "/opt/" not in joined, "ноль абсолютных путей"
+
+
+def test_registry_server_json_valid():
+    # server.json — манифест MCP Registry (registry.modelcontextprotocol.io).
+    reg = _load_json("server.json")
+    assert reg["name"] == "io.github.ilyautov/consilium-principis"
+    assert re.fullmatch(
+        r"io\.github\.[a-z0-9-]+/[a-z0-9-]+", reg["name"]
+    ), "namespace должен быть io.github.<user>/<server> (GitHub-OAuth пруф)"
+    assert reg["repository"]["source"] == "github"
+    pkgs = reg["packages"]
+    assert len(pkgs) == 1
+    pkg = pkgs[0]
+    assert pkg["registryType"] == "mcpb", "выбран формат mcpb (self-contained бандл)"
+    ident = pkg["identifier"]
+    # пруф владения mcpb: URL артефакта обязан содержать «mcp» (расширение .mcpb даёт это).
+    assert ".mcpb" in ident and "mcp" in ident, "URL mcpb-артефакта обязан содержать 'mcp'"
+    assert ident.startswith("https://github.com/ilyautov/consilium-principis/releases/")
+    assert pkg["transport"]["type"] == "stdio"
+
+
+def test_registry_sha256_is_flagged_placeholder_not_published():
+    # fileSha256 намеренно сентинел, а не 64-нулевой фейк: publish с плейсхолдером
+    # споткнётся громко. Гард ловит, если placeholder случайно уедет как «настоящий».
+    reg = _load_json("server.json")
+    sha = reg["packages"][0]["fileSha256"]
+    is_real = bool(re.fullmatch(r"[0-9a-f]{64}", sha))
+    is_sentinel = "REPLACE" in sha
+    assert is_real or is_sentinel, "fileSha256 должен быть либо реальным 64-hex, либо явным сентинелом"
 
 
 def test_mcp_json_uses_plugin_root_no_absolutes():

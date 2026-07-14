@@ -157,6 +157,57 @@ def test_aba_old_token_stale_after_reclaim(tmp_path):
     assert q.ack(c2.task_id, "w1", c2.claim_token, {"x": 2})["ok"] is True
 
 
+# ── Авто-sweep на claim (догфуд 2026-07-14: sweep был реализован, но его никто не звал →
+# упавший воркер держал роль в 'claimed' вечно, самоисцеления не было. Чиним в точке нужды:
+# воркер, пришедший за работой, сперва реклеймит просроченное. Критично для автономного
+# воркер-цикла, где рядом нет человека, чтобы заметить залипание.)
+
+def test_claim_auto_reclaims_expired_lease(tmp_path):
+    from federation.queue import RoleTask
+    q = _mk(tmp_path)
+    q.enqueue(RoleTask("s1", "aurelius", "advisors/aurelius", "Q?"))
+    c1 = q.claim("w1")                      # w1 забрал и «умер», не сделав heartbeat
+    assert c1 is not None
+    assert q.status("s1")["claimed"] == 1
+    # w2 приходит за работой: авто-sweep на входе должен вернуть просроченную роль в очередь
+    # и отдать её w2 в ЭТОМ же вызове — без внешнего звонка sweep.
+    c2 = q.claim("w2", lease_seconds=0)
+    assert c2 is not None, "claim обязан авто-реклеймить просроченный lease"
+    assert c2.claim_token != c1.claim_token
+    assert q.status("s1")["claimed"] == 1
+    # ABA-инвариант держится: старый токен мёртв.
+    assert q.ack(c1.task_id, "w1", c1.claim_token, {"x": 1}).get("stale") is True
+    assert q.ack(c2.task_id, "w2", c2.claim_token, {"x": 2})["ok"] is True
+
+
+def test_claim_auto_sweep_does_not_steal_fresh_claim(tmp_path):
+    from federation.queue import RoleTask
+    q = _mk(tmp_path)
+    q.enqueue(RoleTask("s1", "aurelius", "advisors/aurelius", "Q?"))
+    c1 = q.claim("w1")
+    # Дефолтный lease щедрый: живой воркер, который ещё думает, роль НЕ теряет.
+    assert q.claim("w2") is None, "свежий claim не должен уводиться из-под живого воркера"
+    assert q.status("s1")["claimed"] == 1
+    assert q.ack(c1.task_id, "w1", c1.claim_token, {"x": 1})["ok"] is True
+
+
+def test_claim_auto_sweep_kills_retry_exhausted(tmp_path):
+    from federation.queue import RoleTask
+    q = _mk(tmp_path)
+    q.enqueue(RoleTask("s1", "aurelius", "advisors/aurelius", "Q?", max_attempts=1))
+    q.claim("w1")
+    # Ретраи исчерпаны → авто-sweep хоронит роль, а не крутит её вечно.
+    assert q.claim("w2", lease_seconds=0) is None
+    assert q.status("s1")["dead"] == 1
+
+
+def test_default_lease_is_generous_enough_for_a_thinking_model():
+    from federation.queue import DEFAULT_LEASE_S
+    # Модель, играющая советника, думает минуты. Слишком короткий lease = роль уводят
+    # из-под живого воркера (его submit потом отлетит как stale) → дубль работы.
+    assert DEFAULT_LEASE_S >= 120
+
+
 def _claim_worker(db_path, worker_id, out_q):
     # запускается в ОТДЕЛЬНОМ процессе (spawn) — реальный file-lock, не GIL
     import sys, os

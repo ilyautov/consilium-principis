@@ -39,7 +39,8 @@ class QueueBackend(abc.ABC):
     def enqueue(self, task: RoleTask) -> str: ...
 
     @abc.abstractmethod
-    def claim(self, worker_id: str, roles=None, block: bool = False, timeout: float = 0.0): ...
+    def claim(self, worker_id: str, roles=None, block: bool = False, timeout: float = 0.0,
+              lease_seconds=None): ...
 
     @abc.abstractmethod
     def ack(self, task_id: str, worker_id: str, claim_token: str, result: dict) -> dict: ...
@@ -72,6 +73,11 @@ CREATE TABLE IF NOT EXISTS tasks (
 CREATE INDEX IF NOT EXISTS idx_pending ON tasks(status, priority, created_at);
 """
 _HAS_RETURNING = sqlite3.sqlite_version_info >= (3, 35, 0)
+
+# Аренда роли по умолчанию. Щедрая намеренно: советника играет МОДЕЛЬ, она думает минуты, и
+# не всякий воркер зовёт heartbeat. Слишком короткий lease увёл бы роль из-под живого воркера —
+# его submit потом отлетел бы как stale (порчи нет, claim_token защищает), но работа задвоилась бы.
+DEFAULT_LEASE_S = 300.0
 
 
 class SqliteBackend(QueueBackend):
@@ -143,7 +149,22 @@ class SqliteBackend(QueueBackend):
     # NB: под экстрим-контеншеном (>busy_timeout=5s) sqlite может бросить OperationalError
     # "database is locked" — намеренно НЕ глотаем (fail-loud): таск самоисцелится через sweep
     # по истечении lease, дубля/порчи нет. Ретрай-обёртку не добавляем (лишняя сложность).
-    def claim(self, worker_id, roles=None, block=False, timeout=0.0):
+    def claim(self, worker_id, roles=None, block=False, timeout=0.0,
+              lease_seconds=DEFAULT_LEASE_S):
+        # Само-исцеление В ТОЧКЕ НУЖДЫ: воркер, пришедший за работой, сперва возвращает в
+        # очередь роли умерших воркеров. До этого sweep был реализован, но его не звал НИКТО
+        # (ни поток, ни демон, ни тул) → упавший воркер держал роль в 'claimed' вечно.
+        # Вскрыто живым догфудом 2026-07-14; для автономного воркер-цикла это несущее —
+        # рядом нет человека, чтобы заметить залипание.
+        #
+        # Зовём ОДИН раз на входе, НЕ в backoff-цикле ниже: sweep — это BEGIN IMMEDIATE-запись,
+        # а цикл крутится каждые ~0.5с → был бы write-шторм по single-writer.
+        # Цена: роль, протухшая ПОКА воркер уже блокирован, будет подобрана не этим циклом, а
+        # следующим вызовом claim. Реальный воркер-цикл перевыпускает claim (клиенты режут
+        # tool-call по таймауту), так что на практике sweep случается регулярно.
+        # lease_seconds=None отключает авто-sweep (для тестов/ручного контроля).
+        if lease_seconds is not None:
+            self.sweep(lease_seconds)
         c = self._claim_once(worker_id, roles)
         if c is not None or not block:
             return c

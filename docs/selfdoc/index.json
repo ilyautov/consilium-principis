@@ -4,7 +4,7 @@
     "rule_count": 17,
     "recipe_count": 16,
     "script_count": 68,
-    "test_count": 119,
+    "test_count": 121,
     "glossary_count": 110
   },
   "tools": [
@@ -1902,6 +1902,10 @@
       "covers": "apparatus"
     },
     {
+      "path": "tests/test_apparatus_inline_in_regions.py",
+      "covers": "apparatus inline in regions"
+    },
+    {
       "path": "tests/test_atomic.py",
       "covers": "atomic"
     },
@@ -2016,6 +2020,10 @@
     {
       "path": "tests/test_corpus_pipeline.py",
       "covers": "corpus pipeline"
+    },
+    {
+      "path": "tests/test_corpus_tiering_staleness.py",
+      "covers": "corpus tiering staleness"
     },
     {
       "path": "tests/test_cross_model_probe.py",

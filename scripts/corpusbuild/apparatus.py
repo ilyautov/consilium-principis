@@ -130,6 +130,43 @@ def split_inline(text):
     return segs
 
 
+BLUE_TIERS = ("P1", "P2")   # 🔵-eligible: только их и имеет смысл защищать инлайн-гейтом
+
+# Версия ЛОГИКИ ТИРИНГА (поверхность: apparatus.py + clean.py). Тир печётся в корпус ПРИ СБОРКЕ,
+# поэтому починка кода не доезжает до рва без пересборки. buildlock штампует эту версию в
+# build.lock, doctor.check_corpus_tiering сверяет и громко требует пересборки при расхождении.
+# БАМПАТЬ РУКАМИ, когда меняется РАЗМЕТКА (не косметика) — канарейка test_tiering_surface_pinned
+# не даст изменить поверхность молча.
+#   1 (2026-07-15) — инлайн-гейт аппарата подключён к regions-пути (был opt-in → сноски
+#                    переводчика в теле были 🔵-eligible у machiavelli/marcus-aurelius).
+TIERING_VERSION = 1
+
+
+def demote_inline_apparatus(recs, blue_tiers=BLUE_TIERS):
+    """[{loc,text,tier,...}] → то же, но инлайн-аппарат внутри 🔵-eligible записей понижен до S1.
+
+    МИКРО-ось (аппарат ВНУТРИ тела: скобки, сноски-определения). МАКРО-ось (где кончается
+    вступление) — регионы манифеста либо _resolve_span; оси ортогональны и композируются, поэтому
+    этот гейт обязателен на ЛЮБОМ пути тиринга, а не только при apparatus.mode=="tier".
+
+    Дефект 2026-07-14: жил только в tier_records(inline="bracket") → у советников на `regions`
+    сноска переводчика оставалась P1 и была 🔵-eligible. Fail-closed не бывает opt-in.
+
+    Глубина скобок ТЕЧЁТ сквозь 🔵-eligible записи (многострочный коммент → 🟢 целиком). Записи
+    не-🔵 тиров (B/S1) проходят как есть и глубину НЕ трогают: незакрытая скобка во вступлении
+    не должна травить всё тело автора.
+    """
+    out, depth = [], 0
+    for r in recs:
+        if r.get("tier") not in blue_tiers:
+            out.append(r)
+            continue
+        segs, depth = _split_depth(r["text"], depth)
+        for seg, role in segs:
+            out.append({**r, "text": seg, "tier": r["tier"] if role == "author" else "S1"})
+    return out
+
+
 _BRACKET_RE = re.compile(r"\[[^\[\]]*\]")
 _CONTENTS_RE = re.compile(r"^\s*(CONTENTS|TABLE\s+OF\s+CONTENTS)\s*$", re.I)
 

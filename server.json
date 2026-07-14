@@ -1,0 +1,21 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.ilyautov/consilium-principis",
+  "title": "Consilium Principis",
+  "description": "Личный совет директоров из AI-персон реальных мыслителей, заземлённый в public-domain текстах, с контуром верности (дословные цитаты, fail-closed воздержание).",
+  "version": "0.1.0",
+  "repository": {
+    "url": "https://github.com/ilyautov/consilium-principis",
+    "source": "github"
+  },
+  "packages": [
+    {
+      "registryType": "mcpb",
+      "identifier": "https://github.com/ilyautov/consilium-principis/releases/download/v0.1.0/consilium-principis.mcpb",
+      "fileSha256": "REPLACE-WITH-sha256-AT-RELEASE-TIME",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}

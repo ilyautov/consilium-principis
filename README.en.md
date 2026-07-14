@@ -72,6 +72,8 @@ of a great mind."</sub>
 
 <sub>A live recording of the fidelity gate: a fabricated "Aurelius quote" is refused, a real line is confirmed 🔵 word-for-word with its source. The 🔵/🟡 verdict is computed by code on every run, not scripted. Public-domain figure (Meditations, public domain).</sub>
 
+<sub>More scenarios (wrong-mouth attribution, Monte Carlo, cross-lingual): **[demo gallery →](docs/demo/gallery.md)**</sub>
+
 </div>
 
 You ask in plain words:

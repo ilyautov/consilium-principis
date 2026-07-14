@@ -16,12 +16,14 @@
 """
 import os
 import sys
-import time
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _SCRIPTS = os.path.dirname(_HERE)
 _ROOT = os.path.dirname(_SCRIPTS)
 sys.path.insert(0, _SCRIPTS)
+sys.path.insert(0, _HERE)
+
+import _harness
 
 ADVISOR_DIR = os.path.join("advisors", "marcus-aurelius")
 
@@ -113,50 +115,8 @@ def transcript(include_prompt=True, lang="ru"):
     return lines
 
 
-# ── ANSI для живого прогона (тёмная тема, крупный акцент) ──
-_ANSI = {
-    "prompt": "\033[1;37m",   # белый жирный
-    "dim": "\033[2;37m",      # приглушённый серый
-    "quote": "\033[0;36m",    # голубой — текст цитаты
-    "refuse": "\033[1;33m",   # жёлтый — отказ (дифференциатор)
-    "proof": "\033[1;36m",    # ярко-голубой — 🔵 пруф
-    "cta": "\033[1;37m",
-    "blank": "",
-}
-_RESET = "\033[0m"
-
-
-def _type(text, style, char_delay, line_pause):
-    color = _ANSI.get(style, "")
-    if style == "prompt":  # печатаем посимвольно — эффект набора команды
-        sys.stdout.write(color)
-        for ch in text:
-            sys.stdout.write(ch)
-            sys.stdout.flush()
-            time.sleep(char_delay)
-        sys.stdout.write(_RESET + "\n")
-    else:
-        sys.stdout.write(color + text + _RESET + "\n")
-    sys.stdout.flush()
-    time.sleep(line_pause)
-
-
 def play(animate=True, include_prompt=True, lang="ru"):
-    lines = transcript(include_prompt=include_prompt, lang=lang)
-    if not animate:
-        for _, text in lines:
-            print(text)
-        return
-    for i, (style, text) in enumerate(lines):
-        # паузы подобраны под ≤10 сек: дольше держим кадр отказа и 🔵-пруфа
-        pause = 0.05 if style == "blank" else 0.55
-        if style == "refuse":
-            pause = 1.4          # дифференциатор — держим дольше
-        elif style == "proof":
-            pause = 1.6
-        elif style == "cta":
-            pause = 1.2
-        _type(text, style, char_delay=0.028, line_pause=pause)
+    _harness.render(transcript(include_prompt=include_prompt, lang=lang), animate=animate)
 
 
 def main(argv):

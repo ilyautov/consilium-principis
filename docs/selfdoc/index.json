@@ -4,7 +4,7 @@
     "rule_count": 17,
     "recipe_count": 16,
     "script_count": 68,
-    "test_count": 117,
+    "test_count": 119,
     "glossary_count": 110
   },
   "tools": [
@@ -2038,6 +2038,10 @@
       "covers": "decision tools"
     },
     {
+      "path": "tests/test_demo_scenarios.py",
+      "covers": "demo scenarios"
+    },
+    {
       "path": "tests/test_devils_advocate_probe.py",
       "covers": "devils advocate probe"
     },
@@ -2228,6 +2232,10 @@
     {
       "path": "tests/test_moat_check.py",
       "covers": "moat check"
+    },
+    {
+      "path": "tests/test_montecarlo_demo.py",
+      "covers": "montecarlo demo"
     },
     {
       "path": "tests/test_no_dark_tools.py",

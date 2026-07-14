@@ -4,7 +4,7 @@
     "rule_count": 17,
     "recipe_count": 16,
     "script_count": 68,
-    "test_count": 116,
+    "test_count": 117,
     "glossary_count": 110
   },
   "tools": [
@@ -2292,6 +2292,10 @@
     {
       "path": "tests/test_recipes.py",
       "covers": "recipes"
+    },
+    {
+      "path": "tests/test_refusal_demo.py",
+      "covers": "refusal demo"
     },
     {
       "path": "tests/test_relevance_gate.py",

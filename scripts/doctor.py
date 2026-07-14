@@ -191,6 +191,56 @@ def check_gov_anchors(root="."):
         return {"name": "gov-anchor", "ok": True, "detail": f"не определено ({e})"}
 
 
+def check_corpus_tiering(root="."):
+    """Свежесть разметки тиров. 🔵 опирается на тир, ЗАПЕЧЁННЫЙ в корпус при сборке, — значит
+    починка кода тиринга не доезжает до рва без пересборки, и заметить это нечем: чанк несёт
+    только текст+тир. Так дуга закалки аппарата (5 фиксов) прошла мимо собранных корпусов молча.
+
+    Юрисдикция — корпуса, собранные ЗДЕСЬ (есть build.lock.json). Шипованный/замороженный корпус
+    без build.lock (напр. lenses/strategist — сырья нет, пересобрать юзер не может) пропускаем:
+    вечный ложный крик обесценил бы чек. Такой артефакт стережёт gov-якорь, а не этот чек.
+    """
+    import json
+    try:
+        from corpusbuild.paths import corpus_path, lock_path
+        from corpusbuild.apparatus import TIERING_VERSION
+        stale, fresh = [], 0
+        for sub in ("advisors", "lenses"):
+            base = os.path.join(root, sub)
+            if not os.path.isdir(base):
+                continue
+            for d in sorted(os.listdir(base)):
+                p = os.path.join(base, d)
+                if not (os.path.isdir(p) and os.path.isfile(corpus_path(p))):
+                    continue
+                lp = lock_path(p)
+                if not os.path.isfile(lp):
+                    continue                          # шипованный/замороженный — вне юрисдикции
+                try:
+                    with open(lp, encoding="utf-8") as f:
+                        v = json.load(f).get("tiering_version")
+                except Exception:
+                    stale.append(f"{sub}/{d}: build.lock.json не читается")
+                    continue
+                if v is None:
+                    stale.append(f"{sub}/{d}: собран до версионирования тиринга")
+                elif v != TIERING_VERSION:
+                    stale.append(f"{sub}/{d}: разметка v{v}, код v{TIERING_VERSION}")
+                else:
+                    fresh += 1
+        if stale:
+            return {"name": "corpus-tiering", "ok": False,
+                    "detail": ("✗ разметка тиров устарела — 🔵 может утверждаться по СТАРЫМ "
+                               "правилам (напр. сноска переводчика как дословная речь советника): "
+                               + "; ".join(stale) +
+                               " → пересобери: python3 scripts/board.py build-advisor <dir>")}
+        return {"name": "corpus-tiering", "ok": True,
+                "detail": (f"✓ разметка свежая (v{TIERING_VERSION}): {fresh}" if fresh
+                           else "пропущен (нет локально собранных советников)")}
+    except Exception as e:                             # диагностика не должна ронять doctor
+        return {"name": "corpus-tiering", "ok": True, "detail": f"не определено ({e})"}
+
+
 def summarize(checks):
     # healthy = по СОДЕРЖАТЕЛЬНЫМ чекам; advisory (skill-installed) не роняет здоровье —
     # in-place из репо / MCP-режим работают без глобальной установки. Чек виден, но не блокирует.
@@ -203,7 +253,7 @@ def run_doctor(root="."):
     """Полный health-check. Контур тестируем на первом советнике с корпусом."""
     from corpusbuild.paths import corpus_path
     checks = [check_python(), check_skill_installed(), check_tier(), check_judge(),
-              check_calibration(root), check_gov_anchors(root)]
+              check_calibration(root), check_gov_anchors(root), check_corpus_tiering(root)]
     adv_root = os.path.join(root, "advisors")
     tested = False
     if os.path.isdir(adv_root):

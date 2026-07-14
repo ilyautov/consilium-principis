@@ -33,8 +33,12 @@ def write_lock(advisor_dir: str, config: dict, chunks, built_at: str) -> dict:
                 sources[fn] = _hash_file(fp)
     counts = dict(Counter(c["tier"] for c in chunks))
     counts["chunks"] = len(chunks)
-    lock = {"built_at": built_at, "config": config, "sources": sources, "counts": counts,
-            "gov_head": _gov_head(chunks)}
+    # tiering_version: тир запечён В КОРПУС при сборке — код тиринга чинили 5 раз, и ни одна
+    # починка не доехала до уже собранных корпусов, потому что заметить было нечем (чанк несёт
+    # только текст+тир). Штамп → doctor.check_corpus_tiering видит стухание и требует пересборки.
+    from .apparatus import TIERING_VERSION
+    lock = {"built_at": built_at, "tiering_version": TIERING_VERSION, "config": config,
+            "sources": sources, "counts": counts, "gov_head": _gov_head(chunks)}
     os.makedirs(paths.build_dir(advisor_dir), exist_ok=True)
     with open(paths.lock_path(advisor_dir), "w", encoding="utf-8") as f:
         json.dump(lock, f, ensure_ascii=False, indent=2)

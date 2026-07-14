@@ -7,13 +7,20 @@ from engine import provenance as prov  # noqa: E402
 
 
 def tag_regions(records, source: str, advisor_dir: str):
-    """records: [ (loc, text), ... ] → [ {loc, text, tier}, ... ]."""
+    """records: [ (loc, text), ... ] → [ {loc, text, tier}, ... ].
+
+    Две ортогональные оси: МАКРО (регионы манифеста — где кончается вступление) и МИКРО
+    (аппарат внутри тела — скобки/сноски). Микро-гейт зовём ВСЕГДА: до 2026-07-15 он жил
+    только в apparatus-режиме, и у советников на `regions` сноска переводчика оставалась
+    🔵-eligible (см. test_apparatus_inline_in_regions).
+    """
     lines = [txt for _, txt in records]
     out = []
     for i, (loc, txt) in enumerate(records):
         tier = prov.tier_for_line(source, i, lines, advisor_dir)
         out.append({"loc": loc, "text": txt, "tier": tier})
-    return out
+    from .apparatus import demote_inline_apparatus
+    return demote_inline_apparatus(out)
 
 
 def apparatus_tier(recs, source: str, advisor_dir: str):

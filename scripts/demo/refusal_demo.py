@@ -24,7 +24,6 @@ _ROOT = os.path.dirname(_SCRIPTS)
 sys.path.insert(0, _SCRIPTS)
 
 ADVISOR_DIR = os.path.join("advisors", "marcus-aurelius")
-FIGURE = "Марк Аврелий"
 
 # Реальная дословная строка из «Размышлений» (Long, Project Gutenberg) — открытие книги I.
 REAL_QUOTE = ("Of my grandfather Verus I have learned to be gentle and meek, "
@@ -60,29 +59,56 @@ def verdicts():
     return real, fake
 
 
+# ── язык кадра (RU дефолт для рус. витрины; EN — для README.en / Show HN) ──
+# Цитаты (реальная/выдуманная) — англ. текст в обоих языках (фигура англоязычна по корпусу).
+# Различается только повествование и подпись источника. CTA без длинного тире (AI-маркер).
+_LANG = {
+    "ru": {
+        "figure": "Марк Аврелий",
+        "attributed": "ИИ приписал ему цитату:",
+        "refuse": "  ⛔ Этого нет в его текстах. Я не вложу ему в уста чужие слова.",
+        "caveat": "     Честно: 🟡 в лучшем случае моё прочтение, не его голос.",
+        "actual": "А вот что он писал на самом деле:",
+        "proof": "  🔵 Сверено слово-в-слово. Размышления, пер. George Long.",
+        "cta": "Совет, который докажет цитату или честно промолчит.",
+    },
+    "en": {
+        "figure": "Marcus Aurelius",
+        "attributed": "An AI attributed this quote to him:",
+        "refuse": "  ⛔ Not in his texts. I will not put words in his mouth.",
+        "caveat": "     Honest 🟡: my reading at best, not his own voice.",
+        "actual": "Here is what he actually wrote:",
+        "proof": "  🔵 Verified word-for-word. Meditations, tr. George Long.",
+        "cta": "A council that proves its quotes, or honestly stays silent.",
+    },
+}
+
+
 # ── стили строк транскрипта (для анимации и для рендера кадров) ──
-def transcript(include_prompt=True):
+def transcript(include_prompt=True, lang="ru"):
     """Упорядоченные строки демо: (style, text). style ∈ prompt|dim|quote|refuse|proof|cta|blank.
 
-    include_prompt=False — когда команду печатает сам рекордер (VHS), чтобы не было двойного промпта."""
+    include_prompt=False — когда команду печатает сам рекордер (VHS), чтобы не было двойного промпта.
+    lang ∈ {ru,en} — повествование; цитаты и вердикт (из живого гейта) одинаковы."""
     verdicts()  # валидирует гейт (падает при недостоверности) до отрисовки
+    s = _LANG[lang]
     lines = []
     if include_prompt:
-        lines.append(("prompt", "$ consilium verify «%s»" % FIGURE))
+        lines.append(("prompt", "$ consilium verify %s" % s["figure"]))
     lines += [
         ("blank", ""),
-        ("dim", "ИИ приписал ему цитату:"),
+        ("dim", s["attributed"]),
         ("quote", "  «Price your SaaS by the value it creates,"),
         ("quote", "   not by the cost of your labour.»"),
-        ("refuse", "  ⛔ Этого нет в его текстах. Я не вложу ему в уста чужие слова."),
-        ("dim", "     Честно: 🟡 в лучшем случае моё прочтение, не его голос."),
+        ("refuse", s["refuse"]),
+        ("dim", s["caveat"]),
         ("blank", ""),
-        ("dim", "А вот что он писал на самом деле:"),
+        ("dim", s["actual"]),
         ("quote", "  «Of my grandfather Verus I have learned to be gentle and meek,"),
         ("quote", "   and to refrain from all anger and passion.»"),
-        ("proof", "  🔵 Сверено слово-в-слово. %s." % _SOURCE_LABEL),
+        ("proof", s["proof"]),
         ("blank", ""),
-        ("cta", "Совет, который докажет цитату или честно промолчит."),
+        ("cta", s["cta"]),
     ]
     return lines
 
@@ -115,8 +141,8 @@ def _type(text, style, char_delay, line_pause):
     time.sleep(line_pause)
 
 
-def play(animate=True, include_prompt=True):
-    lines = transcript(include_prompt=include_prompt)
+def play(animate=True, include_prompt=True, lang="ru"):
+    lines = transcript(include_prompt=include_prompt, lang=lang)
     if not animate:
         for _, text in lines:
             print(text)
@@ -139,7 +165,8 @@ def main(argv):
         print("REAL -> %s verbatim=%s source=%s" % (real["status"], real["verbatim"], real["source"]))
         print("FAKE -> %s verbatim=%s" % (fake["status"], fake["verbatim"]))
         return 0
-    play(animate="--no-anim" not in argv, include_prompt="--no-prompt" not in argv)
+    lang = "en" if "--en" in argv else "ru"
+    play(animate="--no-anim" not in argv, include_prompt="--no-prompt" not in argv, lang=lang)
     return 0
 
 

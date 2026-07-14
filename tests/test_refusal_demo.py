@@ -56,11 +56,27 @@ def test_prompt_suppressed_for_recorder():
 
 def test_no_technical_noise_in_frame():
     """Rule 1/10: никаких путей/JSON/тир-кодов в кадре — только человекочитаемое."""
-    for _style, text in demo.transcript():
-        low = text.lower()
-        assert ".jsonl" not in low and ".json" not in low and ".txt" not in low
-        assert "advisors/" not in low and "build/" not in low
-        assert "p1" not in low and "s1" not in low  # внутренние тир-коды не показываем
+    for lang in ("ru", "en"):
+        for _style, text in demo.transcript(lang=lang):
+            low = text.lower()
+            assert ".jsonl" not in low and ".json" not in low and ".txt" not in low
+            assert "advisors/" not in low and "build/" not in low
+            assert "p1" not in low and "s1" not in low  # внутренние тир-коды не показываем
+
+
+def test_en_transcript_has_both_beats():
+    """EN-вариант (README.en / Show HN) несёт те же дифференциаторы: отказ ⛔ и пруф 🔵."""
+    lines = demo.transcript(lang="en")
+    assert any("⛔" in t for _, t in lines)
+    assert any("🔵" in t for _, t in lines)
+    assert any("Verified word-for-word" in t for _, t in lines)
+
+
+def test_cta_has_no_long_dash_either_lang():
+    """Маркетинг-строка (CTA) без длинного тире «—» в обоих языках (AI-маркер, HARD BAN хьюманайзера)."""
+    for lang in ("ru", "en"):
+        cta = [t for s, t in demo.transcript(lang=lang) if s == "cta"]
+        assert cta and all("—" not in t for t in cta)
 
 
 def transcript_first_style(lines):

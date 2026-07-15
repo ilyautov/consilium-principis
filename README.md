@@ -1,4 +1,4 @@
-[English](README.en.md) · **Русский**
+**English** · [Русский](README.ru.md)
 
 <div align="center">
 
@@ -6,11 +6,12 @@
 
 # Consilium Principis
 
-**Спрашиваешь один ИИ, получаешь один уверенный ответ. Иногда мимо. А чтобы звучать умно, он ещё и цитату придумает.**
+**You ask one AI, you get one confident answer. Sometimes it's off. And to sound smart, it'll even invent a quote.**
 
-**Личный совет директоров из великих умов для твоих решений.** Несколько мыслителей за одним столом, каждый своей линзой. Спорят с тобой и между собой. И, в отличие от «сыграй мудреца», они цитату **докажут или честно промолчат**. Выдумывать не станут.
+**A personal board of directors made of great minds, for your decisions.** Several thinkers at one table, each through their own lens: they argue with you and with each other. And unlike "ask an AI to roleplay a sage," they **prove the quote or honestly stay silent**. No fabrication.
 
-Каждую 🔵-цитату код сверил с подлинным текстом автора, **слово-в-слово**. Чего в корпусе нет, советник **не произносит**. Это можно проверить, а не поверить на слово.
+Every 🔵 quote is checked by code against the author's genuine text, **word-for-word**. What isn't
+in the corpus, the advisor **does not say**. You can verify it, not just take it on faith.
 
 [![CI](https://github.com/ilyautov/consilium-principis/actions/workflows/ci.yml/badge.svg)](https://github.com/ilyautov/consilium-principis/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
@@ -22,144 +23,195 @@
 
 ---
 
-## Что это
+## What this is
 
-**Consilium Principis, навык для Claude Code (и MCP-сервер).** Ставишь его в свой AI-агент, и по любому вопросу-решению он созывает **совет из AI-персон реальных мыслителей**: Сунь-цзы, Марк Аврелий, Макиавелли, Эпиктет и кого добавишь сам. Каждый говорит своей линзой, по своим текстам, спорит с тобой и с другими. В конце синтез и один шаг к действию. Считаемый вопрос («что выгоднее, X или Y») совет не решает на глаз, а раскладывает на числа и прогоняет Монте-Карло.
+**Consilium Principis is a skill for Claude Code (and an MCP server).** You install it in your AI
+agent, and for any decision question it convenes a **board of AI personas of real thinkers**: Sun
+Tzu, Marcus Aurelius, Machiavelli, Epictetus, and whoever else you add. Each speaks through their
+own lens, from their own texts, arguing with you and with each other. At the end you get a synthesis
+and one concrete next step. A quantifiable question ("which is more worthwhile, X or Y") the board
+doesn't eyeball. It breaks it into numbers and runs a Monte Carlo.
 
-Это не «попроси ИИ сыграть мудреца». Дословные цитаты (🔵) проверяются по подлинному корпусу автора слово-в-слово, а вне корпуса советник честно молчит, а не выдумывает (fail-closed). Инструмент решений, не ролевая игра и не генератор афоризмов.
+This isn't "ask an AI to roleplay a sage." Verbatim quotes (🔵) are checked against the author's
+genuine corpus word-for-word, and outside the corpus the advisor honestly stays silent instead of
+making things up (fail-closed). A decision tool, not a roleplay game or an aphorism generator.
 
-Важная честность про то, кто за столом: это **AI-представления мыслителей, собранные по их публичным текстам, а не сами люди**. Никто не «говорит с того света». Advisor держит линзу автора и опирается на его слова, но остаётся моделью, и мы это показываем прямо, а не прячем за красивой подачей.
+One honest thing about who's at the table: these are **AI representations of thinkers, built from
+their public texts, not the people themselves**. Nobody is "speaking from beyond the grave." An
+advisor holds the author's lens and leans on their words, but it stays a model, and we say so
+plainly instead of hiding it behind a polished delivery.
 
-Своих ключей и оплаты не требует: работает на агенте, который у тебя уже есть. Сам контур честности не нуждается в сети. Полный офлайн доступен только на локальных моделях.
+It needs no extra keys or payment: it runs on the agent you already have. The honesty contour itself
+needs no network. Full offline is available only with local models.
 
-## Чем отличается от других советов
+## How it differs from other councils
 
-Механика «несколько ИИ совещаются» есть уже у многих. Отличие Consilium не в числе голосов. Оно в том, что заявление можно **перепроверить**, а где нельзя, совет честно молчит:
+The "several AIs deliberate" mechanic is already common. What sets Consilium apart isn't the number
+of voices. It's that a claim can be **re-verified**, and where it can't, the council honestly stays silent:
 
-| | «Сыграй мудреца» (один ИИ) | Совет в стиле LLM Council | **Consilium** |
+| | "Roleplay a sage" (one AI) | LLM-Council-style board | **Consilium** |
 |---|:---:|:---:|:---:|
-| Разные линзы, несогласие как фича | ± | ✅ | ✅ |
-| Дословная цитата с источником | ✗ | ✗ | ✅ |
-| **Цитата сверена дословно с первоисточником** | ✗ | ✗ | **✅** |
-| **Честно молчит вне корпуса (fail-closed)** | ✗ | ✗ | **✅** |
-| Считаемый вопрос → Монте-Карло (📐) | ✗ | ✗ | ✅ |
-| Без своих ключей и оплаты | ± | ✗ | ✅ |
+| Different lenses, disagreement as a feature | ± | ✅ | ✅ |
+| Verbatim quote with a source | ✗ | ✗ | ✅ |
+| **Quote checked verbatim against the source** | ✗ | ✗ | **✅** |
+| **Honestly silent outside the corpus (fail-closed)** | ✗ | ✗ | **✅** |
+| Quantifiable question → Monte Carlo (📐) | ✗ | ✗ | ✅ |
+| No extra keys or payment | ± | ✗ | ✅ |
 
-<sub>Тема не инфоцыганская. «Personal board of directors» это мейнстрим-концепция HBR; ставку на заземление и citation-transparency подтвердил Delphi ($16M от Sequoia именно за это), а несогласие-как-фичу подтвердила академия (multi-persona debate, бенчмарк ALCE). От грифта мы отличаемся строгостью: проверяемая цитата и честный отказ, а не «придумай афоризм в духе великого».</sub>
+<sub>The topic isn't snake-oil. A "personal board of directors" is a mainstream HBR concept; the bet
+on grounding and citation transparency was validated by Delphi ($16M from Sequoia for exactly this),
+and disagreement-as-a-feature by academia (multi-persona debate, the ALCE benchmark). We differ from
+the grift by rigor: a verifiable quote and an honest refusal, not "invent an aphorism in the spirit
+of a great mind."</sub>
 
-## Как это выглядит
+## How it looks
 
 <div align="center">
 
-<img src="assets/demo-refusal.gif" width="760" alt="Consilium отвергает выдуманную цитату и дословно подтверждает реальную" />
+<img src="assets/demo-refusal-en.gif" width="760" alt="Consilium refuses a fabricated quote and confirms a real one word-for-word" />
 
-<sub>Живая запись гейта верности: выдуманную «цитату Аврелия» совет отвергает, реальную строку подтверждает 🔵 слово-в-слово с источником. Вердикт 🔵/🟡 считает код на каждом прогоне, не сценарий. Пример на public-domain фигуре («Размышления», общественное достояние).</sub>
+<sub>A live recording of the fidelity gate: a fabricated "Aurelius quote" is refused, a real line is confirmed 🔵 word-for-word with its source. The 🔵/🟡 verdict is computed by code on every run, not scripted. Public-domain figure (Meditations, public domain).</sub>
 
-<sub>Ещё сценарии (цитата не в тех устах, Monte Carlo, кросс-язык): **[галерея демо →](docs/demo/gallery.md)**</sub>
+<sub>More scenarios (wrong-mouth attribution, Monte Carlo, cross-lingual): **[demo gallery →](docs/demo/gallery.md)**</sub>
 
 </div>
 
-Ты спрашиваешь обычными словами:
+You ask in plain words:
 
-> **«Тяну четыре направления сразу. На чём сфокусироваться?»**
+> **"I'm juggling four directions at once. What should I focus on?"**
 
-И получаешь не один обтекаемый ответ, а **заседание**, где каждый смотрит со своей колокольни. И они расходятся:
+And instead of one smooth, hedge-everything answer, you get a **session** where each advisor looks from their own vantage point, and they disagree:
 
-> **Сунь-цзы** (линза «Стратег») 🟡 «Кто силён везде, не силён нигде. Из четырёх фронтов выбери тот, где у тебя перевес, брось туда вес; остальные держи малым.»
+> **Sun Tzu** (the "Strategist" lens) 🟡 "Whoever is strong everywhere is strong nowhere. Of the four fronts, pick the one where you have the advantage, throw your weight there; hold the rest at a minimum."
 >
-> **Макиавелли** 🟡 «Разбрасываясь, ты слаб на каждом направлении и уязвим на всех. Вопрос не "что развивать", а "от чего готов отказаться". Это и есть решение.»
+> **Machiavelli** 🟡 "Spread thin, you're weak on every front and vulnerable on all of them. The question isn't 'what to grow' but 'what you're willing to give up'. That is the decision."
 >
-> **Марк Аврелий** 🔵 «Let it be thy earnest and incessant care as a Roman and a man to perform whatsoever it is that thou art about» *(Meditations, пер. Long)*. Делай настоящее дело целиком; четыре дела разом это рассеяние.
-> ↳ а спросишь то, чего у него в текстах нет, **честно промолчит, а не сочинит цитату.**
+> **Marcus Aurelius** 🔵 "Let it be thy earnest and incessant care as a Roman and a man to perform whatsoever it is that thou art about" *(Meditations, trans. Long)*. Do the thing in front of you wholly; four things at once is scattering.
+> ↳ and ask him something that isn't in his texts, and **he'll honestly stay silent instead of inventing a quote.**
 
-Дальше **синтез** (где они на самом деле сходятся) и **один шаг к действию**. Несогласие тут фича: ты видишь решение с углов, которые сам бы пропустил. А если вопрос считаемый («что выгоднее, X или Y»), совет предложит не спорить на глаз, а **посчитать** (см. 📐 ниже).
+Next comes the **synthesis** (where they actually agree) and **one concrete next step**. Disagreement here is a feature: you see the decision from angles you'd have missed on your own. And if the question is quantifiable ("which is more worthwhile, X or Y"), the board will offer not to argue by eye but to **calculate** (see 📐 below).
 
-<sub>Пример иллюстративен, а советники это AI-представления по текстам, не сами авторы. 🟡 мысль в духе автора (модель рассуждает его линзой), 🔵 дословная строка с источником в корпусе. Все примеры public-domain фигуры (Сунь-цзы, Аврелий, Макиавелли, Эпиктет); кого посадить за СВОЙ стол, решаешь ты. Твои реальные заседания пишутся в `council/` локально и никогда не попадают в git (см. [техустройство](docs/MANUAL.md)).</sub>
+<sub>The example is illustrative, and the advisors are AI representations built from texts, not the authors themselves. 🟡 = a thought in the author's spirit (the model reasons through their lens), 🔵 = a verbatim line with a source in the corpus. All examples are public-domain figures (Sun Tzu, Aurelius, Machiavelli, Epictetus); who sits at YOUR table is your call. Your real sessions are written to `council/` locally, and never go into git (see [technical design](docs/MANUAL.md)).</sub>
 
-## Что можно спросить
+## What you can ask
 
-Команды учить не нужно. Скажи **«что умеешь?»**, и совет покажет меню. Например:
+No need to learn commands. Say **"what can you do?"** and the board will show a menu. For example:
 
-- **«Что может пойти не так с моим запуском?»** премортем: где сломается, что укрепить заранее
-- **«Что бы сказал Аврелий про выгорание?»** один советник, строго по его текстам
-- **«Пусть Сунь-цзы и Макиавелли поспорят про X»** столкнуть два взгляда
-- **«Что выгоднее, уйти в найм или тянуть своё?»** 📐 карта решения: разложить на числа и посчитать (а не спорить на глаз)
-- **«Помоги выиграть этот спор»** разбор позиции как шахматный движок: твои ходы, контрмеры, честный вердикт
-- **«Не противоречу ли я себе?»** зеркало: что говоришь против того, что выбираешь на деле
+- **"What could go wrong with my launch?"** a premortem: where it'll break, what to shore up in advance
+- **"What would Aurelius say about burnout?"** a single advisor, strictly from his texts
+- **"Have Sun Tzu and Machiavelli argue about X"** pit two viewpoints against each other
+- **"Which is more worthwhile, going back to a salaried job or sticking with my own thing?"** 📐 a decision map: break it into numbers and calculate (rather than argue by eye)
+- **"Help me win this argument"** a position breakdown like a chess engine: your moves, counters, an honest verdict
+- **"Am I contradicting myself?"** a mirror: what you say vs. what you actually choose
 
-## Почему этому можно верить
+## Why you can trust this
 
-Это не «чат-бот в роли мудреца». Каждое слово помечено **защитным контуром**.
+This isn't "a chatbot playing sage." Every word is tagged by a **protective contour**.
 
-Главный пруф не в тоне, а в проверяемости: **дословную цитату (🔵) код сверяет с подлинным корпусом автора слово-в-слово**, и она несёт источник. Не нашлось точной строки, советник честно молчит (fail-closed), а не сочиняет. Вот что отличает инструмент решений от «отыграй мудреца»: заявление можно перепроверить.
+The real proof isn't in the tone but in verifiability: **a verbatim quote (🔵) is checked against
+the author's genuine corpus by code, word-for-word**, and carries a source. If the exact line isn't
+found, the advisor honestly stays silent (fail-closed) instead of making it up. That's what
+separates a decision tool from "roleplay a sage": every claim can be re-checked.
 
-| Маркер | Что значит |
+| Marker | What it means |
 |:---:|---|
-| 🔵 | **дословная цитата** из подлинного корпуса автора, проверена слово-в-слово, с источником |
-| 🟢 | **дословно, но из комментария/толкования** (не голосом автора), с именем комментатора |
-| 🟡 | **мысль в духе автора**, но не его точные слова, честно отмечено |
-| 📐 | **расчёт**: твои числа, прогнанные Монте-Карло; не истина и не цитата, а твоя же модель N раз |
-| *отказ* | вопрос вне корпуса → советник **молчит, а не сочиняет** |
+| 🔵 | **verbatim quote** from the author's genuine corpus, verified word-for-word, with a source |
+| 🟢 | **verbatim, but from commentary/interpretation** (not in the author's own voice), with the commentator named |
+| 🟡 | **in the spirit of the author**, but not their exact words, honestly marked |
+| 📐 | **calculation**: your own numbers, run through Monte Carlo; not truth, not a quote, just your own model run N times |
+| *abstention* | question outside the corpus → the advisor **stays silent instead of making things up** |
 
-Плюс **разные линзы, а не хор**: каждый советник держит свой угол, и их несогласие рабочая часть, не баг (ты видишь решение со сторон, которые сам бы свёл к одной). Контур работает на любой машине, без интернета, без ключей, без оплаты. Слабее там только меткость поиска, а честность никогда. Под капотом её держит двухфазный гейт релевантности (модель судит кандидатов, порог применяет код): топически-близкое-но-не-отвечающее за 🔵 не проскочит.
+Plus **different lenses, not a chorus**: each advisor keeps their own angle, and their disagreement is a working part, not a bug (you see the decision from sides you'd otherwise collapse into one). The contour runs on any machine, no internet, no keys, no cost. Only search precision can get weaker; honesty never does. Under the hood, honesty is held up by a two-phase relevance gate (a model judges the candidates, code applies the threshold): topically-close-but-not-actually-answering material won't slip through as 🔵.
 
-## Посчитать, а не только обсудить: 📐 карта решения
+## Calculate, not just discuss: the 📐 decision map
 
-Совет умеет два хода. Первый это **заседание** (обсудить, оспорить, синтез). Второй включается на **считаемом** вопросе-решении («что выгоднее», «стоит ли», «X или Y»): вместо ответа-на-глаз совет разложит выбор на **карту решения**, то есть варианты, величины (твои числа, выбитые тройками «худший / типичный / лучший», чтобы не якорить) и формулы. Дальше **детерминированный Монте-Карло** (считает код, ноль LLM в счёте, тот же сид даёт тот же результат): P(лучший вариант), торнадо чувствительности, что решает исход. Вариант «ничего не делать» обязателен. Разложить премортемом («прошёл год, провалилось, почему?») и 2×2 по ключевым неопределённостям тоже предложит совет. Всё под лейблом 📐, **рядом** с 🔵/🟢/🟡, но никогда не смешиваясь: это не мудрость, а твоя модель, прогнанная численно. А запишешь решение в журнал, позже совет сверит **прогноз с фактом** (петля исхода: калибровка твоей модели, а не «угадал или нет»).
+The board has two modes. The first is a **session** (discuss, challenge, synthesize). The second
+kicks in on a **quantifiable** decision question ("which is more worthwhile", "is it worth it", "X
+or Y"): instead of an eyeballed answer, the board breaks the choice down into a **decision map**,
+that is options, quantities (your own numbers, elicited as three-point "worst / typical / best"
+estimates, to avoid anchoring), and formulas. Then comes **deterministic Monte Carlo** (code does
+the math, zero LLM in the calculation, same seed gives the same result): P(best option), a tornado
+sensitivity chart, what actually drives the outcome. A "do nothing" option is mandatory. Breaking it
+down with a premortem ("a year passed, it failed, why?") and a 2×2 on the key uncertainties is also
+something the board does. Everything sits under the 📐 label, **next to** 🔵/🟢/🟡 but never blended
+in: this isn't wisdom, it's your own model, run numerically. And if you log the decision, later the
+board will check the **forecast against what actually happened** (the outcome loop: calibrating your
+model, not "right or wrong guess").
 
-**По умолчанию по-человечески:** совет отвечает **на твоём языке** и даёт чистый вывод без лишних чисел. 🔵-цитата остаётся в оригинале (так её можно проверить), а перевод рядом. Нужен полный разбор (вероятности, устойчивость позиции, разметка по источникам), скажи «покажи детали».
+**By default, plainly human:** the board answers **in your language** and gives a clean bottom line without extra numbers. A 🔵 quote stays in the original (so it can be verified), with a translation alongside it. Need the full breakdown (probabilities, robustness of the position, source-by-source markup), just say "show me the details."
 
-## Установка
+## Installation
 
-### Через Claude Code plugin (рекомендуется)
+### Via Claude Code plugin (recommended)
 
-В Claude Code:
+In Claude Code:
 
 > `/plugin marketplace add ilyautov/consilium-principis`
 > `/plugin install consilium-principis@consilium-marketplace`
 
-Claude Code поднимет MCP-сервер и зарегистрирует навык. Потом скажи **«с чего начать»**, и консьерж проверит готовность и соберёт стартовый совет (Марк Аврелий и Эпиктет, public-domain).
+Claude Code will spin up the MCP server and register the skill. Then say **"where do I start"**, and
+the concierge will check readiness and assemble a starter board (Marcus Aurelius and Epictetus, public-domain).
 
-### Или обычной установкой
+### Or a plain install
 
-**Самое простое, поставит сам Claude.** Открой Claude Code и дай ссылку:
+**The simplest way, let Claude install it for you.** Open Claude Code and give it the link:
 
-> «Поставь мне этот навык: `https://github.com/ilyautov/consilium-principis`»
+> "Install this skill for me: `https://github.com/ilyautov/consilium-principis`"
 
-Claude склонирует репозиторий, запустит `python3 install.py` (копия в `~/.claude/skills/`, самопроверка) и отчитается. Ни ключей, ни терминала. Потом скажи **«с чего начать»**, и он соберёт стартовый совет (Марк Аврелий и Эпиктет, public-domain) за пару минут.
+Claude will clone the repository, run `python3 install.py` (a copy lands in `~/.claude/skills/`,
+self-check included) and report back. No keys, no terminal. Then say **"where do I start"**, and it'll
+assemble a starter board (Marcus Aurelius and Epictetus, public-domain) in a couple of minutes.
 
-Не сработало с первого раза, дай Claude это дословно:
+Didn't work on the first try? Give Claude this verbatim:
 ```bash
 git clone https://github.com/ilyautov/consilium-principis ~/consilium-principis
 cd ~/consilium-principis && python3 install.py
 ```
 
-Любишь кнопки или терминал, тебе в [`QUICKSTART.md`](QUICKSTART.md): клик-установщик ([`install.command`](install.command) / `.bat`) и ручной путь.
+Prefer buttons or a terminal? See [`QUICKSTART.md`](QUICKSTART.md): a click-to-install ([`install.command`](install.command) / `.bat`) and the manual path.
 
-**Cowork / Claude Desktop / любой MCP-хост:** подключи как MCP-сервер и получи весь цикл (сборка, заседания, виджеты) тулами, не выходя из агента. Смотри [`CONNECT-MCP.md`](CONNECT-MCP.md) (`python3 scripts/board.py mcp-config` подставит путь сам).
+**Cowork / Claude Desktop / any MCP host:** connect it as an MCP server and get the whole cycle
+(build, sessions, widgets) via tools, without leaving your agent. See [`CONNECT-MCP.md`](CONNECT-MCP.md)
+(`python3 scripts/board.py mcp-config` fills in the path for you).
 
-**Нужно только:** Python 3.10+. Для умного кросс-язычного поиска опционально [ollama](https://ollama.com) с `bge-m3` (совет сам подскажет, как поднять). Контур работает и без него.
+**All you need:** Python 3.10+. For smart cross-language search, optionally
+[ollama](https://ollama.com) with `bge-m3` (the board will walk you through setting it up). The contour works without it too.
 
-## Твой совет, твой выбор
+## Your board, your call
 
-**Пустая доска из коробки это норма.** Кого посадить за стол, решаешь ты; совет личный. Public-domain мудрецы (стоики, Сунь-цзы) собираются одной фразой. Современных мыслителей ты собираешь из материалов, которые принесёшь сам.
+**An empty board out of the box is normal.** Who sits at the table is your call; the board is personal.
+Public-domain sages (the Stoics, Sun Tzu) are assembled with one phrase. Modern thinkers come
+from materials you bring yourself.
 
-> ⚖️ **Граница.** Consilium это **движок верности, не распространитель**: он даёт машинерию, источники приносишь ты. Навык не качает копирайтные книги. Public-domain берётся свободно; копирайт только твои легальные копии, и они остаются на твоей машине. Готовыми мы сеем лишь фигуры общественного достояния, давно умершие; современного советника ты собираешь себе сам. Твоя доска (`advisors/`) и твой профиль это личные данные, в репозиторий они не уходят.
+> ⚖️ **Boundary.** Consilium is a fidelity **engine, not a content distributor**: it ships the machinery,
+> you bring the sources. The skill does not download copyrighted books. Public domain is taken freely;
+> copyright means only your own legal copies, which stay on your machine. The sages we ship pre-assembled
+> are public-domain figures long deceased; anyone modern you build yourself. Your board (`advisors/`) and
+> your profile are personal data; they never go into the repository.
 
-## Как устроено
+## How it's built
 
-Под капотом поиск по корпусу с тремя режимами (от чистого Python до семантического) и мягкой деградацией. Защитный контур это отдельный слой поверх: он сверяет каждую цитату с источником и не зависит от того, какой режим поиска активен. Поэтому честность одинакова на любой машине. Детали в [`SKILL.md`](SKILL.md) и [`docs/`](docs/superpowers/specs/).
+Under the hood is corpus search with three modes (from plain Python to semantic) and graceful
+degradation. The protective contour is a separate layer on top: it checks every quote against its
+source and doesn't depend on which search mode is active. So honesty is the same on any machine.
+Details in [`SKILL.md`](SKILL.md) and [`docs/`](docs/superpowers/specs/).
 
-## Техническое устройство
+## Technical design
 
-Полный технический мануал (что это, архитектура, справочник тулов и правил, как расширять) лежит в [`docs/MANUAL.md`](docs/MANUAL.md). Он сгенерирован из кода (`scripts/gen_selfdoc.py` → `scripts/build_manual.py`); в рантайме то же самое доступно через MCP-тул `explain_self`.
+The full technical manual (what this is, architecture, tool/rule reference, how to extend it) lives
+in [`docs/MANUAL.md`](docs/MANUAL.md). It's generated from code (`scripts/gen_selfdoc.py` →
+`scripts/build_manual.py`); at runtime the same information is available via the MCP tool `explain_self`.
 
-## Участие и безопасность
+## Contributing and security
 
-PR приветствуются, но два правила нерушимы: **только public-domain тексты** (никакого копирайта, даже отрывками) и **не ослаблять fail-closed контур** (🔵 только по верификации кодом). Как настроить, прогнать оффлайн-сьют и оформить PR, смотри в [`CONTRIBUTING.md`](CONTRIBUTING.md). Нашли способ обойти контур верности или утечку данных, это уязвимость первого класса, сообщите приватно по [`SECURITY.md`](SECURITY.md). История изменений в [`CHANGELOG.md`](CHANGELOG.md).
+PRs are welcome, but two rules are non-negotiable: **only public-domain texts** (no copyrighted
+material, not even excerpts) and **never weaken the fail-closed contour** (🔵 only via code
+verification). How to set up, run the offline suite, and open a PR is in [`CONTRIBUTING.md`](CONTRIBUTING.md).
+Found a way to bypass the fidelity contour or a data leak? That's a first-class vulnerability,
+report it privately via [`SECURITY.md`](SECURITY.md). Change history is in [`CHANGELOG.md`](CHANGELOG.md).
 
 ---
 
 <div align="center">
-<sub>Consilium Principis · ранний доступ (v0.1.0) · <a href="LICENSE">MIT</a> · <a href="CONTRIBUTING.md">Contributing</a> · <a href="SECURITY.md">Security</a></sub>
+<sub>Consilium Principis · early access (v0.1.0) · <a href="LICENSE">MIT</a> · <a href="CONTRIBUTING.md">Contributing</a> · <a href="SECURITY.md">Security</a></sub>
 </div>

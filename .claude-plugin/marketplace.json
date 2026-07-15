@@ -1,14 +1,25 @@
 {
   "name": "consilium-marketplace",
-  "description": "Каталог Consilium-Principis — совет AI-персон с контуром верности.",
-  "owner": { "name": "Ilya Autov", "email": "ilyautov@gmail.com" },
+  "description": "Catalog of Consilium-Principis — a council of AI personas with a fidelity contour.",
+  "owner": {
+    "name": "Ilya Autov",
+    "email": "ilyautov@gmail.com"
+  },
   "plugins": [
     {
       "name": "consilium-principis",
-      "source": { "source": "github", "repo": "ilyautov/consilium-principis" },
-      "description": "Совет AI-персон реальных мыслителей + карта решения (Монте-Карло) с fail-closed контуром верности.",
+      "source": {
+        "source": "github",
+        "repo": "ilyautov/consilium-principis"
+      },
+      "description": "A council of AI personas of real thinkers + a decision map (Monte Carlo), with a fail-closed fidelity contour.",
       "homepage": "https://github.com/ilyautov/consilium-principis",
-      "tags": ["mcp", "reasoning", "advisory", "decision-support"]
+      "tags": [
+        "mcp",
+        "reasoning",
+        "advisory",
+        "decision-support"
+      ]
     }
   ]
 }

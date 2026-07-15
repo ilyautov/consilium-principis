@@ -168,8 +168,9 @@ def load_abstain_threshold():
 
 
 def split_corpus_units(adv_dir):
-    """Корпус → юниты-кандидаты для ретрива. Один чанк corpus.jsonl бьём по предложениям,
-    чтобы top-1/top-3 имели нетривиальный выбор (иначе ретрив бессмыслен на 1 чанке)."""
+    """Корпус → [(предложение, tier)] кандидатов для ретрива. Один чанк corpus.jsonl бьём по
+    предложениям, чтобы top-1/top-3 имели нетривиальный выбор (иначе ретрив бессмыслен на
+    1 чанке). Тир едет с текстом — контракт Passage/retrieve его отдаёт; нет поля → None."""
     cj = corpus_path(adv_dir)
     if not os.path.isfile(cj):
         return []
@@ -179,13 +180,15 @@ def split_corpus_units(adv_dir):
         if not line:
             continue
         try:
-            txt = json.loads(line).get("text", "")
+            rec = json.loads(line)
         except Exception:
             continue
+        txt = rec.get("text", "")
+        tier = rec.get("tier")
         for sent in re.split(r"(?<=[.!?])\s+", txt):
             sent = sent.strip()
             if len(sent) >= 8:
-                units.append(sent)
+                units.append((sent, tier))
     return units
 
 
@@ -205,11 +208,12 @@ def lexical_retrieve(question, adv_dir, top_k=3):
     if not qg:
         return []
     scored = []
-    for u in units:
+    for u, tier in units:
         ug = _char_ngrams(u)
         inter = len(qg & ug)
         union = len(qg | ug) or 1
-        scored.append({"text": u, "score": inter / union, "source": "corpus.jsonl"})
+        scored.append({"text": u, "score": inter / union, "source": "corpus.jsonl",
+                       "tier": tier})
     scored.sort(key=lambda d: d["score"], reverse=True)
     return scored[:top_k]
 
@@ -221,7 +225,7 @@ def retrieve(question, adv_dir, top_k=3):
         prefer = os.getenv("EVAL_ENGINE")  # 'lexical'|'semantic'|None
         eng = _engine.resolve_engine(adv_dir, prefer=prefer)
         try:
-            return [{"text": p.text, "score": p.score, "source": p.source}
+            return [{"text": p.text, "score": p.score, "source": p.source, "tier": p.tier}
                     for p in eng.retrieve(question, adv_dir, top_k=top_k)]
         except Exception as e:
             # НЕ молча: деградация семантики до лексич. пола наблюдаема (иначе FULL «как бы есть»,

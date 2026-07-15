@@ -192,7 +192,8 @@ def retrieve(question: str, advisor_dir: str, top_k: int = 3, rerank: bool = Fal
     if not rerank:
         idx = sims.argsort()[::-1][:top_k]
         return [
-            {"text": passages[i]["text"], "score": float(sims[i]), "source": passages[i]["source"]}
+            {"text": passages[i]["text"], "score": float(sims[i]),
+             "source": passages[i]["source"], "tier": passages[i].get("tier")}
             for i in idx
         ]
 
@@ -207,11 +208,14 @@ def retrieve(question: str, advisor_dir: str, top_k: int = 3, rerank: bool = Fal
     from reranker_model import CrossEncoderReranker  # ленивый импорт: тянет torch/transformers
     rerank_n = int(os.getenv("RERANK_N", "20"))
     pool = sims.argsort()[::-1][:rerank_n]
-    cands = [{"text": passages[i]["text"], "source": passages[i]["source"]} for i in pool]
+    # tier едет в кандидате: реранкер отдаёт исходный dict обратно (text_key="text"), так что
+    # поле переживает кросс-энкодер без отдельного маппинга по тексту.
+    cands = [{"text": passages[i]["text"], "source": passages[i]["source"],
+              "tier": passages[i].get("tier")} for i in pool]
     rk = CrossEncoderReranker()
     ranked = rk.rerank(question, cands, top_k=top_k, text_key="text")
     return [
-        {"text": c["text"], "score": float(s), "source": c["source"]}
+        {"text": c["text"], "score": float(s), "source": c["source"], "tier": c.get("tier")}
         for c, s in ranked
     ]
 

@@ -15,8 +15,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 PUBLIC_DOCS = [
-    ROOT / "README.md",
-    ROOT / "README.en.md",
+    ROOT / "README.md",  # витрина GitHub — английский
+    ROOT / "README.ru.md",
     ROOT / "SKILL.md",
     ROOT / "install-skill" / "SKILL.md",
 ]

@@ -4,7 +4,7 @@
     "rule_count": 17,
     "recipe_count": 16,
     "script_count": 68,
-    "test_count": 124,
+    "test_count": 125,
     "glossary_count": 110
   },
   "tools": [
@@ -2188,6 +2188,10 @@
     {
       "path": "tests/test_install_runtime.py",
       "covers": "install runtime"
+    },
+    {
+      "path": "tests/test_instructions_language_probe.py",
+      "covers": "instructions language probe"
     },
     {
       "path": "tests/test_judge_backend.py",

@@ -1,0 +1,99 @@
+{
+  "generated_at": "2026-07-15T12:11:29",
+  "top_k": 8,
+  "advisors": [
+    {
+      "slug": "machiavelli",
+      "k": 8,
+      "literal": {
+        "n": 15,
+        "k": 8,
+        "anchor_recall": 0.3333333333333333,
+        "anchor_mrr": 0.18333333333333332,
+        "blue_share_mean": 0.7416666666666667,
+        "citation_ability": 1.0,
+        "degenerate": false
+      },
+      "abstract": {
+        "n": 15,
+        "k": 8,
+        "anchor_recall": 0.06666666666666667,
+        "anchor_mrr": 0.03333333333333333,
+        "blue_share_mean": 0.7333333333333333,
+        "citation_ability": 1.0,
+        "degenerate": false
+      },
+      "style_gradient": {
+        "d_anchor_recall": 0.26666666666666666,
+        "d_anchor_mrr": 0.15,
+        "d_blue_share": 0.008333333333333415,
+        "relevance_tax": -0.15,
+        "junk_slots_suspected": false,
+        "underpowered": false,
+        "verdict": "ЧЕСТНЫЙ ЛИФТ: нужный пассаж доезжает чаще, налога на релевантность нет."
+      },
+      "hand_en": {
+        "n": 12,
+        "k": 8,
+        "anchor_recall": 0.4166666666666667,
+        "anchor_mrr": 0.375,
+        "blue_share_mean": 0.6979166666666666,
+        "citation_ability": 0.9166666666666666,
+        "degenerate": false
+      }
+    },
+    {
+      "slug": "marcus-aurelius",
+      "k": 8,
+      "literal": {
+        "n": 15,
+        "k": 8,
+        "anchor_recall": 0.6,
+        "anchor_mrr": 0.39111111111111113,
+        "blue_share_mean": 0.5083333333333333,
+        "citation_ability": 0.8666666666666667,
+        "degenerate": false
+      },
+      "abstract": {
+        "n": 15,
+        "k": 8,
+        "anchor_recall": 0.4666666666666667,
+        "anchor_mrr": 0.3,
+        "blue_share_mean": 0.7666666666666667,
+        "citation_ability": 1.0,
+        "degenerate": false
+      },
+      "style_gradient": {
+        "d_anchor_recall": 0.1333333333333333,
+        "d_anchor_mrr": 0.09111111111111114,
+        "d_blue_share": -0.2583333333333334,
+        "relevance_tax": -0.09111111111111114,
+        "junk_slots_suspected": false,
+        "underpowered": false,
+        "verdict": "ЧЕСТНЫЙ ЛИФТ: нужный пассаж доезжает чаще, налога на релевантность нет."
+      },
+      "hand_en": {
+        "n": 12,
+        "k": 8,
+        "anchor_recall": 0.6666666666666666,
+        "anchor_mrr": 0.5119047619047619,
+        "blue_share_mean": 0.90625,
+        "citation_ability": 1.0,
+        "degenerate": false
+      }
+    },
+    {
+      "slug": "sun-tzu",
+      "k": 8,
+      "hand_en": {
+        "n": 12,
+        "k": 8,
+        "anchor_recall": 1.0,
+        "anchor_mrr": 1.0,
+        "blue_share_mean": 0.375,
+        "citation_ability": 1.0,
+        "degenerate": false
+      }
+    }
+  ]
+}

@@ -201,21 +201,27 @@ def calibration_verdict(hits):
 
 
 def parse_queries(raw):
-    """Мусор/None → [] (withheld), не падение платного прогона."""
+    """Мусор/None → [] (withheld), не падение платного прогона.
+
+    Целимся в МАССИВ queries, а не в объект целиком: glm-5.2 на длинных ответах закрывает
+    массив, но теряет `}`. Строгий разбор `{...}` съедал 15 валидных ответов из 25 и отдавал
+    их в withheld — плечо HyDE получало смещённую выборку и ложный вердикт «вредит».
+    Хрупкость парсера превращается в выдумку про поведение модели.
+    Толерантность строго ограничена: нет массива queries → [], прозу в запросы не производим.
+    """
     if not raw or not isinstance(raw, str):
         return []
     s = raw.strip()
     m = re.search(r"```(?:json)?\s*(.*?)```", s, re.S)
     if m:
         s = m.group(1).strip()
-    m = re.search(r"\{.*\}", s, re.S)
+    m = re.search(r'"queries"\s*:\s*(\[.*?\])', s, re.S)
     if not m:
         return []
     try:
-        data = json.loads(m.group(0))
+        qs = json.loads(m.group(1))
     except Exception:
         return []
-    qs = data.get("queries") if isinstance(data, dict) else None
     if not isinstance(qs, list):
         return []
     out = []

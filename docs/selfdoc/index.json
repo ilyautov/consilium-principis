@@ -4,7 +4,7 @@
     "rule_count": 17,
     "recipe_count": 16,
     "script_count": 68,
-    "test_count": 123,
+    "test_count": 124,
     "glossary_count": 110
   },
   "tools": [
@@ -2208,6 +2208,10 @@
     {
       "path": "tests/test_lenses.py",
       "covers": "lenses"
+    },
+    {
+      "path": "tests/test_lever_adoption_probe.py",
+      "covers": "lever adoption probe"
     },
     {
       "path": "tests/test_lifecycle_tools.py",

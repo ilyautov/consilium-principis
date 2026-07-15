@@ -25,7 +25,9 @@ def _char_ngrams(s: str, n: int = 3):
     return {s[i:i + n] for i in range(len(s) - n + 1)}
 
 
-def _split_units(advisor_dir: str) -> List[str]:
+def _split_units(advisor_dir: str) -> List[tuple]:
+    """[(предложение, tier)]. Тир едет вместе с текстом: пол не должен ослеплять потребителя
+    по тиру только потому, что ollama недоступен. Нет поля в корпусе → None (неизвестно)."""
     cj = corpus_path(advisor_dir)
     if not os.path.isfile(cj):
         return []
@@ -36,13 +38,15 @@ def _split_units(advisor_dir: str) -> List[str]:
             if not line:
                 continue
             try:
-                txt = json.loads(line).get("text") or ""
+                rec = json.loads(line)
             except Exception:
                 continue
+            txt = rec.get("text") or ""
+            tier = rec.get("tier")
             for sent in re.split(r"(?<=[.!?])\s+", txt):
                 sent = sent.strip()
                 if len(sent) >= 8:
-                    units.append(sent)
+                    units.append((sent, tier))
     return units
 
 
@@ -56,10 +60,11 @@ class LexicalEngine(Engine):
             return []
         qg = _char_ngrams(question)
         scored = []
-        for u in units:
+        for u, tier in units:
             ug = _char_ngrams(u)
             union = len(qg | ug) or 1
-            scored.append(Passage(text=u, score=len(qg & ug) / union, source="corpus.jsonl"))
+            scored.append(Passage(text=u, score=len(qg & ug) / union,
+                                  source="corpus.jsonl", tier=tier))
         scored.sort(key=lambda p: p.score, reverse=True)
         return scored[:top_k]
 

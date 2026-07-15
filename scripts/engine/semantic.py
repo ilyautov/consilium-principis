@@ -25,7 +25,8 @@ class SemanticEngine(Engine):
         env_alpha = os.getenv("HYBRID_ALPHA")
         alpha = float(env_alpha) if env_alpha is not None else float(load_config_value("hybrid_alpha", 0.0))
         if alpha <= 0:
-            return [Passage(d["text"], float(d["score"]), d["source"]) for d in raw[:top_k]]
+            return [Passage(d["text"], float(d["score"]), d["source"], d.get("tier"))
+                    for d in raw[:top_k]]
 
         def toks(s):
             return set(re.sub(r"[^\w\s]", " ", s.lower()).split())
@@ -35,7 +36,7 @@ class SemanticEngine(Engine):
             dt = toks(d["text"])
             lex = len(qt & dt) / (len(qt) or 1)
             score = (1 - alpha) * float(d["score"]) + alpha * lex
-            rescored.append(Passage(d["text"], score, d["source"]))
+            rescored.append(Passage(d["text"], score, d["source"], d.get("tier")))
         rescored.sort(key=lambda p: p.score, reverse=True)
         return rescored[:top_k]
 

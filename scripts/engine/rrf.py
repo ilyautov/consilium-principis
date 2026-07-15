@@ -32,6 +32,9 @@ def rrf_fuse(ranked_lists, k: int = 60, top_k=None, weights=None):
             if kk not in agg:
                 agg[kk] = [0.0, p]
             agg[kk][0] += w / (k + rank)
-    fused = [Passage(text=p.text, score=score, source=p.source) for score, p in agg.values()]
+    # tier берём у представителя (первого встреченного пассажа с этим текстом): один и тот же
+    # текст в разных списках — один и тот же чанк корпуса, тир у него общий.
+    fused = [Passage(text=p.text, score=score, source=p.source, tier=p.tier)
+             for score, p in agg.values()]
     fused.sort(key=lambda x: x.score, reverse=True)
     return fused[:top_k] if top_k else fused

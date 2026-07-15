@@ -5,6 +5,8 @@
 # at runtime, not hardcoded (see refusal_demo.py).
 
 Output assets/demo-refusal-en.gif
+Output assets/demo-refusal-en.mp4
+Output assets/demo-refusal-en.webm
 
 Require python3
 

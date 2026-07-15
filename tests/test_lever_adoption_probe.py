@@ -225,6 +225,23 @@ def test_parse_queries_tolerates_fenced_json():
     assert P.parse_queries('```json\n{"queries": ["a"]}\n```') == ["a"]
 
 
+def test_parse_queries_survives_missing_closing_brace():
+    """Живой дефект: glm-5.2 на длинных ответах закрывает массив, но теряет `}`. Строгий
+    парсер съедал 15 из 25 ВАЛИДНЫХ ответов и отдавал их в withheld — плечо HyDE получило
+    смещённую выборку и ложный вердикт «вредит». Хрупкость парсера = выдумка про поведение."""
+    raw = '```json\n{"queries": ["первое высказывание", "второе высказывание"]\n```'
+    assert P.parse_queries(raw) == ["первое высказывание", "второе высказывание"]
+
+
+def test_parse_queries_survives_prose_around_the_array():
+    assert P.parse_queries('Вот queries: {"queries": ["a", "b"]} — готово') == ["a", "b"]
+
+
+def test_parse_queries_still_refuses_when_there_is_no_array():
+    """Толерантность к скобке не должна превращаться в выдумывание запросов из прозы."""
+    assert P.parse_queries("Извини, я не могу сочинять цитаты за реального человека.") == []
+
+
 def test_parse_queries_returns_empty_on_garbage_not_crash():
     """Модель вернула мусор → withheld, а не падение платного прогона."""
     assert P.parse_queries("извини, не могу") == []

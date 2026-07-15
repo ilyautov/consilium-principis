@@ -2,7 +2,7 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.ilyautov/consilium-principis",
   "title": "Consilium Principis",
-  "description": "Личный совет директоров из AI-персон реальных мыслителей, заземлённый в public-domain текстах, с контуром верности (дословные цитаты, fail-closed воздержание).",
+  "description": "A personal board of directors made of AI personas of real thinkers, grounded in public-domain texts, with a fidelity contour: quotes checked word-for-word by code, fail-closed abstention when there are no grounds.",
   "version": "0.1.0",
   "repository": {
     "url": "https://github.com/ilyautov/consilium-principis",

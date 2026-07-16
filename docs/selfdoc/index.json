@@ -4,7 +4,7 @@
     "rule_count": 17,
     "recipe_count": 16,
     "script_count": 68,
-    "test_count": 125,
+    "test_count": 126,
     "glossary_count": 110
   },
   "tools": [
@@ -2192,6 +2192,10 @@
     {
       "path": "tests/test_instructions_language_probe.py",
       "covers": "instructions language probe"
+    },
+    {
+      "path": "tests/test_instructions_language_variants_probe.py",
+      "covers": "instructions language variants probe"
     },
     {
       "path": "tests/test_judge_backend.py",

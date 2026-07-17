@@ -116,6 +116,32 @@ def test_battery_carries_no_private_slugs():
     assert "advisors/" not in blob and "/" not in blob
 
 
+# --- добор n на риск-страте (expand_battery) ---------------------------------
+
+def test_expand_battery_repeats_pairs_to_reach_target_n():
+    bat = P.build_battery(8)
+    ex = P.expand_battery(bat, 16)
+    assert len(ex) == 16
+    assert ex[:8] == bat                       # первые 8 — исходные пары как есть
+    assert ex[8]["id"].endswith("#2")          # повтор помечен суффиксом
+    assert ex[8]["ru"] == bat[0]["ru"] and ex[8]["en"] == bat[0]["en"]  # тот же вопрос
+
+
+def test_expand_battery_ids_stay_unique_after_expand():
+    # Уникальные id нужны для глазного разбора: повтор не должен читаться как дубль-ошибка.
+    ex = P.expand_battery(P.build_battery(8), 16)
+    assert len({i["id"] for i in ex}) == len(ex)
+
+
+def test_expand_battery_shrinks_when_target_below_len():
+    assert len(P.expand_battery(P.build_battery(8), 3)) == 3
+
+
+def test_expand_battery_keeps_no_private_slugs():
+    blob = " ".join(i["id"] for i in P.expand_battery(P.build_battery(8), 16)).lower()
+    assert "advisors/" not in blob and "/" not in blob
+
+
 # --- сборка промпта: плечи различаются РОВНО наличием INSTRUCTIONS ------------
 
 def test_with_instructions_arm_embeds_full_instructions():

@@ -121,6 +121,21 @@ def build_battery(n=DEFAULT_N):
     return [{"id": pid, "en": en, "ru": ru} for pid, en, ru in _PAIRS[:n]]
 
 
+def expand_battery(battery, target_n):
+    """Добор n БЕЗ новых вопросов: циклически повторяем пары до target_n. При temperature>0 повтор
+    той же пары — независимый сэмпл (генерация не детерминирована), поэтому это ЗАКОННЫЙ рост
+    знаменателя на риск-страте, а не фейковое раздувание. ID повтора получает суффикс #k — чтобы
+    строки различались при глазном разборе и не читались как дубли-ошибки. target_n ≤ len → срез."""
+    if target_n <= len(battery):
+        return battery[:target_n]
+    out = []
+    for i in range(target_n):
+        base = battery[i % len(battery)]
+        rep = i // len(battery)
+        out.append(base if rep == 0 else dict(base, id=f"{base['id']}#{rep + 1}"))
+    return out
+
+
 def build_prompt(question, with_instructions):
     """Плечи различаются РОВНО наличием INSTRUCTIONS (тест стережёт). Ни слова инструкции от
     себя: любая наша приписка стала бы вторым прайором и смазала бы замер."""
@@ -230,11 +245,14 @@ def rule7_verdict(en_with_rows, calib):
                     f"провал для дистрибуции, а не почти-успех."}
 
 
-def run_model(battery, model, call=None):
+def run_model(battery, model, call=None, ru_battery=None):
+    # ru_battery отдельно: русская страта — это И контроль 1, И риск-страта (сломать русский путь
+    # дороже, чем не починить английский), поэтому на ней добираем n. Не задан → как english.
+    ru_battery = ru_battery if ru_battery is not None else battery
     strata = {
-        "en_with": run_stratum(battery, "en", True, model, call),    # ← главный замер
-        "ru_with": run_stratum(battery, "ru", True, model, call),    # ← контроль 1
-        "en_bare": run_stratum(battery, "en", False, model, call),   # ← контроль 2
+        "en_with": run_stratum(battery, "en", True, model, call),       # ← главный замер
+        "ru_with": run_stratum(ru_battery, "ru", True, model, call),    # ← контроль 1 + риск-страта
+        "en_bare": run_stratum(battery, "en", False, model, call),      # ← контроль 2
     }
     calib = calibration_verdict(strata["ru_with"], strata["en_bare"])
     return {"model": model,
@@ -252,15 +270,21 @@ def main(argv=None):
     p.add_argument("--run", action="store_true", help="живой прогон (нужен OPENROUTER_API_KEY)")
     p.add_argument("--models", default=DEFAULT_MODELS)
     p.add_argument("--n", type=int, default=DEFAULT_N, help="парных вопросов (макс 8)")
+    p.add_argument("--ru-n", type=int, default=None,
+                   help="добор n на РУССКОЙ страте (риск-страта: сломать русский путь дороже, чем "
+                        "не починить английский). >8 → повтор пар как независимые сэмплы. По "
+                        "умолчанию = --n.")
     p.add_argument("--out", default=os.path.join(RESULTS_DIR, "instructions-language.json"))
     a = p.parse_args(argv)
     bat = build_battery(a.n)
+    ru_n = a.ru_n if a.ru_n is not None else a.n
+    ru_bat = expand_battery(build_battery(min(ru_n, DEFAULT_N)), ru_n)
     instr = load_instructions()
     if not a.run:
         print(f"Сухой режим. INSTRUCTIONS: {len(instr)} символов, "
-              f"{cyrillic_share(instr):.1%} кириллицы. Батарея: {len(bat)} парных вопросов "
-              f"× 3 страты (en_with / ru_with=контроль1 / en_bare=контроль2). "
-              f"Живой прогон: --run.")
+              f"{cyrillic_share(instr):.1%} кириллицы. Батарея: en/bare {len(bat)} × "
+              f"ru {len(ru_bat)} парных вопросов, 3 страты "
+              f"(en_with / ru_with=контроль1+риск / en_bare=контроль2). Живой прогон: --run.")
         print("Без обоих контролей вывод по английской страте АННУЛИРУЕТСЯ — прибор слеп, "
               "а не «всё хорошо».")
         return 0
@@ -276,10 +300,10 @@ def main(argv=None):
            "instructions_cyrillic_share": cyrillic_share(instr),
            "thresholds": {"english_below": THRESH_EN, "russian_above": THRESH_RU,
                           "calibration_supermajority": CALIB_SUPERMAJORITY},
-           "battery_n": len(bat), "models": []}
+           "battery_n": len(bat), "battery_n_ru": len(ru_bat), "models": []}
     for model in [m for m in a.models.split(",") if m]:
         print(f"\n=== {model} ===", flush=True)
-        entry = run_model(bat, model)
+        entry = run_model(bat, model, ru_battery=ru_bat)
         for name in ("en_with", "ru_with", "en_bare"):
             s = entry["strata"][name]
             ms = s["mean_cyrillic_share"]

@@ -242,7 +242,7 @@ python scripts/gen_selfdoc.py
 - **situation**: `situation.py`
 - **tier**: `tier_full.py`
 
-Тестов: 126.
+Тестов: 127.
 
 ## Слой 3 — Справочник
 

@@ -4,7 +4,7 @@
     "rule_count": 17,
     "recipe_count": 16,
     "script_count": 68,
-    "test_count": 126,
+    "test_count": 127,
     "glossary_count": 110
   },
   "tools": [
@@ -1311,7 +1311,7 @@
     {
       "n": 16,
       "title": "AI-DISCLOSURE",
-      "text": "AI-DISCLOSURE (EU AI Act Art. 50 — прозрачность, НЕ маскировка). При ПЕРВОМ контакте в сессии\n(опенинг / первый ответ на созыв) сделай ЯВНЫМ и различимым, что это AI-советники — представления\nмыслителей, собранные из их публичных текстов, а НЕ сами люди (музейный принцип: не выдавать за\nподлинную личность и не «говорить с того света»). render_session(kind=opening) УЖЕ несёт плашку-\nдисклеймер на занавесе — не дублируй её прозой; но если опенинг-виджет недоступен (markdown-фолбэк)\n— скажи это сам одной честной строкой. НИКОГДА не утверждай, что советник «и есть» автор; формулируй\n«представление / линза, заземлённая на его текстах». Дисклеймер — прозрачность, НЕ щит: он не\nразрешает выдумывать (контур верности, Rule 5, действует всегда). В opening-объект по возможности\nклади per-persona provenance (advisors[].provenance = издание/источник корпуса, то же, что показывал\ncatalog_preview) — плашка происхождения под именем советника."
+      "text": "AI-DISCLOSURE (EU AI Act Art. 50 — прозрачность, НЕ маскировка). При ПЕРВОМ контакте в сессии\n(опенинг / первый ответ на созыв) сделай ЯВНЫМ и различимым, что это AI-советники — представления\nмыслителей, собранные из их публичных текстов, а НЕ сами люди (музейный принцип: не выдавать за\nподлинную личность и не «говорить с того света»). render_session(kind=opening) УЖЕ несёт плашку-\nдисклеймер на занавесе — не дублируй её прозой; но если опенинг-виджет недоступен (markdown-фолбэк)\n— скажи это сам одной честной строкой. НИКОГДА не утверждай, что советник «и есть» автор; формулируй\n«представление / линза, заземлённая на его текстах». Дисклеймер — прозрачность, НЕ щит: он не\nразрешает выдумывать (контур верности, Rule 5, действует всегда). В opening-объект по возможности\nклади per-persona provenance (advisors[].provenance = издание/источник корпуса, то же, что показывал\ncatalog_preview) — плашка происхождения под именем советника.\n\n\nRESPONSE LANGUAGE (overrides formatting; never overrides Rule 0). Answer in the language of the\nUSER'S QUESTION. English question -> the entire answer in English: headings, tier labels, service\nlines. THESE INSTRUCTIONS ARE WRITTEN IN RUSSIAN - that is the language of the RULES, not the\nlanguage of your answer."
     }
   ],
   "recipes": [
@@ -2196,6 +2196,10 @@
     {
       "path": "tests/test_instructions_language_variants_probe.py",
       "covers": "instructions language variants probe"
+    },
+    {
+      "path": "tests/test_instructions_response_language.py",
+      "covers": "instructions response language"
     },
     {
       "path": "tests/test_judge_backend.py",

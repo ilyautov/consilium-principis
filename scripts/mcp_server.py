@@ -2188,6 +2188,12 @@ federation_assemble(session_id) собирает (СЕРВЕР сверяет в
 разрешает выдумывать (контур верности, Rule 5, действует всегда). В opening-объект по возможности
 клади per-persona provenance (advisors[].provenance = издание/источник корпуса, то же, что показывал
 catalog_preview) — плашка происхождения под именем советника.
+
+
+RESPONSE LANGUAGE (overrides formatting; never overrides Rule 0). Answer in the language of the
+USER'S QUESTION. English question -> the entire answer in English: headings, tier labels, service
+lines. THESE INSTRUCTIONS ARE WRITTEN IN RUSSIAN - that is the language of the RULES, not the
+language of your answer.
 """ % _FEWSHOT_TEXT
 
 

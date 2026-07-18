@@ -2231,11 +2231,13 @@ def _handle_rpc(msg):
     """JSON-RPC запрос → ответ (или None для нотификаций). Реализует initialize/tools.*"""
     method, req_id = msg.get("method"), msg.get("id")
     if method == "initialize":
+        # Язык ответа фиксируется конфигом (env), известным серверу ещё до первого вопроса.
+        instructions = INSTRUCTIONS + _response_language_directive(os.getenv("CONSILIUM_LANG"))
         return _rpc_result(req_id, {
             "protocolVersion": "2024-11-05",
             "capabilities": {"tools": {}},
             "serverInfo": {"name": "consilium-principis", "version": "0.1.0"},
-            "instructions": INSTRUCTIONS,
+            "instructions": instructions,
         })
     if method in ("notifications/initialized", "initialized"):
         return None

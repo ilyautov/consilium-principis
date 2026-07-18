@@ -4,7 +4,7 @@
     "rule_count": 18,
     "recipe_count": 16,
     "script_count": 73,
-    "test_count": 139,
+    "test_count": 141,
     "glossary_count": 113
   },
   "tools": [
@@ -2414,6 +2414,14 @@
     {
       "path": "tests/test_fidelity_marker.py",
       "covers": "fidelity marker"
+    },
+    {
+      "path": "tests/test_fidelity_negation_crop.py",
+      "covers": "fidelity negation crop"
+    },
+    {
+      "path": "tests/test_fidelity_threshold.py",
+      "covers": "fidelity threshold"
     },
     {
       "path": "tests/test_fidelity_tiers.py",

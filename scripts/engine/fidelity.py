@@ -10,9 +10,27 @@ from corpusbuild.paths import corpus_path
 from typing import Optional
 
 
-# 🔵/🟢 требует осмысленного фрагмента: одиночное общее слово («the», «и») дословно совпадёт,
-# но как «цитата» бессмысленно и вводит в заблуждение. Ниже порога (норм. длина) → None (🟡).
+# 🔵/🟢 требует осмысленного фрагмента (H2, Правило A): порог — по СЛОВАМ, не символам.
+# Одиночное/двухсловное совпадение («remember», «your mortality») дословно найдётся, но
+# как «цитата» бессмысленно и вводит в заблуждение. Ниже MIN_QUOTE_WORDS → None (🟡, fail-closed).
+MIN_QUOTE_WORDS = 3
+# MIN_QUOTE_CHARS сохранён для внешнего использования (citation_rate_eval: мин. длина
+# извлекаемого кавычного спана) — это ОТДЕЛЬНАЯ ось, гейтом верности больше не служит.
 MIN_QUOTE_CHARS = 8
+
+# Токены-отрицания (C1): обрезка, отсекающая ведущее отрицание, переворачивает смысл цитаты.
+_NEG = {"not", "no", "never", "nt", "не", "ни", "нет"}
+
+
+def _crop_severs_negation(q: str, chunk: str) -> bool:
+    """True, если непосредственно ПЕРЕД позицией матча q в чанке стоит токен-отрицание —
+    значит обрезка отсекла отрицание из исходного предложения (напр. «not only… but» →
+    «only… but»). Такой матч честной цитатой не является → не 🔵. Оба аргумента норм. (_norm)."""
+    i = chunk.find(q)
+    if i <= 0:
+        return False
+    prefix = chunk[:i].split()
+    return bool(prefix) and prefix[-1] in _NEG
 
 
 def _norm(s: str) -> str:
@@ -79,11 +97,11 @@ def best_match(quote: str, advisor_dir: str):
     пару из ЛУЧШЕГО (самого авторитетного) тира — чтобы source соответствовал
     тиру, который определит маркер. Чанк без поля tier → "A" (fail-closed)."""
     q = _norm(quote)
-    if len(q) < MIN_QUOTE_CHARS:                         # пусто/слишком коротко → не 🔵 (fail-closed)
+    if len(q.split()) < MIN_QUOTE_WORDS:                 # <3 слов → не 🔵 (H2, fail-closed)
         return None
     best = None  # (rank, tier, source)
     for ch in _load_chunks(advisor_dir):
-        if q in ch["_norm"]:
+        if q in ch["_norm"] and not _crop_severs_negation(q, ch["_norm"]):  # C1: обрезка не рвёт отрицание
             t = ch.get("tier", "A")
             rank = _TIER_ORDER.get(t, 9)
             if best is None or rank < best[0]:
@@ -128,7 +146,7 @@ def verbatim_in_corpus(quote: str, advisor_dir: str) -> Optional[str]:
     ни в одном чанке, возвращает None (🟡) — кросс-чанковый join не используется,
     чтобы исключить ложные 🔵."""
     q = _norm(quote)
-    if len(q) < MIN_QUOTE_CHARS:                         # коротыш не считаем верифицированной цитатой
+    if len(q.split()) < MIN_QUOTE_WORDS:                 # <3 слов не считаем верифицированной цитатой (H2)
         return None
     chunks = _corpus_norm_text(advisor_dir)
     for src, ctext in chunks:

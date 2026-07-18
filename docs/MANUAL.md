@@ -227,7 +227,7 @@ python scripts/gen_selfdoc.py
 
 ### Инвентарь кода
 
-Скрипты (70) по подсистемам:
+Скрипты (71) по подсистемам:
 
 - **build**: `build_advisor.py`
 - **calibrate**: `calibrate_advisor.py`
@@ -235,14 +235,14 @@ python scripts/gen_selfdoc.py
 - **collect**: `collect_common.py`, `collect_pd.py`, `collect_transcript.py`, `collect_web.py`
 - **diversity**: `diversity_check.py`
 - **doctor**: `doctor.py`
-- **eval**: `bootstrap_eval.py`, `diagnose_retrieval.py`, `eval.py`, `poison_eval.py`, `serving_gate_eval.py`, `synth_eval.py`
+- **eval**: `bootstrap_eval.py`, `diagnose_retrieval.py`, `eval.py`, `poison_eval.py`, `retrieval_regression.py`, `serving_gate_eval.py`, `synth_eval.py`
 - **install**: `mcp_install.py`
 - **mcp**: `mcp_server.py`
 - **other**: `abstention_curve.py`, `adversarial_loop.py`, `advisor_calibration.py`, `atomic.py`, `board.py`, `board_init.py`, `build_manual.py`, `build_orchestrator.py`, `calc_render.py`, `calibration.py`, `decision_card.py`, `decision_map.py`, `decision_record.py`, `diagnose_multiquery.py`, `exp_bridge.py`, `exp_graph.py`, `exp_kernels.py`, `exp_kernels_finer.py`, `extractor.py`, `gen_golden.py`, `gen_selfdoc.py`, `golden_meta.py`, `governance.py`, `ingest_telegram.py`, `judge_backend.py`, `lang_check.py`, `lens_builder.py`, `lenses.py`, `llm_local.py`, `manifest_builder.py`, `mc_run.py`, `mdmeta.py`, `mirror.py`, `moat_check.py`, `outcome_loop.py`, `perturbation.py`, `prediction_calibration.py`, `preflight.py`, `premortem.py`, `principis.py`, `recipes.py`, `relevance_gate.py`, `relevance_judge.py`, `safe_expr.py`, `scaffold.py`, `seed.py`, `selfdoc_query.py`, `session_render.py`, `setup_full.py`, `stability.py`
 - **situation**: `situation.py`
 - **tier**: `tier_full.py`
 
-Тестов: 133.
+Тестов: 135.
 
 ## Слой 3 — Справочник
 

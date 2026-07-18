@@ -14,6 +14,16 @@ from .fidelity import verbatim_in_corpus, best_match  # backend-независи
 from corpusbuild.paths import config_path  # единый резолвер пути конфига (fidelity уже положил scripts/ на path)
 
 
+class StaleIndexError(Exception):
+    """Семантический индекс рассинхронизирован с корпусом/моделью/чанкингом/форматом
+    (fingerprint в .meta.json не совпал с текущим). Fail-closed: retrieve НЕ отдаёт
+    результаты по устаревшему индексу — иначе `source`/цитаты укажут на чанки корпуса,
+    которого больше нет, а порог abstain потеряет смысл. `safe_retrieve` ловит и
+    деградирует semantic→lexical (наблюдаемо), а не тихо-неверно. Зеркало политики
+    load_calibration (staleness через corpus_sha256). НЕ бьёт по verbatim-рву: fidelity
+    читает свежий corpus.jsonl напрямую, не .meta.json (см. спека 2026-07-18 §1.1)."""
+
+
 @dataclass
 class Passage:
     text: str

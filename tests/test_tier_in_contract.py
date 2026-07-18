@@ -40,14 +40,17 @@ def test_positional_construction_still_works():
 
 # --- tier_full.retrieve: точка, где тир умирал ---
 
-def _index(tmp_path, monkeypatch, passages):
+def _index(tmp_path, monkeypatch, passages, advisor_dir="/tmp/adv"):
     import numpy as np
     import tier_full
     emb = str(tmp_path / "e.npy")
     meta = str(tmp_path / "e.meta.json")
     np.save(emb, np.eye(len(passages), 4, dtype="float32"))
     with open(meta, "w", encoding="utf-8") as f:
-        json.dump({"passages": passages}, f, ensure_ascii=False)
+        # fingerprint СВЕЖИЙ для этого advisor'а — иначе retrieve fail-closed (StaleIndexError).
+        # Эти тесты про пропагацию тира, не про staleness (её покрывает test_index_fingerprint).
+        json.dump({"fingerprint": tier_full._index_fingerprint(advisor_dir),
+                   "passages": passages}, f, ensure_ascii=False)
     monkeypatch.setattr(tier_full, "_paths", lambda adv: (emb, meta))
     monkeypatch.setattr(tier_full, "_embed_query",
                         lambda q: np.array([1.0, 0.0, 0.0, 0.0], dtype="float32"))

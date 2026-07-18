@@ -25,8 +25,9 @@
 """
 import datetime
 import os
+import secrets
 import sys
-import uuid
+import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 if HERE not in sys.path:
@@ -49,15 +50,26 @@ DIRECTIONS = {DIRECTION_MAX, DIRECTION_MIN}
 REVERSIBILITY = {"one-way", "two-way"}
 
 _ID_PREFIX = "dc_"
+# Crockford base32 (без I L O U — не путаются при чтении); алфавит ULID.
+_CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+
+
+def _ulid():
+    """26-символьный ULID: 48-бит мс-таймстамп (старшие 10 симв.) + 80-бит случайность
+    (младшие 16). Лексикографически сортируется по времени создания. Stdlib, без зависимостей.
+    Только 0-9A-Z → проходит и isalnum(), и ^[A-Za-z0-9]+$."""
+    ts = int(time.time() * 1000) & ((1 << 48) - 1)
+    val = (ts << 80) | secrets.randbits(80)                 # 128 бит
+    return "".join(_CROCKFORD[(val >> (5 * (25 - i))) & 0x1F] for i in range(26))
 
 
 def new_card_id():
-    """Стабильный ключ сшивания: dc_ + hex uuid4 (stdlib, без внешних зависимостей).
+    """Стабильный ключ сшивания: dc_ + ULID (stdlib, без внешних зависимостей).
 
-    Открытый вопрос спеки §8.1 (ULID vs uuid4) решён в пользу uuid4: ноль зависимостей,
-    формат матчит ^dc_[A-Za-z0-9]+$. Лексикографическая сортировка по времени (плюс ULID)
-    здесь не нужна — журнал сортируется по created/resolved_on, не по id."""
-    return _ID_PREFIX + uuid.uuid4().hex
+    Открытый вопрос спеки §8.1 (ULID vs uuid4) решён владельцем в пользу ULID: id
+    лексикографически сортируется по времени создания (удобно для листингов/журналов),
+    формат по-прежнему матчит ^dc_[A-Za-z0-9]+$ → старые dc_<hex>-карты остаются валидны."""
+    return _ID_PREFIX + _ulid()
 
 
 def _parse_date(v):

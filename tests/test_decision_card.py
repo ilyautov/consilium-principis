@@ -71,6 +71,22 @@ def test_new_card_id_matches_dc_pattern():
     assert re.fullmatch(r"dc_[A-Za-z0-9]+", cid), cid
 
 
+def test_new_card_id_is_ulid_shape():
+    # ULID: префикс dc_ + ровно 26 символов Crockford base32 (только 0-9A-Z, без I L O U).
+    body = dc.new_card_id()[len(dc._ID_PREFIX):]
+    assert len(body) == 26, body
+    assert all(c in dc._CROCKFORD for c in body), body
+
+
+def test_card_id_sortable_by_time(monkeypatch):
+    # Смысл перехода на ULID: id лексикографически сортируется по времени создания.
+    monkeypatch.setattr(dc.time, "time", lambda: 1_000.0)
+    earlier = dc.new_card_id()
+    monkeypatch.setattr(dc.time, "time", lambda: 2_000.0)
+    later = dc.new_card_id()
+    assert earlier < later, (earlier, later)
+
+
 def test_new_card_id_is_unique():
     assert dc.new_card_id() != dc.new_card_id()
 

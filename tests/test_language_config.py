@@ -69,12 +69,15 @@ def test_rules_0_and_5_survive_every_mode(monkeypatch):  # G2
 
 
 def test_both_force_blocks_bow_to_rule0():  # G3
-    # Клауза подчинения безопасности обязана быть в ОБОИХ форс-блоках — иначе фиксация языка
-    # могла бы позиционно (она последняя) перебить и Правило 0.
+    # Клауза подчинения обязана быть в ОБОИХ форс-блоках — иначе фиксация языка могла бы
+    # позиционно (она последняя) перебить и безопасность (Rule 0), и ров дословности (Rule 5:
+    # «ENTIRELY in English» не должно переводить дословную 🔵-цитату).
     en = _response_language_directive("en").lower()
     ru = _response_language_directive("ru").lower()
     assert "never overrides rule 0" in en, "EN-блок потерял клаузу подчинения Rule 0"
+    assert "rule 5" in en, "EN-блок не защищает ров верности (Rule 5)"
     assert "не перекрывает правило 0" in ru, "RU-блок потерял клаузу подчинения Правилу 0"
+    assert "правило 5" in ru, "RU-блок не защищает ров верности (Правило 5)"
 
 
 def test_guard_not_asleep_force_blocks_are_nonempty_and_distinct():  # G5

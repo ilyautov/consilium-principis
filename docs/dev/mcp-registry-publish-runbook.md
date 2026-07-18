@@ -68,6 +68,12 @@ mcpb pack                                 # читает manifest.json → consi
 `docs/`, `.github/`, `_archive/`. Если mcpb поддерживает `.mcpbignore` — исключить их;
 иначе паковать из подготовленной стейджинг-директории.
 
+### 2b. Гард содержимого бандла (ОБЯЗАТЕЛЬНО до Release)
+```bash
+unzip -Z1 consilium-principis.mcpb | python3 scripts/ci_bundle_guard.py -
+# ожидается: bundle-guard: OK. Любой forbidden путь → СТОП, не публиковать.
+```
+
 ### 2. Посчитать и вписать sha256
 ```bash
 openssl dgst -sha256 consilium-principis.mcpb

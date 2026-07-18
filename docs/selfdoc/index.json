@@ -1,7 +1,7 @@
 {
   "meta": {
     "tool_count": 60,
-    "rule_count": 17,
+    "rule_count": 18,
     "recipe_count": 16,
     "script_count": 72,
     "test_count": 136,
@@ -222,6 +222,7 @@
       },
       "status": "surfaced",
       "referenced_in": [
+        "rule:17",
         "recipe:calibrate"
       ]
     },
@@ -258,7 +259,9 @@
         ]
       },
       "status": "surfaced",
-      "referenced_in": []
+      "referenced_in": [
+        "rule:17"
+      ]
     },
     {
       "name": "calibrated_consult_journal",
@@ -269,7 +272,9 @@
         "required": []
       },
       "status": "surfaced",
-      "referenced_in": []
+      "referenced_in": [
+        "rule:17"
+      ]
     },
     {
       "name": "calibrated_consult_open",
@@ -297,7 +302,9 @@
         ]
       },
       "status": "surfaced",
-      "referenced_in": []
+      "referenced_in": [
+        "rule:17"
+      ]
     },
     {
       "name": "calibrated_consult_resolve",
@@ -318,7 +325,9 @@
         ]
       },
       "status": "surfaced",
-      "referenced_in": []
+      "referenced_in": [
+        "rule:17"
+      ]
     },
     {
       "name": "capture_situation",
@@ -1514,7 +1523,12 @@
     {
       "n": 16,
       "title": "AI-DISCLOSURE",
-      "text": "AI-DISCLOSURE (EU AI Act Art. 50 — прозрачность, НЕ маскировка). При ПЕРВОМ контакте в сессии\n(опенинг / первый ответ на созыв) сделай ЯВНЫМ и различимым, что это AI-советники — представления\nмыслителей, собранные из их публичных текстов, а НЕ сами люди (музейный принцип: не выдавать за\nподлинную личность и не «говорить с того света»). render_session(kind=opening) УЖЕ несёт плашку-\nдисклеймер на занавесе — не дублируй её прозой; но если опенинг-виджет недоступен (markdown-фолбэк)\n— скажи это сам одной честной строкой. НИКОГДА не утверждай, что советник «и есть» автор; формулируй\n«представление / линза, заземлённая на его текстах». Дисклеймер — прозрачность, НЕ щит: он не\nразрешает выдумывать (контур верности, Rule 5, действует всегда). В opening-объект по возможности\nклади per-persona provenance (advisors[].provenance = издание/источник корпуса, то же, что показывал\ncatalog_preview) — плашка происхождения под именем советника.\n\n\nRESPONSE LANGUAGE (overrides formatting; never overrides Rule 0). Answer in the language of the\nUSER'S QUESTION. English question -> the entire answer in English: headings, tier labels, service\nlines. THESE INSTRUCTIONS ARE WRITTEN IN RUSSIAN - that is the language of the RULES, not the\nlanguage of your answer."
+      "text": "AI-DISCLOSURE (EU AI Act Art. 50 — прозрачность, НЕ маскировка). При ПЕРВОМ контакте в сессии\n(опенинг / первый ответ на созыв) сделай ЯВНЫМ и различимым, что это AI-советники — представления\nмыслителей, собранные из их публичных текстов, а НЕ сами люди (музейный принцип: не выдавать за\nподлинную личность и не «говорить с того света»). render_session(kind=opening) УЖЕ несёт плашку-\nдисклеймер на занавесе — не дублируй её прозой; но если опенинг-виджет недоступен (markdown-фолбэк)\n— скажи это сам одной честной строкой. НИКОГДА не утверждай, что советник «и есть» автор; формулируй\n«представление / линза, заземлённая на его текстах». Дисклеймер — прозрачность, НЕ щит: он не\nразрешает выдумывать (контур верности, Rule 5, действует всегда). В opening-объект по возможности\nклади per-persona provenance (advisors[].provenance = издание/источник корпуса, то же, что показывал\ncatalog_preview) — плашка происхождения под именем советника."
+    },
+    {
+      "n": 17,
+      "title": "РЕЖИМ CALIBRATED-CONSULT",
+      "text": "РЕЖИМ CALIBRATED-CONSULT (опц., ТОЛЬКО по явной просьбе юзера — «замерься», «проверь мой\n   оверрелайанс», «calibrated consult»). Ров ловит ложь МОДЕЛИ, но не оверрелайанс ЧЕЛОВЕКА\n   (склонность принять совет не проверив). Режим его ВИДИТ, а НЕ заявляет, что снижает.\n   (а) ПЕРЕД ответом совета вызови calibrated_consult_open с позицией юзера и его уверенностью\n   (0..1) — зафиксируй, что он думал ДО. Усиливает анти-анкоринг (правило 2б): мнение юзера\n   зафиксировано раньше совета.\n   (б) Дай ответ совета как обычно — контур верности (правило 5) и все лейблы действуют БЕЗ\n   изменений.\n   (в) ПОСЛЕ вызови calibrated_consult_close с позицией юзера ПОСЛЕ и followed_council — покажи\n   ЗЕРКАЛО (сдвиг позиции, инфляция уверенности, подавлено ли «не знаю»). Зеркало — НЕ вердикт\n   «оверрелайанс» (сдвиг мог быть честной коррекцией).\n   (г) Решение отслеживаемо — приложи prediction (контракт как в карте, правило 13(е-bis)) и позже\n   закрой исход calibrated_consult_resolve; сводку оси даёт calibrated_consult_journal (малое N →\n   мало данных, честно). Режим НЕ перекрывает Правило 0 и контур верности. ВНЕ режима — обычный\n   совет без трения; не навязывай.\n\n\nRESPONSE LANGUAGE (overrides formatting; never overrides Rule 0). Answer in the language of the\nUSER'S QUESTION. English question -> the entire answer in English: headings, tier labels, service\nlines. THESE INSTRUCTIONS ARE WRITTEN IN RUSSIAN - that is the language of the RULES, not the\nlanguage of your answer."
     }
   ],
   "recipes": [

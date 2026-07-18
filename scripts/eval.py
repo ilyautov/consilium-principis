@@ -235,11 +235,16 @@ def retrieve(question, adv_dir, top_k=3):
     return lexical_retrieve(question, adv_dir, top_k=top_k)
 
 
-def load_golden(name, kind, advisor_dir=None):
+def load_golden(name, kind, advisor_dir=None, lang=None):
     """Грузит golden-jsonl. §1.4: если файл несёт _meta-строку с хэшем корпуса (пишут
     gen_golden/synth_eval), сравниваем с ТЕКУЩИМ корпусом и при дрейфе громко предупреждаем
-    в stderr (не падение). Легаси-файлы без meta грузятся молча, как раньше."""
-    path = os.path.join(GOLDEN_DIR, f"{name}.{kind}.jsonl")
+    в stderr (не падение). Легаси-файлы без meta грузятся молча, как раньше.
+
+    lang: языковой стратум (спека 2026-07-18 §2.1). None → базовый {name}.{kind}.jsonl (RU по
+    конвенции). lang='en' → {name}.{kind}.en.jsonl. Раньше .en-варианта было не достать —
+    стратификация по языку не доезжала до метрики; теперь адресуется явно."""
+    suffix = f".{lang}" if lang else ""
+    path = os.path.join(GOLDEN_DIR, f"{name}.{kind}{suffix}.jsonl")
     if not os.path.isfile(path):
         return None, None
     rows = []
@@ -258,9 +263,9 @@ def load_golden(name, kind, advisor_dir=None):
     return rows, path
 
 
-def retrieval_eval(adv_dir):
+def retrieval_eval(adv_dir, lang=None):
     name = os.path.basename(adv_dir.rstrip("/"))
-    golden, path = load_golden(name, "retrieval", advisor_dir=adv_dir)
+    golden, path = load_golden(name, "retrieval", advisor_dir=adv_dir, lang=lang)
     if not golden:
         return None
     top1 = top3 = 0
@@ -437,19 +442,101 @@ def track_record_eval(adv_dir):
             "resolved": resolved, "pending": pending, "titles": records}
 
 
-def main():
+def _corpus_sha(adv_dir):
+    """Полный sha256 корпуса (форма moat-baseline). engine.corpus_sha256 — ЕДИНЫЙ хэшер;
+    если engine-пакет недоступен, падаем на golden_meta (12 hex) — связь с корпусом всё равно есть."""
+    if ENGINE_OK:
+        try:
+            return _engine.corpus_sha256(adv_dir)
+        except Exception:
+            pass
+    try:
+        import golden_meta
+        return golden_meta.corpus_sha12(adv_dir)
+    except Exception:
+        return None
+
+
+def _retrieval_stratum(r):
+    return {"n": r["n"], "top1": r["top1"], "top3": r["top3"],
+            "mean_top": r["mean_top"], "degenerate": r["degenerate"],
+            "thematic_inexact": r.get("thematic_inexact", False)}
+
+
+def _abstention_stratum(a, curve, threshold):
+    st = {"ooc_n": a["ooc_n"], "correct_abstain": a["correct_abstain"],
+          "honest_abstain": (a["correct_abstain"] / a["ooc_n"]) if a["ooc_n"] else 0.0,
+          "hallucinations": len(a["hallucinations"]),
+          "ans_n": a["ans_n"], "false_abstain": a["false_abstain"], "threshold": threshold}
+    if a["ans_n"]:
+        st["false_abstain_rate"] = a["false_abstain"] / a["ans_n"]
+    if curve:
+        st["auc"] = curve["auc"]
+    return st
+
+
+def build_metrics(advisor_dirs, backend_label):
+    """Стратифицированный машинный артефакт метрик (форма docs/dev/moat-baseline.json).
+
+    Слой 1 узла 2 (спека §2.3): НОЛЬ поведения контура — только сериализация того, что уже
+    считают retrieval_eval / abstention_eval / abstention_curve_eval, разложенное по стратам
+    ru / en / ooc + backend + per-advisor corpus_sha256 (связь метрик с корпусом; сравнение
+    честно лишь при совпадении хэша). EN-стратум доезжает благодаря фиксу load_golden(.en)."""
+    import datetime
+    out = {"meta": {"ts": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    "backend": backend_label, "corpus_sha256": {}},
+           "advisors": {}}
+    for p in advisor_dirs:
+        name = os.path.basename(p.rstrip("/"))
+        sha = _corpus_sha(p)
+        strata = {}
+        ru = retrieval_eval(p, lang=None)
+        if ru:
+            strata["ru"] = _retrieval_stratum(ru)
+        en = retrieval_eval(p, lang="en")
+        if en:
+            strata["en"] = _retrieval_stratum(en)
+        if ENGINE_OK:
+            thr = _engine.resolve_engine(p, prefer=os.getenv("EVAL_ENGINE")).abstain_threshold(p)
+        else:
+            thr = load_abstain_threshold()
+        ab = abstention_eval(p, thr)
+        if ab:
+            strata["ooc"] = _abstention_stratum(ab, abstention_curve_eval(p), thr)
+        if strata:
+            out["advisors"][name] = {"corpus_sha256": sha, "strata": strata}
+        if sha:
+            out["meta"]["corpus_sha256"][name] = sha
+    return out
+
+
+def main(argv=None):
     import argparse
     ap = argparse.ArgumentParser(description="eval.py — харнесс точности и безопасности совета")
     ap.add_argument("advisors", nargs="*", help="папки советников (advisors/munger …)")
     ap.add_argument("--engine", choices=["lexical", "semantic"], default=None,
                     help="форсить бэкенд (иначе resolved). Прокидывается в EVAL_ENGINE.")
-    args = ap.parse_args()
+    ap.add_argument("--emit-metrics", metavar="PATH", default=None,
+                    help="записать стратифицированные метрики JSON (форма moat-baseline) и выйти")
+    args = ap.parse_args(argv)
     if args.engine:
         os.environ["EVAL_ENGINE"] = args.engine
     paths = args.advisors or []
     if not paths:
         print("Дай папки советников: python eval.py advisors/munger ...", file=sys.stderr)
         sys.exit(1)
+
+    if args.emit_metrics:
+        if ENGINE_OK:
+            backend = _engine.resolve_engine(paths[0], prefer=os.getenv("EVAL_ENGINE")).name
+        else:
+            backend = "full" if TIER_FULL else "lexical"
+        metrics = build_metrics(paths, backend)
+        with open(args.emit_metrics, "w", encoding="utf-8") as f:
+            json.dump(metrics, f, ensure_ascii=False, indent=2)
+        print(f"metrics ({backend}, {len(metrics['advisors'])} советников) → {args.emit_metrics}",
+              file=sys.stderr)
+        return
 
     print("=== FIDELITY — exact-match гейт (Correctness: заявленное 🔵/T1/T2 дословно в корпусе?) ===")
     any_violation = False

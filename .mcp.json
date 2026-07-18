@@ -1,7 +1,7 @@
 {
   "mcpServers": {
     "consilium-principis": {
-      "command": "python3",
+      "command": "${CONSILIUM_PYTHON:-python3}",
       "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/mcp_server.py"]
     }
   }

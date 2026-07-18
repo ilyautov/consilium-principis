@@ -177,6 +177,13 @@ Prefer buttons or a terminal? See [`QUICKSTART.md`](QUICKSTART.md): a click-to-i
 **All you need:** Python 3.10+. For smart cross-language search, optionally
 [ollama](https://ollama.com) with `bge-m3` (the board will walk you through setting it up). The contour works without it too.
 
+### Windows
+
+The double-click installer ([`install.bat`](install.bat)) and the mcpb bundle both work out of the box — they launch through the `py` Python Launcher. Two Windows-specific things worth knowing:
+
+- **In a terminal, use `py install.py`** (not `python3 install.py`). The python.org installer ships `py.exe` and `python.exe`, but no `python3.exe`; the `python3.exe` you may see under the Microsoft Store is an App Execution Alias stub that just opens the Store instead of running.
+- **Plugin can't find Python?** Set `CONSILIUM_PYTHON=py` in your environment before launching Claude Code. The plugin's server command defaults to `python3` and honors this override. (The Claude Desktop path needs nothing — `board.py mcp-config` writes the exact interpreter for you.)
+
 ## Your board, your call
 
 **An empty board out of the box is normal.** Who sits at the table is your call; the board is personal.

@@ -121,6 +121,33 @@ def test_thin_skill_exists_no_bash_scripts():
     assert "scripts/" not in text, "skill не должен звать локальные scripts/ — только MCP-тулы"
 
 
+def test_mcpb_manifest_windows_uses_py_launcher():
+    # Windows: python.org НЕ создаёт python3.exe (только python.exe + py.exe), а python3.exe в
+    # WindowsApps — Store-заглушка (App Execution Alias), которая молча открывает магазин вместо
+    # запуска сервера. Поэтому mcpb-бандл на win32 стартует через Python Launcher `py -3`, а не
+    # через `python3`. darwin/linux остаются на python3 (top-level command).
+    m = _load_json("manifest.json")
+    cfg = m["server"]["mcp_config"]
+    assert cfg["command"] == "python3", "top-level (darwin/linux) остаётся python3"
+    win = cfg["platform_overrides"]["win32"]
+    assert win["command"] == "py", "на Windows запускаем через Python Launcher py.exe, не python3"
+    assert "-3" in win["args"], "py -3 фиксирует ветку Python 3"
+    joined = " ".join(win["args"])
+    assert "${__dirname}" in joined and "mcp_server.py" in joined
+    assert "/Users/" not in joined and "/opt/" not in joined, "ноль абсолютных путей в win32-оверрайде"
+
+
+def test_mcp_json_command_windows_overridable():
+    # Claude Code .mcp.json не умеет per-OS команду, но умеет подстановку ${VAR:-default} в поле
+    # command. Дефолт остаётся python3 (mac/linux без изменений — ноль регресса), но перекрывается
+    # CONSILIUM_PYTHON=py на Windows, где python3 обычно не резолвится.
+    m = _load_json(".mcp.json")
+    cmd = m["mcpServers"]["consilium-principis"]["command"]
+    assert cmd == "${CONSILIUM_PYTHON:-python3}", (
+        "команда плагина должна перекрываться CONSILIUM_PYTHON и падать в python3 по умолчанию"
+    )
+
+
 def test_example_mcp_json_neutral_no_machine_path():
     # Реальный mcp.json — личный, в .gitignore (машинный абсолют не течёт в git). В репо трекается
     # ТОЛЬКО mcp.example.json — гардим, что в НЁМ нет ничьего локального пути (нейтральный плейсхолдер).

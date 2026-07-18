@@ -4,7 +4,7 @@
     "rule_count": 17,
     "recipe_count": 16,
     "script_count": 68,
-    "test_count": 127,
+    "test_count": 128,
     "glossary_count": 110
   },
   "tools": [
@@ -2212,6 +2212,10 @@
     {
       "path": "tests/test_lang_check.py",
       "covers": "lang check"
+    },
+    {
+      "path": "tests/test_language_config.py",
+      "covers": "language config"
     },
     {
       "path": "tests/test_lens_builder.py",

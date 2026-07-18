@@ -1,0 +1,43 @@
+{
+  "meta": {
+    "ts": "2026-07-18T11:07:07Z",
+    "backend": "semantic"
+  },
+  "advisors": {
+    "sun-tzu": {
+      "corpus_sha256": "696afa88cd2da578ae8be16de9dcff9b92d737c464d191738473e910b821f1fc",
+      "retrieval": {
+        "en": {
+          "hit1": [
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "hit3": [
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        }
+      }
+    }
+  }
+}

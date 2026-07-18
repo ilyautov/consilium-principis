@@ -1,0 +1,77 @@
+{
+  "meta": {
+    "ts": "2026-07-18T11:07:07Z",
+    "backend": "semantic"
+  },
+  "advisors": {
+    "marcus-aurelius": {
+      "corpus_sha256": "4a4e0c6cad907946a1a19442658d00fed4a0a2513186633e95b962fef55f4beb",
+      "retrieval": {
+        "ru": {
+          "hit1": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "hit3": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        },
+        "en": {
+          "hit1": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            true,
+            false,
+            true,
+            true,
+            true,
+            true
+          ],
+          "hit3": [
+            false,
+            true,
+            false,
+            false,
+            false,
+            false,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        }
+      },
+      "ooc_scores": [
+        0.35885685682296753,
+        0.38226598501205444,
+        0.47317928075790405,
+        0.37589511275291443,
+        0.4557607173919678,
+        0.37835493683815
+      ],
+      "ans_scores": [
+        0.5791950225830078,
+        0.5372238159179688,
+        0.6003028154373169,
+        0.6069921255111694,
+        0.5680895447731018,
+        0.6100755929946899
+      ]
+    }
+  }
+}

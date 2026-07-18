@@ -20,12 +20,25 @@ def _norm(s: str) -> str:
     return re.sub(r"\s+", " ", s).strip()
 
 
-def _corpus_norm_text(advisor_dir: str):
-    """Читает corpus.jsonl и возвращает список (source, norm_chunk) для каждого чанка."""
+# C5/H10: нормализация чанков корпуса кешируется по (path, mtime). best_match зовётся на
+# ~56 кандидатов за сессию — без кеша это полный ре-парс+ре-норм corpus.jsonl на КАЖДЫЙ.
+# Инвалидация — сменой mtime (пересборка корпуса меняет файл): fail-safe, не stale.
+# Записи с прежним mtime того же пути вытесняются → кеш не растёт неограниченно.
+_CHUNK_CACHE = {}   # (path, mtime) -> list[dict]  (raw-запись + служебный "_norm")
+
+
+def _load_chunks(advisor_dir: str):
+    """Список raw-записей corpus.jsonl (кешируется по mtime). У каждой добавлен служебный
+    ключ "_norm" — нормализованный текст (посчитан один раз, переиспользуется best_match /
+    _corpus_norm_text). Нет файла → []."""
     path = corpus_path(advisor_dir)
-    chunks = []
     if not os.path.isfile(path):
-        return chunks
+        return []
+    key = (path, os.path.getmtime(path))
+    hit = _CHUNK_CACHE.get(key)
+    if hit is not None:
+        return hit
+    chunks = []
     with open(path, encoding="utf-8") as fh:
         for line in fh:
             line = line.strip()
@@ -35,24 +48,24 @@ def _corpus_norm_text(advisor_dir: str):
                 rec = json.loads(line)
             except Exception:
                 continue
-            text = rec.get("text") or ""
-            src = rec.get("source") or rec.get("citation") or "corpus.jsonl"
-            chunks.append((str(src), _norm(text)))
+            if not isinstance(rec, dict):
+                continue
+            rec["_norm"] = _norm(rec.get("text") or "")
+            chunks.append(rec)
+    for k in [k for k in _CHUNK_CACHE if k[0] == path and k != key]:
+        del _CHUNK_CACHE[k]                              # вытесняем прежний mtime того же пути
+    _CHUNK_CACHE[key] = chunks
     return chunks
 
 
+def _corpus_norm_text(advisor_dir: str):
+    """Список (source, norm_chunk) для каждого чанка — из кеша _load_chunks."""
+    return [(str(rec.get("source") or rec.get("citation") or "corpus.jsonl"), rec["_norm"])
+            for rec in _load_chunks(advisor_dir)]
+
+
 def _iter_chunks(advisor_dir):
-    path = corpus_path(advisor_dir)
-    if not os.path.isfile(path):
-        return
-    with open(path, encoding="utf-8") as fh:
-        for line in fh:
-            line = line.strip()
-            if line:
-                try:
-                    yield json.loads(line)
-                except Exception:
-                    continue
+    return _load_chunks(advisor_dir)
 
 
 _TIER_ORDER = {"P1": 0, "P2": 1, "S1": 2, "S2": 3, "B": 4, "A": 5}
@@ -69,14 +82,30 @@ def best_match(quote: str, advisor_dir: str):
     if len(q) < MIN_QUOTE_CHARS:                         # пусто/слишком коротко → не 🔵 (fail-closed)
         return None
     best = None  # (rank, tier, source)
-    for ch in _iter_chunks(advisor_dir):
-        if q in _norm(ch.get("text", "")):
+    for ch in _load_chunks(advisor_dir):
+        if q in ch["_norm"]:
             t = ch.get("tier", "A")
             rank = _TIER_ORDER.get(t, 9)
             if best is None or rank < best[0]:
                 src = ch.get("source") or ch.get("citation") or "corpus.jsonl"
                 best = (rank, t, str(src))
     return (best[1], best[2]) if best else None
+
+
+def marker_status(quote: str, advisor_dir: str) -> dict:
+    """ЕДИНЫЙ источник маркера по тиру дословного матча (H6). Оба вызова-обёртки
+    (mcp_server._fidelity_check, Engine.fidelity_check) делегируют сюда — одна формула,
+    нет дрейфа. P1/P2 → 🔵 (слова автора); S1/S2 → 🟢 (дословно, но комментарий);
+    нет матча / B/A / без tier → 🟡 (fail-closed: без провенанса не сертифицируем)."""
+    m = best_match(quote, advisor_dir)
+    if not m:
+        return {"status": "🟡", "verbatim": False, "source": ""}
+    tier, src = m
+    if tier in ("P1", "P2"):
+        return {"status": "🔵", "verbatim": True, "source": src}
+    if tier in ("S1", "S2"):
+        return {"status": "🟢", "verbatim": True, "source": src}
+    return {"status": "🟡", "verbatim": False, "source": ""}
 
 
 def tier_of_match(quote: str, advisor_dir: str):

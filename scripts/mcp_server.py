@@ -61,16 +61,10 @@ def _resolve_under_root(p):
 
 
 def _fidelity_check(quote, advisor_dir):
-    """Протокол-гейт: наиболее авторитетный тир дословного матча → маркер."""
-    m = best_match(quote, _resolve(advisor_dir))
-    if not m:
-        return {"status": "🟡", "verbatim": False, "source": ""}
-    tier, src = m
-    if tier in ("P1", "P2"):
-        return {"status": "🔵", "verbatim": True, "source": src}
-    if tier in ("S1", "S2"):
-        return {"status": "🟢", "verbatim": True, "source": src}
-    return {"status": "🟡", "verbatim": False, "source": ""}
+    """Протокол-гейт: наиболее авторитетный тир дословного матча → маркер.
+    Делегирует единому marker_status (H6) — формула маркера живёт в одном месте."""
+    from engine.fidelity import marker_status
+    return marker_status(quote, _resolve(advisor_dir))
 
 
 # ── межсоветническая атрибуция (§1.1 moat-v2) ──

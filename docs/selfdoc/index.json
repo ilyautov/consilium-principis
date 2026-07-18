@@ -4,7 +4,7 @@
     "rule_count": 18,
     "recipe_count": 16,
     "script_count": 73,
-    "test_count": 137,
+    "test_count": 139,
     "glossary_count": 113
   },
   "tools": [
@@ -2404,6 +2404,10 @@
       "covers": "fetch hardening"
     },
     {
+      "path": "tests/test_fidelity_cache.py",
+      "covers": "fidelity cache"
+    },
+    {
       "path": "tests/test_fidelity_gate.py",
       "covers": "fidelity gate"
     },
@@ -2506,6 +2510,10 @@
     {
       "path": "tests/test_manifest_builder.py",
       "covers": "manifest builder"
+    },
+    {
+      "path": "tests/test_marker_status_single_source.py",
+      "covers": "marker status single source"
     },
     {
       "path": "tests/test_mc_run.py",

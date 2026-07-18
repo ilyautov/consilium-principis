@@ -110,3 +110,24 @@ def test_api_available_iff_key_set(monkeypatch):
     assert llm_local.api_available() is False
     monkeypatch.setenv("OPENROUTER_API_KEY", "")
     assert llm_local.api_available() is False               # пустой ключ = нет ключа
+
+
+# --- num_predict проброс + allow_cloud гейт (C4 / H4) ---
+
+def test_generate_passes_num_predict(monkeypatch):
+    cap = {}
+    monkeypatch.delenv("LLM_BACKEND", raising=False)
+    monkeypatch.setattr(llm_local, "_raw_generate",
+        lambda prompt, model, temperature, timeout, num_predict=None: cap.setdefault("np", num_predict) or "2")
+    llm_local.generate("p", model="m", temperature=0.1, num_predict=4)
+    assert cap["np"] == 4
+
+
+def test_judge_stays_local_when_allow_cloud_false(monkeypatch):
+    monkeypatch.setenv("LLM_BACKEND", "openrouter")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "x")
+    hit = {"cloud": False, "local": False}
+    monkeypatch.setattr(llm_local, "_raw_generate_openrouter", lambda *a, **k: hit.__setitem__("cloud", True) or "2")
+    monkeypatch.setattr(llm_local, "_raw_generate", lambda *a, **k: hit.__setitem__("local", True) or "2")
+    llm_local.generate("p", model="m", temperature=0.1, allow_cloud=False)
+    assert hit["local"] and not hit["cloud"]

@@ -145,9 +145,10 @@ def render_md(s):
         for q in mx["quadrants"]:
             nm = f" · {_e(q['name'])}" if q["name"] else ""
             out.append(f"- **{_e(q['corner'])}{nm}:** {_e(q['council_read'])}")
-    out += ["", "## Синтез", _e(s["synthesis"])]
-    if s.get("what_you_lose"):
-        out.append(f"_Чем платишь:_ {_e(s['what_you_lose'])}")
+    if s.get("synthesis"):
+        out += ["", "## Синтез", _e(s["synthesis"])]
+        if s.get("what_you_lose"):
+            out.append(f"_Чем платишь:_ {_e(s['what_you_lose'])}")
     if s.get("step"):
         out += ["", "## Шаг", _e(s["step"])]
     if s.get("forcing_question"):
@@ -494,9 +495,10 @@ def render_html(s, title="Заседание совета"):
                     f'<ul>{sides}</ul>'
                     + (f'<p><b>Снимается:</b> {_e(d["resolver"])}</p>' if d.get("resolver") else "")
                     + "</section>")
-    body.append(f'<section class=synth><h3>Синтез</h3><p>{_e(s["synthesis"])}</p>'
-                + (f'<p class=lose><em>Чем платишь: {_e(s["what_you_lose"])}</em></p>'
-                   if s.get("what_you_lose") else "") + "</section>")
+    if s.get("synthesis"):
+        body.append(f'<section class=synth><h3>Синтез</h3><p>{_e(s["synthesis"])}</p>'
+                    + (f'<p class=lose><em>Чем платишь: {_e(s["what_you_lose"])}</em></p>'
+                       if s.get("what_you_lose") else "") + "</section>")
     if s.get("step"):
         body.append(f'<section class=step><h3>Шаг</h3><p>{_e(s["step"])}</p></section>')
     if s.get("forcing_question"):

@@ -3,8 +3,8 @@
     "tool_count": 60,
     "rule_count": 18,
     "recipe_count": 16,
-    "script_count": 72,
-    "test_count": 136,
+    "script_count": 73,
+    "test_count": 137,
     "glossary_count": 113
   },
   "tools": [
@@ -1837,6 +1837,11 @@
       "doc": "catalog_verify.py — ритуал целостности PD-каталога. Обходит записи, сверяет подпись/PD-basis."
     },
     {
+      "path": "scripts/ci_bundle_guard.py",
+      "subsystem": "other",
+      "doc": "Fail-closed гард: дан список путей (по одному в строке), которые ПОПАЛИ БЫ в .mcpb-бандл,"
+    },
+    {
       "path": "scripts/collect_common.py",
       "subsystem": "collect",
       "doc": "collect_common.py — общая база для сборщиков корпусов (collect_pd / collect_web / collect_transcript)."
@@ -2169,6 +2174,10 @@
     {
       "path": "tests/test_buildlock.py",
       "covers": "buildlock"
+    },
+    {
+      "path": "tests/test_bundle_guard.py",
+      "covers": "bundle guard"
     },
     {
       "path": "tests/test_calc_render.py",

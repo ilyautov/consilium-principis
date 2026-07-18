@@ -1,0 +1,36 @@
+# СЕКРЕТЫ
+.env
+*.log
+# КОПИРАЙТНЫЕ ИСХОДНИКИ И СОБРАННЫЕ КОРПУСА
+reference-library-raw/
+reference-library/
+*-raw/
+advisors/*/build/
+advisors/*/sources/
+advisors/*/corpus.jsonl
+advisors/*/corpus.lock.json
+lenses/*/build/
+lenses/*/sources/
+# ЛИЧНЫЕ ДАННЫЕ
+principis.md
+relationship.md
+principis_corpus/
+council/
+decisions/
+consults/
+board_config.json
+gov_heads.local.json
+.consilium/
+# ЛОКАЛЬНЫЕ АРТЕФАКТЫ
+data/embeddings*.npy
+data/embeddings*.meta.json
+scripts/golden/
+mcp.json
+# СЛУЖЕБНОЕ
+.git/
+__pycache__/
+*.pyc
+.venv/
+venv/
+.DS_Store
+tests/fixtures/

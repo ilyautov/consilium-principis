@@ -2203,16 +2203,16 @@ language of your answer.
 _LANG_DIRECTIVE_EN = """
 
 
-RESPONSE LANGUAGE OVERRIDE (never overrides Rule 0): the user has configured English output.
+RESPONSE LANGUAGE OVERRIDE (never overrides Rule 0 or Rule 5): the user has configured English output.
 Answer ENTIRELY in English — headings, tier labels, service lines — regardless of the language
-of any individual question. This overrides the "language of the question" rule above."""
+of any individual question. This overrides the "language of the question" rule above — but a 🔵 verbatim quote stays in its original language (with an English gloss), never translated away."""
 
 _LANG_DIRECTIVE_RU = """
 
 
-ЯЗЫК ОТВЕТА — ФИКСАЦИЯ (не перекрывает Правило 0): пользователь настроил русский вывод.
+ЯЗЫК ОТВЕТА — ФИКСАЦИЯ (не перекрывает Правило 0 и Правило 5): пользователь настроил русский вывод.
 Отвечай ЦЕЛИКОМ по-русски — заголовки, лейблы тиров, служебные строки — независимо от языка
-отдельного вопроса. Это перекрывает правило «язык вопроса» выше."""
+отдельного вопроса. Это перекрывает правило «язык вопроса» выше — но 🔵-цитата остаётся в оригинале (с глоссой-переводом), её дословность не жертвуется ради языка."""
 
 
 def _response_language_directive(lang):

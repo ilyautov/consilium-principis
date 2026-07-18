@@ -31,10 +31,15 @@ import urllib.request
 import numpy as np
 
 from corpusbuild.paths import corpus_path
-from engine import provenance
+from engine import provenance, corpus_sha256, StaleIndexError
 
 OLLAMA = os.getenv("OLLAMA_HOST", "http://127.0.0.1:11434")
 EMBED_MODEL = os.getenv("EMBED_MODEL", "bge-m3")
+
+# Версия ФОРМАТА индекса (нормировка матрицы / раскладка меты). Аналог apparatus.TIERING_VERSION:
+# бампни, если сменилась математика/формат матрицы — старые .npy инвалидируются fingerprint'ом
+# даже при неизменных корпусе/модели/чанкинге. Владелец константы = автор формата индекса.
+INDEX_VERSION = 1
 
 # Опциональный кросс-энкодер (rerank=True) живёт во внешнем движке Гефеста. FULL-тир его НЕ
 # требует — только ollama+bge-m3 (см. embed_batch ниже). sys.path к движку подключается ЛЕНИВО
@@ -137,6 +142,35 @@ def _paths(advisor_dir: str):
     return emb, meta
 
 
+# -------------------------------------------------------------- fingerprint (staleness)
+def _effective_chunk_chars() -> int:
+    """chunk_chars, которым РЕАЛЬНО режет _read_corpus_chunks (env override над дефолтом 500).
+    Источник правды для fingerprint = фактическая нарезка индекса, не декларация в конфиге
+    (семантический чанкер board_config.chunk_chars не читает — см. спека §4 в.1)."""
+    return int(os.getenv("TIER_CHUNK_CHARS", "500"))
+
+
+def _index_fingerprint(advisor_dir: str) -> dict:
+    """Отпечаток, связывающий индекс с {корпус, модель, чанкинг, формат}. Зеркало staleness
+    load_calibration: рассинхрон ЛЮБОГО поля = индекс устарел (fail-closed). corpus_sha256 —
+    ЕДИНЫЙ хэшер (engine.corpus_sha256, не форкать)."""
+    return {
+        "corpus_sha256": corpus_sha256(advisor_dir),
+        "embed_model": EMBED_MODEL,
+        "chunk_chars": _effective_chunk_chars(),
+        "index_version": INDEX_VERSION,
+    }
+
+
+def _fingerprint_matches(meta: dict, advisor_dir: str) -> bool:
+    """True только при полном совпадении сохранённого fingerprint с текущим. Легаси-мета без
+    поля 'fingerprint' → False (fail-closed, как калибровка без corpus_sha256)."""
+    stored = (meta or {}).get("fingerprint")
+    if not isinstance(stored, dict):
+        return False
+    return stored == _index_fingerprint(advisor_dir)
+
+
 # --------------------------------------------------------------- build_index
 def build_index(advisor_dir: str) -> None:
     """Строит семантический индекс для advisors/<name>/corpus.jsonl вшитым embed_batch
@@ -157,7 +191,8 @@ def build_index(advisor_dir: str) -> None:
 
     np.save(emb_path, M)
     json.dump(
-        {"model": EMBED_MODEL, "passages": passages},
+        {"fingerprint": _index_fingerprint(advisor_dir),
+         "model": EMBED_MODEL, "passages": passages},   # model оставлен для отображения/бэк-компат
         open(meta_path, "w", encoding="utf-8"),
         ensure_ascii=False,
     )
@@ -181,8 +216,17 @@ def retrieve(question: str, advisor_dir: str, top_k: int = 3, rerank: bool = Fal
     if not (os.path.isfile(emb_path) and os.path.isfile(meta_path)):
         build_index(advisor_dir)
 
-    M = np.load(emb_path).astype(np.float32)
     meta = json.load(open(meta_path, encoding="utf-8"))
+    # Fail-closed staleness (спека 2026-07-18 §1.3, Вариант B): устаревший индекс НЕ используем.
+    # Не авто-rebuild в hot-path — поднимаем StaleIndexError; safe_retrieve деградирует на lexical
+    # (наблюдаемо), явная пересборка живёт в pipeline/doctor. Легаси-мета без fingerprint → stale.
+    if not _fingerprint_matches(meta, advisor_dir):
+        raise StaleIndexError(
+            f"семантический индекс '{os.path.basename(advisor_dir.rstrip('/'))}' устарел: "
+            "fingerprint (corpus_sha256/embed_model/chunk_chars/index_version) не совпал с текущим "
+            "корпусом/конфигом. Пересобери: pipeline.build / doctor / build_index. "
+            "safe_retrieve сейчас деградирует на лексический пол.")
+    M = np.load(emb_path).astype(np.float32)
     passages = meta["passages"]
     M = M[:len(passages)]
 

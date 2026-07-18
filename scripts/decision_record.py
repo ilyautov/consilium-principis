@@ -143,8 +143,12 @@ def _re_review_triggers(session):
     return []
 
 
-def build_record(session):
+def build_record(session, card_id=None):
     """session (canon-объект заседания, session_render.py) → decision-record dict.
+
+    card_id (decision-lifecycle §3.4, аддитивно): если задан — сшивает протокол с
+    Decision Card общим UUID (ключ `card_id`). Без него форма skeleton'а байт-в-байт
+    прежняя (моат-инвариант тиров не затрагивается — card_id не влияет на маркеры).
 
     {"question": str,
      "positions": [{"advisor": str, "stance": str,
@@ -159,7 +163,10 @@ def build_record(session):
     Zero LLM, zero network. Никогда не поднимает/не изобретает тир (см. модульный докстринг).
     """
     if not isinstance(session, dict):
-        return _skeleton()
+        rec = _skeleton()
+        if card_id is not None:
+            rec["card_id"] = str(card_id)
+        return rec
 
     question = session.get("question")
     positions, provenance = _positions_and_provenance(session.get("advisors"))
@@ -167,7 +174,7 @@ def build_record(session):
     decision = _decision(session)
     re_review = _re_review_triggers(session)
 
-    return {
+    record = {
         "question": str(question) if question else "",
         "positions": positions,
         "dissent": dissent,
@@ -176,3 +183,6 @@ def build_record(session):
         "re_review_triggers": re_review,
         "provenance": provenance,
     }
+    if card_id is not None:                 # аддитивно: ключ появляется ТОЛЬКО при сшивании
+        record["card_id"] = str(card_id)
+    return record

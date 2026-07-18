@@ -3,8 +3,8 @@
     "tool_count": 53,
     "rule_count": 17,
     "recipe_count": 16,
-    "script_count": 68,
-    "test_count": 129,
+    "script_count": 69,
+    "test_count": 130,
     "glossary_count": 110
   },
   "tools": [
@@ -1825,6 +1825,11 @@
       "doc": "LLM-as-judge релевантности: заменяет сломанный exact-anchor в retrieval eval."
     },
     {
+      "path": "scripts/retrieval_regression.py",
+      "subsystem": "eval",
+      "doc": "Оффлайн quality-gate: математика метрик из ЗАМОРОЖЕННЫХ скоров + сравнение с baseline."
+    },
+    {
       "path": "scripts/safe_expr.py",
       "subsystem": "other",
       "doc": "Безопасный компилятор формул карты решения («Principis-расчёт», спека §2)."
@@ -2344,6 +2349,10 @@
     {
       "path": "tests/test_relevance_judge.py",
       "covers": "relevance judge"
+    },
+    {
+      "path": "tests/test_retrieval_regression.py",
+      "covers": "retrieval regression"
     },
     {
       "path": "tests/test_safe_expr.py",

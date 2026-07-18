@@ -12,6 +12,8 @@ principis_corpus/
 council/
 # карты решений + Decision Card (save_decision_map/*.card.json: полный вопрос + варианты + диапазоны + исходы) = личные данные
 decisions/
+# calibrated-consult: твоя позиция ДО/ПОСЛЕ совета + прогнозы/исходы (*.consult.json) = личные данные
+consults/
 # затянутые СЫРЫЕ исходники для сборки корпусов (чужие книги под копирайтом) — строго локально,
 # как и собранные из них советники в advisors/*. Никогда не в public-репо.
 reference-library-raw/

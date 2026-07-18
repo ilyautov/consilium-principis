@@ -250,6 +250,53 @@ def check_corpus_tiering(root="."):
         return {"name": "corpus-tiering", "ok": True, "detail": f"не определено ({e})"}
 
 
+def check_semantic_index(root="."):
+    """Свежесть семантического индекса (data/embeddings_<slug>). Индекс несёт fingerprint
+    {corpus_sha256, embed_model, chunk_chars, index_version}; рассинхрон → retrieve fail-closed
+    поднимает StaleIndexError, safe_retrieve деградирует semantic→lexical (наблюдаемо), качество
+    падает до пересборки. НЕ болезнь (ok=True всегда, как калибровка): контур верности цел
+    (fidelity читает свежий корпус, не .meta.json), деградация автоматическая — факт лишь честно
+    виден. Нет индекса (SIMPLE-пол / нет ollama) — норма. chunk_chars берётся из env текущего
+    прогона, поэтому под нестандартным TIER_CHUNK_CHARS «устарел» ожидаем и информативен."""
+    try:
+        import json
+        from corpusbuild.paths import corpus_path
+        import tier_full
+        data_dir = os.path.join(root, "data")
+        stale, fresh, absent = [], 0, 0
+        adv_root = os.path.join(root, "advisors")
+        if os.path.isdir(adv_root):
+            for d in sorted(os.listdir(adv_root)):
+                p = os.path.join(adv_root, d)
+                if not (os.path.isdir(p) and os.path.isfile(corpus_path(p))):
+                    continue
+                meta_path = os.path.join(data_dir, f"embeddings_{d}.meta.json")
+                if not os.path.isfile(meta_path):
+                    absent += 1
+                    continue
+                try:
+                    with open(meta_path, encoding="utf-8") as f:
+                        meta = json.load(f)
+                except Exception:
+                    stale.append(f"{d}: .meta.json не читается")
+                    continue
+                if tier_full._fingerprint_matches(meta, p):
+                    fresh += 1
+                else:
+                    stale.append(f"{d}: fingerprint не совпал")
+        if stale:
+            detail = ("⚠ индекс УСТАРЕЛ (retrieve деградирует на lexical, качество ниже): "
+                      + "; ".join(stale) + " → пересобери: python3 scripts/board.py build-advisor "
+                      "<dir> (или снимется автоматически при пересборке корпуса)")
+        elif fresh:
+            detail = f"✓ индекс свеж (fingerprint совпал): {fresh}"
+        else:
+            detail = "нет семантического индекса (SIMPLE-пол / ollama недоступен) — норма"
+        return {"name": "semantic-index", "ok": True, "detail": detail}
+    except Exception as e:                             # диагностика не должна ронять doctor
+        return {"name": "semantic-index", "ok": True, "detail": f"не определено ({e})"}
+
+
 def summarize(checks):
     # healthy = по СОДЕРЖАТЕЛЬНЫМ чекам; advisory (skill-installed) не роняет здоровье —
     # in-place из репо / MCP-режим работают без глобальной установки. Чек виден, но не блокирует.
@@ -263,7 +310,8 @@ def run_doctor(root="."):
     from corpusbuild.paths import corpus_path
     checks = [check_python(), check_skill_installed(), check_response_language(),
               check_tier(), check_judge(),
-              check_calibration(root), check_gov_anchors(root), check_corpus_tiering(root)]
+              check_calibration(root), check_gov_anchors(root), check_corpus_tiering(root),
+              check_semantic_index(root)]
     adv_root = os.path.join(root, "advisors")
     tested = False
     if os.path.isdir(adv_root):

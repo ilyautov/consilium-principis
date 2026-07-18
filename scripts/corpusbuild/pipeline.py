@@ -31,4 +31,19 @@ def build(advisor_dir: str, config=None, built_at: str = "unknown"):
         for c in all_chunks:
             f.write(json.dumps(c, ensure_ascii=False) + "\n")
     buildlock.write_lock(advisor_dir, config, all_chunks, built_at)
+    _invalidate_semantic_index(advisor_dir)              # корпус уехал → старый .npy устарел
     return all_chunks  # corpus_path() теперь автоматически отдаёт build/corpus.jsonl
+
+
+def _invalidate_semantic_index(advisor_dir: str) -> None:
+    """После пересборки корпуса удалить устаревший семантический индекс (data/embeddings_<slug>).
+    Fail-closed на явной точке (спека 2026-07-18 §1.3): следующий retrieve пересоберёт с нуля
+    (ветка «файлов нет» в tier_full.retrieve) — рассинхрон структурно невозможен. Мягко: любая
+    ошибка (нет numpy / нет индекса) НЕ роняет сборку корпуса."""
+    try:
+        import tier_full
+        for pth in tier_full._paths(advisor_dir):
+            if os.path.isfile(pth):
+                os.remove(pth)
+    except Exception:
+        pass

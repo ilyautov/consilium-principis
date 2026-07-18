@@ -4,7 +4,7 @@
     "rule_count": 17,
     "recipe_count": 16,
     "script_count": 68,
-    "test_count": 128,
+    "test_count": 129,
     "glossary_count": 110
   },
   "tools": [
@@ -2176,6 +2176,10 @@
     {
       "path": "tests/test_host_judge_protocol.py",
       "covers": "host judge protocol"
+    },
+    {
+      "path": "tests/test_index_fingerprint.py",
+      "covers": "index fingerprint"
     },
     {
       "path": "tests/test_index_tier.py",

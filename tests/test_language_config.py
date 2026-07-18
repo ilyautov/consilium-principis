@@ -32,3 +32,37 @@ def test_auto_and_empty_and_junk_yield_no_directive():
 def test_case_and_whitespace_insensitive():
     assert _response_language_directive("  EN ") == _response_language_directive("en")
     assert _response_language_directive("Ru") == _response_language_directive("ru")
+
+
+def _served_instructions(monkeypatch, lang):
+    # lang=None → снять переменную (режим auto/unset)
+    if lang is None:
+        monkeypatch.delenv("CONSILIUM_LANG", raising=False)
+    else:
+        monkeypatch.setenv("CONSILIUM_LANG", lang)
+    resp = mcp_server._handle_rpc({"jsonrpc": "2.0", "id": 1, "method": "initialize"})
+    return resp["result"]["instructions"]
+
+def test_initialize_en_appends_english_directive(monkeypatch):  # G1
+    served = _served_instructions(monkeypatch, "en")
+    assert served.startswith(INSTRUCTIONS)          # базовый контур целиком на месте
+    assert served.endswith(_response_language_directive("en"))
+    assert "answer entirely in english" in served.lower()
+
+def test_initialize_ru_appends_russian_directive(monkeypatch):  # G1
+    served = _served_instructions(monkeypatch, "ru")
+    assert served.endswith(_response_language_directive("ru"))
+    assert "отвечай целиком по-русски" in served.lower()
+
+def test_initialize_auto_appends_nothing(monkeypatch):  # G1
+    served = _served_instructions(monkeypatch, None)
+    assert served == INSTRUCTIONS                    # ровно базовый контур, без довеска
+    served_junk = _served_instructions(monkeypatch, "xyz")
+    assert served_junk == INSTRUCTIONS               # мусор → тоже базовый (G4 на уровне initialize)
+
+def test_rules_0_and_5_survive_every_mode(monkeypatch):  # G2
+    # Правила безопасности и верности присутствуют во всех режимах — форс-блок их не вытесняет.
+    for lang in ("en", "ru", None):
+        served = _served_instructions(monkeypatch, lang)
+        assert "0. БЕЗОПАСНОСТЬ ВЫШЕ ВСЕГО" in served, f"Rule 0 пропал в режиме {lang}"
+        assert "5. КОНТУР ВЕРНОСТИ" in served, f"Rule 5 пропал в режиме {lang}"

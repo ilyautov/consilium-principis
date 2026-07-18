@@ -1352,6 +1352,142 @@ def _prediction_calibration():
     return journal
 
 
+# ── Calibrated Consult: анти-оверрелайанс инструмент (спека 2026-07-18-calibrated-consult) ──
+# Тонкие обёртки ядра calibrated_consult. Пишущие тулы зовут ТОЛЬКО с согласия юзера (Rule 0).
+# Артефакты — consults/*.consult.json (gitignored, личные данные).
+_CONSULTS_DIR = "consults"
+# Свой relay-хинт: в потоке консульта нет карты решения — общий _RELAY_AS_QUESTIONS_HINT
+# (текст про Decision Card) ввёл бы в заблуждение. Ошибки гейтов = вопросы к юзеру.
+_CONSULT_RELAY_HINT = ("Ошибки — это вопросы к тебе: уточни свою позицию/уверенность/прогноз "
+                       "и повтори.")
+
+
+def _consult_slug(question):
+    import re
+    return re.sub(r"[^a-z0-9]+", "-", str(question or "").lower()).strip("-")[:40] or "consult"
+
+
+def _write_consult(record):
+    """Записать запись consults/<created>-<slug>.consult.json под _root(), traversal-гард,
+    коллизия→суффикс. → {ok, path} | {error}."""
+    day = record.get("created") or time.strftime("%Y-%m-%d")
+    base = os.path.join(_CONSULTS_DIR, "%s-%s" % (day, _consult_slug(record.get("question"))))
+    p, err = _resolve_under_root(base + ".consult.json")
+    if err:
+        return err
+    i = 1
+    while os.path.exists(p):
+        i += 1
+        p, err = _resolve_under_root("%s-%d.consult.json" % (base, i))
+        if err:
+            return err
+    rel = os.path.relpath(p, os.path.realpath(_root())).replace(os.sep, "/")
+    os.makedirs(os.path.dirname(p), exist_ok=True)
+    with open(p, "w", encoding="utf-8") as f:
+        json.dump(record, f, ensure_ascii=False, indent=2)
+    return {"ok": True, "path": rel}
+
+
+def _load_consults(root):
+    """Все записи consults/*.consult.json (fail-closed: битый/не-consult → пропуск).
+    → [(name, record)]."""
+    import calibrated_consult as ccm
+    cdir = os.path.join(root, _CONSULTS_DIR)
+    try:
+        names = sorted(n for n in os.listdir(cdir) if n.endswith(".consult.json"))
+    except OSError:
+        return []
+    out = []
+    for name in names:
+        try:
+            with open(os.path.join(cdir, name), encoding="utf-8") as f:
+                rec = json.load(f)
+        except (OSError, ValueError):
+            continue
+        if isinstance(rec, dict) and rec.get("kind") == ccm.KIND_CONSULT:
+            out.append((name, rec))
+    return out
+
+
+def _find_consult(root, consult_id):
+    """Путь+запись по id (скан consults/). → (path, record) | (None, None)."""
+    for name, rec in _load_consults(root):
+        if rec.get("id") == consult_id:
+            return os.path.join(root, _CONSULTS_DIR, name), rec
+    return None, None
+
+
+def _open_consult(question, prior_call, prior_confidence, prior_abstain=False):
+    """Зафиксировать ПРИОР ДО совета (МУТИРУЮЩИЙ, Rule 0). Fail-closed валидация → отказ до записи."""
+    import calibrated_consult as ccm
+    record = ccm.build_consult(question, prior_call, prior_confidence,
+                               prior_abstain=prior_abstain)
+    errs = ccm.validate_consult(record)
+    if errs:
+        return {"error": "Приор не проходит гейты (fail-closed) — фиксировать нечего.",
+                "errors": errs, "hint": _CONSULT_RELAY_HINT}
+    saved = _write_consult(record)
+    if "error" in saved:
+        return saved
+    return {"ok": True, "consult_id": record["id"], "path": saved["path"],
+            "next": "Теперь спроси совет как обычно. Когда получишь ответ, зафиксируй свою "
+                    "позицию ПОСЛЕ через calibrated_consult_close(consult_id, …)."}
+
+
+def _close_consult_tool(consult_id, posterior_call, posterior_confidence,
+                        followed_council, posterior_abstain=False, prediction=None):
+    """Зафиксировать ПОСТЕРИОР после совета + вернуть ЗЕРКАЛО (МУТИРУЮЩИЙ, Rule 0).
+    Fail-closed: неизвестный/закрытый id, невалидный постериор/прогноз → отказ без записи."""
+    import calibrated_consult as ccm
+    root = os.path.realpath(_root())
+    path, rec = _find_consult(root, consult_id)
+    if rec is None:
+        return {"error": "Не нашёл консульт с id %s в consults/ — сначала "
+                         "calibrated_consult_open." % consult_id}
+    try:
+        closed = ccm.close_consult(rec, posterior_call, posterior_confidence,
+                                   posterior_abstain=posterior_abstain,
+                                   followed_council=followed_council, prediction=prediction)
+    except ValueError as e:
+        return {"error": str(e), "hint": _CONSULT_RELAY_HINT}
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(closed, f, ensure_ascii=False, indent=2)
+    m = closed["mirror"]
+    return {"ok": True, "mirror": m,
+            "note": ("Зеркало: сдвиг позиции=%s, Δуверенности=%+.2f, «не знаю» подавлено=%s. "
+                     "Это НЕ вердикт «оверрелайанс» (сдвиг мог быть честной коррекцией) — "
+                     "вердикт даст лишь исход. Если решение отслеживаемо, приложи prediction "
+                     "и закрой исход позже через calibrated_consult_resolve."
+                     % (m["shifted"], m["confidence_delta"], m["abstention_dropped"]))}
+
+
+def _resolve_consult_tool(consult_id, outcome):
+    """Проставить исход консульту (МУТИРУЮЩИЙ, Rule 0). Fail-closed: неизвестный id / кривой
+    исход / нет прогноза → отказ без записи."""
+    import calibrated_consult as ccm
+    root = os.path.realpath(_root())
+    path, rec = _find_consult(root, consult_id)
+    if rec is None:
+        return {"error": "Не нашёл консульт с id %s в consults/." % consult_id}
+    try:
+        resolved = ccm.resolve_consult(rec, outcome)
+    except ValueError as e:
+        return {"error": str(e), "hint": _CONSULT_RELAY_HINT}
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(resolved, f, ensure_ascii=False, indent=2)
+    return {"ok": True, "consult_id": consult_id,
+            "note": "Исход записан. Сводку оси оверрелайанса смотри calibrated_consult_journal."}
+
+
+def _consult_journal_tool():
+    """Сводка оси оверрелайанса по consults/ (реюз calibrated_consult.overreliance_journal).
+    Малое N → trustworthy=False (честный «мало данных», не выдумка)."""
+    import calibrated_consult as ccm
+    root = os.path.realpath(_root())
+    consults = [rec for _name, rec in _load_consults(root)]
+    return ccm.overreliance_journal(consults)
+
+
 def _calc_forecast_line(calculation):
     """Ф2×§4.3: опциональный calculation-блок канона сессии → строка «- Прогноз: 📐 …»
     для шаблона записи в outcome_nudge. Канал детекции — ЯВНЫЙ: хост кладёт в сессию
@@ -2156,6 +2292,55 @@ TOOLS = {
         "input_schema": _obj({"task_id": "string", "worker_id": "string", "claim_token": "string"},
                              ["task_id", "worker_id", "claim_token"]),
         "handler": _federation_heartbeat,
+    },
+    "calibrated_consult_open": {
+        "description": "Анти-оверрелайанс ИНСТРУМЕНТ (не совет): зафиксировать ТВОЮ позицию + "
+                       "уверенность (0..1) ДО ответа совета, чтобы потом увидеть свой сдвиг. "
+                       "Зови в режиме calibrated-consult ПЕРЕД тем как спросить совет. Пишет "
+                       "запись (Rule 0). Затем calibrated_consult_close после ответа совета.",
+        "input_schema": {"type": "object",
+                         "properties": {"question": {"type": "string"},
+                                        "prior_call": {"type": "string"},
+                                        "prior_confidence": {"type": "number"},
+                                        "prior_abstain": {"type": "boolean"}},
+                         "required": ["question", "prior_call", "prior_confidence"]},
+        "handler": _open_consult,   # dispatch зовёт handler(**args); имена параметров = props схемы
+    },
+    "calibrated_consult_close": {
+        "description": "Зафиксировать ТВОЮ позицию ПОСЛЕ ответа совета + получить ЗЕРКАЛО "
+                       "(сдвиг позиции, инфляция уверенности, подавлено ли «не знаю»). "
+                       "followed_council: принял ли ты позицию совета. prediction (опц.): "
+                       "resolvable-прогноз (контракт decision_card) для калибровки по исходу. "
+                       "Идёт после calibrated_consult_open; закрой исход позже через "
+                       "calibrated_consult_resolve.",
+        "input_schema": {"type": "object",
+                         "properties": {"consult_id": {"type": "string"},
+                                        "posterior_call": {"type": "string"},
+                                        "posterior_confidence": {"type": "number"},
+                                        "posterior_abstain": {"type": "boolean"},
+                                        "followed_council": {"type": "boolean"},
+                                        "prediction": {"type": "object"}},
+                         "required": ["consult_id", "posterior_call", "posterior_confidence",
+                                      "followed_council"]},
+        "handler": _close_consult_tool,   # handler(**args); имена параметров = props схемы
+    },
+    "calibrated_consult_resolve": {
+        "description": "Проставить ИСХОД консульту (когда факт лёг): outcome={resolved_on, "
+                       "occurred|actual, endorsed?}. Кормит калибровку оси оверрелайанса. "
+                       "Fail-closed: нужен прогноз в консульте и верный тип исхода. "
+                       "Сводку оси смотри в calibrated_consult_journal.",
+        "input_schema": {"type": "object",
+                         "properties": {"consult_id": {"type": "string"},
+                                        "outcome": {"type": "object"}},
+                         "required": ["consult_id", "outcome"]},
+        "handler": _resolve_consult_tool,   # handler(**args); имена параметров = props схемы
+    },
+    "calibrated_consult_journal": {
+        "description": "Сводка ОСИ ОВЕРРЕЛАЙАНСА по твоим консультам: инфляция уверенности, "
+                       "сколько раз «не знаю» подавлено, калибровка followed-совета против "
+                       "самостоятельных. Малое N → trustworthy=false (мало данных).",
+        "input_schema": _obj({}, []),
+        "handler": _consult_journal_tool,   # без параметров; dispatch зовёт handler() при пустых args
     },
 }
 

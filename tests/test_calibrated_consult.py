@@ -13,7 +13,9 @@ import pytest
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "scripts"))
 
+import json  # noqa: E402
 import calibrated_consult as cc  # noqa: E402
+import mcp_server as srv  # noqa: E402
 
 
 def _prior(**over):
@@ -276,3 +278,144 @@ def test_prior_confidence_bounds_inclusive():
     # ровно 0.0 и ровно 1.0 валидны (замок на включающие границы <=)
     assert cc.validate_consult(_min_consult(prior=_prior(confidence=0.0))) == []
     assert cc.validate_consult(_min_consult(prior=_prior(confidence=1.0))) == []
+
+
+# ── Task 8: MCP persistence + calibrated_consult_open ──
+
+
+def _point_root(monkeypatch, tmp_path):
+    """Указать сервер на временный корень доски (не трогать реальные consults/)."""
+    monkeypatch.setattr(srv, "_root", lambda: str(tmp_path))
+
+
+def test_open_tool_writes_record_and_returns_id(tmp_path, monkeypatch):
+    _point_root(monkeypatch, tmp_path)
+    res = srv.dispatch("calibrated_consult_open",
+                       {"question": "Шипнуть сейчас?", "prior_call": "ждать",
+                        "prior_confidence": 0.6})
+    assert res["ok"] is True and res["consult_id"].startswith("cc_")
+    files = list((tmp_path / "consults").glob("*.consult.json"))
+    assert len(files) == 1
+    rec = json.load(open(files[0], encoding="utf-8"))
+    assert rec["prior"]["call"] == "ждать" and rec["posterior"] is None
+
+
+def test_open_tool_fail_closed_on_bad_confidence(tmp_path, monkeypatch):
+    _point_root(monkeypatch, tmp_path)
+    res = srv.dispatch("calibrated_consult_open",
+                       {"question": "q", "prior_call": "x", "prior_confidence": 5})
+    assert "error" in res and res.get("errors")
+    assert not list((tmp_path / "consults").glob("*.consult.json"))   # ничего не записано
+
+
+def test_open_tool_listed():
+    names = {t["name"] for t in srv.list_tools()}
+    assert "calibrated_consult_open" in names
+
+
+# ── Task 9: calibrated_consult_close ──
+
+
+def test_close_tool_returns_mirror(tmp_path, monkeypatch):
+    _point_root(monkeypatch, tmp_path)
+    opened = srv.dispatch("calibrated_consult_open",
+                          {"question": "Шипнуть?", "prior_call": "ждать",
+                           "prior_confidence": 0.6, "prior_abstain": True})
+    cid = opened["consult_id"]
+    res = srv.dispatch("calibrated_consult_close",
+                       {"consult_id": cid, "posterior_call": "шипнуть",
+                        "posterior_confidence": 0.85, "followed_council": True})
+    assert res["ok"] is True
+    assert abs(res["mirror"]["confidence_delta"] - 0.25) < 1e-9
+    assert res["mirror"]["abstention_dropped"] is True
+    # запись на диске обновлена
+    _, rec = srv._find_consult(str(tmp_path), cid)
+    assert rec["posterior"]["call"] == "шипнуть"
+
+
+def test_close_tool_unknown_id_fail_closed(tmp_path, monkeypatch):
+    _point_root(monkeypatch, tmp_path)
+    res = srv.dispatch("calibrated_consult_close",
+                       {"consult_id": "cc_NOPE", "posterior_call": "x",
+                        "posterior_confidence": 0.5, "followed_council": False})
+    assert "error" in res
+
+
+def test_close_tool_bad_prediction_fail_closed(tmp_path, monkeypatch):
+    _point_root(monkeypatch, tmp_path)
+    cid = srv.dispatch("calibrated_consult_open",
+                       {"question": "q", "prior_call": "a", "prior_confidence": 0.5})["consult_id"]
+    res = srv.dispatch("calibrated_consult_close",
+                       {"consult_id": cid, "posterior_call": "b", "posterior_confidence": 0.7,
+                        "followed_council": True,
+                        "prediction": {"kind": "event", "probability": 2.0, "statement": "s",
+                                       "horizon_days": 10}})
+    assert "error" in res
+
+
+# ── Task 10: calibrated_consult_resolve + calibrated_consult_journal ──
+
+
+def _open_close_with_pred(monkeypatch, tmp_path, prob, followed):
+    _point_root(monkeypatch, tmp_path)
+    cid = srv.dispatch("calibrated_consult_open",
+                       {"question": "q", "prior_call": "a", "prior_confidence": 0.5})["consult_id"]
+    srv.dispatch("calibrated_consult_close",
+                 {"consult_id": cid, "posterior_call": "b", "posterior_confidence": 0.8,
+                  "followed_council": followed,
+                  "prediction": {"id": "p", "kind": "event", "statement": "s",
+                                 "probability": prob, "horizon_days": 30}})
+    return cid
+
+
+def test_resolve_tool_sets_outcome_then_journal(tmp_path, monkeypatch):
+    cid = _open_close_with_pred(monkeypatch, tmp_path, 0.9, True)
+    res = srv.dispatch("calibrated_consult_resolve",
+                       {"consult_id": cid, "outcome": {"resolved_on": "2026-08-17",
+                                                       "occurred": False}})
+    assert res["ok"] is True
+    j = srv.dispatch("calibrated_consult_journal", {})
+    assert j["n_closed"] == 1
+
+
+def test_resolve_tool_unknown_id_fail_closed(tmp_path, monkeypatch):
+    _point_root(monkeypatch, tmp_path)
+    res = srv.dispatch("calibrated_consult_resolve",
+                       {"consult_id": "cc_NOPE", "outcome": {"resolved_on": "2026-08-17",
+                                                             "occurred": True}})
+    assert "error" in res
+
+
+def test_journal_tool_empty_is_honest(tmp_path, monkeypatch):
+    _point_root(monkeypatch, tmp_path)
+    j = srv.dispatch("calibrated_consult_journal", {})
+    assert j["n_closed"] == 0 and j["trustworthy"] is False
+
+
+def test_close_tool_double_close_fail_closed_no_corruption(tmp_path, monkeypatch):
+    _point_root(monkeypatch, tmp_path)
+    cid = srv.dispatch("calibrated_consult_open",
+                       {"question": "q", "prior_call": "a", "prior_confidence": 0.5})["consult_id"]
+    first = srv.dispatch("calibrated_consult_close",
+                         {"consult_id": cid, "posterior_call": "b", "posterior_confidence": 0.7,
+                          "followed_council": True})
+    assert first["ok"] is True
+    # повторное закрытие уже закрытого консульта → отказ, запись НЕ портится
+    second = srv.dispatch("calibrated_consult_close",
+                          {"consult_id": cid, "posterior_call": "снова",
+                           "posterior_confidence": 0.9, "followed_council": False})
+    assert "error" in second
+    _, rec = srv._find_consult(str(tmp_path), cid)
+    assert rec["posterior"]["call"] == "b"                 # первый постериор цел
+    assert abs(rec["posterior"]["confidence"] - 0.7) < 1e-9
+
+
+def test_resolve_tool_without_close_fail_closed(tmp_path, monkeypatch):
+    _point_root(monkeypatch, tmp_path)
+    cid = srv.dispatch("calibrated_consult_open",
+                       {"question": "q", "prior_call": "a", "prior_confidence": 0.5})["consult_id"]
+    # резолв открытого консульта (нет close → нет прогноза) → fail-closed
+    res = srv.dispatch("calibrated_consult_resolve",
+                       {"consult_id": cid, "outcome": {"resolved_on": "2026-08-17",
+                                                       "occurred": True}})
+    assert "error" in res

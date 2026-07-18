@@ -1,6 +1,6 @@
 {
   "meta": {
-    "tool_count": 56,
+    "tool_count": 60,
     "rule_count": 17,
     "recipe_count": 16,
     "script_count": 72,
@@ -224,6 +224,101 @@
       "referenced_in": [
         "recipe:calibrate"
       ]
+    },
+    {
+      "name": "calibrated_consult_close",
+      "description": "Зафиксировать ТВОЮ позицию ПОСЛЕ ответа совета + получить ЗЕРКАЛО (сдвиг позиции, инфляция уверенности, подавлено ли «не знаю»). followed_council: принял ли ты позицию совета. prediction (опц.): resolvable-прогноз (контракт decision_card) для калибровки по исходу. Идёт после calibrated_consult_open; закрой исход позже через calibrated_consult_resolve.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "consult_id": {
+            "type": "string"
+          },
+          "posterior_call": {
+            "type": "string"
+          },
+          "posterior_confidence": {
+            "type": "number"
+          },
+          "posterior_abstain": {
+            "type": "boolean"
+          },
+          "followed_council": {
+            "type": "boolean"
+          },
+          "prediction": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "consult_id",
+          "posterior_call",
+          "posterior_confidence",
+          "followed_council"
+        ]
+      },
+      "status": "surfaced",
+      "referenced_in": []
+    },
+    {
+      "name": "calibrated_consult_journal",
+      "description": "Сводка ОСИ ОВЕРРЕЛАЙАНСА по твоим консультам: инфляция уверенности, сколько раз «не знаю» подавлено, калибровка followed-совета против самостоятельных. Малое N → trustworthy=false (мало данных).",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "status": "surfaced",
+      "referenced_in": []
+    },
+    {
+      "name": "calibrated_consult_open",
+      "description": "Анти-оверрелайанс ИНСТРУМЕНТ (не совет): зафиксировать ТВОЮ позицию + уверенность (0..1) ДО ответа совета, чтобы потом увидеть свой сдвиг. Зови в режиме calibrated-consult ПЕРЕД тем как спросить совет. Пишет запись (Rule 0). Затем calibrated_consult_close после ответа совета.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "question": {
+            "type": "string"
+          },
+          "prior_call": {
+            "type": "string"
+          },
+          "prior_confidence": {
+            "type": "number"
+          },
+          "prior_abstain": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "question",
+          "prior_call",
+          "prior_confidence"
+        ]
+      },
+      "status": "surfaced",
+      "referenced_in": []
+    },
+    {
+      "name": "calibrated_consult_resolve",
+      "description": "Проставить ИСХОД консульту (когда факт лёг): outcome={resolved_on, occurred|actual, endorsed?}. Кормит калибровку оси оверрелайанса. Fail-closed: нужен прогноз в консульте и верный тип исхода. Сводку оси смотри в calibrated_consult_journal.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "consult_id": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "consult_id",
+          "outcome"
+        ]
+      },
+      "status": "surfaced",
+      "referenced_in": []
     },
     {
       "name": "capture_situation",

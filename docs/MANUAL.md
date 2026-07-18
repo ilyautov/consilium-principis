@@ -227,10 +227,10 @@ python scripts/gen_selfdoc.py
 
 ### Инвентарь кода
 
-Скрипты (71) по подсистемам:
+Скрипты (72) по подсистемам:
 
 - **build**: `build_advisor.py`
-- **calibrate**: `calibrate_advisor.py`
+- **calibrate**: `calibrate_advisor.py`, `calibrated_consult.py`
 - **catalog**: `catalog.py`, `catalog_verify.py`
 - **collect**: `collect_common.py`, `collect_pd.py`, `collect_transcript.py`, `collect_web.py`
 - **diversity**: `diversity_check.py`
@@ -242,7 +242,7 @@ python scripts/gen_selfdoc.py
 - **situation**: `situation.py`
 - **tier**: `tier_full.py`
 
-Тестов: 135.
+Тестов: 136.
 
 ## Слой 3 — Справочник
 

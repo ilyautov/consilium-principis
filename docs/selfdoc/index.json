@@ -3,8 +3,8 @@
     "tool_count": 56,
     "rule_count": 17,
     "recipe_count": 16,
-    "script_count": 71,
-    "test_count": 135,
+    "script_count": 72,
+    "test_count": 136,
     "glossary_count": 113
   },
   "tools": [
@@ -1708,6 +1708,11 @@
       "doc": "§3.2 moat-v2: per-advisor автокалибровка порогов при сборке."
     },
     {
+      "path": "scripts/calibrated_consult.py",
+      "subsystem": "calibrate",
+      "doc": "Calibrated Consult — анти-оверрелайанс ИНСТРУМЕНТ (спека 2026-07-18-calibrated-consult-design)."
+    },
+    {
       "path": "scripts/calibration.py",
       "subsystem": "other",
       "doc": "A/B-калибровка подачи под человека (N=1), с guardrail не-захвата."
@@ -2063,6 +2068,10 @@
     {
       "path": "tests/test_calibrate_advisor.py",
       "covers": "calibrate advisor"
+    },
+    {
+      "path": "tests/test_calibrated_consult.py",
+      "covers": "calibrated consult"
     },
     {
       "path": "tests/test_calibration.py",

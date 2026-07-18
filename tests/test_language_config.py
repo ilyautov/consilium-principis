@@ -66,3 +66,20 @@ def test_rules_0_and_5_survive_every_mode(monkeypatch):  # G2
         served = _served_instructions(monkeypatch, lang)
         assert "0. БЕЗОПАСНОСТЬ ВЫШЕ ВСЕГО" in served, f"Rule 0 пропал в режиме {lang}"
         assert "5. КОНТУР ВЕРНОСТИ" in served, f"Rule 5 пропал в режиме {lang}"
+
+
+def test_both_force_blocks_bow_to_rule0():  # G3
+    # Клауза подчинения безопасности обязана быть в ОБОИХ форс-блоках — иначе фиксация языка
+    # могла бы позиционно (она последняя) перебить и Правило 0.
+    en = _response_language_directive("en").lower()
+    ru = _response_language_directive("ru").lower()
+    assert "never overrides rule 0" in en, "EN-блок потерял клаузу подчинения Rule 0"
+    assert "не перекрывает правило 0" in ru, "RU-блок потерял клаузу подчинения Правилу 0"
+
+
+def test_guard_not_asleep_force_blocks_are_nonempty_and_distinct():  # G5
+    # Если кто-то опустошит блок, «фиксация» станет молчаливым no-op — гард это ловит.
+    en = _response_language_directive("en")
+    ru = _response_language_directive("ru")
+    assert len(en.strip()) > 40 and len(ru.strip()) > 40, "форс-блок схлопнулся до пустого"
+    assert en != ru, "EN и RU блоки совпали — один из них потерян"

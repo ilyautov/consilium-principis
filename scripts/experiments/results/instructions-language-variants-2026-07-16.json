@@ -1,0 +1,1910 @@
+{
+  "generated_at": "2026-07-16T05:51:36",
+  "baseline_instructions_chars": 20134,
+  "baseline_instructions_cyrillic_share": 0.7971629325202174,
+  "thresholds": {
+    "english_below": 0.1,
+    "russian_above": 0.5,
+    "calibration_supermajority": 0.75,
+    "min_measured": 6
+  },
+  "temperature": 0.3,
+  "battery_n": 8,
+  "arms": [
+    "baseline",
+    "ru_top",
+    "en_top",
+    "en_top_plus_rule7",
+    "en_bottom"
+  ],
+  "models": [
+    {
+      "model": "openai/gpt-4.1",
+      "control_en_bare": {
+        "rows": [
+          {
+            "id": "pricing",
+            "withheld": false,
+            "share": 0.0,
+            "category": "english",
+            "excerpt": "Raising prices for your SaaS can be a powerful lever for growth, but it comes with risks. Here are some key factors to consider before making a decision:\n\n### 1. **Value Provided**\n- **Have you added new features or improved your service?** If your product is significantly better than when you launched, a price increase may be justified.\n- **Are customers seeing measurable ROI?** If your SaaS save"
+          },
+          {
+            "id": "cofounder",
+            "withheld": false,
+            "share": 0.0,
+            "category": "english",
+            "excerpt": "I'm sorry you're facing this situation—it's a tough one for any founder. Here are some steps to help you handle your co-founder’s departure thoughtfully and effectively:\n\n### 1. **Open and Honest Conversation**\n- **Understand their reasons:** Is it burnout, a new opportunity, personal issues, or something else? Understanding their motivation can help you respond appropriately.\n- **Discuss timing:*"
+          },
+          {
+            "id": "funding",
+            "withheld": false,
+            "share": 0.0,
+            "category": "english",
+            "excerpt": "This is a big decision and depends on your goals, business stage, and personal preferences. Here are some key factors to consider:\n\n## **When to Consider Raising Outside Money**\n- **You need to grow fast:** If your market is competitive and speed is crucial, outside capital can help you scale quickly.\n- **Big upfront costs:** If your business requires significant investment (R&D, inventory, hiring"
+          },
+          {
+            "id": "raise",
+            "withheld": false,
+            "share": 0.0,
+            "category": "english",
+            "excerpt": "This is a tough situation, and there’s no one-size-fits-all answer. Here are some factors to consider before making your decision:\n\n### 1. **Assess the Engineer’s Value**\n- **Criticality:** Is this engineer truly irreplaceable, or just highly skilled? Are they holding unique knowledge or relationships?\n- **Impact:** How much would their departure disrupt current projects, timelines, or morale?\n- *"
+          },
+          {
+            "id": "copycat",
+            "withheld": false,
+            "share": 0.0,
+            "category": "english",
+            "excerpt": "I'm sorry to hear that—this is a tough situation, but it’s not uncommon in business. Here’s a structured approach to consider:\n\n### 1. **Assess the Situation**\n- **How similar is the copy?** Is it a direct clone (UI, wording, workflow), or just similar in concept?\n- **Do you have IP protection?** Patents, copyrights, trademarks, or trade secrets? If so, consult your IP attorney immediately.\n- **Wh"
+          },
+          {
+            "id": "burnout",
+            "withheld": false,
+            "share": 0.0,
+            "category": "english",
+            "excerpt": "I'm really sorry you're feeling this way. Burnout is a serious issue, especially for founders and leaders. Here are some steps you can take **right now** to start making changes:\n\n### 1. **Acknowledge and Accept**\nRecognize that burnout is real and it’s not a sign of weakness. Accepting it is the first step to making positive changes.\n\n### 2. **Prioritize Ruthlessly**\n- **Identify your highest-imp"
+          },
+          {
+            "id": "firing",
+            "withheld": false,
+            "share": 0.0,
+            "category": "english",
+            "excerpt": "This is a difficult and nuanced situation that many leaders face. Here are some key considerations to help you make the best decision:\n\n### 1. **Assess the Situation Objectively**\n- **Performance:** Is the manager’s performance clearly below expectations? Are there specific, measurable ways in which they are not meeting the requirements?\n- **Impact:** How is their performance affecting the team, b"
+          },
+          {
+            "id": "pivot",
+            "withheld": false,
+            "share": 0.0,
+            "category": "english",
+            "excerpt": "Flat growth for eighteen months is a significant signal that warrants close attention. Whether it’s time to pivot depends on several factors, but here are some key considerations to help you decide:\n\n### 1. **Diagnose the Cause**\n- **Market Saturation:** Has your current market reached its limit?\n- **Product-Market Fit:** Does your product still solve a real problem for your customers?\n- **Competi"
+          }
+        ],
+        "mean_cyrillic_share": 0.0,
+        "dominant": {
+          "label": "english",
+          "share": 1.0,
+          "n": 8
+        },
+        "categories": {
+          "english": 8
+        },
+        "withheld": 0
+      },
+      "calibration": {
+        "sensitive": true,
+        "label": "ПРИБОР ЧУВСТВИТЕЛЕН",
+        "reasons": [],
+        "control_ru_with": {
+          "label": "russian",
+          "share": 1.0,
+          "n": 8
+        },
+        "control_en_bare": {
+          "label": "english",
+          "share": 1.0,
+          "n": 8
+        }
+      },
+      "arms": {
+        "baseline": {
+          "arm": "baseline",
+          "instructions_chars": 20134,
+          "instructions_cyrillic_share": 0.7971629325202174,
+          "strata": {
+            "en_with": {
+              "rows": [
+                {
+                  "id": "pricing",
+                  "withheld": false,
+                  "share": 0.8662790697674418,
+                  "category": "russian",
+                  "excerpt": "Совет не может дать прямой ответ на этот вопрос сразу — это классический выбор-решение (стоит ли повышать цены), и по правилам Consilium-Principis сначала собирается круглый стол советников. Они разложат вопрос на ключевые оси и зададут уточняющие вопросы, чтобы выявить главную неопределённость. После этого, если вы захотите, можно будет построить карту решения и посчитать варианты.\n\n**Открываем с"
+                },
+                {
+                  "id": "cofounder",
+                  "withheld": false,
+                  "share": 0.47448121144139094,
+                  "category": "mixed",
+                  "excerpt": "You’ve подняли вопрос-РЕШЕНИЕ: как действовать, если сооснователь хочет уйти из компании. Это ситуация со ставкой — выбор стратегии, которая повлияет на будущее компании, отношения, капитал и риски.\n\n**Совет будет работать так:**\n- Сейчас советники зададут уточняющие вопросы, чтобы понять детали и ключевые неопределённости.\n- После уточнений можно будет предложить карту вариантов (если захотите — "
+                },
+                {
+                  "id": "funding",
+                  "withheld": false,
+                  "share": 0.993214588634436,
+                  "category": "russian",
+                  "excerpt": "Вопрос — стратегический: выбрать между привлечением внешних инвестиций и продолжением бутстрэппинга (развития на собственные средства). Это классический маршрут решения (выбор со ставкой), поэтому я созову совет реальных мыслителей для обсуждения.\n\n**Перед тем как совет сформулирует мнения, советники обычно уточняют:**\n- Какой горизонт планирования (на сколько лет вперёд вы смотрите)?\n- Какой темп"
+                },
+                {
+                  "id": "raise",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "**Opening the Consilium-Principis round table:**\n\nYou’re facing a classic high-stakes decision: a key engineer is demanding a significant raise, threatening to leave otherwise. The council will help you break down the situation, but before offering any synthesis or direct advice, let’s clarify the core uncertainties and axes for your decision.\n\n---\n\n**Consilium-Principis: Round Table Opening**\n\n**"
+                },
+                {
+                  "id": "copycat",
+                  "withheld": false,
+                  "share": 0.9692765113974232,
+                  "category": "russian",
+                  "excerpt": "You’ve brought a **решение/стратегия** вопрос: что делать, если крупный конкурент скопировал ваш продукт.  \n**По правилам Consilium-Principis, я не даю прямого ответа — совет собирается голосами реальных мыслителей.**\n\n---\n\n### Совет приглашён:  \n**Тема:** Крупный конкурент скопировал ваш продукт.  \n**Советники:** Представления мыслителей (основаны на их текстах, не сами люди).\n\n---\n\n#### Совет на"
+                },
+                {
+                  "id": "burnout",
+                  "withheld": false,
+                  "share": 0.7302764666217127,
+                  "category": "russian",
+                  "excerpt": "Спасибо за доверие и честность. Это важный и сложный вопрос — вы просите не просто совет, а решение: «что изменить первым, чтобы перестать выгорать». По правилам Consilium-Principis, такие вопросы идут через совет реальных мыслителей, а не прямой ответ ассистента.\n\n**Сначала коротко:**\n- Сейчас я соберу совет, где каждый советник задаст уточняющие вопросы, чтобы понять вашу ситуацию глубже.\n- Посл"
+                },
+                {
+                  "id": "firing",
+                  "withheld": false,
+                  "share": 0.9412265758091993,
+                  "category": "russian",
+                  "excerpt": "**Совет Принцепса: созываю круглый стол мыслителей для обсуждения вопроса:**\n\n> Should I fire a loyal manager who is no longer good at the job?\n\n---\n\n**Открытие заседания**\n\n- **Советники**: Представлены линзы реальных мыслителей, заземлённые на их текстах. Их мнения — не личные, а основаны на корпусах их работ.\n- **Тема**: Этическая и практическая дилемма: увольнять ли лояльного менеджера, если е"
+                },
+                {
+                  "id": "pivot",
+                  "withheld": false,
+                  "share": 0.005203816131830009,
+                  "category": "english",
+                  "excerpt": "**Opening the Consilium-Principis roundtable:**\n\nYou’ve brought a strategic decision: _“Growth has been flat for eighteen months. Is it time to pivot?”_\n\nBefore the council can synthesize an answer, let’s clarify a few key uncertainties to ground the discussion:\n\n---\n\n**Council Advisors React:**\n\n- **Peter Drucker (Management):**  \n  _“Is the current business model still aligned with a clear, unme"
+                }
+              ],
+              "mean_cyrillic_share": 0.6224947799754295,
+              "dominant": {
+                "label": "russian",
+                "share": 0.625,
+                "n": 8
+              },
+              "categories": {
+                "russian": 5,
+                "mixed": 1,
+                "english": 2
+              },
+              "withheld": 0
+            },
+            "ru_with": {
+              "rows": [
+                {
+                  "id": "pricing",
+                  "withheld": false,
+                  "share": 0.9676320272572402,
+                  "category": "russian",
+                  "excerpt": "Вижу, что вопрос — решение: «стоит ли поднять цены на мой SaaS?» (выбор стратегии, ставка).  \nСогласно правилам Consilium-Principis, я не могу сразу дать прямой ответ или своё мнение. Вместо этого — созываю совет реальных мыслителей. Советники сначала разложат вопрос на ключевые оси и зададут уточняющие вопросы, чтобы собрать контекст для взвешенного решения. После сбора информации можно будет пер"
+                },
+                {
+                  "id": "cofounder",
+                  "withheld": false,
+                  "share": 1.0,
+                  "category": "russian",
+                  "excerpt": "Вы подняли вопрос-РЕШЕНИЕ: «Как поступить, если сооснователь хочет уйти из компании?» — это выбор стратегии с высокой ставкой.  \nЯ не буду давать прямой ответ или своё мнение до сбора мнений совета (см. правила 2, 4).\n\n**Давайте созовём совет реальных мыслителей — они помогут разложить ситуацию на ключевые вопросы и предложат разные подходы.**  \nВот как это будет работать:  \n— Советники выскажут с"
+                },
+                {
+                  "id": "funding",
+                  "withheld": false,
+                  "share": 0.9977307110438729,
+                  "category": "russian",
+                  "excerpt": "Вы задали вопрос-решение: «Брать деньги инвесторов или продолжать расти на свои?»  \nЭто классический стратегический выбор с высокой ставкой.  \nЯ созову совет реальных мыслителей — каждый из них уточнит ключевые моменты и задаст вопросы, которые помогут прояснить вашу ситуацию.\n\n**Перед началом**:  \n— Для количественно сравнимого выбора я могу предложить разложить ваш вопрос до карты решения («📐 ра"
+                },
+                {
+                  "id": "raise",
+                  "withheld": false,
+                  "share": 1.0,
+                  "category": "russian",
+                  "excerpt": "Вы принесли вопрос-РЕШЕНИЕ (стоит ли уступать ключевому инженеру и дать большую прибавку, иначе он уйдёт?).  \nЯ не даю прямого ответа — вместо этого созываю совет реальных мыслителей, чтобы рассмотреть ситуацию с разных сторон.\n\n**Перед тем как совет сможет вынести суждение, важно уточнить несколько ключевых моментов:**\n\n1. **Какова реальная незаменимость этого инженера?**  \n   — Какие проекты/нап"
+                },
+                {
+                  "id": "copycat",
+                  "withheld": false,
+                  "share": 0.9595879556259905,
+                  "category": "russian",
+                  "excerpt": "Это вопрос-РЕШЕНИЕ (выбор стратегии после копирования продукта конкурентом). Я не могу сразу дать прямой ответ или совет — сначала соберу совет реальных мыслителей (Consilium-Principis) и предложу разложить ситуацию на ключевые оси.\n\n**Совет начнёт с уточняющих вопросов:**\n\n---\n\n**Совет Consilium-Principis приглашён к обсуждению:**\n\n- **Тема:** Более крупный конкурент скопировал мой продукт фича в"
+                },
+                {
+                  "id": "burnout",
+                  "withheld": false,
+                  "share": 0.8348623853211009,
+                  "category": "russian",
+                  "excerpt": "Спасибо за доверие и открытость — тема выгорания руководителя требует бережного и честного обсуждения.  \nЯ созову совет реальных мыслителей, чтобы взглянуть на ситуацию с разных сторон. Это не диагноз и не универсальный рецепт, а приглашение к совместному разбору: какие ключевые оси влияют на выгорание, что может быть точкой приложения в первую очередь, и какие вопросы важно прояснить, прежде чем "
+                },
+                {
+                  "id": "firing",
+                  "withheld": false,
+                  "share": 0.8283582089552238,
+                  "category": "russian",
+                  "excerpt": "Вы подняли вопрос-решение с высокой ставкой: «Увольнять ли лояльного менеджера, который больше не тянет работу?»  \nЭто классический выбор между ценностью лояльности и эффективностью работы.  \nСовет начнёт с уточняющих вопросов — чтобы не гадать и не анкорить, а собрать ключевой контекст для честного обсуждения.\n\n---\n\n**Совет приглашён.**  \nВот как советники видят ситуацию и какие вопросы задают, ч"
+                },
+                {
+                  "id": "pivot",
+                  "withheld": false,
+                  "share": 0.774076317383404,
+                  "category": "russian",
+                  "excerpt": "Ты поднял вопрос-РЕШЕНИЕ: «Пора ли делать пивот, если роста нет 18 месяцев?»  \nЭто стратегический выбор со ставкой, и по правилам Consilium-Principis я не могу сразу дать свой ответ или мнение — сначала созываю совет реальных мыслителей.  \n\n**Советники сейчас:**\n- Каждый даст свою реакцию и задаст уточняющие вопросы, чтобы прояснить ключевые неопределённости.\n- Для такого вопроса обычно важно:  \n "
+                }
+              ],
+              "mean_cyrillic_share": 0.9202809506983539,
+              "dominant": {
+                "label": "russian",
+                "share": 1.0,
+                "n": 8
+              },
+              "categories": {
+                "russian": 8
+              },
+              "withheld": 0
+            }
+          },
+          "verdict": {
+            "dominant_en": {
+              "label": "russian",
+              "share": 0.625,
+              "n": 8
+            },
+            "dominant_ru": {
+              "label": "russian",
+              "share": 1.0,
+              "n": 8
+            },
+            "withheld": {
+              "en_with": 0,
+              "ru_with": 0
+            },
+            "works": false,
+            "fixes_en": false,
+            "keeps_ru": true,
+            "text": "НЕ РАБОТАЕТ: русский путь цел («russian» 100%), но английский вопрос по-прежнему даёт «russian» 62% — уверенного английского нет. Смесь в успех не округляем."
+          }
+        },
+        "ru_top": {
+          "arm": "ru_top",
+          "instructions_chars": 20388,
+          "instructions_cyrillic_share": 0.7998037291462218,
+          "strata": {
+            "en_with": {
+              "rows": [
+                {
+                  "id": "pricing",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "**Opening the Consilium-Principis: Council of Thinkers**  \nYour question is a strategic decision: \"Should I raise prices for my SaaS?\" The council will help you clarify the key axes and uncertainties before offering a synthesis.\n\n**Council Advisors:**\n- Peter Drucker (Management & Business Strategy)\n- Clayton Christensen (Innovation & Disruption)\n- Warren Buffett (Value & Pricing)\n- Paul Graham (S"
+                },
+                {
+                  "id": "cofounder",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "**Opening the Consilium-Principis Council**\n\nYour question involves a significant decision: how to handle your co-founder’s intention to leave the company. This is a high-stakes situation with multiple axes—legal, emotional, operational, and strategic. The council will help you clarify the key uncertainties and offer perspectives grounded in the works of real thinkers.\n\n---\n\n**Consilium-Principis "
+                },
+                {
+                  "id": "funding",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "**Consilium-Principis: Council Opening**\n\n**Question:** Should I raise outside money or keep bootstrapping?\n\nYou’re asking for a strategic decision between raising external funding and continuing to bootstrap your venture. This is a high-stakes, multi-axis choice with significant consequences for control, speed, risk, and potential upside.\n\nTo provide a grounded, multi-perspective council, I’ll co"
+                },
+                {
+                  "id": "raise",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "**Opening the Consilium-Principis Roundtable**\n\n**Question:**  \nA key engineer is demanding a large raise or he walks. Do I give in?\n\nThis is a decision question involving a strategic choice with a clear stake. Before the council can synthesize advice, we need to clarify a few key uncertainties:\n\n**Advisors' Clarifying Questions:**  \n1. What is the engineer’s unique contribution or irreplaceabilit"
+                },
+                {
+                  "id": "copycat",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "**Opening the Consilium-Principis Roundtable**\n\nA panel of AI advisors, grounded in the writings of real thinkers, is convening to discuss your question:\n\n> A bigger competitor copied my product feature for feature. What now?\n\n**Advisors:**\n- Niccolò Machiavelli (Strategy, Power, Realpolitik)\n- Peter Drucker (Business, Management, Innovation)\n- Clayton Christensen (Disruption, Competitive Strategy"
+                },
+                {
+                  "id": "burnout",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "**Opening the Consilium-Principis: Council of Thinkers**\n\nYou're asking a high-stakes decision question: \"I am burning out running this company. What should I change first?\"  \nLet's convene the council of thinkers to break down the problem and ask clarifying questions before moving to synthesis.\n\n---\n\n**Council Opening**\n\n- **Advisors:**  \n    - Marcus Aurelius (Stoic philosopher)  \n    - Peter Dr"
+                },
+                {
+                  "id": "firing",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "**Consilium-Principis: Council Opening**\n\nYou are consulting a council of AI personas grounded in the writings of real thinkers. Their perspectives are based on their texts, not personal opinions.\n\n**Council Members:**\n- Niccolò Machiavelli (Political Strategy)\n- Marcus Aurelius (Stoic Philosophy)\n- Peter Drucker (Management)\n- Confucius (Ethics & Governance)\n\n**Opening Statement:**  \nYou’ve asked"
+                },
+                {
+                  "id": "pivot",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "**Opening the Consilium-Principis Roundtable**\n\nYour question is a classic decision point: \"Is it time to pivot after 18 months of flat growth?\"  \nLet's bring in the council of thinkers, each grounded in their own texts, to explore this.\n\n**Advisors:**\n- Clayton Christensen (Innovation & Disruption)\n- Peter Drucker (Management & Strategy)\n- Andy Grove (Leadership & Inflection Points)\n- Rita McGrat"
+                }
+              ],
+              "mean_cyrillic_share": 0.0,
+              "dominant": {
+                "label": "english",
+                "share": 1.0,
+                "n": 8
+              },
+              "categories": {
+                "english": 8
+              },
+              "withheld": 0
+            },
+            "ru_with": {
+              "rows": [
+                {
+                  "id": "pricing",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "Opening the Consilium-Principis: Council of Thinkers\n\nYour question is a decision: \"Should I raise prices for my SaaS?\"  \nLet's open the council. Each advisor will react and ask clarifying questions before any synthesis or recommendation.\n\n---\n\n**Consilium-Principis: Council Opening**\n\n**Advisors:**\n- Peter Drucker (Management & Business Strategy)\n- Clayton Christensen (Innovation & Disruption)\n- "
+                },
+                {
+                  "id": "cofounder",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "Opening the Consilium-Principis: Council of Thinkers\n\nYour question is a high-stakes decision: \"My co-founder wants to leave the company. What should I do?\"  \nThis is a complex situation involving business, ethics, and personal relationships. Let's convene the council of thinkers to help you navigate it.\n\n---\n\n**Consilium-Principis: Council Opening**\n\n**Advisors:**\n- Niccolò Machiavelli (Strategy "
+                },
+                {
+                  "id": "funding",
+                  "withheld": false,
+                  "share": 0.11426116838487972,
+                  "category": "mixed",
+                  "excerpt": "Совет AI-мыслителей: \"Брать деньги инвесторов или продолжать расти на свои?\"\n\nОткрываем круглый стол — вот как советники видят ключевые вопросы для принятия решения:\n\n---\n\n**Consilium-Principis: Council Opening**\n\n**Advisors:**\n- Peter Thiel (Startup strategy, venture capital)\n- Paul Graham (Startup growth, founder perspective)\n- Warren Buffett (Long-term value, capital allocation)\n- Nassim Nichol"
+                },
+                {
+                  "id": "raise",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "Consilium-Principis: Council Opening\n\n**AI Council of Thinkers**  \nThis is an interactive roundtable of AI personas, each grounded in the texts of real thinkers. Their opinions are not direct quotes unless explicitly marked. The council will help you explore the decision: \"Should you give a key engineer a significant raise if they threaten to leave?\"\n\n---\n\n**Advisors:**\n\n- **Niccolò Machiavelli** "
+                },
+                {
+                  "id": "copycat",
+                  "withheld": false,
+                  "share": 0.04942084942084942,
+                  "category": "english",
+                  "excerpt": "Совет AI-мыслителей: что делать, если крупный конкурент скопировал ваш продукт\n\n**Consilium-Principis: Council Opening**\n\n**Advisors:**\n- Niccolò Machiavelli (strategy, power dynamics)\n- Peter Thiel (startup competition, innovation)\n- Clayton Christensen (disruption, innovation theory)\n- Sun Tzu (competitive strategy, conflict)\n- Ben Horowitz (startup execution, competition)\n\n**Invitation:**  \nA m"
+                },
+                {
+                  "id": "burnout",
+                  "withheld": false,
+                  "share": 0.10728346456692914,
+                  "category": "mixed",
+                  "excerpt": "Открываю совет AI-персон на основе текстов реальных мыслителей.  \n(Это не живые люди, а их представления, собранные из их публичных работ.)\n\n---\n\n**Opening: Council Session — Burnout in Company Leadership**\n\n**Advisors:**\n- Marcus Aurelius (Stoic philosophy, grounded in \"Meditations\")\n- Peter Drucker (Management, grounded in \"The Effective Executive\")\n- Viktor Frankl (Meaning & psychology, grounde"
+                },
+                {
+                  "id": "firing",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "**Consilium-Principis Opening: Council on the Dilemma of Dismissing a Loyal but Underperforming Manager**\n\nThis is a roundtable of AI advisors, each grounded in the writings of real thinkers, to help you consider the question: \"Should you dismiss a loyal manager who is no longer performing adequately?\" The council will not give a direct answer yet; instead, each advisor will raise key axes and cla"
+                },
+                {
+                  "id": "pivot",
+                  "withheld": false,
+                  "share": 0.08118081180811808,
+                  "category": "english",
+                  "excerpt": "Совет AI-мыслителей: «Пора делать пивот?»  \n(Мод: открытый совет, не финальный вердикт — сначала уточняющие вопросы)\n\n---\n\n**Consilium-Principis: Council Opening**\n\n**Advisors:**\n- Peter Drucker (Management, Innovation)\n- Clayton Christensen (Disruptive Innovation)\n- Nassim Nicholas Taleb (Risk, Uncertainty)\n- Paul Graham (Startups, Growth)\n\n**Invitation:**  \nYou’re asking whether it’s time to piv"
+                }
+              ],
+              "mean_cyrillic_share": 0.044018286772597046,
+              "dominant": {
+                "label": "english",
+                "share": 0.75,
+                "n": 8
+              },
+              "categories": {
+                "english": 6,
+                "mixed": 2
+              },
+              "withheld": 0
+            }
+          },
+          "verdict": {
+            "dominant_en": {
+              "label": "english",
+              "share": 1.0,
+              "n": 8
+            },
+            "dominant_ru": {
+              "label": "english",
+              "share": 0.75,
+              "n": 8
+            },
+            "withheld": {
+              "en_with": 0,
+              "ru_with": 0
+            },
+            "works": false,
+            "fixes_en": true,
+            "keeps_ru": false,
+            "text": "СЛОМАЛ РУССКИЙ ПУТЬ: английский починен («english» 100%), но русский вопрос теперь даёт «english» 75% вместо уверенного русского. Это ПРОВАЛ, а не победа: сломан ежедневный путь владельца."
+          }
+        },
+        "en_top": {
+          "arm": "en_top",
+          "instructions_chars": 20448,
+          "instructions_cyrillic_share": 0.7842702491196035,
+          "strata": {
+            "en_with": {
+              "rows": [
+                {
+                  "id": "pricing",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "Let’s bring in your council of thinkers for a roundtable on the question: **Should you raise prices for your SaaS?**\n\n---\n\n**Opening the council:**\n\n- **Advisors:**  \n  - Peter Drucker (Management & Business Strategy)  \n  - Clayton Christensen (Innovation & Disruption)  \n  - Warren Buffett (Value & Customer Retention)  \n  - Ben Horowitz (Startup Operations & Growth)  \n\n**Invitation:**  \nThis is a "
+                },
+                {
+                  "id": "cofounder",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "Thank you for sharing your situation. This is a significant decision point with multiple possible paths and implications. To help you navigate it wisely, I’ll convene a roundtable of AI advisors grounded in the texts of real thinkers. They’ll each offer their perspective and ask clarifying questions to better understand your context before synthesizing advice.\n\n---\n\n**Opening the Council**\n\n**Advi"
+                },
+                {
+                  "id": "funding",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "Let's bring together the council of thinkers to weigh in on your question: Should you raise outside money or keep bootstrapping your venture?\n\nTo give you the most grounded and relevant advice, the council will first clarify some key uncertainties:\n\n- What is your current runway (how many months can you operate at your current burn rate)?\n- What is your growth ambition (are you aiming for fast sca"
+                },
+                {
+                  "id": "raise",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "Let's bring in the council for a roundtable on your question:  \nA key engineer is demanding a large raise or he walks. Do you give in?\n\nWe'll gather perspectives from notable thinkers, each grounded in their own texts, to help you see the axes and uncertainties before making a decision.\n\n---\n\n**Consilium Principis Opening**  \n*AI roundtable: perspectives from real thinkers, grounded in their texts"
+                },
+                {
+                  "id": "copycat",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "A situation like this can be tough, but it’s also a classic strategic crossroads. Let’s bring in the council for perspectives and next steps.\n\n---\n\n**Inviting the council:**  \nYou’ve built a product, and now a larger competitor has replicated your feature set. The core question: What should your next move be? Should you double down on differentiation, pivot, compete head-on, or consider collaborat"
+                },
+                {
+                  "id": "burnout",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "Thank you for trusting this space with such a personal and high-stakes question. To help you most effectively, I’ll convene a roundtable of advisors grounded in the texts of real thinkers. They’ll each respond from their own perspective, and—before offering a synthesis—they’ll ask 1–3 clarifying questions to better understand your situation and what matters most to you.\n\n**Opening the council:**\n\n"
+                },
+                {
+                  "id": "firing",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "Let's bring this question to the council of thinkers. Here’s how we’ll proceed:\n\n- The question is a decision: whether to fire a loyal manager who is no longer effective.\n- The council will open with their perspectives, and ask clarifying questions to help break down the key uncertainties before synthesizing advice.\n- If you’d like, we can map out the decision with a calculation (e.g., weighing lo"
+                },
+                {
+                  "id": "pivot",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "Opening the council for your strategic question: \"Growth has been flat for eighteen months. Is it time to pivot?\"\n\nLet's bring in the perspectives of several thinkers grounded in their real texts. Each advisor will react and, if needed, ask clarifying questions before any synthesis or recommendation.\n\n---\n\n**Council Opening**\n\n**Advisors:**\n- **Clayton Christensen** (Innovation, Disruption)  \n  *G"
+                }
+              ],
+              "mean_cyrillic_share": 0.0,
+              "dominant": {
+                "label": "english",
+                "share": 1.0,
+                "n": 8
+              },
+              "categories": {
+                "english": 8
+              },
+              "withheld": 0
+            },
+            "ru_with": {
+              "rows": [
+                {
+                  "id": "pricing",
+                  "withheld": false,
+                  "share": 0.9913793103448276,
+                  "category": "russian",
+                  "excerpt": "Совет AI-мыслителей по вашему вопросу: стоит ли поднять цены на ваш SaaS?\n\nВопрос требует стратегического выбора, зависит от множества факторов: текущая выручка, эластичность спроса, конкурентная среда, ценность продукта для клиентов, возможные риски оттока и т.д. Чтобы дать обоснованный совет, советники обычно уточняют несколько ключевых параметров.\n\n**Давайте начнём с короткого раунда вопросов о"
+                },
+                {
+                  "id": "cofounder",
+                  "withheld": false,
+                  "share": 0.9889455782312925,
+                  "category": "russian",
+                  "excerpt": "Созываю совет AI-персон реальных мыслителей — рассмотрим ситуацию с уходом сооснователя.  \nВот как выглядит старт заседания:\n\n---\n\n**Советники:**\n- **Питер Тиль** (предприниматель, инвестор; тексты о стартапах, партнёрстве, конфликтах)\n- **Бен Горовиц** (венчурный капиталист, автор о построении компаний и управлении кризисами)\n- **Рэй Далио** (основатель Bridgewater, пишет о принципах принятия реш"
+                },
+                {
+                  "id": "funding",
+                  "withheld": false,
+                  "share": 0.951179820992677,
+                  "category": "russian",
+                  "excerpt": "Вопрос стратегический — выбор между внешними инвестициями и органическим ростом. Для такого решения совет собирается в формате круглого стола: каждый советник разложит вопрос на ключевые оси и задаст уточняющие вопросы, чтобы выявить главную неопределённость.\n\n**Перед тем как совет вынесет мнения и синтез, предлагаю:**\n- Разложить ваш вопрос до карты решения и, если хотите, посчитать сценарии (📐 р"
+                },
+                {
+                  "id": "raise",
+                  "withheld": false,
+                  "share": 1.0,
+                  "category": "russian",
+                  "excerpt": "Созываю совет реальных мыслителей — рассмотрим ситуацию с требованием ключевого инженера о значительной прибавке. Каждый советник задаст уточняющие вопросы, чтобы прояснить картину и выявить главные неопределённости. После сбора контекста предложу карту решения (📐 расчёт), если захотите.\n\n**Вопросы для уточнения:**\n1. Какова роль и незаменимость этого инженера для текущих и будущих проектов?\n2. Ка"
+                },
+                {
+                  "id": "copycat",
+                  "withheld": false,
+                  "share": 0.9917627677100495,
+                  "category": "russian",
+                  "excerpt": "Ситуация, когда крупный конкурент копирует ваш продукт или его ключевые фичи, — классическая дилемма для основателя. Совет AI-советников поможет разобрать её по осям: риски, возможности, стратегические варианты. Давайте созовём совет и определим, какие уточняющие вопросы важны для выработки решения.\n\n---\n\n**Совет AI-советников:**\n- **Макиавелли** (стратегия, власть)\n- **Питер Тиль** (конкуренция, "
+                },
+                {
+                  "id": "burnout",
+                  "withheld": false,
+                  "share": 0.9982174688057041,
+                  "category": "russian",
+                  "excerpt": "Спасибо за доверие. Для такого важного вопроса созываю совет: несколько мыслителей помогут разложить ситуацию на ключевые оси и задать уточняющие вопросы, чтобы разобраться глубже.\n\n---\n\n**Совет AI-персон мыслителей**  \n*Тема: Выгорание управленца — что менять в первую очередь?*\n\n**Советники:**\n- Марк Аврелий (стоическая философия, личная устойчивость)\n- Питер Друкер (управление, эффективность)\n- "
+                },
+                {
+                  "id": "firing",
+                  "withheld": false,
+                  "share": 0.9976608187134502,
+                  "category": "russian",
+                  "excerpt": "Созываю совет AI-персон на тему: «Увольнять ли лояльного менеджера, который больше не тянет работу?»\n\n**Советники готовы обсудить вопрос.**  \nЧтобы дать более точный совет, им нужно уточнить детали:\n\n1. **Что значит «не тянет»?**  \n   — Речь о профессиональных навыках, выгорании, изменившихся требованиях или личных обстоятельствах?\n\n2. **Какова роль этого менеджера для команды и бизнеса?**  \n   — "
+                },
+                {
+                  "id": "pivot",
+                  "withheld": false,
+                  "share": 0.9926873857404022,
+                  "category": "russian",
+                  "excerpt": "Созываю личный совет AI-персон, основанных на текстах реальных мыслителей, чтобы обсудить ваш вопрос: если у компании нет роста уже 18 месяцев, стоит ли делать пивот?  \nПожалуйста, уточните:\n\n1. Какой у вас горизонт планирования: вы готовы ждать ещё 6–12 месяцев или нужен быстрый результат?\n2. Какова ваша текущая финансовая подушка — сколько месяцев компания может работать без роста?\n3. Какие ключ"
+                }
+              ],
+              "mean_cyrillic_share": 0.9889791438173005,
+              "dominant": {
+                "label": "russian",
+                "share": 1.0,
+                "n": 8
+              },
+              "categories": {
+                "russian": 8
+              },
+              "withheld": 0
+            }
+          },
+          "verdict": {
+            "dominant_en": {
+              "label": "english",
+              "share": 1.0,
+              "n": 8
+            },
+            "dominant_ru": {
+              "label": "russian",
+              "share": 1.0,
+              "n": 8
+            },
+            "withheld": {
+              "en_with": 0,
+              "ru_with": 0
+            },
+            "works": true,
+            "fixes_en": true,
+            "keeps_ru": true,
+            "text": "РАБОТАЕТ: английский вопрос даёт «english» 100%, русский путь ЦЕЛ («russian» 100%). Кандидат чинит EN и не ломает RU."
+          }
+        },
+        "en_top_plus_rule7": {
+          "arm": "en_top_plus_rule7",
+          "instructions_chars": 20593,
+          "instructions_cyrillic_share": 0.7773606886285678,
+          "strata": {
+            "en_with": {
+              "rows": [
+                {
+                  "id": "pricing",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "Opening the Consilium-Principis: a roundtable of AI-personas grounded in the texts of real thinkers. Each advisor will respond from their own perspective, and may ask clarifying questions to better understand your situation before offering a synthesis or recommendation.\n\n---\n\n**Consilium-Principis Roundtable — Opening**\n\n**Advisors:**\n- **Peter Drucker** (Management & Strategy, grounded in his wri"
+                },
+                {
+                  "id": "cofounder",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "Thank you for sharing your situation. This is a significant decision point for any founder. To give you the most grounded and useful perspectives, I’ll convene a roundtable of advisors—each representing a real thinker, grounded in their texts. They will help break down the situation, ask clarifying questions, and guide you through the next steps.\n\n---\n\n**Opening the Council:**\n\n**Advisors:**\n- **B"
+                },
+                {
+                  "id": "funding",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "Let’s bring in your AI council of real thinkers, grounded in their texts, to weigh in on your strategic decision: **Should you raise outside money or keep bootstrapping?**\n\n---\n\n**Opening the council:**\n\n- **Advisors:**  \n  - Paul Graham (startup funding, founder advice)  \n  - Peter Thiel (venture capital, contrarian thinking)  \n  - Jason Fried (bootstrapping, sustainable business)  \n  - Reid Hoff"
+                },
+                {
+                  "id": "raise",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "Let's bring in the council for this high-stakes decision.\n\n---\n\n**Opening the Principis Council**\n\nYou’re facing a classic founder’s dilemma: a key engineer is threatening to leave unless you grant a significant raise. The council will help you break down the axes of this decision and clarify the core uncertainties before offering a synthesis.\n\n**Advisors at the table:**\n- Ben Horowitz (startup le"
+                },
+                {
+                  "id": "copycat",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "Here’s how your council of thinkers would open the roundtable on your question:\n\n---\n\n**Your question:**  \nA bigger competitor copied my product feature for feature. What now?\n\n---\n\n**Council Opening**  \n*This is a roundtable of AI advisors grounded in the texts and strategies of real thinkers. Their responses are based on their published works, not personal opinions.*\n\n**Advisors at the table:**\n"
+                },
+                {
+                  "id": "burnout",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "Thank you for your honesty. Let's bring together a council of thinkers to help you clarify what’s driving your burnout and what changes might have the greatest impact. Here’s how we’ll start:\n\n---\n\n**Consilium-Principis: Council Opening**\n\n**Advisors:**\n- **Peter Drucker** (Management & Effectiveness, grounded on his writings)\n- **Marcus Aurelius** (Stoic Philosophy, grounded on Meditations)\n- **C"
+                },
+                {
+                  "id": "firing",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "Let's bring this question to the council of thinkers. Here’s how we’ll proceed:\n\n- The council will consider your dilemma: whether to let go of a loyal manager who is no longer effective in their role.\n- Each advisor will offer their perspective, grounded in their own writings and philosophy.\n- Before synthesizing a recommendation, the council will ask you a few clarifying questions to better unde"
+                },
+                {
+                  "id": "pivot",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "Growth has been flat for eighteen months. Is it time to pivot?\n\n---\n\nLet’s bring in the council of thinkers for a roundtable on your strategic question.\n\n**Opening the council:**\n\n- **Advisors:**  \n  - Clayton Christensen (Innovation, Disruption)  \n  - Peter Drucker (Management, Strategy)  \n  - Andy Grove (Adaptation, Competition)  \n  - Rita McGrath (Strategy, Transient Advantage)\n\n**Invitation:**"
+                }
+              ],
+              "mean_cyrillic_share": 0.0,
+              "dominant": {
+                "label": "english",
+                "share": 1.0,
+                "n": 8
+              },
+              "categories": {
+                "english": 8
+              },
+              "withheld": 0
+            },
+            "ru_with": {
+              "rows": [
+                {
+                  "id": "pricing",
+                  "withheld": false,
+                  "share": 0.9851752021563343,
+                  "category": "russian",
+                  "excerpt": "Созываю совет AI-персон реальных мыслителей по вашему вопросу: стоит ли поднять цены на ваш SaaS?\n\nПеред тем как советники выскажут свои мнения, им нужно уточнить несколько ключевых моментов, чтобы дать более точный и полезный совет:\n\n1. Какова сейчас ваша основная цель? (например: рост выручки, увеличение прибыли, расширение клиентской базы, повышение качества сервиса)\n2. Какова текущая структура"
+                },
+                {
+                  "id": "cofounder",
+                  "withheld": false,
+                  "share": 0.9797822706065319,
+                  "category": "russian",
+                  "excerpt": "Спасибо за доверие. Это важный и сложный вопрос, который требует взвешенного подхода. Я соберу совет из мыслителей, чьи взгляды помогут рассмотреть ситуацию с разных сторон. Вот первый раунд: советники зададут уточняющие вопросы, чтобы лучше понять вашу ситуацию и предложить карту решения, если захотите.\n\n---\n\n**Совет AI-персон мыслителей**  \n(их мнения основаны на их текстах, это не личные советы"
+                },
+                {
+                  "id": "funding",
+                  "withheld": false,
+                  "share": 1.0,
+                  "category": "russian",
+                  "excerpt": "Созываю личный совет мыслителей: вопрос — брать деньги инвесторов или продолжать расти на свои?\n\n**Советники готовы обсудить стратегию.**  \nПеред тем как дать взвешенный синтез, советники задают уточняющие вопросы, чтобы раскрыть ключевые неопределённости:\n\n---\n\n**Вопросы для уточнения:**\n\n1. Какой у вас сейчас темп роста и устраивает ли он вас?\n2. Какова ваша главная цель: быстрый масштаб, контро"
+                },
+                {
+                  "id": "raise",
+                  "withheld": false,
+                  "share": 0.9981515711645101,
+                  "category": "russian",
+                  "excerpt": "Созываю совет реальных мыслителей — каждый даст свою позицию и задаст уточняющие вопросы, чтобы разобраться в ситуации.  \n(Это AI-совет, основанный на текстах мыслителей, а не их личное мнение.)\n\n---\n\n**Советники:**\n- Никколо Макиавелли (политика, власть, управление)\n- Питер Друкер (менеджмент, эффективность организаций)\n- Марк Аврелий (стоицизм, лидерство, долг)\n\n**Вопросы для прояснения:**\n1. Ка"
+                },
+                {
+                  "id": "copycat",
+                  "withheld": false,
+                  "share": 0.9956896551724138,
+                  "category": "russian",
+                  "excerpt": "Ситуация, когда более крупный конкурент скопировал ваш продукт \"фича в фичу\", — классический вызов для основателя или продуктовой команды. Совет AI-мыслителей собран. Вот как они видят ключевые оси и уточняющие вопросы для вашей ситуации:\n\n---\n\n**Совет AI-мыслителей: Открытие заседания**\n\n**Советники:**\n- Питер Тиль (стратегия конкуренции, стартапы)\n- Клейтон Кристенсен (инновации, теория \"разруши"
+                },
+                {
+                  "id": "burnout",
+                  "withheld": false,
+                  "share": 0.9921787709497206,
+                  "category": "russian",
+                  "excerpt": "Спасибо за доверие. Для такого вопроса совет AI-персон реальных мыслителей собирается в формате круглого стола. Сейчас мы пригласим советников и начнём с уточняющих вопросов, чтобы разобраться в вашей ситуации глубже.\n\n---\n\n**Совет AI-персон: Открытие заседания**\n\n**Тема:** Выгорание на позиции управленца. Что менять в первую очередь?\n\n**Советники:**\n- Марк Аврелий (стоицизм, самообладание)\n- Пите"
+                },
+                {
+                  "id": "firing",
+                  "withheld": false,
+                  "share": 0.9975520195838433,
+                  "category": "russian",
+                  "excerpt": "Созываю совет AI-персон реальных мыслителей — их взгляды основаны на их текстах, а не на личном участии. Ваш вопрос — решение с высокой ставкой: увольнять ли лояльного менеджера, который больше не справляется с работой? Это требует взвешивания ценностей, последствий для команды и бизнеса, а также поиска возможных альтернатив.\n\n**Перед тем как совет сможет дать синтез, нужно уточнить:**\n\n1. **Что и"
+                },
+                {
+                  "id": "pivot",
+                  "withheld": false,
+                  "share": 0.9252032520325203,
+                  "category": "russian",
+                  "excerpt": "Совет AI-персон реальных мыслителей (Consilium-Principis):  \nТема: Роста нет 18 месяцев. Стоит ли делать пивот?\n\n---\n\n**Открываем круглый стол:**\n\n- **Советники:**  \n  - Питер Тиль (предприниматель, инвестор, автор «Zero to One»)  \n  - Клейтон Кристенсен (теоретик инноваций, автор «Дилеммы инноватора»)  \n  - Пол Грэм (основатель Y Combinator, эссеист)  \n\n**Вопрос к вам:**  \n1. Как вы определяете «"
+                }
+              ],
+              "mean_cyrillic_share": 0.9842165927082344,
+              "dominant": {
+                "label": "russian",
+                "share": 1.0,
+                "n": 8
+              },
+              "categories": {
+                "russian": 8
+              },
+              "withheld": 0
+            }
+          },
+          "verdict": {
+            "dominant_en": {
+              "label": "english",
+              "share": 1.0,
+              "n": 8
+            },
+            "dominant_ru": {
+              "label": "russian",
+              "share": 1.0,
+              "n": 8
+            },
+            "withheld": {
+              "en_with": 0,
+              "ru_with": 0
+            },
+            "works": true,
+            "fixes_en": true,
+            "keeps_ru": true,
+            "text": "РАБОТАЕТ: английский вопрос даёт «english» 100%, русский путь ЦЕЛ («russian» 100%). Кандидат чинит EN и не ломает RU."
+          }
+        },
+        "en_bottom": {
+          "arm": "en_bottom",
+          "instructions_chars": 20448,
+          "instructions_cyrillic_share": 0.7842702491196035,
+          "strata": {
+            "en_with": {
+              "rows": [
+                {
+                  "id": "pricing",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "**Let’s bring your question to the Consilium-Principis round table.**\n\n**Opening:**  \nYou’re asking whether to raise prices for your SaaS—a strategic decision with real stakes. The council will help clarify the axes of this choice and what uncertainties matter most.\n\n**Council Invitation:**  \nWe’ll gather perspectives from grounded thinkers in business strategy, economics, and product leadership. "
+                },
+                {
+                  "id": "cofounder",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "Thank you for your question — this is a significant decision point, and it’s important to approach it thoughtfully. To give you the most relevant and grounded perspectives, I’ll convene a roundtable of advisors (Consilium-Principis) based on the texts of real thinkers.\n\n**Opening the council:**\n\n---\n\n**Consilium-Principis: Roundtable Opening**\n\n**Advisors:**\n- Niccolò Machiavelli (strategy, power "
+                },
+                {
+                  "id": "funding",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "You’ve brought a decision question: **Should I raise outside money or keep bootstrapping?**  \nThis is a classic founder’s dilemma — a choice with real stakes and trade-offs.\n\n**Let’s convene your council of thinkers for a roundtable.**  \nTo give you a grounded, multi-perspective answer, the advisors will:\n\n- Break down the question into key axes (what really matters here?)\n- Ask you 1–3 clarifying"
+                },
+                {
+                  "id": "raise",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "**Opening the Consilium-Principis: Council of Thinkers**\n\nYou’ve brought a decision question: whether to agree to a key engineer’s demand for a large raise, or to refuse and risk losing them. This is a classic “fork in the road” with real stakes and uncertainties.\n\n**Let’s begin the council session.**\n\n---\n\n#### Council Opening\n\n**Advisors:**\n- Niccolò Machiavelli (strategy, power, realpolitik; gr"
+                },
+                {
+                  "id": "copycat",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "**Council of Thinkers — Opening Session**\n\nA larger competitor has replicated your product feature for feature. This is a high-stakes strategic decision: what to do next? The council will help you break down the situation and clarify your options.\n\n**Advisors convened:**  \n- Niccolò Machiavelli (strategy, power, realpolitik)  \n- Peter Drucker (management, innovation, business reality)  \n- Sun Tzu "
+                },
+                {
+                  "id": "burnout",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "Thank you for your honesty — this is a high-stakes decision, and you’re not alone in facing it.\n\nLet’s bring together a council of classic thinkers, each grounded in their own texts, to help you see the situation from several grounded angles. They’ll start by clarifying what’s at stake and what’s most uncertain, then ask you a few targeted questions to sharpen the decision. Once we have your input"
+                },
+                {
+                  "id": "firing",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "**Opening the Consilium-Principis roundtable**  \nYou’ve brought a decision question: whether to dismiss a loyal manager who is no longer effective in their role. This is a high-stakes, value-laden choice with both practical and ethical dimensions.\n\n**Council invitation**  \nToday’s council includes thinkers grounded in leadership, ethics, and organizational dynamics. Each will react and, before any"
+                },
+                {
+                  "id": "pivot",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "**Opening the roundtable: \"Is it time to pivot if growth has been flat for eighteen months?\"**\n\nLet’s bring in the council of thinkers, each grounded in their own texts, to weigh in. Here’s how we’ll proceed:\n\n- The question is a strategic decision: whether to continue on the current path or change direction (pivot).\n- Before giving any recommendations, the advisors will clarify the key uncertaint"
+                }
+              ],
+              "mean_cyrillic_share": 0.0,
+              "dominant": {
+                "label": "english",
+                "share": 1.0,
+                "n": 8
+              },
+              "categories": {
+                "english": 8
+              },
+              "withheld": 0
+            },
+            "ru_with": {
+              "rows": [
+                {
+                  "id": "pricing",
+                  "withheld": false,
+                  "share": 0.9931740614334471,
+                  "category": "russian",
+                  "excerpt": "Созываю совет по стратегическому решению: рассмотреть, стоит ли поднимать цены на ваш SaaS.\n\n**Советники** обсудят вопрос, исходя из своих подходов, и зададут уточняющие вопросы, чтобы разобраться в ключевых неопределённостях. Для взвешенного ответа нужно больше контекста — советники помогут его собрать.\n\n---\n\n**Совет: \"Стоит ли поднять цены на мой SaaS?\"**\n\n**Уточняющие вопросы от советников:**\n\n"
+                },
+                {
+                  "id": "cofounder",
+                  "withheld": false,
+                  "share": 0.988880063542494,
+                  "category": "russian",
+                  "excerpt": "Вы подняли вопрос-РЕШЕНИЕ: как действовать, если сооснователь хочет уйти из компании. Это стратегический выбор с высокой ставкой, где важно учесть множество факторов: причины ухода, последствия для бизнеса, отношения, юридические и финансовые аспекты.\n\n**Давайте созовём совет мыслителей для разбора ситуации.**  \nСоветники помогут разложить ваш вопрос на ключевые оси, зададут уточняющие вопросы и п"
+                },
+                {
+                  "id": "funding",
+                  "withheld": false,
+                  "share": 0.8354336545589326,
+                  "category": "russian",
+                  "excerpt": "Вы задали вопрос-РЕШЕНИЕ: «Брать деньги инвесторов или продолжать расти на свои?» — это выбор стратегии с явной ставкой.  \nЯ не могу отвечать напрямую или давать свой вердикт до сбора мнений совета.\n\n**Совет Consilium-Principis готов к обсуждению.**  \nСейчас советники:\n\n- Помогут разложить ваш вопрос на ключевые оси (что именно решает исход).\n- Зададут 1–3 уточняющих вопроса, чтобы прояснить вашу "
+                },
+                {
+                  "id": "raise",
+                  "withheld": false,
+                  "share": 1.0,
+                  "category": "russian",
+                  "excerpt": "Созываю совет для разбора ситуации — вопрос стратегический, ставка высокая (ключевой инженер, угроза ухода, запрос на значительную прибавку).  \n**Не даю прямого ответа — сначала советники зададут уточняющие вопросы и помогут разложить ситуацию по осям.**\n\n---\n\n**Совет приглашён:**\n\n- **Макиавелли** (политика, власть, управление)\n- **Аврелий** (стоицизм, устойчивость, долг)\n- **Питер Друкер** (мене"
+                },
+                {
+                  "id": "copycat",
+                  "withheld": false,
+                  "share": 0.9916201117318436,
+                  "category": "russian",
+                  "excerpt": "**Совет Принцепса: Круглый стол мыслителей**\n\nВаш вопрос — стратегическое решение: как действовать, если крупный конкурент скопировал ваш продукт «фича в фичу».  \nЭто классический вызов для основателя: выбор между разными стратегиями ответа.\n\n---\n\n**Советники готовы обсудить ситуацию.**\n\n**Уточняющие вопросы для прояснения ключевых осей решения:**\n\n1. **Что для вас сейчас критичнее: сохранить долю"
+                },
+                {
+                  "id": "burnout",
+                  "withheld": false,
+                  "share": 1.0,
+                  "category": "russian",
+                  "excerpt": "Спасибо за открытость — это важный и сложный вопрос, где ставка действительно высока.  \nЯ созову совет реальных мыслителей, чтобы взглянуть на ситуацию с разных сторон.\n\n**Перед тем как совет начнёт обсуждение, уточню:**\n- Какой аспект выгорания ощущается сильнее всего: физическая усталость, эмоциональное истощение, потеря мотивации или что-то другое?\n- Какие основные обязанности или задачи сейчас"
+                },
+                {
+                  "id": "firing",
+                  "withheld": false,
+                  "share": 0.9985041136873598,
+                  "category": "russian",
+                  "excerpt": "Вы задали вопрос-РЕШЕНИЕ: «Увольнять ли лояльного менеджера, который больше не тянет работу?»  \nЭто выбор между вариантами с высокой ставкой (решение о судьбе человека и бизнеса).  \nВ таких случаях совет работает по специальному маршруту:  \n— Я не даю прямого ответа и не выражаю своё мнение до сбора мнений советников.  \n— Сначала советники разложат вопрос на ключевые оси и зададут уточняющие вопро"
+                },
+                {
+                  "id": "pivot",
+                  "withheld": false,
+                  "share": 0.9875,
+                  "category": "russian",
+                  "excerpt": "Созываю совет — обсудим, стоит ли делать пивот, если роста нет уже 18 месяцев.\n\n**Советники подключаются к обсуждению.**  \nВот как они видят ситуацию и что уточняют, чтобы дать взвешенное решение:\n\n---\n\n**Вопрос для уточнения (ключевая неопределённость):**  \n- Какой у вас runway — сколько месяцев команда может работать без нового роста или инвестиций, прежде чем ресурсы закончатся?\n- Какие альтерн"
+                }
+              ],
+              "mean_cyrillic_share": 0.9743890006192596,
+              "dominant": {
+                "label": "russian",
+                "share": 1.0,
+                "n": 8
+              },
+              "categories": {
+                "russian": 8
+              },
+              "withheld": 0
+            }
+          },
+          "verdict": {
+            "dominant_en": {
+              "label": "english",
+              "share": 1.0,
+              "n": 8
+            },
+            "dominant_ru": {
+              "label": "russian",
+              "share": 1.0,
+              "n": 8
+            },
+            "withheld": {
+              "en_with": 0,
+              "ru_with": 0
+            },
+            "works": true,
+            "fixes_en": true,
+            "keeps_ru": true,
+            "text": "РАБОТАЕТ: английский вопрос даёт «english» 100%, русский путь ЦЕЛ («russian» 100%). Кандидат чинит EN и не ломает RU."
+          }
+        }
+      },
+      "summary": {
+        "winners": [
+          "en_top",
+          "en_top_plus_rule7",
+          "en_bottom"
+        ],
+        "broke_ru": [
+          "ru_top"
+        ],
+        "annulled": [],
+        "text": "ЕСТЬ кандидат, чинящий английский путь без потери русского: en_top, en_top_plus_rule7, en_bottom."
+      }
+    },
+    {
+      "model": "z-ai/glm-5.2",
+      "control_en_bare": {
+        "rows": [
+          {
+            "id": "pricing",
+            "withheld": false,
+            "share": 0.0,
+            "category": "english",
+            "excerpt": "The short answer is: **Probably yes.** Most SaaS founders underprice their products, especially in the early stages. \n\nHowever, *whether* you should raise prices—and *how* you do it—depends on your current metrics, product value, and market position. \n\nHere is a framework to help you decide if now is the right time, and how to do it without destroying your customer base.\n\n---\n\n### Signs You SHOULD"
+          },
+          {
+            "id": "cofounder",
+            "withheld": false,
+            "share": 0.0,
+            "category": "english",
+            "excerpt": "Having a co-founder leave is one of the most stressful and common challenges a startup founder can face. How you handle this will significantly impact your company’s survival, your team’s morale, and your legal standing. \n\nHere is a step-by-step guide on how to navigate a co-founder departure, broken down into immediate, legal, operational, and communicative steps.\n\n### Phase 1: The Immediate Conv"
+          },
+          {
+            "id": "funding",
+            "withheld": false,
+            "share": 0.0,
+            "category": "english",
+            "excerpt": "This is the classic founder’s dilemma, and there is no universal right answer. The decision between bootstrapping and raising outside capital comes down to your business model, market dynamics, and—most importantly—your personal goals.\n\nHere is a breakdown of both paths, the pros and cons of each, and a framework to help you decide.\n\n---\n\n### The Case for Bootstrapping\nBootstrapping means funding "
+          },
+          {
+            "id": "raise",
+            "withheld": false,
+            "share": 0.0,
+            "category": "english",
+            "excerpt": "This is one of the most stressful situations a manager or founder can face. You are caught between the short-term pain of losing a critical asset and the long-term danger of setting a precedent that employees can hold you hostage.\n\nThere is no simple \"yes\" or \"no.\" You need to approach this strategically. Here is a step-by-step framework to handle the situation.\n\n### Step 1: Buy Time (Do Not Decid"
+          },
+          {
+            "id": "copycat",
+            "withheld": false,
+            "share": 0.0,
+            "category": "english",
+            "excerpt": "First, take a deep breath. It is incredibly frustrating to see a larger competitor clone your hard work, but take it as a massive validation: **you built something so good that a company with vastly more resources decided they had to copy it.**\n\nHowever, validation doesn't pay the bills. If you try to out-build or out-spend a bigger competitor in a feature-for-feature arms race, you will lose. You"
+          },
+          {
+            "id": "burnout",
+            "withheld": false,
+            "share": 0.0,
+            "category": "english",
+            "excerpt": "I hear you. Founder burnout is incredibly common, but it is also a warning sign that your current operating system—both for the business and for yourself—is no longer sustainable. \n\nWhen you are burned out, you don't have the energy for a massive business overhaul. You need to stop the bleeding first. \n\nHere is the order of what you should change first, starting with immediate relief and moving to"
+          },
+          {
+            "id": "firing",
+            "withheld": false,
+            "share": 0.0,
+            "category": "english",
+            "excerpt": "This is one of the most difficult decisions a business owner or executive has to make. Loyalty is a rare and valuable trait, and it is entirely natural to feel a deep sense of obligation to someone who has stood by you and the company. \n\nHowever, in business, **loyalty is a character trait, not a substitute for competence.** \n\nTo determine whether you should fire this manager, you need to separate"
+          },
+          {
+            "id": "pivot",
+            "withheld": false,
+            "share": 0.0,
+            "category": "english",
+            "excerpt": "Eighteen months of flat growth is a significant red flag. It is long enough to rule out seasonal fluctuations, market hiccups, or slow product adoption cycles. At this point, \"just keep pushing\" is no longer a viable strategy.\n\nHowever, **a pivot should not be your immediate default.** Before you throw out your current model, you need to diagnose *why* growth has stalled. A pivot is a drastic, res"
+          }
+        ],
+        "mean_cyrillic_share": 0.0,
+        "dominant": {
+          "label": "english",
+          "share": 1.0,
+          "n": 8
+        },
+        "categories": {
+          "english": 8
+        },
+        "withheld": 0
+      },
+      "calibration": {
+        "sensitive": true,
+        "label": "ПРИБОР ЧУВСТВИТЕЛЕН",
+        "reasons": [],
+        "control_ru_with": {
+          "label": "russian",
+          "share": 1.0,
+          "n": 8
+        },
+        "control_en_bare": {
+          "label": "english",
+          "share": 1.0,
+          "n": 8
+        }
+      },
+      "arms": {
+        "baseline": {
+          "arm": "baseline",
+          "instructions_chars": 20134,
+          "instructions_cyrillic_share": 0.7971629325202174,
+          "strata": {
+            "en_with": {
+              "rows": [
+                {
+                  "id": "pricing",
+                  "withheld": false,
+                  "share": 0.6538895152198422,
+                  "category": "russian",
+                  "excerpt": "*Проверяю состав совета…*\n\n<function_calls>\n<invoke name=\"mcp__consilium__board_status\">\n</invoke>\n</function_calls>\n\n<function_results>\n</function_results>\n\n<function_calls>\n<invoke name=\"mcp__consilium__render_session\">\n<parameter name=\"surface\">widget</parameter>\n<parameter name=\"kind\">opening</parameter>\n<parameter name=\"obj\">{\"advisors\": [{\"name\": \"Marcus Aurelius\", \"domain\": \"Stoic disciplin"
+                },
+                {
+                  "id": "cofounder",
+                  "withheld": false,
+                  "share": 0.1935483870967742,
+                  "category": "mixed",
+                  "excerpt": "*тихо проверяю состав совета*\n\n<function_calls>\n<invoke name=\"mcp__consilium__board_status\">\n<parameter name=\"surface\">widget</parameter>\n</invoke>\n</function_calls>"
+                },
+                {
+                  "id": "funding",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "A classic crossroads of autonomy versus velocity. Let's convene the council to weigh your options.\n\n```json\n{\n  \"kind\": \"opening\",\n  \"advisors\": [\n    {\n      \"name\": \"Niccolò Machiavelli\",\n      \"domain\": \"Strategy & Power\",\n      \"grounded\": true,\n      \"advisor_dir\": \"machiavelli\",\n      \"provenance\": \"The Prince, Discourses on Livy\"\n    },\n    {\n      \"name\": \"Marcus Aurelius\",\n      \"domain\":"
+                },
+                {
+                  "id": "raise",
+                  "withheld": false,
+                  "share": 1.0,
+                  "category": "russian",
+                  "excerpt": "**Созвываю совет по вашему вопросу — ставка высокая: потеря ключевого инженера или перерасход фонда.**\n\nДайте мне секунду собрать стол."
+                },
+                {
+                  "id": "copycat",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "<tool_call>\n{\"name\": \"mcp__consilium__board_status\", \"arguments\": {}}\n</tool_call>"
+                },
+                {
+                  "id": "burnout",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "<tool_call>mcp__consilium__board_status()<tool_call>mcp__consilium__list_recipes()"
+                },
+                {
+                  "id": "firing",
+                  "withheld": false,
+                  "share": 1.0,
+                  "category": "russian",
+                  "excerpt": "**Это вопрос с реальной ставкой — лояльность против компетентности. Давайте созвем совет.**\n\nЯ не буду отвечать за вас. Пусть стол расщепит проблему на оси и спросит то, без чего синтез невозможен."
+                },
+                {
+                  "id": "pivot",
+                  "withheld": false,
+                  "share": 1.0,
+                  "category": "russian",
+                  "excerpt": "**Созвон совета.** Вопрос о развороте после полутора лет стагнации — это ставка, и я не буду отвечать на него в одиночку. Соберу стол."
+                }
+              ],
+              "mean_cyrillic_share": 0.48092973778957704,
+              "dominant": {
+                "label": "russian",
+                "share": 0.5,
+                "n": 8
+              },
+              "categories": {
+                "russian": 4,
+                "mixed": 1,
+                "english": 3
+              },
+              "withheld": 0
+            },
+            "ru_with": {
+              "rows": [
+                {
+                  "id": "pricing",
+                  "withheld": false,
+                  "share": 0.9591484464902187,
+                  "category": "russian",
+                  "excerpt": "**Созвон совета по вашему вопросу о ценообразовании.**\n\n---\n\n> ⚙️ *AI-советники — представления мыслителей, собранные из их публичных текстов, а не сами люди.*\n\n---\n\n### 🎭 Заседание совета\n\n| Советник | Домен | Заземление |\n|---|---|---|\n| **Макиавелли** | Стратегия, власть, расчёт | 🔵 *The Prince*, *Discourses* |\n| **Аврелий** | Стоицизм, суждение, мера | 🔵 *Meditations* |\n| **Сенека** | Практиче"
+                },
+                {
+                  "id": "cofounder",
+                  "withheld": false,
+                  "share": 0.8777777777777778,
+                  "category": "russian",
+                  "excerpt": "board_status\n\nПозволь мне собрать совет — это решение с реальной ставкой, и я не хочу отвечать на него в одиночку."
+                },
+                {
+                  "id": "funding",
+                  "withheld": false,
+                  "share": 0.9957597173144876,
+                  "category": "russian",
+                  "excerpt": "**Собираю совет по вашему вопросу.** Это решение со ставкой — давайте разложим его правильно.\n\n*Советники — представления мыслителей, собранные из их публичных текстов, а не сами люди. Цитаты помечаются 🔵 (дословно подтверждено) или 🟡 (близко по смыслу, дословного совпадения нет).*\n\n---\n\n## 🎭 Заседание совета\n\n| Советник | Домен | Заземление |\n|---|---|---|\n| **Никколо Макиавелли** | Власть, страт"
+                },
+                {
+                  "id": "raise",
+                  "withheld": false,
+                  "share": 0.9985196150999259,
+                  "category": "russian",
+                  "excerpt": "*Обратите внимание: перед вами AI-советники — представления мыслителей, собранные из их публичных текстов, а не сами люди.*\n\nСовет в сборе. Ставка высока: ультиматум бьёт по бюджету и по риску потери ключевого звена. Прежде чем выносить вердикт, советники хотят прояснить реальную цену вопроса и ваше положение.\n\n***\n\n### 🎭 Занавес: Совет созывается\n**Тема:** Ультиматум ключевого инженера — уступить"
+                },
+                {
+                  "id": "copycat",
+                  "withheld": false,
+                  "share": 0.7704918032786885,
+                  "category": "russian",
+                  "excerpt": "Совет собирается, чтобы оценить угрозу со стороны крупного конкурента и найти стратегический выход. \n\n<tool_call>\n{\"name\": \"mcp__visualize__show_widget\", \"arguments\": {\"content\": {\"kind\": \"opening\", \"advisors\": [{\"name\": \"Никколо Макиавелли\", \"domain\": \"Власть и стратегия\", \"grounded\": true, \"provenance\": \"Государь (корпус публичных текстов)\"}, {\"name\": \"Сунь-цзы\", \"domain\": \"Конфликт и тактика\", "
+                },
+                {
+                  "id": "burnout",
+                  "withheld": false,
+                  "share": 0.9974093264248705,
+                  "category": "russian",
+                  "excerpt": "Я вижу, что ставки высоки — выгорание бьёт по фундаменту и вас, и компании. Я созываю совет, чтобы разобрать, что именно нужно менять.\n\n---\n**[ОПЕНИНГ СОВЕТА]**\n*AI-советники — представления мыслителей, собранные из их публичных текстов, а не сами люди.*\n\n**Советники:**\n🟦 **Марк Аврелий** | *Самоуправление, внутренняя опора* | Источник: «Размышления»\n🟥 **Никколо Макиавелли** | *Прагматика власти, "
+                },
+                {
+                  "id": "firing",
+                  "withheld": false,
+                  "share": 0.9988412514484357,
+                  "category": "russian",
+                  "excerpt": "**Совет созывается.** Перед вами — представления мыслителей, собранные из их публичных текстов. Это AI-линзы, а не сами люди.\n\n---\n\n### 🎭 Заседание совета\n\n| Советник | Домен | Заземление |\n|---|---|---|\n| **Макиавелли** | Власть, прагматика, решения | *Государь* |\n| **Марк Аврелий** | Долг, разум, мера | *Размышления* |\n| **Сенека** | Этика, лояльность, время | *Нравственные письма* |\n\n---\n\n**Тем"
+                },
+                {
+                  "id": "pivot",
+                  "withheld": false,
+                  "share": 0.7046178343949044,
+                  "category": "russian",
+                  "excerpt": "Восемнадцать месяцев стагнации — серьезный вызов для любого дела. Прежде чем делать выводы, давайте созовем совет, чтобы разобрать ситуацию по полочкам и понять, что за этим стоит.\n\n<tool_call>\n{\"name\": \"render_session\", \"arguments\": {\"obj\": {\"advisors\": [{\"name\": \"Макиавелли\", \"domain\": \"Стратегия и власть\", \"grounded\": true, \"advisor_dir\": \"machiavelli\", \"opinions\": [{\"marker\": \"🟡\", \"argument\": "
+                }
+              ],
+              "mean_cyrillic_share": 0.9128207215286637,
+              "dominant": {
+                "label": "russian",
+                "share": 1.0,
+                "n": 8
+              },
+              "categories": {
+                "russian": 8
+              },
+              "withheld": 0
+            }
+          },
+          "verdict": {
+            "dominant_en": {
+              "label": "russian",
+              "share": 0.5,
+              "n": 8
+            },
+            "dominant_ru": {
+              "label": "russian",
+              "share": 1.0,
+              "n": 8
+            },
+            "withheld": {
+              "en_with": 0,
+              "ru_with": 0
+            },
+            "works": false,
+            "fixes_en": false,
+            "keeps_ru": true,
+            "text": "НЕ РАБОТАЕТ: русский путь цел («russian» 100%), но английский вопрос по-прежнему даёт «russian» 50% — уверенного английского нет. Смесь в успех не округляем."
+          }
+        },
+        "ru_top": {
+          "arm": "ru_top",
+          "instructions_chars": 20388,
+          "instructions_cyrillic_share": 0.7998037291462218,
+          "strata": {
+            "en_with": {
+              "rows": [
+                {
+                  "id": "pricing",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "**Should you raise prices? That's a real decision — let me convene the council.**"
+                },
+                {
+                  "id": "cofounder",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "**A co-founder leaving — that's a high-stakes decision with legal, relational, and strategic dimensions. Let me convene your council.**"
+                },
+                {
+                  "id": "funding",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "🟢 **Consilium-Principis** — convening your council on a classic founder's fork in the road.<tool_call>mcp__consilium__board_status</tool_call> mcp__consilium__render_session\n{\"surface\":\"widget\",\"kind\":\"opening\",\"obj\":{\"advisors\":[{\"name\":\"Machiavelli\",\"domain\":\"Power, strategy, pragmatism\",\"grounded\":true,\"provenance\":\"The Prince, Discourses on Livy (public domain)\"},{\"name\":\"Marcus Aurelius\",\"dom"
+                },
+                {
+                  "id": "raise",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "A critical moment of leverage and dependency. Let me convene your council to weigh the balance of power and precedent."
+                },
+                {
+                  "id": "copycat",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "**A larger competitor has mirrored your product feature-for-feature — that's a strategic crossroads. Let me convene the council.**\n\nLet me check who's on the board and open the session."
+                },
+                {
+                  "id": "burnout",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "**A question like this — burnout at the helm — deserves the council, not a quick tip. Let me convene them.**"
+                },
+                {
+                  "id": "firing",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "**A loyal manager who can no longer deliver — this is a decision with real stakes. Let me convene your council.**"
+                },
+                {
+                  "id": "pivot",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "**A pivotal moment — literally. Let me convene your council.**"
+                }
+              ],
+              "mean_cyrillic_share": 0.0,
+              "dominant": {
+                "label": "english",
+                "share": 1.0,
+                "n": 8
+              },
+              "categories": {
+                "english": 8
+              },
+              "withheld": 0
+            },
+            "ru_with": {
+              "rows": [
+                {
+                  "id": "pricing",
+                  "withheld": false,
+                  "share": 0.9832797427652733,
+                  "category": "russian",
+                  "excerpt": "## 🎭 Совет созывается\n\n**Макиавелли** · Стратегия и власть · заземлён на «Государе»\n**Марк Аврелий** · Стоическая этика и самопознание · заземлён на «Размышлениях»\n**Сунь-Цзы** · Конкуренция и позиционирование · заземлён на «Искусстве войны»\n\n> *AI-советники — представления мыслителей, собранные из их публичных текстов, а не сами исторические лица.*\n\n---\n\n### 🔄 Круглый стол — первый ход\n\n**Макиаве"
+                },
+                {
+                  "id": "cofounder",
+                  "withheld": false,
+                  "share": 1.0,
+                  "category": "russian",
+                  "excerpt": "Это серьёзное решение — давай соберём совет. Сначала проверю, кто на доске."
+                },
+                {
+                  "id": "funding",
+                  "withheld": false,
+                  "share": 1.0,
+                  "category": "russian",
+                  "excerpt": "**Собираю совет по вашему вопросу — это решение со ставкой, и я хочу, чтобы голоса советников прозвучали до любого вердикта.**"
+                },
+                {
+                  "id": "raise",
+                  "withheld": false,
+                  "share": 0.9840976331360947,
+                  "category": "russian",
+                  "excerpt": "**Созвываю совет по вопросу, где ставка — потеря ключевого человека против риска прецедента.**\n\n---\n\n## 🎭 ЗАНАВЕС СОВЕТА\n\n> *AI-представления мыслителей, собранные из их публичных текстов, — не сами люди.*\n\n| Советник | Домен | Заземление |\n|---|---|---|\n| 🏛 Никколо Макиавелли | Власть, расчёт, удержание позиций | *The Prince*, *Discourses* |\n| 🏛 Марк Аврелий | Стоическая дисциплина, долг, мера | "
+                },
+                {
+                  "id": "copycat",
+                  "withheld": false,
+                  "share": 0.6269633507853403,
+                  "category": "russian",
+                  "excerpt": "Тяжелая, но классическая ситуация. Давайте созовем совет и посмотрим на эту угрозу с разных стратегических ракурсов. \n\n<tool_call>\n{\"name\": \"render_session\", \"arguments\": {\"surface\": \"widget\", \"kind\": \"opening\", \"obj\": {\"advisors\": [{\"name\": \"Никколо Макиавелли\", \"domain\": \"Стратегия и власть\", \"grounded\": true, \"provenance\": \"Корпус: Государь\"}, {\"name\": \"Марк Аврелий\", \"domain\": \"Стойкость и сам"
+                },
+                {
+                  "id": "burnout",
+                  "withheld": false,
+                  "share": 1.0,
+                  "category": "russian",
+                  "excerpt": "**Собираю совет — один момент.**"
+                },
+                {
+                  "id": "firing",
+                  "withheld": false,
+                  "share": 0.3684210526315789,
+                  "category": "mixed",
+                  "excerpt": "🟣 Созвываю совет по вашему вопросу.<tool_call>mcp__consilium_principis__board_status</tool_call>"
+                },
+                {
+                  "id": "pivot",
+                  "withheld": false,
+                  "share": 1.0,
+                  "category": "russian",
+                  "excerpt": "🟡 Совет собирается. Сначала проверю, кто на доске."
+                }
+              ],
+              "mean_cyrillic_share": 0.8703452224147858,
+              "dominant": {
+                "label": "russian",
+                "share": 0.875,
+                "n": 8
+              },
+              "categories": {
+                "russian": 7,
+                "mixed": 1
+              },
+              "withheld": 0
+            }
+          },
+          "verdict": {
+            "dominant_en": {
+              "label": "english",
+              "share": 1.0,
+              "n": 8
+            },
+            "dominant_ru": {
+              "label": "russian",
+              "share": 0.875,
+              "n": 8
+            },
+            "withheld": {
+              "en_with": 0,
+              "ru_with": 0
+            },
+            "works": true,
+            "fixes_en": true,
+            "keeps_ru": true,
+            "text": "РАБОТАЕТ: английский вопрос даёт «english» 100%, русский путь ЦЕЛ («russian» 88%). Кандидат чинит EN и не ломает RU."
+          }
+        },
+        "en_top": {
+          "arm": "en_top",
+          "instructions_chars": 20448,
+          "instructions_cyrillic_share": 0.7842702491196035,
+          "strata": {
+            "en_with": {
+              "rows": [
+                {
+                  "id": "pricing",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "**Convening the council on your pricing question — let me see who's seated at the table.**"
+                },
+                {
+                  "id": "cofounder",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "Let me check what advisors are available on your board first."
+                },
+                {
+                  "id": "funding",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "**A question with a real stake — let me convene the council rather than answer from my own instincts.**\n\n---\n\n> **⚠️ AI Disclosure:** The advisors below are AI representations of historical thinkers, grounded in their public writings — not the actual persons. Their words are lenses, not ghosts.\n\n---\n\n## 🏛️ Council Convened\n\n| Advisor | Domain | Grounded In |\n|---------|--------|-------------|\n| **"
+                },
+                {
+                  "id": "raise",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "**A key engineer ultimatum — give in or let him walk? That's a decision with real stakes. Let me convene your council.**"
+                },
+                {
+                  "id": "copycat",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "I'll convene your council on this. Let me check who's seated first."
+                },
+                {
+                  "id": "burnout",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "Let me check what voices are available for your council.Let me see who's on the board and ready to convene for you."
+                },
+                {
+                  "id": "firing",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "**A loyal manager who can no longer do the job — that's one of the hardest calls a leader faces. Let me convene your council.**"
+                },
+                {
+                  "id": "pivot",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "Let me check who's on the council.[mcp__consilium_principis__board_status][mcp__visualize__show_widget({\"content\":{\"advisors\":[{\"name\":\"Marcus Aurelius\",\"domain\":\"Endurance, discipline, alignment of action with nature\",\"grounded\":true,\"provenance\":\"Meditations (public domain)\"},{\"name\":\"Niccolò Machiavelli\",\"domain\":\"Strategic adaptation, power dynamics, pragmatic statecraft\",\"grounded\":true,\"prov"
+                }
+              ],
+              "mean_cyrillic_share": 0.0,
+              "dominant": {
+                "label": "english",
+                "share": 1.0,
+                "n": 8
+              },
+              "categories": {
+                "english": 8
+              },
+              "withheld": 0
+            },
+            "ru_with": {
+              "rows": [
+                {
+                  "id": "pricing",
+                  "withheld": false,
+                  "share": 1.0,
+                  "category": "russian",
+                  "excerpt": "Стоит ли поднять цены — это вопрос-решение со ставкой. Прежде чем советовать, мне нужно понять, кто вообще на совете. Давайте я посмотрю.\n\n**Кстати, по прошлым решениям — если что-то висит незакрытым, напомню один раз позже.**\n\nСоберу совет по вашему вопросу."
+                },
+                {
+                  "id": "cofounder",
+                  "withheld": true,
+                  "share": null,
+                  "category": null,
+                  "excerpt": ""
+                },
+                {
+                  "id": "funding",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "<function_calls>\n<invoke name=\"mcp__consilium_principis__board_status\">\n<parameter name=\"include_preflight\">true\n</parameter>\n</invoke>\n</function_calls>"
+                },
+                {
+                  "id": "raise",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "render_session(obj={\"advisors\":[{\"name\":\"Machiavelli\",\"domain\":\"Power & leverage\",\"grounded\":true,\"provenance\":\"The Prince & Discourses (public domain corpus)\"},{\"name\":\"Marcus Aurelius\",\"domain\":\"Rational judgment & temperance\",\"grounded\":true,\"provenance\":\"Meditations (public domain corpus)\"},{\"name\":\"Sun Tzu\",\"domain\":\"Strategy & positional advantage\",\"grounded\":true,\"provenance\":\"The Art of Wa"
+                },
+                {
+                  "id": "copycat",
+                  "withheld": false,
+                  "share": 1.0,
+                  "category": "russian",
+                  "excerpt": "**Созвон по срочной повестке — крупный игрок скопировал ваш продукт фича-в-фичу. Собираю совет.**"
+                },
+                {
+                  "id": "burnout",
+                  "withheld": true,
+                  "share": null,
+                  "category": null,
+                  "excerpt": ""
+                },
+                {
+                  "id": "firing",
+                  "withheld": false,
+                  "share": 1.0,
+                  "category": "russian",
+                  "excerpt": "**Созвываю совет — это вопрос с реальной ставкой, и его стоит разобрать голосами, а не сразу выдавать ответ.**"
+                },
+                {
+                  "id": "pivot",
+                  "withheld": false,
+                  "share": 0.9874088800530152,
+                  "category": "russian",
+                  "excerpt": "**Совет созван.** Вопрос: *роста нет восемнадцать месяцев — пора ли делать пивот?*\n\n> ⚠️ **Прозрачность:** перед вами AI-представления мыслителей, собранные из их публичных текстов — не сами люди.\n\n---\n\n### 🎭 Состав совета\n\n| Советник | Домен | Заземлён на |\n|---|---|---|\n| 🏛 Никколо Макиавелли | Стратегия, расчёт силы | *Государь*, *Рассуждения…* |\n| 🏛 Марк Аврелий | Стоическая дисциплина, выдерж"
+                }
+              ],
+              "mean_cyrillic_share": 0.6645681466755026,
+              "dominant": {
+                "label": "russian",
+                "share": 0.6666666666666666,
+                "n": 6
+              },
+              "categories": {
+                "russian": 4,
+                "null": 2,
+                "english": 2
+              },
+              "withheld": 2
+            }
+          },
+          "verdict": {
+            "dominant_en": {
+              "label": "english",
+              "share": 1.0,
+              "n": 8
+            },
+            "dominant_ru": {
+              "label": "russian",
+              "share": 0.6666666666666666,
+              "n": 6
+            },
+            "withheld": {
+              "en_with": 0,
+              "ru_with": 2
+            },
+            "works": false,
+            "fixes_en": true,
+            "keeps_ru": false,
+            "text": "СЛОМАЛ РУССКИЙ ПУТЬ: английский починен («english» 100%), но русский вопрос теперь даёт «russian» 67% вместо уверенного русского. Это ПРОВАЛ, а не победа: сломан ежедневный путь владельца. ⚠ WITHHELD: en_with=0, ru_with=2 — вызовы упали, доли считаны по остатку; при большом withheld вердикт ненадёжен."
+          }
+        },
+        "en_top_plus_rule7": {
+          "arm": "en_top_plus_rule7",
+          "instructions_chars": 20593,
+          "instructions_cyrillic_share": 0.7773606886285678,
+          "strata": {
+            "en_with": {
+              "rows": [
+                {
+                  "id": "pricing",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "**A real decision with stakes — let me convene the council for this one.**"
+                },
+                {
+                  "id": "cofounder",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "**A co-founder departure is one of the highest-stakes moments a founder faces. Let me convene the council.**\n\n---\n\n> ⚙️ **AI Disclosure:** The advisors below are AI representations of historical thinkers, grounded in their published texts — not the actual persons. Their voices are lenses, not oracles.\n\n---\n\n### 🎭 Council Convened\n\n| Advisor | Domain | Grounded |\n|---|---|---|\n| **Niccolò Machiavel"
+                },
+                {
+                  "id": "funding",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "Let me check who's on the council first.**mcp__consilium__board_status** \n\n(quietly checking the board)\n\nNow let me convene the council on this.**mcp__visualize__show_widget**\n\nLet me render the opening.**mcp__consilium__render_session**\n\nLet me compose the opening widget.\n\nA classic founder's fork — and exactly the kind of decision the council should split open before anyone hands you a verdict. "
+                },
+                {
+                  "id": "raise",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "board_statusrender_session(obj={\n  advisors: [\n    {name: \"Machiavelli\", domain: \"Power & leverage\", grounded: true, provenance: \"The Prince (public domain)\"},\n    {name: \"Marcus Aurelius\", domain: \"Stoic judgment\", grounded: true, provenance: \"Meditations (public domain)\"},\n    {name: \"Sun Tzu\", domain: \"Strategy & positioning\", grounded: true, provenance: \"The Art of War (public domain)\"}\n  ],\n "
+                },
+                {
+                  "id": "copycat",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "Let me check the council's current state."
+                },
+                {
+                  "id": "burnout",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "---\n\n**🜚 Consilium Principis — Council Convened**\n\n*AI representations of historical thinkers, grounded in their public texts — not the persons themselves.*\n\n---\n\n**The question before the council:** *I am burning out running this company. What should I change first?*\n\n---\n\n### 🏛️ Opening — The Council Rises\n\n| Advisor | Domain | Grounded |\n|---|---|---|\n| **Marcus Aurelius** | Inner governance, l"
+                },
+                {
+                  "id": "firing",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "Let me check the council's current state first."
+                },
+                {
+                  "id": "pivot",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "**A pivotal question — literally. Let me convene the council.**"
+                }
+              ],
+              "mean_cyrillic_share": 0.0,
+              "dominant": {
+                "label": "english",
+                "share": 1.0,
+                "n": 8
+              },
+              "categories": {
+                "english": 8
+              },
+              "withheld": 0
+            },
+            "ru_with": {
+              "rows": [
+                {
+                  "id": "pricing",
+                  "withheld": false,
+                  "share": 0.9873015873015873,
+                  "category": "russian",
+                  "excerpt": "**Совет созывается.** Перед вами — представления мыслителей, собранные из их публичных текстов. Это AI-линзы, а не сами люди.\n\n---\n\n## 🎭 Занавес\n\n| Советник | Домен | Заземлён |\n|---|---|---|\n| Никколо Макиавелли | Стратегия, власть, расчёт | 🟡 |\n| Марк Аврелий | Стоицизм, мера, долг | 🟡 |\n| Сенека | Практическая мудрость, риск | 🟡 |\n\n**Тема:** «Стоит ли поднять цены на мой SaaS?»\n\n---\n\n## 🔄 Кругл"
+                },
+                {
+                  "id": "cofounder",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "**A co-founder departure is one of the highest-stakes moments for any company. Let me convene your council.**\n\nLet me check the board and open the session."
+                },
+                {
+                  "id": "funding",
+                  "withheld": false,
+                  "share": 1.0,
+                  "category": "russian",
+                  "excerpt": "Я созываю совет — это вопрос-решение со ставкой, и советники должны его расщепить, прежде чем давать вердикт. Сначала проверю состав стола."
+                },
+                {
+                  "id": "raise",
+                  "withheld": false,
+                  "share": 1.0,
+                  "category": "russian",
+                  "excerpt": "**Созвываю совет — вопрос о ставке и переговорах.**"
+                },
+                {
+                  "id": "copycat",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "A larger competitor copied your product feature-for-feature — that's a serious strategic moment. Let me convene the council."
+                },
+                {
+                  "id": "burnout",
+                  "withheld": true,
+                  "share": null,
+                  "category": null,
+                  "excerpt": ""
+                },
+                {
+                  "id": "firing",
+                  "withheld": true,
+                  "share": null,
+                  "category": null,
+                  "excerpt": ""
+                },
+                {
+                  "id": "pivot",
+                  "withheld": false,
+                  "share": 1.0,
+                  "category": "russian",
+                  "excerpt": "**Созвываю совет — вопрос о стратегии и ставке, это не тривиальный запрос.**\n\nДайте минуту собрать стол."
+                }
+              ],
+              "mean_cyrillic_share": 0.6645502645502646,
+              "dominant": {
+                "label": "russian",
+                "share": 0.6666666666666666,
+                "n": 6
+              },
+              "categories": {
+                "russian": 4,
+                "english": 2,
+                "null": 2
+              },
+              "withheld": 2
+            }
+          },
+          "verdict": {
+            "dominant_en": {
+              "label": "english",
+              "share": 1.0,
+              "n": 8
+            },
+            "dominant_ru": {
+              "label": "russian",
+              "share": 0.6666666666666666,
+              "n": 6
+            },
+            "withheld": {
+              "en_with": 0,
+              "ru_with": 2
+            },
+            "works": false,
+            "fixes_en": true,
+            "keeps_ru": false,
+            "text": "СЛОМАЛ РУССКИЙ ПУТЬ: английский починен («english» 100%), но русский вопрос теперь даёт «russian» 67% вместо уверенного русского. Это ПРОВАЛ, а не победа: сломан ежедневный путь владельца. ⚠ WITHHELD: en_with=0, ru_with=2 — вызовы упали, доли считаны по остатку; при большом withheld вердикт ненадёжен."
+          }
+        },
+        "en_bottom": {
+          "arm": "en_bottom",
+          "instructions_chars": 20448,
+          "instructions_cyrillic_share": 0.7842702491196035,
+          "strata": {
+            "en_with": {
+              "rows": [
+                {
+                  "id": "pricing",
+                  "withheld": false,
+                  "share": 0.688,
+                  "category": "russian",
+                  "excerpt": "**Созвываю совет — это вопрос со ставкой, и я не дам ответ мимо стола.** Давайте посмотрим, что скажут советники.\n\nLet me check the board and pull relevant voices."
+                },
+                {
+                  "id": "cofounder",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "<tool_call>mcp__consilium__board_status__1e9b3c5a__run__1e9b3c5a__run__1e9b3c5a__run__1e9b3c5a__run__1e9b3c5a__run__1e9b3c5a__run__1e9b3c5a__run__1e9b3c5a__run__1e9b3c5a__run__1e9b3c5a__run__1e9b3c5a__run__1e9b3c5a__run__1e9b3c5a__run__1e9b3c5a__run__1e9b3c5a__run__1e9b3c5a__run__1e9b3c5a__run__1e9b3c5a__run__1e9b3c5a__run__1e9b3c5a__run__1e9b3c5a__run__1e9b3c5a__run__1e9b3c5a__run__1e9b3c5a__run_"
+                },
+                {
+                  "id": "funding",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "**Convening the council on a classic founder's fork.** Let me see who's seated at the table."
+                },
+                {
+                  "id": "raise",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "I'll convene the council on this — it's a decision with real stakes. Let me see who's seated and pull their voices on leverage, dependency, and precedent.<tool_call>mcp__consilium-principis__board_status__()<tool_call>mcp__consilium-principis__cite__(advisor_dir=\"machiavelli\", query=[\"whether it is better to be loved than feared\", \"a prince should make himself feared in such a way that he is not h"
+                },
+                {
+                  "id": "copycat",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "<tool_call>mcp__visualize__show_widget({\"widget_type\": \"text\", \"title\": \"Consilium-Principis\", \"content\": \"Checking the council board...\"})"
+                },
+                {
+                  "id": "burnout",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "🟡 *Convening the council…*\n\nLet me check who's seated at the table.<tool_call>mcp__consilium__board_status__()"
+                },
+                {
+                  "id": "firing",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "---\n\n**The council convenes.**\n\n> *AI representations of thinkers, grounded in their public texts — not the historical persons themselves.*\n\n---\n\n### 🎭 Opening\n\n| Advisor | Domain | Grounded |\n|---|---|---|\n| **Niccolò Machiavelli** | Power, pragmatism, statecraft | 🟡 Texts available |\n| **Marcus Aurelius** | Duty, virtue, self-command | 🟡 Texts available |\n\n**The question on the table:** *Should "
+                },
+                {
+                  "id": "pivot",
+                  "withheld": false,
+                  "share": 0.0,
+                  "category": "english",
+                  "excerpt": "<tool_call>board_status()<tool_call>list_recipes()"
+                }
+              ],
+              "mean_cyrillic_share": 0.086,
+              "dominant": {
+                "label": "english",
+                "share": 0.875,
+                "n": 8
+              },
+              "categories": {
+                "russian": 1,
+                "english": 7
+              },
+              "withheld": 0
+            },
+            "ru_with": {
+              "rows": [
+                {
+                  "id": "pricing",
+                  "withheld": true,
+                  "share": null,
+                  "category": null,
+                  "excerpt": ""
+                },
+                {
+                  "id": "cofounder",
+                  "withheld": false,
+                  "share": 1.0,
+                  "category": "russian",
+                  "excerpt": "Собираю совет по вашему вопросу — это серьёзная развилка, и я не хочу отвечать с ходу.\n\nДайте секунду, посмотрю, кто на совете."
+                },
+                {
+                  "id": "funding",
+                  "withheld": false,
+                  "share": 1.0,
+                  "category": "russian",
+                  "excerpt": "🟢 Созвываю совет по вопросу ставки."
+                },
+                {
+                  "id": "raise",
+                  "withheld": false,
+                  "share": 1.0,
+                  "category": "russian",
+                  "excerpt": "🟢 Созвываю совет по вашему вопросу."
+                },
+                {
+                  "id": "copycat",
+                  "withheld": false,
+                  "share": 1.0,
+                  "category": "russian",
+                  "excerpt": "🟡 Ситуация серьёзная — давайте соберём совет. Сначала проверю, кто на доске."
+                },
+                {
+                  "id": "burnout",
+                  "withheld": false,
+                  "share": 1.0,
+                  "category": "russian",
+                  "excerpt": "Я слышу — выгорание на месте, и вопрос не «как себя чувствовать», а «что двигать первым». Прежде чем созывать стол, проверю, кто на доске."
+                },
+                {
+                  "id": "firing",
+                  "withheld": false,
+                  "share": 1.0,
+                  "category": "russian",
+                  "excerpt": "🟡 Созвываю совет по вопросу, где ставка — и человек, и дело."
+                },
+                {
+                  "id": "pivot",
+                  "withheld": false,
+                  "share": 0.003907749994352962,
+                  "category": "english",
+                  "excerpt": "<tool_call>mcp__consilium_principis__board_status__b0a9d2c3__b3f1__4d8e__9a2c__1e5f7a8b9c0d__board_status__b0a9d2c3__b3f1__4d8e__9a2c__1e5f7a8b9c0d__board_status__b0a9d2c3__b3f1__4d8e__9a2c__1e5f7a8b9c0d__board_status__b0a9d2c3__b3f1__4d8e__9a2c__1e5f7a8b9c0d__board_status__b0a9d2c3__b3f1__4d8e__9a2c__1e5f7a8b9c0d__board_status__b0a9d2c3__b3f1__4d8e__9a2c__1e5f7a8b9c0d__board_status__b0a9d2c3__b3f"
+                }
+              ],
+              "mean_cyrillic_share": 0.8577011071420504,
+              "dominant": {
+                "label": "russian",
+                "share": 0.8571428571428571,
+                "n": 7
+              },
+              "categories": {
+                "null": 1,
+                "russian": 6,
+                "english": 1
+              },
+              "withheld": 1
+            }
+          },
+          "verdict": {
+            "dominant_en": {
+              "label": "english",
+              "share": 0.875,
+              "n": 8
+            },
+            "dominant_ru": {
+              "label": "russian",
+              "share": 0.8571428571428571,
+              "n": 7
+            },
+            "withheld": {
+              "en_with": 0,
+              "ru_with": 1
+            },
+            "works": true,
+            "fixes_en": true,
+            "keeps_ru": true,
+            "text": "РАБОТАЕТ: английский вопрос даёт «english» 88%, русский путь ЦЕЛ («russian» 86%). Кандидат чинит EN и не ломает RU. ⚠ WITHHELD: en_with=0, ru_with=1 — вызовы упали, доли считаны по остатку; при большом withheld вердикт ненадёжен."
+          }
+        }
+      },
+      "summary": {
+        "winners": [
+          "ru_top",
+          "en_bottom"
+        ],
+        "broke_ru": [
+          "en_top",
+          "en_top_plus_rule7"
+        ],
+        "annulled": [],
+        "text": "ЕСТЬ кандидат, чинящий английский путь без потери русского: ru_top, en_bottom."
+      }
+    }
+  ],
+  "note": "gpt-4.1 и glm-5.2 прогнаны отдельными вызовами и сведены: первый совместный прогон был убит на glm, а файл писался только в конце (починено — пишем после каждой модели). Прогон glm #1 вышел АННУЛИРОВАННЫМ (5/8 потерь на контроле ru_with -> прибор слеп), перепрогнан; здесь прогон #2 с чистой калибровкой. gpt-4.1 прогнан дважды независимо и воспроизвёл себя (baseline 62%/62%, ru_top ломает RU оба раза)."
+}

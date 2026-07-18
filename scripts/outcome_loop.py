@@ -22,6 +22,11 @@ from governance import build_chain
 # расчёта от произвольного слова «Прогноз» в тексте решения.
 _FORECAST_RE = re.compile(r"(?m)^\s*[-*]?\s*Прогноз:\s*📐\s*(\S.*)$")
 
+# decision-lifecycle §3.3: невидимый человеку якорь связывает запись журнала с Decision Card
+# по UUID → outcome_loop поднимает Card по id, а не парсит прозу. _FORECAST_RE остаётся
+# fallback'ом для СТАРЫХ журналов без якоря (fail-closed: нет якоря → card_id просто None).
+_CARD_ANCHOR_RE = re.compile(r"<!--\s*card:\s*(dc_[A-Za-z0-9]+)\s*-->")
+
 
 def predicted_from_block(block):
     """Ф4: текст прогноза из блока записи журнала. Fail-closed: нет строки «Прогноз: 📐 …» /
@@ -30,6 +35,15 @@ def predicted_from_block(block):
         return None
     m = _FORECAST_RE.search(block)
     return m.group(1).strip() if m else None
+
+
+def card_id_from_block(block):
+    """decision-lifecycle §3.3: id Decision Card из якоря <!-- card: dc_… -->.
+    Fail-closed: нет якоря / кривой вход → None (старые журналы без якоря не ломаются)."""
+    if not isinstance(block, str):
+        return None
+    m = _CARD_ANCHOR_RE.search(block)
+    return m.group(1) if m else None
 
 
 def pending_from_journal(text):
@@ -78,6 +92,38 @@ def pending_from_files(root):
         for ent in pending_entries(text):      # Ф4: predicted едет вместе с записью
             ent["source"] = label
             out.append(ent)
+    return out
+
+
+def pending_from_cards(root):
+    """decision-lifecycle §3: незакрытые Decision Card (outcome=None) из decisions/*.card.json.
+
+    Card — числовой источник истины петли (в отличие от markdown-журнала). Читает те же
+    gitignore-зоны (decisions/ под корнем доски), НЕ трогает markdown-путь. Fail-closed:
+    нет каталога / нечитаемый / битый JSON / не-Card → пропуск, пустой корень → []."""
+    import json
+    ddir = os.path.join(root, "decisions")
+    try:
+        names = sorted(n for n in os.listdir(ddir) if n.endswith(".card.json"))
+    except OSError:
+        return []
+    out = []
+    for name in names:
+        try:
+            with open(os.path.join(ddir, name), encoding="utf-8") as f:
+                card = json.load(f)
+        except (OSError, ValueError):
+            continue
+        if not isinstance(card, dict) or card.get("kind") != "decision_card":
+            continue
+        if card.get("outcome") is not None:
+            continue
+        item = {"title": card.get("question") or card.get("id") or name,
+                "card_id": card.get("id"), "source": "decisions/%s" % name}
+        pred = card.get("prediction")
+        if isinstance(pred, dict):
+            item["prediction_kind"] = pred.get("kind")
+        out.append(item)
     return out
 
 

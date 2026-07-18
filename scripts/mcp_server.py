@@ -1152,6 +1152,206 @@ def _save_decision_map(map, slug=None, seed=_CALC_SEED_DEFAULT, n=None):
                      "в render_session — outcome_nudge сам расширится прогнозом.")}
 
 
+# ── Decision Card: жизненный цикл прогноз → исход → калибровка (спека decision-lifecycle) ──
+# Card — единственный персистентный узел цикла (§2). Тонкие обёртки ядра decision_card /
+# prediction_calibration (логика гейтов/метрик — там). Пишущие тулы (save/close) зовут ТОЛЬКО
+# с согласия юзера (Rule 0). Артефакты — под decisions/ (gitignored, личные данные, §7).
+
+def _card_path(root, name):
+    return os.path.join(root, _DECISIONS_DIR, name)
+
+
+def _load_cards(root):
+    """Все Decision Card из decisions/*.card.json (fail-closed: битый/не-Card → пропуск)."""
+    ddir = os.path.join(root, _DECISIONS_DIR)
+    try:
+        names = sorted(n for n in os.listdir(ddir) if n.endswith(".card.json"))
+    except OSError:
+        return []
+    out = []
+    for name in names:
+        try:
+            with open(os.path.join(ddir, name), encoding="utf-8") as f:
+                card = json.load(f)
+        except (OSError, ValueError):
+            continue
+        if isinstance(card, dict) and card.get("kind") == "decision_card":
+            out.append((name, card))
+    return out
+
+
+def _save_decision_card(map, chosen_option, slug=None, seed=_CALC_SEED_DEFAULT, n=None,
+                        form=None, owner="self", review_date=None, review_horizon_days=None,
+                        assumptions=None, success_criterion=None, reversibility=None,
+                        statement=None, map_path=None, session_id=None, situation_ref=None):
+    """Записать Decision Card артефактом decisions/<дата>-<slug>.card.json (МУТИРУЮЩИЙ, Rule 0).
+
+    Card = момент РЕШЕНИЯ («я выбрал вариант X»): UUID, prediction contract (числа из mc_run,
+    ХРАНЯТСЯ ЧИСЛАМИ), допущения, критерий успеха, дата ревью. chosen_option = id варианта из
+    карты или null (явный defer → прогноз строится по статус-кво). Нужна дата ревью: либо
+    review_date (ISO), либо review_horizon_days (дней от сегодня). form: event|metric|null
+    (null → metric, если у ставки есть единицы). Fail-closed: невалидная карта/Card/слаг/путь
+    → отказ ДО записи. Возвращает card_id + journal_line с якорем <!-- card: dc_… -->."""
+    import re
+    import datetime
+    from decision_map import validate_map
+    from mc_run import N_DEFAULT, mc_run
+    import decision_card as dc
+
+    errors = validate_map(map)
+    if errors:
+        return {"error": "Карта решения не проходит гейты честности — Card не собрать "
+                         "(fail-closed).", "errors": errors, "hint": _RELAY_AS_QUESTIONS_HINT}
+
+    option_ids = [o.get("id") for o in map.get("options", []) if isinstance(o, dict)]
+    if chosen_option is not None and chosen_option not in option_ids:
+        return {"error": "Выбранный вариант «%s» не из вариантов карты." % chosen_option,
+                "hint": "chosen_option — id одного из map.options, либо null (defer)."}
+    # прогноз строится по варианту решения; при defer (null) — по статус-кво (что будет, если ничего)
+    pred_option = chosen_option
+    if pred_option is None:
+        pred_option = next((o.get("id") for o in map["options"] if o.get("status_quo") is True),
+                           option_ids[0] if option_ids else None)
+
+    created = time.strftime("%Y-%m-%d")
+    # горизонт/дата ревью: одно выводится из другого; без обоих — отказ (петля обязана вернуться)
+    horizon_days = review_horizon_days
+    if review_date is None and isinstance(horizon_days, int) and not isinstance(horizon_days, bool):
+        review_date = (dc._parse_date(created) + datetime.timedelta(
+            days=horizon_days)).isoformat()
+    if review_date is not None and (horizon_days is None):
+        rd, cd = dc._parse_date(review_date), dc._parse_date(created)
+        if rd is not None and cd is not None:
+            horizon_days = (rd - cd).days
+    if review_date is None or horizon_days is None:
+        return {"error": "Нужна дата возврата к решению: задай review_date (ISO YYYY-MM-DD) "
+                         "или review_horizon_days (дней).",
+                "hint": "Совет обязан назначить, КОГДА вернуться и закрыть исход."}
+
+    n_eff = N_DEFAULT if n is None else n
+    try:
+        res = mc_run(map, seed, n_eff)
+        prediction = dc.build_prediction_from_mc(map, res, pred_option, form=form,
+                                                 horizon_days=horizon_days, created=created,
+                                                 statement=statement)
+    except ValueError as e:
+        return {"error": str(e)}
+
+    card = {
+        "schema_version": dc.SCHEMA_VERSION, "id": dc.new_card_id(), "created": created,
+        "owner": owner if (isinstance(owner, str) and owner.strip()) else "self",
+        "kind": dc.KIND_CARD,
+        "links": {"map_path": map_path, "session_id": session_id, "situation_ref": situation_ref},
+        "question": str(map.get("question") or ""), "chosen_option": chosen_option,
+        "assumptions": assumptions if isinstance(assumptions, list) else [],
+        "success_criterion": success_criterion, "review_date": review_date,
+        "review_horizon_days": horizon_days, "prediction": prediction, "outcome": None,
+    }
+    if reversibility is not None:
+        card["reversibility"] = reversibility
+
+    card_errors = dc.validate_card(card, map=map)
+    if card_errors:
+        return {"error": "Decision Card не проходит гейты (fail-closed).", "errors": card_errors,
+                "hint": _RELAY_AS_QUESTIONS_HINT}
+
+    # слаг: тот же строгий контракт, что save_decision_map (fail-closed, без тихой санации)
+    if slug is not None:
+        if not isinstance(slug, str) or not re.fullmatch(_SLUG_RE, slug):
+            return {"error": "Слаг Card — строчная латиница/цифры/дефисы (a-z0-9-), без путей "
+                             "и юникода.", "hint": "Дай простой латинский слаг или опусти его."}
+        s = slug
+    else:
+        s = re.sub(r"[^a-z0-9]+", "-", str(map.get("question") or "").lower()).strip("-")[:40] \
+            or "decision"
+    base = os.path.join(_DECISIONS_DIR, "%s-%s" % (created, s))
+    p, err = _resolve_under_root(base + ".card.json")     # write-side traversal-гард (§7)
+    if err:
+        return err
+    i = 1
+    while os.path.exists(p):
+        i += 1
+        p, err = _resolve_under_root("%s-%d.card.json" % (base, i))
+        if err:
+            return err
+
+    rel = os.path.relpath(p, os.path.realpath(_root())).replace(os.sep, "/")
+    os.makedirs(os.path.dirname(p), exist_ok=True)
+    with open(p, "w", encoding="utf-8") as f:
+        json.dump(card, f, ensure_ascii=False, indent=2)
+    predicted = _decision_predicted(map, res)
+    journal_line = ("- Прогноз: 📐 %s (карта: %s) <!-- card: %s -->"
+                    % (predicted, map_path or rel, card["id"]))
+    return {"ok": True, "path": rel, "card_id": card["id"], "predicted": predicted,
+            "journal_line": journal_line,
+            "note": ("Decision Card сохранена (тул зовут ТОЛЬКО с согласия юзера, Rule 0). "
+                     "journal_line несёт невидимый якорь <!-- card: … --> — вставь строку в "
+                     "запись журнала перед ИСХОД: при закрытии зови close_decision_card(card_id, "
+                     "outcome) — числа (occurred/actual в тех же единицах) идут в Card, глиф ✅/❌ "
+                     "остаётся человеку. Точность прогнозов копит prediction_calibration.")}
+
+
+def _close_decision_card(outcome, card_id=None, path=None):
+    """Закрыть Decision Card фактом исхода (МУТИРУЮЩИЙ, Rule 0). outcome: {resolved_on,
+    occurred|actual, endorsed?, note?} — occurred(bool) для event / actual(число, ТЕ ЖЕ
+    единицы) для metric. Ищет карту по card_id (скан decisions/) или по path. Fail-closed:
+    исход не в тех единицах / дата раньше created / путь вне корня → отказ ДО записи."""
+    import decision_card as dc
+    root = _root()
+    target = None
+    if path is not None:
+        p, err = _resolve_under_root(path)
+        if err:
+            return err
+        if not p.endswith(".card.json") or not os.path.isfile(p):
+            return {"error": "По пути нет Decision Card (.card.json): %s" % path}
+        target = p
+    elif card_id is not None:
+        for name, card in _load_cards(root):
+            if card.get("id") == card_id:
+                target = _card_path(root, name)
+                break
+        if target is None:
+            return {"error": "Не нашёл Decision Card с id %s в decisions/." % card_id}
+    else:
+        return {"error": "Укажи card_id или path закрываемой Card."}
+
+    try:
+        with open(target, encoding="utf-8") as f:
+            card = json.load(f)
+    except (OSError, ValueError) as e:
+        return {"error": "Не читается Card: %s" % e}
+    try:
+        closed = dc.close_card(card, outcome)
+    except ValueError as e:
+        return {"error": str(e), "hint": _RELAY_AS_QUESTIONS_HINT}
+    with open(target, "w", encoding="utf-8") as f:
+        json.dump(closed, f, ensure_ascii=False, indent=2)
+    rel = os.path.relpath(target, os.path.realpath(root)).replace(os.sep, "/")
+    return {"ok": True, "path": rel, "card_id": closed.get("id"),
+            "note": ("Исход записан числом в Card. Обнови и markdown-запись (глиф ИСХОД ⏳ → "
+                     "✅/❌). Прогон prediction_calibration покажет Brier/MAE/покрытие по "
+                     "сопоставимым решениям — расхождение прогноза и факта = калибровка, не провал.")}
+
+
+def _prediction_calibration():
+    """Числовая калибровка ПРОГНОЗОВ (не подачи): сканирует закрытые Decision Card в decisions/
+    и считает Brier/log (события) + MAE/покрытие интервала (величины) по группам kind+unit.
+    Малый N шумен → группа помечается trustworthy=False (порог prediction_calibration)."""
+    from prediction_calibration import calibration_journal, MIN_TRUSTWORTHY_N
+    cards = [c for _, c in _load_cards(_root())]
+    journal = calibration_journal(cards)
+    journal["min_trustworthy_n"] = MIN_TRUSTWORTHY_N
+    if journal["closed"] == 0:
+        journal["hint"] = ("Пока нет ЗАКРЫТЫХ решений с исходом — калибровать нечего. Закрывай "
+                           "Card через close_decision_card, когда исход ляжет.")
+    else:
+        journal["hint"] = ("Показывай юзеру ТОЛЬКО группы с trustworthy=true (иначе N мал и "
+                           "Brier/MAE шумны). Покрытие интервала ≈0.80 при честных p10/p90; "
+                           "систематический промах — сигнал, что диапазоны узки/широки.")
+    return journal
+
+
 def _calc_forecast_line(calculation):
     """Ф2×§4.3: опциональный calculation-блок канона сессии → строка «- Прогноз: 📐 …»
     для шаблона записи в outcome_nudge. Канал детекции — ЯВНЫЙ: хост кладёт в сессию
@@ -1727,6 +1927,59 @@ TOOLS = {
                          "required": ["map"]},
         "handler": _save_decision_map,
     },
+    "save_decision_card": {
+        "description": "Записать Decision Card артефактом decisions/<дата>-<slug>.card.json — "
+                       "момент РЕШЕНИЯ (я выбрал вариант X): UUID (dc_…), prediction contract "
+                       "(числа из mc_run хранятся ЧИСЛАМИ: event probability ИЛИ metric "
+                       "p10/p50/p90+единицы), допущения, критерий успеха, дата ревью. МУТИРУЮЩИЙ "
+                       "тул: зови ТОЛЬКО с согласия юзера (Rule 0), ОДИН РАЗ после того как юзер "
+                       "выбрал вариант. chosen_option — id из map.options или null (defer). Нужна "
+                       "дата возврата: review_date или review_horizon_days. Возвращает card_id + "
+                       "journal_line с якорем. Закрытие исхода — close_decision_card, точность — "
+                       "prediction_calibration.",
+        "input_schema": {"type": "object",
+                         "properties": {"map": {"type": "object"},
+                                        "chosen_option": {"type": ["string", "null"]},
+                                        "slug": {"type": "string"},
+                                        "seed": {"type": "integer"},
+                                        "n": {"type": "integer"},
+                                        "form": {"type": "string"},
+                                        "owner": {"type": "string"},
+                                        "review_date": {"type": "string"},
+                                        "review_horizon_days": {"type": "integer"},
+                                        "assumptions": {"type": "array"},
+                                        "success_criterion": {"type": "object"},
+                                        "reversibility": {"type": "string"},
+                                        "statement": {"type": "string"},
+                                        "map_path": {"type": "string"},
+                                        "session_id": {"type": "string"},
+                                        "situation_ref": {"type": "string"}},
+                         "required": ["map", "chosen_option"]},
+        "handler": _save_decision_card,
+    },
+    "close_decision_card": {
+        "description": "Закрыть Decision Card фактом исхода (МУТИРУЮЩИЙ, Rule 0): числа "
+                       "(occurred для event / actual в ТЕХ ЖЕ единицах для metric) идут в Card, "
+                       "глиф ✅/❌ остаётся человеку в markdown. Ищет карту по card_id (скан "
+                       "decisions/) или path. outcome={resolved_on, occurred|actual, endorsed?, "
+                       "note?}. Fail-closed: чужие единицы / дата раньше created → отказ. Потом "
+                       "зови prediction_calibration.",
+        "input_schema": {"type": "object",
+                         "properties": {"outcome": {"type": "object"},
+                                        "card_id": {"type": "string"},
+                                        "path": {"type": "string"}},
+                         "required": ["outcome"]},
+        "handler": _close_decision_card,
+    },
+    "prediction_calibration": {
+        "description": "Числовая калибровка ПРОГНОЗОВ (не подачи): по закрытым Decision Card "
+                       "считает Brier/log score (события) и MAE/покрытие интервала (величины), "
+                       "журнал по группам kind+unit. Показывай юзеру ТОЛЬКО группы trustworthy=true "
+                       "(малый N шумен). Расхождение прогноза и факта — калибровка модели юзера, "
+                       "не провал.",
+        "input_schema": {"type": "object", "properties": {}, "required": []},
+        "handler": _prediction_calibration,
+    },
     "render_session": {
         "description": "ОБЯЗАТЕЛЬНЫЙ финал заседания совета в Cowork: отрисовать canon-объект "
                        "заседания виджетом. Зови этот тул ПОСЛЕДНИМ действием, потом скорми "
@@ -2114,6 +2367,10 @@ Consilium-Principis — личный совет AI-персон реальных
    да/нет» (одобрил бы задним числом?). Если запись несёт строку «Прогноз: 📐 …»
    (pending-item отдаёт её полем predicted) — сравни ВСЛУХ прогноз и факт: расхождение —
    не провал, а калибровка модели юзера (диапазоны системно узкие/широкие — скажи об этом).
+   Если у записи есть якорь Decision Card (<!-- card: dc_… -->, поле card_id у pending-item) —
+   закрой её ЧИСЛОМ: close_decision_card(card_id, outcome={resolved_on, occurred|actual в тех
+   же единицах, endorsed}); потом prediction_calibration покажет Brier/MAE/покрытие интервала
+   по сопоставимым решениям (только группы trustworthy=true — при малом N шумно).
    (г) КАЛИБРОВКА ГОЛОСОВ: при резолюции исхода зови advisor_weights(records=[{advisor,outcome,
    endorsed}]) — он взвешивает голос каждого советника по РЕАЛЬНЫМ исходам для этого юзера
    («кто прав ДЛЯ ТЕБЯ», не «кто звучит мудро»); без данных вес нейтрален. (д) ЗЕРКАЛО: периодически
@@ -2146,6 +2403,14 @@ Consilium-Principis — личный совет AI-персон реальных
    seed/n, что показывал в расчёте — журнал хранит ИМЕННО одобренные юзером числа (вернёт
    journal_line «Прогноз: 📐 …»); при записи решения в журнал передай calculation={journal_line}
    в render_session — outcome_nudge сам расширится строкой прогноза.
+   (е-bis) КОГДА ЮЗЕР ВЫБРАЛ ВАРИАНТ (принял решение, не просто посчитал) — предложи ОДИН РАЗ
+   зафиксировать его как Decision Card: согласие → save_decision_card(map, chosen_option,
+   review_date|review_horizon_days). Card держит прогноз ЧИСЛАМИ (не прозой): event —
+   вероятность, metric — интервал p10/p50/p90 в единицах ставки; по умолчанию metric, когда у
+   ставки есть единицы. Вернёт journal_line с якорем <!-- card: dc_… --> — вставь её в запись
+   журнала: этот якорь свяжет карту, протокол (decision_record card_id) и исход одним UUID,
+   а при закрытии close_decision_card соберёт числовую калибровку. chosen_option=null — явный
+   defer (прогноз по статус-кво).
    (ж) ПРЕ-МОРТЕМ — ДО расчёта, когда карта наполнена (перед validate_decision_map): «прошёл
    год, вариант X провалился — почему?» КАЖДЫЙ советник отвечает ИЗ СВОЕГО КЕРНЕЛА — это
    заседание, не счёт: обычные правила лейблов 🔵/🟢/🟡 действуют (цитата — только через cite).

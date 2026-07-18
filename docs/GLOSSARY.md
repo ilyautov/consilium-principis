@@ -399,10 +399,12 @@ gov_head. `build.lock` под `build/` (не в git); `corpus.lock.json` — т�
 ## Расчёт решений (Principis)
 
 **decision map / карта решения** — JSON-схема модели решения (`scripts/decision_map.py`,
-сервер — единственный владелец схемы): `question`, `options` (с `reversibility`
-one-way|two-way; статус-кво-вариант ОБЯЗАТЕЛЕН), `uncertainties`, `stakes`
-(metric+direction max|min), `horizon`, опциональный `situational`, `model`
-(формула на вариант + словесная версия).
+сервер — единственный владелец схемы): `question`, `options` (статус-кво-вариант
+ОБЯЗАТЕЛЕН), `uncertainties`, `stakes` (metric+direction max|min), `horizon`,
+опциональный `situational`, `model` (формула на вариант + словесная версия). NB:
+`reversibility` (one-way|two-way) `validate_map` НЕ гейтит — обратимость исполняется на
+уровне Decision Card (`scripts/decision_card.py`, поле `reversibility`), а не карты;
+карта остаётся моделью для расчёта, Card несёт решение.
 
 **validate_map / гейты честности** — `validate_map` (fail-closed): отказывает в
 расчёте, если хоть одна uncertainty без `confirmed_by_user`, нарушен `min≤mode≤max`,
@@ -447,6 +449,30 @@ regret, торнадо. Тул `run_calculation` (с «📐 рамкой» из 
 **save_decision_map** — тул: артефакт `decisions/<дата>-<slug>.json` (строгий слаг
 `[a-z0-9-]`, `_resolve_under_root`) + `journal_line` «Прогноз: 📐 …». Сохраняется
 только с согласия юзера, С ТЕМИ ЖЕ seed/n, что показаны.
+
+**Decision Card / карта решения (жизненный цикл)** — `scripts/decision_card.py`:
+единственный персистентный узел цикла прогноз→исход→калибровка (спека decision-lifecycle
+§2). JSON `decisions/<дата>-<slug>.card.json` (gitignore-зона, личные данные): `id`
+(UUID `dc_…`, стабильный ключ сшивания карты/протокола/исхода), `schema_version`, `owner`,
+`review_date`, `links` (map_path/session_id/situation_ref), `chosen_option` (id варианта
+или null=defer), `assumptions`, `success_criterion`, `reversibility` (C1: обещание
+глоссария теперь исполняется здесь), `prediction`, `outcome`. `validate_card` — fail-closed,
+аккумулирует RU-ошибки как `validate_map`. Тулы `save_decision_card` (момент РЕШЕНИЯ, Rule 0)
+/ `close_decision_card` (исход числом, Rule 0).
+
+**prediction contract / контракт прогноза** — два вида (`scripts/decision_card.py`,
+`build_prediction_from_mc`): **event** (`probability`∈[0,1] + `horizon_days`) ИЛИ **metric**
+(`unit` + `p10`/`p50`/`p90` + `direction` + `horizon_days`). Числа берутся ПРЯМО из `mc_run`
+(`p_best[chosen]` / `options[chosen].{p10,median,p90}`, единицы ← `stakes.metric`) и хранятся
+ЧИСЛАМИ в Card, а не сериализуются в RU-строку (закрывает разрыв §1.2). `outcome` при закрытии
+несёт `occurred`(bool) для event / `actual`(число, ТЕ ЖЕ единицы) для metric.
+
+**prediction_calibration / числовая калибровка прогнозов** — `scripts/prediction_calibration.py`
+(≠ калибровка ПОДАЧИ в `calibration.py`): по закрытым Decision Card считает **Brier**
+`mean((p−y)²)` и **log score** (клип p∈[ε,1−ε]) для событий, **MAE** `mean(|actual−p50|)` +
+**покрытие интервала** (доля с p10≤actual≤p90, цель ≈0.80) для величин; журнал по группам
+`kind+unit` (сопоставимые решения). Порог показа `MIN_TRUSTWORTHY_N=5` (малый N шумен →
+`trustworthy=False`, по аналогии с `premortem.trustworthy`). Тул `prediction_calibration`.
 
 **anti-anchoring / анти-анкоринг** — правило 12 INSTRUCTIONS: совет НЕ называет
 числа первым, только выбивает тройками «худший/типичный/лучший»; формулу пишет LLM

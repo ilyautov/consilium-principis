@@ -1,11 +1,11 @@
 {
   "meta": {
-    "tool_count": 53,
+    "tool_count": 56,
     "rule_count": 17,
     "recipe_count": 16,
-    "script_count": 68,
-    "test_count": 128,
-    "glossary_count": 110
+    "script_count": 70,
+    "test_count": 133,
+    "glossary_count": 113
   },
   "tools": [
     {
@@ -373,6 +373,32 @@
       ]
     },
     {
+      "name": "close_decision_card",
+      "description": "Закрыть Decision Card фактом исхода (МУТИРУЮЩИЙ, Rule 0): числа (occurred для event / actual в ТЕХ ЖЕ единицах для metric) идут в Card, глиф ✅/❌ остаётся человеку в markdown. Ищет карту по card_id (скан decisions/) или path. outcome={resolved_on, occurred|actual, endorsed?, note?}. Fail-closed: чужие единицы / дата раньше created → отказ. Потом зови prediction_calibration.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "outcome": {
+            "type": "object"
+          },
+          "card_id": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "outcome"
+        ]
+      },
+      "status": "surfaced",
+      "referenced_in": [
+        "rule:12",
+        "rule:13"
+      ]
+    },
+    {
       "name": "config_get",
       "description": "Прочитать board_config.json (тюнинг без правки файла): весь конфиг или один ключ (retrieval_mode, abstain_threshold, hybrid_alpha…).",
       "input_schema": {
@@ -439,7 +465,8 @@
       },
       "status": "surfaced",
       "referenced_in": [
-        "rule:12"
+        "rule:12",
+        "rule:13"
       ]
     },
     {
@@ -882,6 +909,19 @@
       ]
     },
     {
+      "name": "prediction_calibration",
+      "description": "Числовая калибровка ПРОГНОЗОВ (не подачи): по закрытым Decision Card считает Brier/log score (события) и MAE/покрытие интервала (величины), журнал по группам kind+unit. Показывай юзеру ТОЛЬКО группы trustworthy=true (малый N шумен). Расхождение прогноза и факта — калибровка модели юзера, не провал.",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "status": "surfaced",
+      "referenced_in": [
+        "rule:12"
+      ]
+    },
+    {
       "name": "premortem",
       "description": "Пре-мортем исхода: сценарии [{label,value,prob}] → ожидаемый исход + крайние случаи. trustworthy=False без истории попаданий (анти-театр).",
       "input_schema": {
@@ -1040,6 +1080,74 @@
       "status": "surfaced",
       "referenced_in": [
         "rule:2",
+        "rule:13"
+      ]
+    },
+    {
+      "name": "save_decision_card",
+      "description": "Записать Decision Card артефактом decisions/<дата>-<slug>.card.json — момент РЕШЕНИЯ (я выбрал вариант X): UUID (dc_…), prediction contract (числа из mc_run хранятся ЧИСЛАМИ: event probability ИЛИ metric p10/p50/p90+единицы), допущения, критерий успеха, дата ревью. МУТИРУЮЩИЙ тул: зови ТОЛЬКО с согласия юзера (Rule 0), ОДИН РАЗ после того как юзер выбрал вариант. chosen_option — id из map.options или null (defer). Нужна дата возврата: review_date или review_horizon_days. Возвращает card_id + journal_line с якорем. Закрытие исхода — close_decision_card, точность — prediction_calibration.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "map": {
+            "type": "object"
+          },
+          "chosen_option": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "slug": {
+            "type": "string"
+          },
+          "seed": {
+            "type": "integer"
+          },
+          "n": {
+            "type": "integer"
+          },
+          "form": {
+            "type": "string"
+          },
+          "owner": {
+            "type": "string"
+          },
+          "review_date": {
+            "type": "string"
+          },
+          "review_horizon_days": {
+            "type": "integer"
+          },
+          "assumptions": {
+            "type": "array"
+          },
+          "success_criterion": {
+            "type": "object"
+          },
+          "reversibility": {
+            "type": "string"
+          },
+          "statement": {
+            "type": "string"
+          },
+          "map_path": {
+            "type": "string"
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "situation_ref": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "map",
+          "chosen_option"
+        ]
+      },
+      "status": "surfaced",
+      "referenced_in": [
         "rule:13"
       ]
     },
@@ -1291,12 +1399,12 @@
     {
       "n": 12,
       "title": "ПЕТЛЯ ИСХОДА",
-      "text": "ПЕТЛЯ ИСХОДА (совет — продукт, только если решения возвращаются исходами). Ненавязчиво,\n   но не теряй: (а) СТАРТ сессии — board_status/loop_status могут вернуть pending_outcomes\n   (решения с висящим ⏳): упомяни ОДИН РАЗ, одной строкой, между делом («кстати, по X — как\n   легло?»); не подхватил — в этой сессии больше не поднимай. (б) СИНТЕЗ выдан —\n   render_session вернёт outcome_nudge: один раз предложи занести решение в журнал и, если\n   юзер согласился, допиши запись по шаблону из нуджа в principis.md (раздел «Журнал решений»).\n   Если юзер ЯВНО просит поделиться заседанием («сохрани/экспортируй/пришли артефакт») — зови\n   export_session(session, surface=md|html): вернёт самодостаточный `content` с панелью «что совет\n   НЕ стал выдумывать» и атрибуцией; отдай текст юзеру (файлов сам не пишет, сохраняет он).\n   Просит пруф ОДНОЙ цитаты («докажи/покажи пруф цитаты») — зови proof_card(quote, advisor_dir):\n   не дословна в 🔵-корпусе → карточки нет (fail-closed); иначе отдай html-карточку юзеру.\n   Просит «цитату дня / мысль дня» (PULL-ONLY, только по запросу — сам не навязывай) — зови\n   quote_of_day(): одна 🔵-verbatim-цитата с источником; нет дословных P1/P2 → честно скажи (не выдумывай).\n   Просит протокол/минуты/decision-record заседания («оформи решение», «протокол», «минуты») —\n   зови decision_record(session): позиции+допущения+диссент+статус решения+provenance, тиры\n   скопированы из session as-is (никогда не поднимаются).\n   (в) РЕЗОЛЮЦИЯ: юзер рассказал, чем кончилось → в его записи ИСХОД ⏳ → ✅/❌ + «Одобрено:\n   да/нет» (одобрил бы задним числом?). Если запись несёт строку «Прогноз: 📐 …»\n   (pending-item отдаёт её полем predicted) — сравни ВСЛУХ прогноз и факт: расхождение —\n   не провал, а калибровка модели юзера (диапазоны системно узкие/широкие — скажи об этом).\n   (г) КАЛИБРОВКА ГОЛОСОВ: при резолюции исхода зови advisor_weights(records=[{advisor,outcome,\n   endorsed}]) — он взвешивает голос каждого советника по РЕАЛЬНЫМ исходам для этого юзера\n   («кто прав ДЛЯ ТЕБЯ», не «кто звучит мудро»); без данных вес нейтрален. (д) ЗЕРКАЛО: периодически\n   mirror_report(stated, decisions) показывает дрейф «заявляю X — выбираю Y» — отражает разрыв, не советует.\n   Запись/правка журнала — только с согласия юзера\n   (это правка ЕГО модели); отказ — не дави и не повторяй."
+      "text": "ПЕТЛЯ ИСХОДА (совет — продукт, только если решения возвращаются исходами). Ненавязчиво,\n   но не теряй: (а) СТАРТ сессии — board_status/loop_status могут вернуть pending_outcomes\n   (решения с висящим ⏳): упомяни ОДИН РАЗ, одной строкой, между делом («кстати, по X — как\n   легло?»); не подхватил — в этой сессии больше не поднимай. (б) СИНТЕЗ выдан —\n   render_session вернёт outcome_nudge: один раз предложи занести решение в журнал и, если\n   юзер согласился, допиши запись по шаблону из нуджа в principis.md (раздел «Журнал решений»).\n   Если юзер ЯВНО просит поделиться заседанием («сохрани/экспортируй/пришли артефакт») — зови\n   export_session(session, surface=md|html): вернёт самодостаточный `content` с панелью «что совет\n   НЕ стал выдумывать» и атрибуцией; отдай текст юзеру (файлов сам не пишет, сохраняет он).\n   Просит пруф ОДНОЙ цитаты («докажи/покажи пруф цитаты») — зови proof_card(quote, advisor_dir):\n   не дословна в 🔵-корпусе → карточки нет (fail-closed); иначе отдай html-карточку юзеру.\n   Просит «цитату дня / мысль дня» (PULL-ONLY, только по запросу — сам не навязывай) — зови\n   quote_of_day(): одна 🔵-verbatim-цитата с источником; нет дословных P1/P2 → честно скажи (не выдумывай).\n   Просит протокол/минуты/decision-record заседания («оформи решение», «протокол», «минуты») —\n   зови decision_record(session): позиции+допущения+диссент+статус решения+provenance, тиры\n   скопированы из session as-is (никогда не поднимаются).\n   (в) РЕЗОЛЮЦИЯ: юзер рассказал, чем кончилось → в его записи ИСХОД ⏳ → ✅/❌ + «Одобрено:\n   да/нет» (одобрил бы задним числом?). Если запись несёт строку «Прогноз: 📐 …»\n   (pending-item отдаёт её полем predicted) — сравни ВСЛУХ прогноз и факт: расхождение —\n   не провал, а калибровка модели юзера (диапазоны системно узкие/широкие — скажи об этом).\n   Если у записи есть якорь Decision Card (<!-- card: dc_… -->, поле card_id у pending-item) —\n   закрой её ЧИСЛОМ: close_decision_card(card_id, outcome={resolved_on, occurred|actual в тех\n   же единицах, endorsed}); потом prediction_calibration покажет Brier/MAE/покрытие интервала\n   по сопоставимым решениям (только группы trustworthy=true — при малом N шумно).\n   (г) КАЛИБРОВКА ГОЛОСОВ: при резолюции исхода зови advisor_weights(records=[{advisor,outcome,\n   endorsed}]) — он взвешивает голос каждого советника по РЕАЛЬНЫМ исходам для этого юзера\n   («кто прав ДЛЯ ТЕБЯ», не «кто звучит мудро»); без данных вес нейтрален. (д) ЗЕРКАЛО: периодически\n   mirror_report(stated, decisions) показывает дрейф «заявляю X — выбираю Y» — отражает разрыв, не советует.\n   Запись/правка журнала — только с согласия юзера\n   (это правка ЕГО модели); отказ — не дави и не повторяй."
     },
     {
       "n": 13,
       "title": "КАРТА РЕШЕНИЯ",
-      "text": "КАРТА РЕШЕНИЯ («📐 расчёт»). Юзер принёс вопрос-РЕШЕНИЕ (выбор из вариантов со ставкой) —\n   ОДИН РАЗ предложи разложить его до карты и посчитать; отказ = обычный Режим B, НЕ навязывай.\n   Согласился — круглый стол наполняет карту допросом:\n   (а) АНТИ-АНКОРИНГ: числа выбивай тройками вопросов «худший реалистичный? типичный? лучший?»\n   (continuous: min/mode/max) или вероятностью события (event: prob). Совет НЕ называет числа первым —\n   только спрашивает; confirmed_by_user=true ставь ТОЛЬКО после явного ответа юзера про эту\n   величину (elicited=дословная цитата его ответа) — без этого расчёт откажет.\n   (б) ФОРМУЛУ на каждый вариант предлагает совет: словами (words) и выражением (expr; синтаксис:\n   + - * / ( ), min/max, тернарный `x if cond else y`, числа, id величин). Юзер ВИЗИРУЕТ формулу;\n   словесную версию произнеси вслух ПЕРЕД расчётом. Вариант статус-кво («ничего не делать»,\n   \"status_quo\": true) ОБЯЗАТЕЛЕН — выбей его.\n   (в) Образцовые модели: EV-сравнение — `p_success * upside_hours - hours_to_ship` («вероятность успеха умножить на выигрыш в часах, минус часы на шиппинг; статус-кво: 0»); cost-benefit с альтернативной стоимостью — `revenue_gain - direct_cost - hours_spent * alt_hour_value` («выгода минус прямые затраты минус часы, умноженные на цену лучшей альтернативы этих часов»); гонка-за-рынок с событием-риском — `(late_share if rival_first > 0 else 1) * market_value - build_cost` («если конкурент вышел первым (событие) — берём позднюю долю рынка, иначе весь рынок; минус стоимость сборки»).\n   (г) Поток: validate_decision_map → ошибки задай юзеру ВОПРОСАМИ совета (не техдампом) →\n   run_calculation (считает ТОЛЬКО код, детерминированно — сам ничего не прикидывай). Показывай\n   расчёт ЕДИНСТВЕННО с рамкой label_text из ответа; подача ГОТОВА в render (в Cowork скорми\n   render.widget в show_widget — гистограмма исходов, торнадо, сводка); top_uncertainties —\n   величины, решающие исход: предложи 2×2, назвав их осями (формат — (з)).\n   (д) ЛЕЙБЛ: «📐 расчёт» стоит РЯДОМ с мнениями советников (🔵/🟢/🟡), НИКОГДА не смешивается\n   с ними: это не истина и не цитата, а модель юзера, прогнанная N раз. Расчёта без\n   валидной карты НЕ СУЩЕСТВУЕТ.\n   (е) После расчёта ОДИН РАЗ предложи сохранить карту: согласие → save_decision_map С ТЕМИ ЖЕ\n   seed/n, что показывал в расчёте — журнал хранит ИМЕННО одобренные юзером числа (вернёт\n   journal_line «Прогноз: 📐 …»); при записи решения в журнал передай calculation={journal_line}\n   в render_session — outcome_nudge сам расширится строкой прогноза.\n   (ж) ПРЕ-МОРТЕМ — ДО расчёта, когда карта наполнена (перед validate_decision_map): «прошёл\n   год, вариант X провалился — почему?» КАЖДЫЙ советник отвечает ИЗ СВОЕГО КЕРНЕЛА — это\n   заседание, не счёт: обычные правила лейблов 🔵/🟢/🟡 действуют (цитата — только через cite).\n   Продукт пре-мортема — НЕДОСТАЮЩИЕ неопределённости: каждую причину провала сведи к величине\n   и предложи добавить в карту (числа — снова тройками (а), confirmed_by_user только от юзера).\n   В canon-объект render_session клади premortem:[{advisor,reason}] — отрисуется блоком заседания.\n   (з) 2×2 — ПОСЛЕ расчёта (предложи ОДИН РАЗ, опционально): оси = top_uncertainties из\n   run_calculation. Совет разыгрывает 4 квадранта (обе величины хорошо / обе плохо /\n   крест-накрест) — что делаем в каждом. Квадрант вскрыл новую величину → предложи уточнить\n   карту и пересчитать (петля слоёв: пре-мортем → карта → расчёт → торнадо → 2×2 → карта;\n   гоняй её ТОЛЬКО по желанию юзера). В canon-объект клади matrix2x2:{axes:[id1,id2],\n   quadrants:[{corner,name,council_read}]} — отрисуется блоком заседания."
+      "text": "КАРТА РЕШЕНИЯ («📐 расчёт»). Юзер принёс вопрос-РЕШЕНИЕ (выбор из вариантов со ставкой) —\n   ОДИН РАЗ предложи разложить его до карты и посчитать; отказ = обычный Режим B, НЕ навязывай.\n   Согласился — круглый стол наполняет карту допросом:\n   (а) АНТИ-АНКОРИНГ: числа выбивай тройками вопросов «худший реалистичный? типичный? лучший?»\n   (continuous: min/mode/max) или вероятностью события (event: prob). Совет НЕ называет числа первым —\n   только спрашивает; confirmed_by_user=true ставь ТОЛЬКО после явного ответа юзера про эту\n   величину (elicited=дословная цитата его ответа) — без этого расчёт откажет.\n   (б) ФОРМУЛУ на каждый вариант предлагает совет: словами (words) и выражением (expr; синтаксис:\n   + - * / ( ), min/max, тернарный `x if cond else y`, числа, id величин). Юзер ВИЗИРУЕТ формулу;\n   словесную версию произнеси вслух ПЕРЕД расчётом. Вариант статус-кво («ничего не делать»,\n   \"status_quo\": true) ОБЯЗАТЕЛЕН — выбей его.\n   (в) Образцовые модели: EV-сравнение — `p_success * upside_hours - hours_to_ship` («вероятность успеха умножить на выигрыш в часах, минус часы на шиппинг; статус-кво: 0»); cost-benefit с альтернативной стоимостью — `revenue_gain - direct_cost - hours_spent * alt_hour_value` («выгода минус прямые затраты минус часы, умноженные на цену лучшей альтернативы этих часов»); гонка-за-рынок с событием-риском — `(late_share if rival_first > 0 else 1) * market_value - build_cost` («если конкурент вышел первым (событие) — берём позднюю долю рынка, иначе весь рынок; минус стоимость сборки»).\n   (г) Поток: validate_decision_map → ошибки задай юзеру ВОПРОСАМИ совета (не техдампом) →\n   run_calculation (считает ТОЛЬКО код, детерминированно — сам ничего не прикидывай). Показывай\n   расчёт ЕДИНСТВЕННО с рамкой label_text из ответа; подача ГОТОВА в render (в Cowork скорми\n   render.widget в show_widget — гистограмма исходов, торнадо, сводка); top_uncertainties —\n   величины, решающие исход: предложи 2×2, назвав их осями (формат — (з)).\n   (д) ЛЕЙБЛ: «📐 расчёт» стоит РЯДОМ с мнениями советников (🔵/🟢/🟡), НИКОГДА не смешивается\n   с ними: это не истина и не цитата, а модель юзера, прогнанная N раз. Расчёта без\n   валидной карты НЕ СУЩЕСТВУЕТ.\n   (е) После расчёта ОДИН РАЗ предложи сохранить карту: согласие → save_decision_map С ТЕМИ ЖЕ\n   seed/n, что показывал в расчёте — журнал хранит ИМЕННО одобренные юзером числа (вернёт\n   journal_line «Прогноз: 📐 …»); при записи решения в журнал передай calculation={journal_line}\n   в render_session — outcome_nudge сам расширится строкой прогноза.\n   (е-bis) КОГДА ЮЗЕР ВЫБРАЛ ВАРИАНТ (принял решение, не просто посчитал) — предложи ОДИН РАЗ\n   зафиксировать его как Decision Card: согласие → save_decision_card(map, chosen_option,\n   review_date|review_horizon_days). Card держит прогноз ЧИСЛАМИ (не прозой): event —\n   вероятность, metric — интервал p10/p50/p90 в единицах ставки; по умолчанию metric, когда у\n   ставки есть единицы. Вернёт journal_line с якорем <!-- card: dc_… --> — вставь её в запись\n   журнала: этот якорь свяжет карту, протокол (decision_record card_id) и исход одним UUID,\n   а при закрытии close_decision_card соберёт числовую калибровку. chosen_option=null — явный\n   defer (прогноз по статус-кво).\n   (ж) ПРЕ-МОРТЕМ — ДО расчёта, когда карта наполнена (перед validate_decision_map): «прошёл\n   год, вариант X провалился — почему?» КАЖДЫЙ советник отвечает ИЗ СВОЕГО КЕРНЕЛА — это\n   заседание, не счёт: обычные правила лейблов 🔵/🟢/🟡 действуют (цитата — только через cite).\n   Продукт пре-мортема — НЕДОСТАЮЩИЕ неопределённости: каждую причину провала сведи к величине\n   и предложи добавить в карту (числа — снова тройками (а), confirmed_by_user только от юзера).\n   В canon-объект render_session клади premortem:[{advisor,reason}] — отрисуется блоком заседания.\n   (з) 2×2 — ПОСЛЕ расчёта (предложи ОДИН РАЗ, опционально): оси = top_uncertainties из\n   run_calculation. Совет разыгрывает 4 квадранта (обе величины хорошо / обе плохо /\n   крест-накрест) — что делаем в каждом. Квадрант вскрыл новую величину → предложи уточнить\n   карту и пересчитать (петля слоёв: пре-мортем → карта → расчёт → торнадо → 2×2 → карта;\n   гоняй её ТОЛЬКО по желанию юзера). В canon-объект клади matrix2x2:{axes:[id1,id2],\n   quadrants:[{corner,name,council_read}]} — отрисуется блоком заседания."
     },
     {
       "n": 14,
@@ -1635,6 +1743,11 @@
       "doc": "collect_web.py — сборщик ПУБЛИЧНОГО веб-контента живых/недавних фигур: эссе, блоги, твиты,"
     },
     {
+      "path": "scripts/decision_card.py",
+      "subsystem": "other",
+      "doc": "Decision Card — единственный персистентный узел жизненного цикла решения."
+    },
+    {
       "path": "scripts/decision_map.py",
       "subsystem": "other",
       "doc": "Карта решения — схема и гейты честности («Principis-расчёт», спека §§1-2)."
@@ -1795,6 +1908,11 @@
       "doc": "§3.1 moat-v2: eval инъекций через отравленный источник (poisoned-passage KIND)."
     },
     {
+      "path": "scripts/prediction_calibration.py",
+      "subsystem": "other",
+      "doc": "Числовая калибровка ПРОГНОЗОВ (decision-lifecycle §2.4)."
+    },
+    {
       "path": "scripts/preflight.py",
       "subsystem": "other",
       "doc": "Преднастройка заседания — что готово к созыву совета (зовётся в начале сессии)."
@@ -1946,6 +2064,10 @@
       "covers": "calibration"
     },
     {
+      "path": "tests/test_card_stays_local.py",
+      "covers": "card stays local"
+    },
+    {
       "path": "tests/test_catalog.py",
       "covers": "catalog"
     },
@@ -2032,6 +2154,10 @@
     {
       "path": "tests/test_dark_tools_wired.py",
       "covers": "dark tools wired"
+    },
+    {
+      "path": "tests/test_decision_card.py",
+      "covers": "decision card"
     },
     {
       "path": "tests/test_decision_map.py",
@@ -2230,6 +2356,10 @@
       "covers": "lever adoption probe"
     },
     {
+      "path": "tests/test_lifecycle_backcompat.py",
+      "covers": "lifecycle backcompat"
+    },
+    {
       "path": "tests/test_lifecycle_tools.py",
       "covers": "lifecycle tools"
     },
@@ -2292,6 +2422,14 @@
     {
       "path": "tests/test_positioning_doc.py",
       "covers": "positioning doc"
+    },
+    {
+      "path": "tests/test_prediction_calibration.py",
+      "covers": "prediction calibration"
+    },
+    {
+      "path": "tests/test_prediction_contract.py",
+      "covers": "prediction contract"
     },
     {
       "path": "tests/test_preflight.py",
@@ -2709,7 +2847,7 @@
     },
     {
       "term": "decision map / карта решения",
-      "definition": "JSON-схема модели решения (`scripts/decision_map.py`, сервер — единственный владелец схемы): `question`, `options` (с `reversibility` one-way|two-way; статус-кво-вариант ОБЯЗАТЕЛЕН), `uncertainties`, `stakes` (metric+direction max|min), `horizon`, опциональный `situational`, `model` (формула на вариант + словесная версия)."
+      "definition": "JSON-схема модели решения (`scripts/decision_map.py`, сервер — единственный владелец схемы): `question`, `options` (статус-кво-вариант ОБЯЗАТЕЛЕН), `uncertainties`, `stakes` (metric+direction max|min), `horizon`, опциональный `situational`, `model` (формула на вариант + словесная версия). NB: `reversibility` (one-way|two-way) `validate_map` НЕ гейтит — обратимость исполняется на уровне Decision Card (`scripts/decision_card.py`, поле `reversibility`), а не карты; карта остаётся моделью для расчёта, Card несёт решение."
     },
     {
       "term": "validate_map / гейты честности",
@@ -2750,6 +2888,18 @@
     {
       "term": "save_decision_map",
       "definition": "тул: артефакт `decisions/<дата>-<slug>.json` (строгий слаг `[a-z0-9-]`, `_resolve_under_root`) + `journal_line` «Прогноз: 📐 …». Сохраняется только с согласия юзера, С ТЕМИ ЖЕ seed/n, что показаны."
+    },
+    {
+      "term": "Decision Card / карта решения (жизненный цикл)",
+      "definition": "`scripts/decision_card.py`: единственный персистентный узел цикла прогноз→исход→калибровка (спека decision-lifecycle §2). JSON `decisions/<дата>-<slug>.card.json` (gitignore-зона, личные данные): `id` (UUID `dc_…`, стабильный ключ сшивания карты/протокола/исхода), `schema_version`, `owner`, `review_date`, `links` (map_path/session_id/situation_ref), `chosen_option` (id варианта или null=defer), `assumptions`, `success_criterion`, `reversibility` (C1: обещание глоссария теперь исполняется здесь), `prediction`, `outcome`. `validate_card` — fail-closed, аккумулирует RU-ошибки как `validate_map`. Тулы `save_decision_card` (момент РЕШЕНИЯ, Rule 0) / `close_decision_card` (исход числом, Rule 0)."
+    },
+    {
+      "term": "prediction contract / контракт прогноза",
+      "definition": "два вида (`scripts/decision_card.py`, `build_prediction_from_mc`): **event** (`probability`∈[0,1] + `horizon_days`) ИЛИ **metric** (`unit` + `p10`/`p50`/`p90` + `direction` + `horizon_days`). Числа берутся ПРЯМО из `mc_run` (`p_best[chosen]` / `options[chosen].{p10,median,p90}`, единицы ← `stakes.metric`) и хранятся ЧИСЛАМИ в Card, а не сериализуются в RU-строку (закрывает разрыв §1.2). `outcome` при закрытии несёт `occurred`(bool) для event / `actual`(число, ТЕ ЖЕ единицы) для metric."
+    },
+    {
+      "term": "prediction_calibration / числовая калибровка прогнозов",
+      "definition": "`scripts/prediction_calibration.py` (≠ калибровка ПОДАЧИ в `calibration.py`): по закрытым Decision Card считает **Brier** `mean((p−y)²)` и **log score** (клип p∈[ε,1−ε]) для событий, **MAE** `mean(|actual−p50|)` + **покрытие интервала** (доля с p10≤actual≤p90, цель ≈0.80) для величин; журнал по группам `kind+unit` (сопоставимые решения). Порог показа `MIN_TRUSTWORTHY_N=5` (малый N шумен → `trustworthy=False`, по аналогии с `premortem.trustworthy`). Тул `prediction_calibration`."
     },
     {
       "term": "anti-anchoring / анти-анкоринг",

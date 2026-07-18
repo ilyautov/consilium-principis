@@ -25,12 +25,22 @@ def _char_ngrams(s: str, n: int = 3):
     return {s[i:i + n] for i in range(len(s) - n + 1)}
 
 
+# H10: разбивка корпуса на предложения кешируется по (path, mtime) — retrieve зовёт _split_units
+# на КАЖДЫЙ вопрос, без кеша это полный ре-парс corpus.jsonl каждый раз. Инвалидация сменой mtime.
+_UNITS_CACHE = {}   # (path, mtime) -> list[(sentence, tier)]
+
+
 def _split_units(advisor_dir: str) -> List[tuple]:
     """[(предложение, tier)]. Тир едет вместе с текстом: пол не должен ослеплять потребителя
-    по тиру только потому, что ollama недоступен. Нет поля в корпусе → None (неизвестно)."""
+    по тиру только потому, что ollama недоступен. Нет поля в корпусе → None (неизвестно).
+    Результат кешируется по mtime corpus.jsonl (H10)."""
     cj = corpus_path(advisor_dir)
     if not os.path.isfile(cj):
         return []
+    key = (cj, os.path.getmtime(cj))
+    hit = _UNITS_CACHE.get(key)
+    if hit is not None:
+        return hit
     units = []
     with open(cj, encoding="utf-8") as fh:
         for line in fh:
@@ -47,6 +57,9 @@ def _split_units(advisor_dir: str) -> List[tuple]:
                 sent = sent.strip()
                 if len(sent) >= 8:
                     units.append((sent, tier))
+    for k in [k for k in _UNITS_CACHE if k[0] == cj and k != key]:
+        del _UNITS_CACHE[k]
+    _UNITS_CACHE[key] = units
     return units
 
 

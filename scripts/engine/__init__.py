@@ -77,16 +77,10 @@ class Engine(ABC):
         """Tier-aware гейт маркера. Дословный матч сам по себе НЕ даёт 🔵 — решает ТИР:
           P1/P2 → 🔵 (слова автора)
           S1/S2 → 🟢 (дословно, но комментарий — source = комментатор, не голос автора)
-          B/A/нет матча/без tier → 🟡 (fail-closed: без провенанса не сертифицируем)."""
-        m = best_match(quote, advisor_dir)
-        if m is None:
-            return FidelityResult(status="🟡", verbatim=False, source="")
-        tier, src = m
-        if tier in ("P1", "P2"):
-            return FidelityResult(status="🔵", verbatim=True, source=src)
-        if tier in ("S1", "S2"):
-            return FidelityResult(status="🟢", verbatim=True, source=src)
-        return FidelityResult(status="🟡", verbatim=False, source="")
+          B/A/нет матча/без tier → 🟡 (fail-closed: без провенанса не сертифицируем).
+        Делегирует единому marker_status (H6) — формула маркера в одном месте."""
+        from .fidelity import marker_status
+        return FidelityResult(**marker_status(quote, advisor_dir))
 
 
 def _pick_threshold(at, backend, default):

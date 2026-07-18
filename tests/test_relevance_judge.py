@@ -39,7 +39,7 @@ def test_judge_parses_digit_0(monkeypatch):
 
 def _capture_prompt(monkeypatch):
     seen = {}
-    def fake_generate(prompt, model=None, temperature=0.1, timeout=120):
+    def fake_generate(prompt, model=None, temperature=0.1, timeout=120, **kw):
         seen["prompt"] = prompt
         return "2"
     monkeypatch.setattr(llm_local, "generate", fake_generate)
@@ -282,7 +282,7 @@ def test_retrieval_eval_judged_single_query_known_rels(monkeypatch):
     passages = ["passage_high", "passage_low", "passage_mid"]
     score_map = {"passage_high": 3, "passage_low": 0, "passage_mid": 1}
 
-    def fake_generate(prompt, model=None, temperature=0.3, timeout=120):
+    def fake_generate(prompt, model=None, temperature=0.3, timeout=120, **kw):
         for text, score in score_map.items():
             if text in prompt:
                 return str(score)
@@ -340,7 +340,7 @@ def test_retrieval_eval_judged_two_queries_means(monkeypatch):
     call_seq = [3, 0, 1, 0, 2, 0]  # по одному per judge-вызов
     state = {"i": 0}
 
-    def fake_generate(prompt, model=None, temperature=0.3, timeout=120):
+    def fake_generate(prompt, model=None, temperature=0.3, timeout=120, **kw):
         val = call_seq[state["i"] % len(call_seq)]
         state["i"] += 1
         return str(val)

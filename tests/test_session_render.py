@@ -231,3 +231,12 @@ def test_theater_never_shows_fake_quote_but_keeps_source():
     w = render_widget(s)
     assert "verbatim" in w and "Prince" in w           # слова + источник-шёпот видны в театре
     assert 'class="eng"' in w                           # пилюля достоверности спрятана под капот
+
+
+def test_render_md_html_no_synthesis_no_keyerror():
+    # C3: canonical object без 'synthesis' (ход круглого стола) не должен ронять
+    # render_md/render_html через KeyError — секция «Синтез» опускается, как в render_widget.
+    s = {"question": "Q?", "opinions": [], "abstentions": []}  # нет 'synthesis'
+    md = render_md(s)
+    html = render_html(s)
+    assert "Синтез" not in md and "Синтез" not in html

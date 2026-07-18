@@ -108,7 +108,7 @@ def judge(query: str, passage: str, model=None, source=None) -> int:
         source_block = ""
     prompt = _JUDGE_PROMPT.format(query=query, passage=_sanitize_passage(passage),
                                   source_block=source_block)
-    response = llm_local.generate(prompt, model=model, temperature=0.1)
+    response = llm_local.generate(prompt, model=model, temperature=0.1, num_predict=4, allow_cloud=False)
     m = re.match(r"^\s*([0-3])\s*$", response.strip())
     if m:                                # строгий одиночный ответ по промпту
         return int(m.group(1))

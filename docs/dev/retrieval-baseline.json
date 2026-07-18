@@ -1,15 +1,90 @@
 {
-  "_note": "ПЛЕЙСХОЛДЕР. Baseline retrieval/abstention для блокирующего regression-гейта (спека 2026-07-18 узел 2, слой 2). Форма = docs/dev/moat-baseline.json. Числа ФИКСИРУЮТСЯ backend'ом: заполняется на semantic-машине владельца ритуалом слоя-3 (см. docs/dev/retrieval-regression-refresh.md), НЕ на lexical-CI (кросс-язык там degenerate). Пока advisors пуст — гейт нечего сравнивать (run_gate → ok). corpus_sha256 связывает числа с корпусом: рассинхрон = baseline stale = явный fail.",
   "meta": {
-    "backend": null,
-    "corpus_sha256": {},
-    "tolerance": {
-      "top1": 0.05,
-      "top3": 0.05,
-      "honest_abstain": 0.05,
-      "false_abstain": 0.05,
-      "auc": 0.05
+    "ts": "2026-07-18T10:37:40Z",
+    "backend": "semantic",
+    "corpus_sha256": {
+      "machiavelli": "6d5b1ebf223b19ec333cbfe27b151a90e501dd30326bdb76be2bd90b562b3528",
+      "marcus-aurelius": "4a4e0c6cad907946a1a19442658d00fed4a0a2513186633e95b962fef55f4beb",
+      "sun-tzu": "696afa88cd2da578ae8be16de9dcff9b92d737c464d191738473e910b821f1fc"
     }
   },
-  "advisors": {}
+  "advisors": {
+    "machiavelli": {
+      "corpus_sha256": "6d5b1ebf223b19ec333cbfe27b151a90e501dd30326bdb76be2bd90b562b3528",
+      "strata": {
+        "ru": {
+          "n": 8,
+          "top1": 0,
+          "top3": 3,
+          "mean_top": 0.625,
+          "degenerate": false,
+          "thematic_inexact": false
+        },
+        "en": {
+          "n": 12,
+          "top1": 4,
+          "top3": 5,
+          "mean_top": 0.644,
+          "degenerate": false,
+          "thematic_inexact": false
+        },
+        "ooc": {
+          "ooc_n": 6,
+          "correct_abstain": 6,
+          "honest_abstain": 1.0,
+          "hallucinations": 0,
+          "ans_n": 8,
+          "false_abstain": 0,
+          "threshold": 0.5,
+          "false_abstain_rate": 0.0,
+          "auc": 1.0
+        }
+      }
+    },
+    "marcus-aurelius": {
+      "corpus_sha256": "4a4e0c6cad907946a1a19442658d00fed4a0a2513186633e95b962fef55f4beb",
+      "strata": {
+        "ru": {
+          "n": 6,
+          "top1": 0,
+          "top3": 0,
+          "mean_top": 0.584,
+          "degenerate": false,
+          "thematic_inexact": true
+        },
+        "en": {
+          "n": 12,
+          "top1": 5,
+          "top3": 7,
+          "mean_top": 0.622,
+          "degenerate": false,
+          "thematic_inexact": false
+        },
+        "ooc": {
+          "ooc_n": 6,
+          "correct_abstain": 6,
+          "honest_abstain": 1.0,
+          "hallucinations": 0,
+          "ans_n": 6,
+          "false_abstain": 0,
+          "threshold": 0.5,
+          "false_abstain_rate": 0.0,
+          "auc": 1.0
+        }
+      }
+    },
+    "sun-tzu": {
+      "corpus_sha256": "696afa88cd2da578ae8be16de9dcff9b92d737c464d191738473e910b821f1fc",
+      "strata": {
+        "en": {
+          "n": 12,
+          "top1": 12,
+          "top3": 12,
+          "mean_top": 0.705,
+          "degenerate": false,
+          "thematic_inexact": false
+        }
+      }
+    }
+  }
 }

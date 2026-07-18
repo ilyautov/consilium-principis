@@ -36,6 +36,15 @@ def check_skill_installed(skills_home=None):
                       else f"Consilium не найден в {home} (запусти install.py, либо работаешь in-place из репо)"}
 
 
+def check_response_language():
+    # Диагностика: какой язык ответа зафиксирован env CONSILIUM_LANG. advisory — режим auto
+    # (умолчание) полностью рабочий, чек не роняет здоровье.
+    val = (os.getenv("CONSILIUM_LANG") or "").strip().lower()
+    mode = val if val in ("en", "ru") else "auto"
+    return {"name": "response-language", "ok": True, "advisory": True,
+            "detail": f"{mode} (CONSILIUM_LANG)"}
+
+
 def check_tier():
     try:
         from engine.semantic import SemanticEngine
@@ -252,7 +261,8 @@ def summarize(checks):
 def run_doctor(root="."):
     """Полный health-check. Контур тестируем на первом советнике с корпусом."""
     from corpusbuild.paths import corpus_path
-    checks = [check_python(), check_skill_installed(), check_tier(), check_judge(),
+    checks = [check_python(), check_skill_installed(), check_response_language(),
+              check_tier(), check_judge(),
               check_calibration(root), check_gov_anchors(root), check_corpus_tiering(root)]
     adv_root = os.path.join(root, "advisors")
     tested = False

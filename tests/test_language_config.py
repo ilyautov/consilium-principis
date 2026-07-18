@@ -83,3 +83,20 @@ def test_guard_not_asleep_force_blocks_are_nonempty_and_distinct():  # G5
     ru = _response_language_directive("ru")
     assert len(en.strip()) > 40 and len(ru.strip()) > 40, "форс-блок схлопнулся до пустого"
     assert en != ru, "EN и RU блоки совпали — один из них потерян"
+
+
+def test_doctor_reports_language_mode(monkeypatch):
+    import doctor
+    monkeypatch.setenv("CONSILIUM_LANG", "en")
+    c = doctor.check_response_language()
+    assert c["name"] == "response-language"
+    assert c["ok"] is True and c.get("advisory") is True   # диагностика, не блокирует здоровье
+    assert "en" in c["detail"] and "CONSILIUM_LANG" in c["detail"]
+
+
+def test_doctor_language_mode_defaults_to_auto(monkeypatch):
+    import doctor
+    monkeypatch.delenv("CONSILIUM_LANG", raising=False)
+    assert "auto" in doctor.check_response_language()["detail"]
+    monkeypatch.setenv("CONSILIUM_LANG", "xyz")             # мусор → auto (как в directive)
+    assert "auto" in doctor.check_response_language()["detail"]

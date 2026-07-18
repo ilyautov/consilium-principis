@@ -50,9 +50,14 @@
 2. Запусти установщик:
    - **macOS:** двойной клик [`install.command`](install.command) (первый раз: правый клик → «Открыть»);
    - **Windows:** двойной клик [`install.bat`](install.bat);
-   - **терминал:** `python3 install.py`
+   - **терминал:** `python3 install.py` (**Windows:** `py install.py` — см. нюанс ниже)
 3. Установщик скопирует скилл в `~/.claude/skills/`, определит тир и **сам прогонит самопроверку**.
    Перезапусти Claude Code и скажи **«с чего начать»**.
+
+> **Windows-нюанс.** python.org кладёт `py.exe` и `python.exe`, но **не** `python3.exe` (а `python3.exe`
+> из Microsoft Store — заглушка, открывает магазин вместо запуска). Поэтому в терминале зови `py`, а не
+> `python3`. Двойной клик `install.bat` и mcpb-бандл это уже учитывают. Если плагин в Claude Code не
+> находит Python — поставь `CONSILIUM_PYTHON=py` в окружении перед запуском.
 
 ---
 

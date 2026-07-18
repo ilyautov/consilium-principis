@@ -19,7 +19,13 @@
     "entry_point": "scripts/mcp_server.py",
     "mcp_config": {
       "command": "python3",
-      "args": ["${__dirname}/scripts/mcp_server.py"]
+      "args": ["${__dirname}/scripts/mcp_server.py"],
+      "platform_overrides": {
+        "win32": {
+          "command": "py",
+          "args": ["-3", "${__dirname}/scripts/mcp_server.py"]
+        }
+      }
     }
   }
 }

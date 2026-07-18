@@ -2197,6 +2197,36 @@ language of your answer.
 """ % _FEWSHOT_TEXT
 
 
+# Форс-блоки языка ответа (выключатель CONSILIUM_LANG). Дописываются ПОСЛЕ en_bottom, поэтому
+# «фиксация» перекрывает «язык вопроса» позиционно. Оба несут клаузу подчинения Правилу 0 —
+# фиксация языка НЕ ослабляет безопасность/fail-closed.
+_LANG_DIRECTIVE_EN = """
+
+
+RESPONSE LANGUAGE OVERRIDE (never overrides Rule 0): the user has configured English output.
+Answer ENTIRELY in English — headings, tier labels, service lines — regardless of the language
+of any individual question. This overrides the "language of the question" rule above."""
+
+_LANG_DIRECTIVE_RU = """
+
+
+ЯЗЫК ОТВЕТА — ФИКСАЦИЯ (не перекрывает Правило 0): пользователь настроил русский вывод.
+Отвечай ЦЕЛИКОМ по-русски — заголовки, лейблы тиров, служебные строки — независимо от языка
+отдельного вопроса. Это перекрывает правило «язык вопроса» выше."""
+
+
+def _response_language_directive(lang):
+    """Форс-блок языка ответа по CONSILIUM_LANG. en → английский форс, ru → русский; auto/пусто/
+    любой мусор → '' (базовый en_bottom сам подстроится под язык вопроса). Fail-safe: неизвестное
+    значение НЕ роняет сервер и не инжектит мусор."""
+    norm = (lang or "").strip().lower()
+    if norm == "en":
+        return _LANG_DIRECTIVE_EN
+    if norm == "ru":
+        return _LANG_DIRECTIVE_RU
+    return ""
+
+
 def _handle_rpc(msg):
     """JSON-RPC запрос → ответ (или None для нотификаций). Реализует initialize/tools.*"""
     method, req_id = msg.get("method"), msg.get("id")

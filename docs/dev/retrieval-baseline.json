@@ -1,0 +1,15 @@
+{
+  "_note": "ПЛЕЙСХОЛДЕР. Baseline retrieval/abstention для блокирующего regression-гейта (спека 2026-07-18 узел 2, слой 2). Форма = docs/dev/moat-baseline.json. Числа ФИКСИРУЮТСЯ backend'ом: заполняется на semantic-машине владельца ритуалом слоя-3 (см. docs/dev/retrieval-regression-refresh.md), НЕ на lexical-CI (кросс-язык там degenerate). Пока advisors пуст — гейт нечего сравнивать (run_gate → ok). corpus_sha256 связывает числа с корпусом: рассинхрон = baseline stale = явный fail.",
+  "meta": {
+    "backend": null,
+    "corpus_sha256": {},
+    "tolerance": {
+      "top1": 0.05,
+      "top3": 0.05,
+      "honest_abstain": 0.05,
+      "false_abstain": 0.05,
+      "auc": 0.05
+    }
+  },
+  "advisors": {}
+}

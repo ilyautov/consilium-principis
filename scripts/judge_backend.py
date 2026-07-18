@@ -13,14 +13,18 @@
            а оценки логируются (аудит-трейл). Двухфазный протокол — mcp_server.
 
 Резолюция (конфиг board_config.json → relevance_gate.judge_backend, дефолт auto):
-  auto   : api-ключ есть → api; иначе ollama жив → ollama; иначе host.
+  auto   : ollama жив → ollama; иначе host. НИКОГДА не уходит в облако молча,
+           даже если api-ключ есть в env. Приватность вопроса юзера важнее
+           независимости судьи: облако = данные уходят провайдеру, а это выбор,
+           а не умолчание (был обратный дефолт до 2026-07-18; см. ниже).
   явный  : выбранный уровень, с fail-closed деградацией ВНИЗ по независимости
            api → ollama → host. host — пол иерархии: его собственный fail-closed
            (нет вердикта / кривой nonce) = 🟡, т.е. цепочка спеки «выбранный →
            ollama → 🟡» заканчивается в host-протоколе, который сам кончается 🟡.
+           judge_backend="api" в конфиге = ЯВНОЕ согласие на облако (opt-in).
   env    : CONSILIUM_JUDGE_BACKEND=host|ollama|api — ЖЁСТКИЙ пин без пробинга
-           (dev/тесты; тест-сьют пинит ollama, чтобы легаси-контракт single-phase
-           оставался покрыт — см. tests/conftest.py).
+           (dev/тесты; api-пин = явное согласие; тест-сьют пинит ollama, чтобы
+           легаси-контракт single-phase оставался покрыт — см. tests/conftest.py).
 
 Семантика для протокола: host → двухфазное судейство (cite отдаёт judgment_request,
 хост зовёт gate_verdict); ollama/api → single-phase, сервер судит сам, поведение
@@ -56,14 +60,17 @@ def resolve(advisor_dir=None) -> str:
     env-пин пробинг обходит целиком → в тестах сети нет."""
     pin = os.getenv(ENV_PIN, "").strip().lower()
     if pin in VALID_BACKENDS:
-        return pin
+        return pin                                     # env-пин = явное согласие (включая api)
     import llm_local
     choice = configured(advisor_dir)
     if choice == "host":
         return "host"
-    if choice in ("api", "auto") and llm_local.api_available():
+    # Облако (api) — ТОЛЬКО по явному выбору (config judge_backend="api" или env-пин).
+    # auto НИКОГДА не уходит в облако молча, даже при наличии ключа: приватность вопроса
+    # юзера > независимости судьи. api остаётся в одну строку конфига (opt-in).
+    if choice == "api" and llm_local.api_available():
         return "api"
-    if llm_local.available():                          # api/auto деградируют сюда; ollama — прямой
+    if llm_local.available():                          # auto / api-без-ключа / ollama деградируют сюда
         return "ollama"
     return "host"                                      # пол: self-check с решением в коде
 

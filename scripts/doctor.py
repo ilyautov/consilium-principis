@@ -67,6 +67,23 @@ def check_judge():
         return {"name": "judge", "ok": True, "detail": f"судья релевантности: не определён ({e})"}
 
 
+def check_ollama_endpoint():
+    """Приватность: если OLLAMA_HOST указывает НЕ на loopback, вопросы/пассажи уходят на
+    удалённую машину. Это легитимная возможность (BYOK-догфуд на реальном железе) → advisory,
+    не болезнь (ok=True); но юзер должен ВИДЕТЬ, что данные покидают машину."""
+    try:
+        import llm_local
+        from urllib.parse import urlparse
+        host = (urlparse(getattr(llm_local, "OLLAMA", "")).hostname or "").lower()
+        loopback = host in ("localhost", "::1", "") or host.startswith("127.")
+        detail = (f"loopback ({host or 'localhost'}) — данные не покидают машину" if loopback
+                  else f"⚠ НЕ loopback ({host}) — вопросы/пассажи уходят на удалённый хост")
+        return {"name": "ollama-endpoint", "ok": True, "advisory": True, "detail": detail}
+    except Exception as e:                             # диагностика не должна ронять doctor
+        return {"name": "ollama-endpoint", "ok": True, "advisory": True,
+                "detail": f"эндпоинт не определён ({e})"}
+
+
 def check_calibration(root="."):
     """§3.2 moat-v2: per-advisor флаг автокалибровки порогов (build/calibration.json,
     пишет calibrate_advisor.py). «Не калиброван» — НЕ болезнь (глобальные дефолты
@@ -262,7 +279,7 @@ def run_doctor(root="."):
     """Полный health-check. Контур тестируем на первом советнике с корпусом."""
     from corpusbuild.paths import corpus_path
     checks = [check_python(), check_skill_installed(), check_response_language(),
-              check_tier(), check_judge(),
+              check_tier(), check_judge(), check_ollama_endpoint(),
               check_calibration(root), check_gov_anchors(root), check_corpus_tiering(root)]
     adv_root = os.path.join(root, "advisors")
     tested = False

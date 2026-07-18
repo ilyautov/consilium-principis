@@ -5,7 +5,8 @@
   api    — независимый облачный (ключ в env; данные уходят провайдеру — честно в лейбле);
   ollama — независимый локальный;
   host   — self-check: судит сам хост (заинтересованная сторона), РЕШЕНИЕ остаётся в коде.
-auto (дефолт): api-ключ есть → api; иначе ollama жив → ollama; иначе host.
+auto (дефолт): ollama жив → ollama; иначе host. НИКОГДА не облако молча (privacy 2026-07-18).
+Облако (api) — только по ЯВНОМУ выбору: judge_backend="api" в конфиге или env-пин = согласие.
 Явный выбор деградирует по цепочке api → ollama → host (host — пол: его fail-closed = 🟡).
 Env-пин CONSILIUM_JUDGE_BACKEND — жёсткий (без пробинга): dev/тесты.
 
@@ -44,15 +45,18 @@ def _cfg(monkeypatch, tmp_path, judge=None, extra=None):
 
 
 # ── матрица auto-резолюции: (api-ключ × ollama) ──
+# ВАЖНО (privacy, 2026-07-18): auto НИКОГДА не уходит в облако молча, даже при наличии
+# api-ключа. Облако = данные уходят провайдеру, а это ЯВНЫЙ выбор (config judge_backend=api
+# / env-пин), не умолчание. До этой правки auto+ключ → api; реверс осознанный.
 
-def test_auto_api_key_present_resolves_api(monkeypatch):
+def test_auto_never_clouds_prefers_ollama_even_with_key(monkeypatch):
     _avail(monkeypatch, api=True, ollama=True)
-    assert judge_backend.resolve() == "api"            # ключ есть → api, ollama не важен
+    assert judge_backend.resolve() == "ollama"         # ключ есть, но auto не клауди → локальный ollama
 
 
-def test_auto_api_key_only_resolves_api(monkeypatch):
+def test_auto_key_but_ollama_down_resolves_host_not_cloud(monkeypatch):
     _avail(monkeypatch, api=True, ollama=False)
-    assert judge_backend.resolve() == "api"
+    assert judge_backend.resolve() == "host"           # ключ есть, ollama нет → host (пол), НЕ облако
 
 
 def test_auto_no_key_ollama_up_resolves_ollama(monkeypatch):
@@ -66,6 +70,12 @@ def test_auto_nothing_available_resolves_host(monkeypatch):
 
 
 # ── явный конфиг + деградация api → ollama → host ──
+
+def test_explicit_api_with_key_resolves_api(monkeypatch, tmp_path):
+    _avail(monkeypatch, api=True, ollama=True)
+    _cfg(monkeypatch, tmp_path, judge="api")
+    assert judge_backend.resolve() == "api"            # ЯВНЫЙ judge_backend=api = согласие на облако
+
 
 def test_explicit_host_wins_even_with_judges_available(monkeypatch, tmp_path):
     _avail(monkeypatch, api=True, ollama=True)
@@ -130,7 +140,7 @@ def test_info_labels_are_honest(monkeypatch):
     assert i["backend"] == "ollama" and i["independence"] == "independent-local"
     assert "локальн" in i["label"]
 
-    _avail(monkeypatch, api=True, ollama=True)
+    monkeypatch.setenv(judge_backend.ENV_PIN, "api")   # облако — только по явному согласию (пин)
     i = judge_backend.info()
     assert i["backend"] == "api" and i["independence"] == "independent-cloud"
     assert "облако" in i["label"] and "провайдеру" in i["label"]
@@ -155,3 +165,23 @@ def test_doctor_shows_independent_labels(monkeypatch):
     assert "локальн" in _judge_check(run_doctor(ROOT)["checks"])["detail"]
     monkeypatch.setenv(judge_backend.ENV_PIN, "api")
     assert "облако" in _judge_check(run_doctor(ROOT)["checks"])["detail"]
+
+
+# ── doctor: приватность ollama-эндпоинта (advisory, не болезнь) ──
+
+def _ollama_check(checks):
+    return next(c for c in checks if c["name"] == "ollama-endpoint")
+
+
+def test_doctor_ollama_loopback_no_egress_warning(monkeypatch):
+    monkeypatch.setattr(llm_local, "OLLAMA", "http://127.0.0.1:11434")
+    c = _ollama_check(run_doctor(ROOT)["checks"])
+    assert c["ok"] is True and c.get("advisory") is True
+    assert "loopback" in c["detail"] and "не покидают" in c["detail"]
+
+
+def test_doctor_ollama_remote_warns_data_leaves_machine(monkeypatch):
+    monkeypatch.setattr(llm_local, "OLLAMA", "http://192.168.1.50:11434")
+    c = _ollama_check(run_doctor(ROOT)["checks"])
+    assert c["ok"] is True and c.get("advisory") is True   # легитимная возможность → не болезнь
+    assert "НЕ loopback" in c["detail"] and "удалённ" in c["detail"]

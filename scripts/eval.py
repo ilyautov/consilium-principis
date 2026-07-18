@@ -458,7 +458,13 @@ def _corpus_sha(adv_dir):
 
 
 def _retrieval_stratum(r):
-    return {"n": r["n"], "top1": r["top1"], "top3": r["top3"],
+    # top1/top3 — ДОЛИ (не счётчики): единый юнит с retrieval_regression.metrics_from_frozen
+    # и с tolerance (0.05 = 5 п.п.). n сохраняется → счётчик восстановим (top1*n). Слой-2 гейт
+    # сравнивает пересчитанные из замороженных хитов доли с этими — единицы обязаны совпадать.
+    n = r["n"] or 0
+    return {"n": r["n"],
+            "top1": (r["top1"] / n) if n else 0.0,
+            "top3": (r["top3"] / n) if n else 0.0,
             "mean_top": r["mean_top"], "degenerate": r["degenerate"],
             "thematic_inexact": r.get("thematic_inexact", False)}
 
@@ -510,6 +516,46 @@ def build_metrics(advisor_dirs, backend_label):
     return out
 
 
+def build_scores(advisor_dirs, backend_label):
+    """Слой 2 (продюсер замороженных фикстур): СЫРЫЕ поштучные хиты/скоры для входа
+    retrieval_regression.metrics_from_frozen. В отличие от build_metrics (ВЫХОД — уже
+    посчитанные доли), тут ВХОД гейта: per-question hit1/hit3 (bool) + ooc/ans max-скоры.
+    Гейт пересчитывает из них доли и сверяет с замороженным baseline (build_metrics) —
+    ловит регресс КОДА метрик на реальных числах, без сети в CI. НОЛЬ поведения контура:
+    только сериализация того, что уже считают retrieval_eval / collect_abstention_scores.
+    Требует живого движка (semantic-машина владельца) ровно как baseline."""
+    import datetime
+    out = {"meta": {"ts": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    "backend": backend_label},
+           "advisors": {}}
+    for p in advisor_dirs:
+        name = os.path.basename(p.rstrip("/"))
+        adv = {"corpus_sha256": _corpus_sha(p), "retrieval": {}}
+        for lang, key in ((None, "ru"), ("en", "en")):
+            r = retrieval_eval(p, lang=lang)
+            if not r:
+                continue
+            entry = {"hit1": [bool(d["hit1"]) for d in r["details"]],
+                     "hit3": [bool(d["hit3"]) for d in r["details"]]}
+            if r["degenerate"]:
+                entry["degenerate"] = True
+            adv["retrieval"][key] = entry
+        ooc_scores, ans_scores = collect_abstention_scores(p)
+        if ooc_scores and ans_scores:
+            adv["ooc_scores"] = ooc_scores
+            adv["ans_scores"] = ans_scores
+        if adv["retrieval"] or "ooc_scores" in adv:
+            out["advisors"][name] = adv
+    return out
+
+
+def _resolve_backend_label(paths):
+    """Единый ярлык бэкенда для --emit-metrics / --emit-scores (движок или тир)."""
+    if ENGINE_OK:
+        return _engine.resolve_engine(paths[0], prefer=os.getenv("EVAL_ENGINE")).name
+    return "full" if TIER_FULL else "lexical"
+
+
 def main(argv=None):
     import argparse
     ap = argparse.ArgumentParser(description="eval.py — харнесс точности и безопасности совета")
@@ -518,6 +564,8 @@ def main(argv=None):
                     help="форсить бэкенд (иначе resolved). Прокидывается в EVAL_ENGINE.")
     ap.add_argument("--emit-metrics", metavar="PATH", default=None,
                     help="записать стратифицированные метрики JSON (форма moat-baseline) и выйти")
+    ap.add_argument("--emit-scores", metavar="PATH", default=None,
+                    help="записать замороженные СЫРЫЕ хиты/скоры JSON (вход слой-2 гейта) и выйти")
     args = ap.parse_args(argv)
     if args.engine:
         os.environ["EVAL_ENGINE"] = args.engine
@@ -526,16 +574,20 @@ def main(argv=None):
         print("Дай папки советников: python eval.py advisors/munger ...", file=sys.stderr)
         sys.exit(1)
 
-    if args.emit_metrics:
-        if ENGINE_OK:
-            backend = _engine.resolve_engine(paths[0], prefer=os.getenv("EVAL_ENGINE")).name
-        else:
-            backend = "full" if TIER_FULL else "lexical"
-        metrics = build_metrics(paths, backend)
-        with open(args.emit_metrics, "w", encoding="utf-8") as f:
-            json.dump(metrics, f, ensure_ascii=False, indent=2)
-        print(f"metrics ({backend}, {len(metrics['advisors'])} советников) → {args.emit_metrics}",
-              file=sys.stderr)
+    if args.emit_metrics or args.emit_scores:
+        backend = _resolve_backend_label(paths)
+        if args.emit_metrics:
+            metrics = build_metrics(paths, backend)
+            with open(args.emit_metrics, "w", encoding="utf-8") as f:
+                json.dump(metrics, f, ensure_ascii=False, indent=2)
+            print(f"metrics ({backend}, {len(metrics['advisors'])} советников) → {args.emit_metrics}",
+                  file=sys.stderr)
+        if args.emit_scores:
+            scores = build_scores(paths, backend)
+            with open(args.emit_scores, "w", encoding="utf-8") as f:
+                json.dump(scores, f, ensure_ascii=False, indent=2)
+            print(f"scores ({backend}, {len(scores['advisors'])} советников) → {args.emit_scores}",
+                  file=sys.stderr)
         return
 
     print("=== FIDELITY — exact-match гейт (Correctness: заявленное 🔵/T1/T2 дословно в корпусе?) ===")

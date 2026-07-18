@@ -1,6 +1,6 @@
 {
   "meta": {
-    "ts": "2026-07-18T10:37:40Z",
+    "ts": "2026-07-18T11:06:49Z",
     "backend": "semantic",
     "corpus_sha256": {
       "machiavelli": "6d5b1ebf223b19ec333cbfe27b151a90e501dd30326bdb76be2bd90b562b3528",
@@ -14,16 +14,16 @@
       "strata": {
         "ru": {
           "n": 8,
-          "top1": 0,
-          "top3": 3,
+          "top1": 0.0,
+          "top3": 0.375,
           "mean_top": 0.625,
           "degenerate": false,
           "thematic_inexact": false
         },
         "en": {
           "n": 12,
-          "top1": 4,
-          "top3": 5,
+          "top1": 0.3333333333333333,
+          "top3": 0.4166666666666667,
           "mean_top": 0.644,
           "degenerate": false,
           "thematic_inexact": false
@@ -46,16 +46,16 @@
       "strata": {
         "ru": {
           "n": 6,
-          "top1": 0,
-          "top3": 0,
+          "top1": 0.0,
+          "top3": 0.0,
           "mean_top": 0.584,
           "degenerate": false,
           "thematic_inexact": true
         },
         "en": {
           "n": 12,
-          "top1": 5,
-          "top3": 7,
+          "top1": 0.4166666666666667,
+          "top3": 0.5833333333333334,
           "mean_top": 0.622,
           "degenerate": false,
           "thematic_inexact": false
@@ -78,8 +78,8 @@
       "strata": {
         "en": {
           "n": 12,
-          "top1": 12,
-          "top3": 12,
+          "top1": 1.0,
+          "top3": 1.0,
           "mean_top": 0.705,
           "degenerate": false,
           "thematic_inexact": false

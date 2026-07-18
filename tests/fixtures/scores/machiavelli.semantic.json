@@ -1,0 +1,83 @@
+{
+  "meta": {
+    "ts": "2026-07-18T11:07:07Z",
+    "backend": "semantic"
+  },
+  "advisors": {
+    "machiavelli": {
+      "corpus_sha256": "6d5b1ebf223b19ec333cbfe27b151a90e501dd30326bdb76be2bd90b562b3528",
+      "retrieval": {
+        "ru": {
+          "hit1": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "hit3": [
+            false,
+            false,
+            false,
+            false,
+            true,
+            true,
+            false,
+            true
+          ]
+        },
+        "en": {
+          "hit1": [
+            true,
+            false,
+            false,
+            false,
+            false,
+            true,
+            false,
+            true,
+            false,
+            true,
+            false,
+            false
+          ],
+          "hit3": [
+            true,
+            false,
+            false,
+            false,
+            false,
+            true,
+            false,
+            true,
+            false,
+            true,
+            true,
+            false
+          ]
+        }
+      },
+      "ooc_scores": [
+        0.439462274312973,
+        0.4483025372028351,
+        0.3772800862789154,
+        0.44884076714515686,
+        0.47050732374191284,
+        0.3775898218154907
+      ],
+      "ans_scores": [
+        0.688608705997467,
+        0.6103528738021851,
+        0.6582865715026855,
+        0.6155036687850952,
+        0.6136115789413452,
+        0.5789346694946289,
+        0.6480189561843872,
+        0.5899497270584106
+      ]
+    }
+  }
+}

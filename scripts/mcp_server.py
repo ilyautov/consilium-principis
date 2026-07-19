@@ -215,6 +215,12 @@ def _validate_session_attribution(session):
 
 
 def _retrieve(query, advisor_dir, top_k=3):
+    # M7-refuted: retrieve/cite — синхронны НАМЕРЕННО (не джобы). Работают поверх УЖЕ
+    # собранного индекса; тяжёлая сборка вынесена в фоновый джоб build_advisor. Массовый
+    # (lexical) тир индекс не строит вовсе → всегда быстро. Единственная небыстрая ветка —
+    # ленивый семантический build в tier_full.retrieve при отсутствии индекса на FULL-тире,
+    # но нормальный поток строит индекс джобом build_advisor; джоббинг же cite/retrieve сломал
+    # бы inline-UX fidelity-гейта (хост обязан вызывать их в момент цитирования). Не конвертируем.
     import eval as _eval                     # ленивый импорт (тянет corpusbuild/engine)
     import relevance_gate
     import judge_backend
@@ -286,6 +292,7 @@ def _kernel_themes(advisor_dir, limit=6):
 
 _HOST_JUDGE_CAP = 12          # кап кандидатов хосту (top-N по primary-косинусу) — не раздуваем контекст
 _VERDICT_TTL_S = 900.0        # nonce живёт ~15 мин; single-use (pop на вердикте)
+_MAX_PENDING_VERDICTS = 256   # жёсткий кап поверх TTL: защита от роста в пределах TTL-окна (утечка памяти)
 _PENDING_VERDICTS = {}        # nonce -> состояние фазы 1 (в памяти процесса, как _JOBS)
 _VERDICT_LOCK = threading.Lock()
 
@@ -303,6 +310,14 @@ def _purge_expired_verdicts(now=None):
     now = time.time() if now is None else now
     for n in [n for n, st in _PENDING_VERDICTS.items() if st["ts"] + _VERDICT_TTL_S < now]:
         _PENDING_VERDICTS.pop(n, None)
+
+
+def _enforce_verdict_cap():
+    """Ограничить рост _PENDING_VERDICTS поверх TTL (всплеск cite в пределах TTL-окна иначе
+    раздувал бы память). FIFO по вставке = старейший nonce ближе всех к истечению → его и
+    выбрасываем. dict сохраняет порядок вставки. Зовётся под _VERDICT_LOCK."""
+    while len(_PENDING_VERDICTS) > _MAX_PENDING_VERDICTS:
+        _PENDING_VERDICTS.pop(next(iter(_PENDING_VERDICTS)), None)
 
 
 def _cite_result(ranked, lang_out):
@@ -383,6 +398,7 @@ def _host_judgment_phase1(adv_res, primary, ordered_cands, scores, gcfg, limit, 
                                     "rel_threshold": gcfg["rel_threshold"],
                                     "candidates": kept_state, "dropped": dropped,
                                     "lang": lang_out}
+        _enforce_verdict_cap()          # жёсткий кап поверх TTL (утечка памяти)
     out = dict(lang_out or {})
     out.update({
         "phase": "judgment_request", "nonce": nonce, "question": primary,
@@ -1619,6 +1635,19 @@ import threading
 _JOBS = {}
 _JOBS_LOCK = threading.Lock()
 _JOB_SEQ = [0]
+_MAX_JOBS = 256               # кап реестра: без него долгоживущий сервер = утечка памяти (реестр не чистится)
+
+
+def _evict_jobs_over_cap():
+    """Ограничить рост _JOBS. FIFO по возрасту (dict хранит порядок вставки), но НЕ
+    выбрасываем running-джоб, который вызывающий ещё может опрашивать: сперва самые старые
+    ТЕРМИНАЛЬНЫЕ (done/error), и лишь если терминальных нет — старейший вообще (крайне
+    маловероятно при 256). Зовётся под _JOBS_LOCK."""
+    while len(_JOBS) > _MAX_JOBS:
+        victim = next((k for k, j in _JOBS.items() if j["status"] != "running"), None)
+        if victim is None:
+            victim = next(iter(_JOBS))     # все running — жертвуем старейшим
+        _JOBS.pop(victim, None)
 
 
 def _start_job(fn, label):
@@ -1626,6 +1655,7 @@ def _start_job(fn, label):
         _JOB_SEQ[0] += 1
         jid = "job-%d" % _JOB_SEQ[0]
         _JOBS[jid] = {"status": "running", "label": label, "result": None, "error": None}
+        _evict_jobs_over_cap()             # кап реестра (утечка памяти)
 
     def _run():
         try:
@@ -2770,9 +2800,36 @@ def _handle_rpc(msg):
     return None
 
 
+_MAX_LINE = 10 * 1024 * 1024   # кап на одну JSON-RPC строку: без него патологически длинная
+                               # строка (нет '\n') буферизуется в память безгранично — DoS
+
+
+def _line_within_limit(line, max_len=_MAX_LINE):
+    """True, если stdio-строка в пределах капа. Чистая функция → юнит-тестируется без live-сервера."""
+    return len(line) <= max_len
+
+
 def _serve_stdio():
-    """Минимальный построчный JSON-RPC по stdio. Замена — официальный MCP SDK на тот же dispatch."""
-    for line in sys.stdin:
+    """Минимальный построчный JSON-RPC по stdio. Замена — официальный MCP SDK на тот же dispatch.
+
+    Читаем через readline(_MAX_LINE + 1): длинную строку НЕ буферизуем целиком — при переросте
+    капа дренируем остаток строки чанками и отвечаем JSON-RPC-ошибкой (id=null), не пытаясь
+    json-парсить гигабайты."""
+    stream = sys.stdin
+    while True:
+        line = stream.readline(_MAX_LINE + 1)
+        if line == "":                          # EOF
+            break
+        if not _line_within_limit(line):
+            while not line.endswith("\n"):      # дренируем хвост переросшей строки чанками
+                chunk = stream.readline(_MAX_LINE + 1)
+                if chunk == "":
+                    break
+                line = chunk
+            resp = _rpc_error(None, -32600, "сообщение превышает лимит размера (%d байт)" % _MAX_LINE)
+            sys.stdout.write(json.dumps(resp, ensure_ascii=False) + "\n")
+            sys.stdout.flush()
+            continue
         line = line.strip()
         if not line:
             continue

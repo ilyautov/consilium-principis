@@ -66,6 +66,24 @@
         "text_status": "public_domain",
         "consenter_circle": "exhausted"
       }
+    },
+    {
+      "id": "machiavelli",
+      "name": "Никколо Макиавелли",
+      "seat": "реалист власти / политика",
+      "lang": "en",
+      "source": {
+        "platform": "gutenberg",
+        "ref": "1232",
+        "edition": "The Prince (Il Principe), пер. W. K. Marriott 1908",
+        "url": "https://www.gutenberg.org/cache/epub/1232/pg1232.txt",
+        "pd_basis": "Project Gutenberg (US-PD)"
+      },
+      "rights": {
+        "death_year": 1527,
+        "text_status": "public_domain",
+        "consenter_circle": "exhausted"
+      }
     }
   ]
 }

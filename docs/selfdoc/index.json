@@ -3,7 +3,7 @@
     "tool_count": 60,
     "rule_count": 18,
     "recipe_count": 16,
-    "script_count": 73,
+    "script_count": 67,
     "test_count": 146,
     "glossary_count": 113
   },
@@ -1877,16 +1877,6 @@
       "doc": "decision_record.py — протокол заседания (board minutes) как канонический ВЫХОД совета."
     },
     {
-      "path": "scripts/diagnose_multiquery.py",
-      "subsystem": "other",
-      "doc": "Левер 2 замер: single hybrid (Левер 1) vs multi-query@N (сетка из линз → RRF)."
-    },
-    {
-      "path": "scripts/diagnose_retrieval.py",
-      "subsystem": "eval",
-      "doc": "Диагностика ретрива: РАНГ anchor'а в выдаче (не только top-1)."
-    },
-    {
       "path": "scripts/diversity_check.py",
       "subsystem": "diversity",
       "doc": "diversity_check.py — проверка ортогональности состава совета."
@@ -1900,26 +1890,6 @@
       "path": "scripts/eval.py",
       "subsystem": "eval",
       "doc": "eval.py — харнесс точности и безопасности совета (перенос логики Гефеста под fidelity)."
-    },
-    {
-      "path": "scripts/exp_bridge.py",
-      "subsystem": "other",
-      "doc": "Эксперимент A: добавляет ли русский Тарасов-мост recall P1-якорей над translate-query?"
-    },
-    {
-      "path": "scripts/exp_graph.py",
-      "subsystem": "other",
-      "doc": "Граф-валидация (L2.3.3): рёбра 'заземляет' (кернел→P1) не выдуманы — заземляющие пассажи кернела"
-    },
-    {
-      "path": "scripts/exp_kernels.py",
-      "subsystem": "other",
-      "doc": "L2-эксперимент: извлечь мета-идеи (кернелы) и провалидировать ФАЛЬСИФИЦИРУЕМО."
-    },
-    {
-      "path": "scripts/exp_kernels_finer.py",
-      "subsystem": "other",
-      "doc": "B: добить асимметрию Макиавелли (64% vs 91% Аврелия) — гетерогенному корпусу нужны тоньше кернелы?"
     },
     {
       "path": "scripts/extractor.py",

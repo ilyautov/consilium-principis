@@ -10,7 +10,7 @@
 Зовёт движок напрямую (resolve_engine prefer=...), top_k=20.
 """
 import sys, os, json
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # experiments/ → scripts/
 import eval as E
 import engine as ENG
 

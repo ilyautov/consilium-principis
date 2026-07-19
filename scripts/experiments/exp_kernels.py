@@ -16,7 +16,7 @@
 """
 import os, sys, json, re, urllib.request, math
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # experiments/ → scripts/
 from corpusbuild.paths import corpus_path
 from corpusbuild.kernel_extract import extract_kernels  # ядро вынесено в продакшн-модуль
 

@@ -12,7 +12,7 @@
 TODO: переписать на валидацию ЭНРИЧМЕНТ-рёбер (held-out предсказание), а не детерминир. заземления.
 """
 import os, sys, json, random
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # experiments/ → scripts/
 from corpusbuild import embed, ids, paths
 
 ADV = sys.argv[1] if len(sys.argv) > 1 else "advisors/machiavelli"

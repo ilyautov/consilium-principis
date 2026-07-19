@@ -48,6 +48,17 @@ try:
 except Exception:
     ENGINE_OK = False
 
+# Гейт верности eval'а ДЕЛЕГИРУЕТ проду: та же per-chunk формула, что энфорсит скилл
+# (MIN_QUOTE_WORDS≥3 + negation-crop guard + tier). Иначе eval над-репортит верность —
+# см. fidelity_eval. Импорт отдельный от ENGINE_OK: fidelity backend-независим (нужен лишь
+# corpus.jsonl), доступен даже когда семантический движок недоступен.
+try:
+    from engine.fidelity import best_match as _best_match
+    FIDELITY_OK = True
+except Exception:
+    _best_match = None
+    FIDELITY_OK = False
+
 # Fallback-дефолт ТОЛЬКО для случая, когда engine-пакет недоступен И в board_config нет порога.
 # Живой путь берёт порог per-backend из движка (semantic 0.50 / lexical 0.04). Калибровка 0.50.
 ABSTAIN_THRESHOLD_DEFAULT = 0.50
@@ -94,60 +105,80 @@ def parse_quote_bank(persona_path):
     return out
 
 
-def load_corpus_text(adv_dir):
+def _corpus_present(adv_dir):
+    """Загружен ли корпус (для метки corpus_loaded). Раньше это делал load_corpus_text
+    склейкой всех чанков — теперь верность считается per-chunk через best_match, поэтому
+    достаточно факта наличия файла corpus.jsonl."""
+    return os.path.isfile(corpus_path(adv_dir))
+
+
+def _fallback_verbatim_per_chunk(quote, adv_dir):
+    """СТРОГИЙ per-chunk fallback на случай, если engine.fidelity не импортировался
+    (FIDELITY_OK=False). Зеркалит ядро best_match: норм. + MIN_QUOTE_WORDS≥3 + подстрока
+    в ОДНОМ чанке (без склейки). Нет negation-crop guard'а прода — но всё равно НЕ мягче
+    прежней склейки-всех-чанков (не даёт матч на стыке чанков). Живой путь сюда не заходит:
+    fidelity backend-независим и обычно доступен."""
+    nq = norm(quote)
+    if len(nq.split()) < 3:
+        return False
     cj = corpus_path(adv_dir)
     if not os.path.isfile(cj):
-        return None
-    chunks = []
+        return False
     for line in open(cj, encoding="utf-8"):
         line = line.strip()
-        if line:
-            try:
-                chunks.append(json.loads(line).get("text", ""))
-            except Exception:
-                pass
-    return norm(" ".join(chunks))
+        if not line:
+            continue
+        try:
+            txt = json.loads(line).get("text", "")
+        except Exception:
+            continue
+        if nq in norm(txt):
+            return True
+    return False
 
 
-def verbatim_status(quote, corpus):
-    """exact-match гейт: 'full' = вся цитата дословно в корпусе; 'anchor' = только первые ~8 слов
-    (частичное/парафраз — НЕ 🔵); 'none' = нет."""
-    nq = norm(quote)
-    if not nq:
-        return "none"
-    if nq in corpus:
-        return "full"
-    anchor = " ".join(nq.split()[:8])
-    if anchor and anchor in corpus:
-        return "anchor"
-    return "none"
+def verbatim_ok(quote, adv_dir):
+    """Дословна ли цитата ПО ОДНОМУ чанку — РОВНО как энфорсит прод-гейт скилла.
+    Делегирует engine.fidelity.best_match (несёт Phase-2 гарды: MIN_QUOTE_WORDS≥3,
+    negation-crop guard, tier). eval меряет ИМЕННО то, что прод отвергает/пропускает."""
+    if FIDELITY_OK:
+        return _best_match(quote, adv_dir) is not None
+    return _fallback_verbatim_per_chunk(quote, adv_dir)
 
 
 def fidelity_eval(adv_dir):
+    """Гейт верности eval'а. ВЕРНОСТЬ здесь = РОВНО то, что энфорсит прод: дословный матч
+    цитаты ПО ОДНОМУ чанку через engine.fidelity.best_match. Раньше eval склеивал ВСЕ
+    чанки в один blob и проверял подстроку — это над-репортило верность: цитата на СТЫКЕ
+    соседних чанков (хвост A + голова B) проходила в eval как 'full', а прод-гейт
+    (per-chunk) её ОТВЕРГАЛ. Теперь eval делегирует best_match → eval НЕ мягче прода.
+
+    Бакет 'partial' (прежний якорь по первым ~8 словам в СКЛЕЙКЕ) УБРАН из логики: у
+    прод-гейта нет понятия частичного совпадения, а якорь-в-склейке был как раз СЛАБЕЕ
+    прода (мог увести фабрикацию из violations в partial). Ключ 'partial' сохранён в
+    результате (всегда []) для обратной совместимости формы. Любая заявленная-дословной
+    цитата, которую best_match не подтвердил → VIOLATION (бинарно, как прод)."""
     name = os.path.basename(adv_dir.rstrip("/"))
     quotes = parse_quote_bank(os.path.join(adv_dir, "persona.md"))
-    corpus = load_corpus_text(adv_dir)
+    corpus_loaded = _corpus_present(adv_dir)
     res = {
-        "name": name, "corpus_loaded": corpus is not None,
+        "name": name, "corpus_loaded": corpus_loaded,
         "grounded_total": 0, "grounded_ok": 0,
-        "violations": [],          # заявлено дословным, но НЕ verbatim → опасно
-        "partial": [],             # только anchor совпал → должно быть 🟡, не 🔵
+        "violations": [],          # заявлено дословным, но best_match не подтвердил → опасно
+        "partial": [],             # сохранён для формы; прод не знает 'partial' → всегда пуст
         "extrapolation": 0,        # 🟡/T3 — корректно не выданы как дословные
     }
-    if corpus is None:
+    if not corpus_loaded:
         res["grounded_total"] = sum(1 for lvl, _ in quotes if lvl != "extrapolation")
         return res
     for level, q in quotes:
         if level == "extrapolation":
             res["extrapolation"] += 1
             continue
-        # grounded или unknown (без маркера) → должны быть verbatim
+        # grounded или unknown (без маркера) → должны быть verbatim по ОДНОМУ чанку (как прод)
         res["grounded_total"] += 1
-        st = verbatim_status(q, corpus)
-        if st == "full":
+        if verbatim_ok(q, adv_dir):
             res["grounded_ok"] += 1
-        elif st == "anchor":
-            res["partial"].append(q[:70])
         else:
             res["violations"].append(q[:70])
     return res
@@ -489,7 +520,7 @@ def build_metrics(advisor_dirs, backend_label):
     ru / en / ooc + backend + per-advisor corpus_sha256 (связь метрик с корпусом; сравнение
     честно лишь при совпадении хэша). EN-стратум доезжает благодаря фиксу load_golden(.en)."""
     import datetime
-    out = {"meta": {"ts": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+    out = {"meta": {"ts": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
                     "backend": backend_label, "corpus_sha256": {}},
            "advisors": {}}
     for p in advisor_dirs:
@@ -525,7 +556,7 @@ def build_scores(advisor_dirs, backend_label):
     только сериализация того, что уже считают retrieval_eval / collect_abstention_scores.
     Требует живого движка (semantic-машина владельца) ровно как baseline."""
     import datetime
-    out = {"meta": {"ts": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+    out = {"meta": {"ts": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
                     "backend": backend_label},
            "advisors": {}}
     for p in advisor_dirs:

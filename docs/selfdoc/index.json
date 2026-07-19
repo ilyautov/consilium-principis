@@ -4,7 +4,7 @@
     "rule_count": 18,
     "recipe_count": 16,
     "script_count": 67,
-    "test_count": 148,
+    "test_count": 150,
     "glossary_count": 113
   },
   "tools": [
@@ -1639,7 +1639,7 @@
         "дрейфую ли",
         "сверь с моими словами"
       ],
-      "does": "Отражу разрыв между тем, что ты заявляешь, и что выбираешь на деле — без советов, just покажу.",
+      "does": "Отражу разрыв между тем, что ты заявляешь, и что выбираешь на деле — без советов, просто покажу.",
       "reads": "Это инструмент видеть дрейф, не приговор. Решаешь ты."
     },
     {
@@ -2406,6 +2406,10 @@
       "covers": "fidelity tiers"
     },
     {
+      "path": "tests/test_gate_simple_tier_inert.py",
+      "covers": "gate simple tier inert"
+    },
+    {
       "path": "tests/test_gen_selfdoc.py",
       "covers": "gen selfdoc"
     },
@@ -2516,6 +2520,10 @@
     {
       "path": "tests/test_mcp_server.py",
       "covers": "mcp server"
+    },
+    {
+      "path": "tests/test_mcp_server_bounds.py",
+      "covers": "mcp server bounds"
     },
     {
       "path": "tests/test_mirror.py",

@@ -590,7 +590,19 @@ def _config_get(key=None):
 
 def _config_set(key, value):
     """Записать ключ в board_config.json (тюнинг из хоста). Persistent change — хост обязан
-    подтвердить у юзера ПЕРЕД вызовом (см. правила)."""
+    подтвердить у юзера ПЕРЕД вызовом (см. правила).
+
+    Moat-guard (M7): числовые ключи валидируются ПЕРЕД записью — иначе abstain_threshold=0
+    тихо отключил бы весь ров воздержания, а hybrid_alpha вне [0,1] сломал бы смешивание.
+    Невалидное значение отвергается fail-closed: файл НЕ трогается."""
+    from decision_map import _is_number  # тот же числовой гейт (конечный, не bool)
+    if key == "abstain_threshold" and not (_is_number(value) and 0.0 < value < 1.0):
+        return {"key": key, "rejected": value,
+                "error": "abstain_threshold должен быть числом в диапазоне (0, 1) не включая края "
+                         "(0 или ниже отключает воздержание, 1 запрещает любой ответ)."}
+    if key == "hybrid_alpha" and not (_is_number(value) and 0.0 <= value <= 1.0):
+        return {"key": key, "rejected": value,
+                "error": "hybrid_alpha должен быть числом в диапазоне [0, 1] включительно."}
     p = _config_path()
     try:
         cfg = json.load(open(p, encoding="utf-8"))

@@ -4,14 +4,15 @@ install.py — поставить скилл personal-board (Consilium) в ~/.cl
 где Claude Code обнаруживает пользовательские скиллы.
 
 Что делает (ничего не ломает, повторный запуск безопасен):
-  1. копирует МАШИНЕРИЮ (SKILL.md, scripts/, QUICKSTART.md, council/, assets/) + грунтованный
+  1. копирует МАШИНЕРИЮ (SKILL.md, scripts/, QUICKSTART.md, assets/) + грунтованный
      контент из коробки (lenses/ = Сунь-цзы 🔵-линза, gov_heads.json = якорь целостности)
      в каноническое место — обновляет, НЕ удаляя твою доску;
-  2. определяет тир (есть ollama bge-m3 → FULL, иначе пол) и гонит board_init;
+  2. определяет тир (есть ollama bge-m3 → FULL, иначе пол) и гонит board_init
+     (он же заводит council/ с нуля — приватную папку решений мы НЕ копируем);
   3. пишет breadcrumb last_install.json (без секретов).
 
 ТВОЯ ДОСКА = user-data, НИКОГДА не затирается переустановкой:
-  advisors/ (кроме README), board_config.json, data/, scripts/golden/.
+  advisors/ (кроме README), board_config.json, data/, scripts/golden/, council/ (приватные решения).
 
 Примеры:
   python3 install.py                 # поставить в ~/.claude/skills/consilium-principis
@@ -35,7 +36,7 @@ SKILLS_HOME = Path.home() / ".claude" / "skills"
 # онбординг покрыт README/QUICKSTART + тулами board_status/doctor/seed_council/setup_full.
 # catalog/ — указатели PD-фигур (pd_figures.json) для catalog_add/search/preview: без него
 # эти тулы на установленном скилле бьют по несуществующему файлу.
-RUNTIME = ["SKILL.md", "QUICKSTART.md", "recipes.json", "scripts", "council", "assets",
+RUNTIME = ["SKILL.md", "QUICKSTART.md", "recipes.json", "scripts", "assets",
            "lenses", "gov_heads.json", "catalog"]
 # golden = per-advisor user-data; build = тяжёлые регенерируемые артефакты (эмбеддинги/индексы линз —
 # шипуем только PD-исходник corpus.jsonl + manifest, не производное).
@@ -131,8 +132,14 @@ def main() -> None:
             print("   FULL-тир (умный кросс-язычный поиск) — по желанию: `python3 scripts/board.py setup-full`")
             print("   (контур 🔵 и совет работают и без него, на полу)")
     sys.stdout.flush()
-    subprocess.run([sys.executable, "scripts/board_init.py", "advisors",
-                    "--semantic-available", "true" if semantic else "false"], cwd=dest)
+    init = subprocess.run([sys.executable, "scripts/board_init.py", "advisors",
+                           "--semantic-available", "true" if semantic else "false"], cwd=dest)
+    if init.returncode != 0:
+        # board_init = ЯДРО установки. Упал → доска не инициализирована; молчаливый «✅ Готово»
+        # выдал бы сломанную установку за успех. Fail-closed: честная ошибка + ненулевой выход.
+        print(f"\n❌ board_init упал (код {init.returncode}) — установка не завершена. "
+              f"Проверь вывод выше и запусти повторно.", file=sys.stderr)
+        sys.exit(1)
     write_breadcrumb(dest, semantic)
 
     print("\n🔎 Самопроверка:")

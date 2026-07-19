@@ -4,7 +4,7 @@
     "rule_count": 18,
     "recipe_count": 16,
     "script_count": 73,
-    "test_count": 143,
+    "test_count": 145,
     "glossary_count": 113
   },
   "tools": [
@@ -2224,6 +2224,10 @@
       "covers": "cite early exit"
     },
     {
+      "path": "tests/test_config_set.py",
+      "covers": "config set"
+    },
+    {
       "path": "tests/test_corpus_chunk.py",
       "covers": "corpus chunk"
     },
@@ -2462,6 +2466,10 @@
     {
       "path": "tests/test_ingest_telegram.py",
       "covers": "ingest telegram"
+    },
+    {
+      "path": "tests/test_install.py",
+      "covers": "install"
     },
     {
       "path": "tests/test_install_runtime.py",

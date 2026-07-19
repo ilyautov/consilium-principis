@@ -121,7 +121,7 @@ separates a decision tool from "roleplay a sage": every claim can be re-checked.
 | 📐 | **calculation**: your own numbers, run through Monte Carlo; not truth, not a quote, just your own model run N times |
 | *abstention* | question outside the corpus → the advisor **stays silent instead of making things up** |
 
-Plus **different lenses, not a chorus**: each advisor keeps their own angle, and their disagreement is a working part, not a bug (you see the decision from sides you'd otherwise collapse into one). The contour runs on any machine, no internet, no keys, no cost. Only search precision can get weaker; honesty never does. Under the hood, honesty is held up by a two-phase relevance gate (a model judges the candidates, code applies the threshold): topically-close-but-not-actually-answering material won't slip through as 🔵.
+Plus **different lenses, not a chorus**: each advisor keeps their own angle, and their disagreement is a working part, not a bug (you see the decision from sides you'd otherwise collapse into one). The contour runs on any machine, no internet, no keys, no cost. Only search precision can get weaker; honesty never does. Under the hood, honesty is held up by a two-phase relevance gate (a model judges the candidates, code applies the threshold): topically-close-but-not-actually-answering material won't slip through as 🔵. The judge is *independent* only with a local (ollama) or API backend; on the default keys-free path the host model self-judges (an interested party), which `doctor` labels honestly — and the verbatim 🔵 gate never depends on it.
 
 ## Calculate, not just discuss: the 📐 decision map
 

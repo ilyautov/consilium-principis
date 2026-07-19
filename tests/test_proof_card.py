@@ -1,7 +1,16 @@
 """proof_card — карточка ОДНОЙ 🔵-verbatim-цитаты (виирал-ассет). Fail-closed: не 🔵 → нет карточки."""
 import os, sys, json
+import pytest
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "scripts"))
+
+
+@pytest.fixture(autouse=True)
+def _clamp_root_at_tmp(monkeypatch, tmp_path):
+    """H5 read-гард клампит advisor_dir корнем репо; синтетический корпус лежит под tmp_path,
+    значит _root надо навести на tmp_path, иначе abs-путь честно отвергается как вне корня."""
+    import mcp_server
+    monkeypatch.setattr(mcp_server, "_root", lambda: str(tmp_path))
 
 
 def _make_advisor(tmp_path, chunks):

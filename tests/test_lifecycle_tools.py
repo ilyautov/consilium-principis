@@ -224,6 +224,7 @@ def test_resolve_under_root_edges(monkeypatch, tmp_path):
 
 
 def test_embed_batch_rejects_count_mismatch(monkeypatch):
+    pytest.importorskip("numpy")   # H8: tier_full тянет numpy транзитивно → SKIP без numpy
     import tier_full
     class _Resp:
         def __init__(self, p): self._p = p
@@ -239,6 +240,7 @@ def test_embed_batch_rejects_count_mismatch(monkeypatch):
 
 
 def test_embed_batch_happy_path(monkeypatch):
+    pytest.importorskip("numpy")   # H8: tier_full тянет numpy транзитивно → SKIP без numpy
     import tier_full
     class _Resp:
         def __init__(self, p): self._p = p

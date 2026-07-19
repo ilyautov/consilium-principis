@@ -11,10 +11,20 @@ import subprocess
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts", "experiments"))
+import pytest  # noqa: E402
 import citation_rate_eval as E  # noqa: E402
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
 KNOWN_TEXT = "it is safer to be feared than loved when one of the two must be lacking"
+
+
+@pytest.fixture(autouse=True)
+def _clamp_root_at_tmp(monkeypatch, tmp_path):
+    """H5 read-гард в mcp_server._fidelity_check клампит advisor_dir корнем; синтетический
+    корпус score_claims строит под tmp_path (adv=str(tmp_path)) → наводим _root на tmp_path,
+    иначе гейт честно отвергает abs-путь как вне корня и всё уходит в 🟡."""
+    import mcp_server
+    monkeypatch.setattr(mcp_server, "_root", lambda: str(tmp_path))
 
 
 def _mk_corpus(adv):

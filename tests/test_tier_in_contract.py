@@ -41,6 +41,8 @@ def test_positional_construction_still_works():
 # --- tier_full.retrieve: точка, где тир умирал ---
 
 def _index(tmp_path, monkeypatch, passages, advisor_dir="/tmp/adv"):
+    import pytest
+    pytest.importorskip("numpy")   # H8: без numpy эти retrieve-тесты SKIP (Passage-контракт-тесты выше — stdlib)
     import numpy as np
     import tier_full
     emb = str(tmp_path / "e.npy")

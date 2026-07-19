@@ -32,9 +32,13 @@ def _pool(n, start=0.95, step=0.02):
 
 
 @pytest.fixture(autouse=True)
-def _host_mode(monkeypatch):
-    """Переопределяем сьютовый пин: здесь тестируем host-режим. Nonce-стейт чистим."""
+def _host_mode(monkeypatch, tmp_path):
+    """Переопределяем сьютовый пин: здесь тестируем host-режим. Nonce-стейт чистим.
+    H5: _cite/_retrieve клампят advisor_dir корнем репо; синтетический советник — под tmp_path
+    (host_env: str(tmp_path/'adv')), значит _root наводим на tmp_path, иначе abs-путь отвергается
+    как вне корня и _cite отдаёт пустой 🟡 ещё до мока retrieve."""
     monkeypatch.setenv("CONSILIUM_JUDGE_BACKEND", "host")
+    monkeypatch.setattr(mcp_server, "_root", lambda: str(tmp_path))
     mcp_server._PENDING_VERDICTS.clear()
     yield
     mcp_server._PENDING_VERDICTS.clear()

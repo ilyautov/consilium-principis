@@ -5,11 +5,21 @@ import os
 import sys
 import json
 
+import pytest
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "scripts"))
 
 from federation.queue import SqliteBackend
 from mcp_server import _fidelity_check
+
+
+@pytest.fixture(autouse=True)
+def _clamp_root_at_tmp(monkeypatch, tmp_path):
+    """H5 read-гард клампит advisor_dir корнем репо; tmp-корпуса лежат под tmp_path →
+    наводим _root на tmp_path, иначе реальный гейт отвергает abs-пути как вне корня."""
+    import mcp_server
+    monkeypatch.setattr(mcp_server, "_root", lambda: str(tmp_path))
 
 
 def _make_advisor(tmp_path, chunks, name="adv"):

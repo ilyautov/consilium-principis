@@ -3,8 +3,18 @@
 = дрейф рва. Теперь один marker_status() в fidelity.py, оба вызова делегируют."""
 import os
 import sys
+import pytest
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "scripts"))
+
+
+@pytest.fixture(autouse=True)
+def _clamp_root_at_tmp(monkeypatch, tmp_path):
+    """H5 read-гард клампит advisor_dir у mcp_server._fidelity_check корнем; синтетический корпус
+    под tmp_path → наводим _root на tmp_path. Прямые вызовы engine.marker_status клампинга не
+    касаются (не через mcp_server) — на них фикстура не влияет."""
+    import mcp_server
+    monkeypatch.setattr(mcp_server, "_root", lambda: str(tmp_path))
 
 
 def _corpus(tmp_path, text, tier="P1"):

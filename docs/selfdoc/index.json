@@ -4,7 +4,7 @@
     "rule_count": 18,
     "recipe_count": 16,
     "script_count": 73,
-    "test_count": 145,
+    "test_count": 146,
     "glossary_count": 113
   },
   "tools": [
@@ -2614,6 +2614,10 @@
     {
       "path": "tests/test_provenance.py",
       "covers": "provenance"
+    },
+    {
+      "path": "tests/test_provenance_graph_unwired.py",
+      "covers": "provenance graph unwired"
     },
     {
       "path": "tests/test_quote_of_day.py",

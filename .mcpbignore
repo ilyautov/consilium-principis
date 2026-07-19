@@ -21,6 +21,8 @@ consults/
 board_config.json
 gov_heads.local.json
 .consilium/
+# ВНУТРЕННИЕ ЗАМЕТКИ (позиционирование/стратегия — ров + открытые слабости)
+POSITIONING-*.md
 # ЛОКАЛЬНЫЕ АРТЕФАКТЫ
 data/embeddings*.npy
 data/embeddings*.meta.json

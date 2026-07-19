@@ -23,8 +23,10 @@ if [ -n "$PRIV" ]; then
   if git grep -liE "$PRIV" -- . ":!$self"; then echo "FAIL: приватное имя в теле трекаемого файла"; fail=1; fi
 fi
 
-# 2. секреты — паттерн ловит РЕАЛЬНЫЙ ключ (префикс+хвост), не голый префикс из доков
-if git grep -lE 'sk-or-v1-[A-Za-z0-9]{20,}|sk-ant-[A-Za-z0-9-]{20,}|AKIA[0-9A-Z]{16}' -- . ":!$self"; then
+# 2. секреты — паттерн ловит РЕАЛЬНЫЙ ключ (префикс+хвост), не голый префикс из доков.
+# Префиксы отличительны (низкий риск ложняка): OpenRouter/Anthropic/AWS + GitHub-токены
+# (ghp_/gho_/ghu_/ghs_/ghr_) + Slack (xoxb-/xoxa-/xoxp-/xoxr-/xoxs-).
+if git grep -lE 'sk-or-v1-[A-Za-z0-9]{20,}|sk-ant-[A-Za-z0-9-]{20,}|AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9]{20,}|xox[baprs]-[A-Za-z0-9-]{10,}' -- . ":!$self"; then
   echo "FAIL: похоже на секрет"; fail=1
 fi
 

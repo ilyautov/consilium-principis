@@ -4,7 +4,7 @@
     "rule_count": 18,
     "recipe_count": 16,
     "script_count": 67,
-    "test_count": 146,
+    "test_count": 148,
     "glossary_count": 113
   },
   "tools": [
@@ -2530,6 +2530,10 @@
       "covers": "montecarlo demo"
     },
     {
+      "path": "tests/test_network_sandbox.py",
+      "covers": "network sandbox"
+    },
+    {
       "path": "tests/test_no_dark_tools.py",
       "covers": "no dark tools"
     },
@@ -2676,6 +2680,10 @@
     {
       "path": "tests/test_tier_pool_probe.py",
       "covers": "tier pool probe"
+    },
+    {
+      "path": "tests/test_tool_dispatch_smoke.py",
+      "covers": "tool dispatch smoke"
     }
   ],
   "glossary": [

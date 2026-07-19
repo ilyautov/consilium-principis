@@ -30,3 +30,23 @@ jobs:
           pip install pytest numpy
       - name: Run tests (SIMPLE-тир, без ollama/движка)
         run: python -m pytest tests/ -q
+
+  pytest-no-numpy:
+    # H8: заявлено «ядро — чистый stdlib». Эта нога ставит ТОЛЬКО pytest (без numpy) и гоняет
+    # тот же офлайн-инвариант: numpy-зависимые тесты (tier_full-транзитив) обязаны SKIPнуться
+    # через pytest.importorskip, а НЕ уронить сбор ImportError'ом. Зелёный тут = ядро реально stdlib.
+    runs-on: ubuntu-latest
+    env:
+      HEPHAESTUS_ENGINE: /nonexistent
+      OLLAMA_HOST: http://127.0.0.1:59999
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install deps (pytest ТОЛЬКО, без numpy)
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+      - name: Run tests (ожидаем SKIP numpy-тестов, НЕ collection-error)
+        run: python -m pytest tests/ -q

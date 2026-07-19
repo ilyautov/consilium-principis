@@ -60,11 +60,33 @@ def _resolve_under_root(p):
                           "или положи файл внутрь проекта."}
 
 
+def _resolve_read(p):
+    """Read-side path-traversal гард (H5). `_resolve` НЕ ограничивал результат корнем → read-тул
+    с advisor_dir/path от хоста читал файлы ВНЕ репо (симметрия write-side _resolve_under_root
+    отсутствовала на чтении). Клампим ЛЮБОЙ путь — и относительный ('../outside'), и абсолютный
+    ('/etc/hosts') — к корню репо: не под корнем → None (вызывающий отдаёт fail-closed 🟡/пусто,
+    НЕ читает).
+
+    Абсолютные тоже клампим (ужесточение, решение владельца): _governance_verify(path) при .jsonl
+    читает файл напрямую и host-exposed → abs pass-through был бы arbitrary-.jsonl-read под инъекцией.
+    Легит abs-путь ПОД реальным корнем (advisors/… через _root()) проходит; синтетические тесты
+    обязаны патчить _root на родителя своего корпуса. Возвращает срезолвленный путь или None."""
+    if not p:
+        return None
+    rp = os.path.realpath(_resolve(p))          # _resolve: rel→от корня, abs→как есть; затем realpath
+    root = os.path.realpath(_root())
+    return rp if (rp == root or rp.startswith(root + os.sep)) else None
+
+
 def _fidelity_check(quote, advisor_dir):
     """Протокол-гейт: наиболее авторитетный тир дословного матча → маркер.
-    Делегирует единому marker_status (H6) — формула маркера живёт в одном месте."""
+    Делегирует единому marker_status (H6) — формула маркера живёт в одном месте.
+    Read-гард H5: advisor_dir вне корня (traversal) → 🟡 fail-closed, корпус не читаем."""
     from engine.fidelity import marker_status
-    return marker_status(quote, _resolve(advisor_dir))
+    adv = _resolve_read(advisor_dir)
+    if adv is None:
+        return {"status": "🟡", "verbatim": False, "source": ""}
+    return marker_status(quote, adv)
 
 
 # ── межсоветническая атрибуция (§1.1 moat-v2) ──
@@ -197,7 +219,9 @@ def _retrieve(query, advisor_dir, top_k=3):
     import relevance_gate
     import judge_backend
     import lang_check
-    adv_res = _resolve(advisor_dir)
+    adv_res = _resolve_read(advisor_dir)                # H5 read-гард: traversal → пусто, не читаем
+    if adv_res is None:
+        return {"passages": []}
     passages = _eval.retrieve(query, adv_res, top_k=top_k)
     # Borderline-гейт релевантности: топически-близкий-но-не-отвечающий пассаж (камуфляж
     # смежного домена) флагуется relevance_gated (не выбрасываем — прозрачность). Инертен
@@ -459,7 +483,9 @@ def _cite(advisor_dir, query, top_k=8, use_kernels=True, limit=4):
     import relevance_gate
     import judge_backend
     import lang_check
-    adv_res = _resolve(advisor_dir)
+    adv_res = _resolve_read(advisor_dir)                # H5 read-гард: traversal → пустой 🟡, не читаем
+    if adv_res is None:
+        return _cite_result([], {})
     queries = [query] if isinstance(query, str) else [q for q in (query or []) if q]
     # Судить релевантность против РЕАЛЬНОГО вопроса юзера, НЕ против кернел-тем (те — recall-
     # экспансия ретрива, не то, на что цитата обязана отвечать).
@@ -822,7 +848,10 @@ def _situation_stress_test(tree, perturbations, stance="competitive"):
 
 
 def _governance_verify(path):
-    path = _resolve(path)
+    path = _resolve_read(path)                       # H5 read-гард: путь вне корня → отказ, не читаем
+    if path is None:
+        return {"ok": False, "error": "путь вне корня репо запрещён (path-traversal)",
+                "hint": "Проверять можно только корпуса/файлы внутри проекта."}
     if path.endswith(".jsonl"):                      # голый файл: цепь без эталонов/якоря
         res = _verify_corpus(path)
         cj = path
@@ -873,7 +902,10 @@ def _premortem(scenarios, ledger=None):
 
 def _atomic_grounding(text, advisor_dir):
     from atomic import inflation_gap
-    return inflation_gap(text, _resolve(advisor_dir))
+    adv = _resolve_read(advisor_dir)                    # H5 read-гард
+    if adv is None:                                     # traversal → нет корпуса → 0 grounded (fail-closed)
+        adv = os.path.join(_root(), "__no_such_advisor__")
+    return inflation_gap(text, adv)
 
 
 def _advisor_weights(records):
@@ -971,8 +1003,8 @@ def _quote_of_day(advisor_dir=None, date=None):
     from corpusbuild.paths import corpus_path
     import hashlib, datetime
     if advisor_dir:
-        adv = _resolve(advisor_dir)
-        adv_list = [adv] if os.path.isfile(corpus_path(adv)) else []
+        adv = _resolve_read(advisor_dir)               # H5 read-гард: traversal → пусто, не читаем
+        adv_list = [adv] if adv and os.path.isfile(corpus_path(adv)) else []
     else:
         adv_list = [d for d in _advisor_dirs() if os.path.isfile(corpus_path(d))]
     if not adv_list:
@@ -1554,7 +1586,10 @@ def _render_session(session, surface="md", depth="plain", kind="session"):
 def _validate_manifest(advisor_dir):
     from manifest_builder import validate_manifest
     import json as _json
-    sd = os.path.join(_resolve(advisor_dir), "sources")
+    d = _resolve_read(advisor_dir)                      # H5 read-гард
+    if d is None:
+        return {"ok": True, "problems": [], "note": "путь вне корня репо — манифест не читаю (traversal)"}
+    sd = os.path.join(d, "sources")
     mp = os.path.join(sd, "manifest.json")
     if not os.path.isfile(mp):
         return {"ok": True, "problems": [], "note": "нет манифеста → всё P1 (бэк-компат)"}

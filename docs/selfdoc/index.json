@@ -4,7 +4,7 @@
     "rule_count": 18,
     "recipe_count": 16,
     "script_count": 73,
-    "test_count": 141,
+    "test_count": 143,
     "glossary_count": 113
   },
   "tools": [
@@ -2352,6 +2352,10 @@
       "covers": "engine threshold"
     },
     {
+      "path": "tests/test_eval.py",
+      "covers": "eval"
+    },
+    {
       "path": "tests/test_explain_self.py",
       "covers": "explain self"
     },
@@ -2606,6 +2610,10 @@
     {
       "path": "tests/test_quote_of_day.py",
       "covers": "quote of day"
+    },
+    {
+      "path": "tests/test_read_traversal.py",
+      "covers": "read traversal"
     },
     {
       "path": "tests/test_reader_migration.py",

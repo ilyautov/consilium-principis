@@ -18,6 +18,7 @@ import json
 import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
+pytest.importorskip("numpy")   # H8: tier_full тянет numpy транзитивно; нет numpy → SKIP, не collection-error
 import tier_full  # noqa: E402
 import engine  # noqa: E402
 

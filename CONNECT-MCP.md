@@ -16,7 +16,7 @@ decision-calc (`validate_decision_map`/`run_calculation`/`save_decision_map`, т
 общественного достояния (`catalog_list`/`catalog_search`/`catalog_preview`/`catalog_add`), ситуационная
 карта (`capture_situation`/`situation_analyze`/`situation_stress_test`), выходы заседания
 (`decision_record`/`proof_card`/`quote_of_day`/`export_session`), само-документация (`explain_self`)
-плюс тулы линз и жизненного цикла (`build_lens`/`add_source`/`config_*`/`ollama_*`). **Всего 53 тула.**
+плюс тулы линз и жизненного цикла (`build_lens`/`add_source`/`config_*`/`ollama_*`). **Всего 60 тулов.**
 
 ## Подключение за 3 шага (Claude Desktop / Cowork)
 

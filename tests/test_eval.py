@@ -22,13 +22,15 @@ def _advisor(tmp_path, corpus_text, quote_bank_md, tier="P1"):
 
 # ─────────────────────────── fidelity_eval ───────────────────────────
 
-def test_fidelity_eval_counts_grounded_partial_violation_extrapolation(tmp_path):
+def test_fidelity_eval_counts_grounded_violation_extrapolation(tmp_path):
     corpus = "fortune favors the bold indeed and wise men know this truth clearly"
     persona = (
         "## Quote bank\n"
-        # 🔵 дословно целиком в корпусе → grounded_ok
+        # 🔵 дословно целиком в чанке корпуса → grounded_ok
         "- 🔵 «fortune favors the bold indeed» — src A\n"
-        # 🔵 совпал только якорь (первые 8 слов), хвост не из корпуса → partial (должно быть 🟡)
+        # 🔵 совпал только якорь (первые 8 слов), хвост не из корпуса → VIOLATION.
+        # Item M1: раньше это был бакет 'partial' (якорь-в-склейке), но прод-гейт
+        # (best_match, per-chunk, бинарно) такую цитату ОТВЕРГАЕТ — значит и eval обязан.
         "- 🔵 «fortune favors the bold indeed and wise men plus fabricated tail words here» — src B\n"
         # 🔵 заявлено дословным, но нигде нет → VIOLATION
         "- 🔵 «completely fabricated line that appears nowhere at all» — src C\n"
@@ -39,10 +41,35 @@ def test_fidelity_eval_counts_grounded_partial_violation_extrapolation(tmp_path)
     r = ev.fidelity_eval(adv)
     assert r["corpus_loaded"] is True
     assert r["grounded_total"] == 3            # три заявленных-дословных (🔵), 🟡 не считается
-    assert r["grounded_ok"] == 1               # только первая реально verbatim
-    assert len(r["partial"]) == 1              # вторая — только якорь
-    assert len(r["violations"]) == 1           # третья — фабрикация атрибуции
+    assert r["grounded_ok"] == 1               # только первая реально verbatim по чанку
+    assert r["partial"] == []                  # бакет 'partial' убран (прод его не знает)
+    assert len(r["violations"]) == 2           # якорь-хвост + чистая фабрикация — обе VIOLATION
     assert r["extrapolation"] == 1             # 🟡 корректно вне grounded
+
+
+def test_fidelity_eval_boundary_straddling_quote_matches_prod_per_chunk(tmp_path):
+    """Item M1: цитата, чьи слова лежат НА СТЫКЕ двух соседних чанков (хвост чанка A +
+    голова чанка B), НЕ должна засчитываться дословной. Прод-гейт
+    engine.fidelity.best_match матчит ПО ОДНОМУ чанку, а старый eval склеивал ВСЕ чанки
+    в один blob → ложный 'full'. eval обязан делегировать проду и быть НЕ мягче."""
+    from engine import fidelity as fx
+    adv = tmp_path / "adv"
+    (adv / "build").mkdir(parents=True)
+    with open(str(adv / "build" / "corpus.jsonl"), "w", encoding="utf-8") as f:
+        f.write(json.dumps({"text": "победа любит тщательную подготовку", "tier": "P1"}) + "\n")
+        f.write(json.dumps({"text": "скрытую и быструю атаку врасплох", "tier": "P1"}) + "\n")
+    # 3-словная (проходит MIN_QUOTE_WORDS) цитата на границе A|B: «подготовку»(хвост A) +
+    # «скрытую и»(голова B). В склейке — подстрока; ни в одном ОТДЕЛЬНОМ чанке — нет.
+    boundary_quote = "подготовку скрытую и"
+    # Прод-гейт (per-chunk) её ОТВЕРГАЕТ — это эталон, с которым eval обязан совпасть.
+    assert fx.best_match(boundary_quote, str(adv)) is None
+    (adv / "persona.md").write_text(
+        "## Quote bank\n- 🔵 «" + boundary_quote + "» — src boundary\n", encoding="utf-8")
+    r = ev.fidelity_eval(str(adv))
+    assert r["corpus_loaded"] is True
+    assert r["grounded_total"] == 1
+    assert r["grounded_ok"] == 0               # НЕ дословно по чанку → не засчитано (был баг: 1)
+    assert len(r["violations"]) == 1           # заявлено 🔵, прод отвергает → VIOLATION
 
 
 def test_fidelity_eval_corpus_missing_marks_not_loaded(tmp_path):

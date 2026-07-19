@@ -6,7 +6,7 @@ Powered-набор (back-translation, не круговой): held-out P1-пас
 T (RU→Тарасов→links→P1), T+B1. Метрика recall@k, значимость McNemar (T+B1 vs B1).
 """
 import os, sys, json, urllib.request, random
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # experiments/ → scripts/
 from corpusbuild import embed, ids, paths
 
 OLLAMA = os.getenv("OLLAMA_HOST", "http://127.0.0.1:11434")

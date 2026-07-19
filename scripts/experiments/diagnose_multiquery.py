@@ -6,7 +6,7 @@
 Генератор вариантов вслепую к anchor (только вопрос + линзы из persona.md). Печатает варианты.
 """
 import sys, os, json, re
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # experiments/ → scripts/
 import eval as E
 import engine as ENG
 from engine.multi_query import generate_variants, multiquery_retrieve

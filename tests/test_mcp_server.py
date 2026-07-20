@@ -32,6 +32,16 @@ def test_relative_advisor_dir_resolves_regardless_of_cwd(tmp_path, monkeypatch):
     assert r["status"] == "🔵"                         # нашёл корпус несмотря на чужой cwd
 
 
+def test_load_source_rejects_consilium_runtime_log(tmp_path, monkeypatch):
+    import mcp_server
+    runtime_log = tmp_path / ".consilium" / "swallow.log"
+    runtime_log.parent.mkdir()
+    runtime_log.write_text("runtime details\n", encoding="utf-8")
+    monkeypatch.setattr(mcp_server, "_root", lambda: str(tmp_path))
+    with pytest.raises(ValueError):
+        mcp_server._load_source_text(path=".consilium/swallow.log")
+
+
 def test_long_tool_returns_job_and_completes(monkeypatch):
     # долгие тулы рвали таймаут MCP → теперь фоновый джоб: job_id сразу, job_status опрашивается
     import mcp_server, time

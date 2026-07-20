@@ -134,6 +134,7 @@ def _resolve_read(p):
 # а не '/'/конец), а ключевые расширения ловятся и с суффиксом .bak.
 _SENSITIVE_RE = re.compile(
     r"(^|/)\.git(/|$)"
+    r"|(^|/)\.consilium(/|$)"
     r"|(^|/)(\.env[^/]*|id_rsa[^/]*|credentials[^/]*|[^/]*\.(pem|key|p12|pfx)(\.bak)?)$", re.I)
 
 # Публичные шаблоны env — НЕ секреты: задокументированное исключение denylist (без него

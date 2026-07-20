@@ -1,7 +1,9 @@
 """Регресс-гард корпус-зависимых демо-сценариев: A (misattribution), C (crosslingual),
 клэш (illustrative). Каждый несёт проверяемое ядро из живого гейта; тут стережём честность.
 
-Корпуса gitignored → без build/corpus.jsonl тесты ПРОПУСКАЮТСЯ (CI зелёный офлайн).
+Корпуса gitignored → без build/corpus.jsonl тесты бежали бы только локально. В CI их
+размораживает закоммиченная фикстура tests/fixtures/demo_corpora/<slug>.jsonl: conftest
+материализует её в advisors/<slug>/build/corpus.jsonl (только если реальный не собран).
 """
 import os
 import sys
@@ -12,13 +14,12 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_ROOT, "scripts"))
 sys.path.insert(0, os.path.join(_ROOT, "scripts", "demo"))
 
+import conftest
 
-def _corpus(slug):
-    return os.path.join(_ROOT, "advisors", slug, "build", "corpus.jsonl")
+_HAVE_MARCUS = conftest.demo_corpus_available("marcus-aurelius")
+_HAVE_BOTH = _HAVE_MARCUS and conftest.demo_corpus_available("machiavelli")
 
-
-_HAVE_MARCUS = os.path.isfile(_corpus("marcus-aurelius"))
-_HAVE_BOTH = _HAVE_MARCUS and os.path.isfile(_corpus("machiavelli"))
+pytestmark = pytest.mark.usefixtures("demo_pd_corpora")
 
 import misattribution_demo as mis
 import crosslingual_demo as cross
@@ -34,14 +35,14 @@ def _assert_clean(lines):
 
 
 # ── A: цитата не в тех устах ──
-@pytest.mark.skipif(not _HAVE_BOTH, reason="нет корпусов marcus+machiavelli (gitignored)")
+@pytest.mark.skipif(not _HAVE_BOTH, reason="нет корпусов marcus+machiavelli ни живых, ни фикстуры")
 def test_misattribution_catches_wrong_mouth():
     wrong, right, reason = mis.run()
     assert wrong["marker"] == "violation" and reason        # чужая атрибуция снята
     assert right["marker"] == "blue"                        # верная — держится
 
 
-@pytest.mark.skipif(not _HAVE_BOTH, reason="нет корпусов marcus+machiavelli (gitignored)")
+@pytest.mark.skipif(not _HAVE_BOTH, reason="нет корпусов marcus+machiavelli ни живых, ни фикстуры")
 def test_misattribution_frame_clean_both_langs():
     for lang in ("ru", "en"):
         lines = mis.transcript(lang=lang)
@@ -50,20 +51,20 @@ def test_misattribution_frame_clean_both_langs():
 
 
 # ── C: спросил по-русски, 🔵 по англ. тексту ──
-@pytest.mark.skipif(not _HAVE_MARCUS, reason="нет корпуса marcus-aurelius (gitignored)")
+@pytest.mark.skipif(not _HAVE_MARCUS, reason="нет корпуса marcus-aurelius ни живого, ни фикстуры")
 def test_crosslingual_anchor_is_blue():
     fc = cross.run()
     assert fc["status"] == "🔵" and fc["verbatim"] is True
 
 
-@pytest.mark.skipif(not _HAVE_MARCUS, reason="нет корпуса marcus-aurelius (gitignored)")
+@pytest.mark.skipif(not _HAVE_MARCUS, reason="нет корпуса marcus-aurelius ни живого, ни фикстуры")
 def test_crosslingual_frame_clean():
     _assert_clean(cross.transcript(lang="ru"))
     _assert_clean(cross.transcript(lang="en"))
 
 
 # ── клэш (иллюстративный) ──
-@pytest.mark.skipif(not _HAVE_MARCUS, reason="нет корпуса marcus-aurelius (gitignored)")
+@pytest.mark.skipif(not _HAVE_MARCUS, reason="нет корпуса marcus-aurelius ни живого, ни фикстуры")
 def test_clash_blue_core_verified_and_marked_illustrative():
     fc = clash.run()
     assert fc["status"] == "🔵"                             # проверяемое ядро реально

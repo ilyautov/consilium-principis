@@ -1,4 +1,5 @@
 """MCP-проводка федерации: 6 тулов через TOOLS + централизованный гейт инъектится в assemble."""
+import json
 import os, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "scripts"))
@@ -91,3 +92,53 @@ def test_federation_claim_timeout_capped(tmp_path, monkeypatch):
     monkeypatch.setattr(m, "_fed_claim", spy)
     m.dispatch("federation_claim", {"worker_id": "w", "timeout": 10**9})
     assert seen["timeout"] <= 60.0
+
+
+def test_federation_full_cycle_open_claim_submit_poll_assemble(tmp_path, monkeypatch):
+    """Сквозной e2e на ЖИВОМ sqlite-бэкенде: _root → tmp (стейт пишется в tmp/.consilium/),
+    _FED_BACKEND сброшен → _fed_backend() сам строит SqliteBackend, как в проде. Верность
+    сверяет НАСТОЯЩИЙ _fidelity_check против синтетического tmp-корпуса (не мок)."""
+    monkeypatch.setattr(m, "_root", lambda: str(tmp_path))
+    monkeypatch.setattr(m, "_FED_BACKEND", None)
+    real_quote = "Waste no more time arguing what a good man should be. Be one."
+    fake_quote = "выдуманная строка, которой заведомо нет ни в одном корпусе"
+    adv = tmp_path / "advisors" / "marcus-aurelius" / "build"
+    adv.mkdir(parents=True)
+    (adv / "corpus.jsonl").write_text(
+        json.dumps({"text": real_quote + " " + "Filler sentence for the chunk body.",
+                    "source": "meditations.txt", "tier": "P1"}, ensure_ascii=False) + "\n",
+        encoding="utf-8")
+
+    plan = [{"role": "стоик", "advisor_dir": "advisors/marcus-aurelius",
+             "question": "Как жить?", "replicas": 1},
+            {"role": "тактик", "advisor_dir": "advisors/machiavelli",
+             "question": "Как жить?", "replicas": 1}]
+    opened = m.dispatch("federation_open", {"session_id": "e2e", "plan": plan})
+    assert opened["enqueued"] == 2
+    assert m.dispatch("federation_poll", {"session_id": "e2e"})["pending"] == 2
+
+    brief = m.dispatch("federation_claim", {"worker_id": "w1", "roles": ["стоик"], "timeout": 1.0})
+    assert brief["role"] == "стоик" and brief["question"] == "Как жить?"
+    sub = m.dispatch("federation_submit", {
+        "task_id": brief["task_id"], "worker_id": "w1", "claim_token": brief["claim_token"],
+        "worker_model": "model-A",
+        "candidate": {"argument": "Действуй, не рассуждай.",
+                      "quotes": [{"text": real_quote}, {"text": fake_quote}]}})
+    assert sub == {"ok": True}
+    mid = m.dispatch("federation_poll", {"session_id": "e2e"})
+    assert mid["done"] == 1 and mid["pending"] == 1
+
+    out = m.dispatch("federation_assemble", {"session_id": "e2e"})
+    assert out["session_id"] == "e2e"
+    by_role = {r["role"]: r for r in out["roles"]}
+    stoa = by_role["стоик"]
+    assert stoa["representative"]["worker_model"] == "model-A"
+    statuses = {q["text"]: q["status"] for q in stoa["representative"]["quotes"]}
+    assert statuses[real_quote] == "🔵"              # живая сверка против tmp-корпуса
+    assert statuses[fake_quote] == "🟡"              # выдумка честно не подтверждена
+    assert stoa["grounded_replicas"] == 1
+    assert stoa["replicas_done"] == 1 and stoa["replicas_total"] == 1 and stoa["complete"] is True
+    # несыгранная роль не исчезает молча — помечена деградировавшей
+    assert by_role["тактик"]["degraded"] is True
+    assert out["degraded_roles"] == ["тактик"]
+    assert out["diversity"] == "reduced" and out["complete"] is False

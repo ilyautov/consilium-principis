@@ -291,6 +291,24 @@ def test_bad_n_and_seed_rejected():
         mc_run(_spec_map(), seed="сорок два", n=100)
 
 
+def test_n_above_cap_rejected():
+    # M2a: потолок n — DoS-гард однопоточного расчёта (n=10**9 от хоста = часы CPU)
+    import mc_run as mc_module
+    with pytest.raises(ValueError):
+        mc_module.mc_run(_spec_map(), seed=1, n=10**9)
+
+
+def test_n_at_cap_accepted_boundary():
+    # НЕ гоняем полный прогон на капе (медленно): проверяем константу и границу отказа
+    import mc_run as mc_module
+    assert mc_module.N_MAX == 100_000
+    try:
+        mc_module.mc_run(_spec_map(), seed=1, n=mc_module.N_MAX + 1)
+        assert False, "n>N_MAX обязан отклоняться"
+    except ValueError:
+        pass
+
+
 # ── гистограмма (Ф3, opt-in): бины детерминированы, дефолтный выход не тронут ──
 
 _BASE_KEYS = {"options", "pairwise", "p_best", "expected_regret",

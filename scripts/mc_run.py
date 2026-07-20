@@ -49,6 +49,9 @@ from decision_map import KIND_EVENT, DIRECTION_MIN, validate_map
 from safe_expr import SafeExprEvalError, compile_expr
 
 N_DEFAULT = 10_000
+N_MAX = 100_000    # DoS-гард (review M2): хост может передать произвольный n в
+                   # однопоточный расчёт — 100k сценариев достаточно для стабильных
+                   # перцентилей и не даёт одному вызову съесть часы CPU/RAM сервера
 HISTOGRAM_BINS = 20    # фикс-число бинов opt-in гистограммы (детерминизм подачи)
 
 
@@ -104,8 +107,10 @@ def mc_run(m, seed, n=N_DEFAULT, histogram=False):
     """
     if not isinstance(seed, int) or isinstance(seed, bool):
         raise ValueError("Сид расчёта должен быть целым числом — получено: %r." % (seed,))
-    if not isinstance(n, int) or isinstance(n, bool) or n < 1:
-        raise ValueError("Число сценариев n должно быть целым >= 1 — получено: %r." % (n,))
+    if not isinstance(n, int) or isinstance(n, bool) or n < 1 or n > N_MAX:
+        raise ValueError("Число сценариев n должно быть целым в [1, %d] — получено: %r. "
+                         "(потолок — защита однопоточного расчёта от чрезмерного n)"
+                         % (N_MAX, n))
 
     errors = validate_map(m)
     if errors:

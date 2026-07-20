@@ -14,7 +14,9 @@
   mcp-config [--json]    — готовый конфиг подключения как MCP-сервера (путь подставится сам)
   mcp-install [--dry-run] — подключить скриптом: мердж в claude_desktop_config.json (+бэкап)
 
-Логика тонкая — оборачивает preflight/scaffold/ingest_telegram. Реальные вопросы юзеру
+Логика тонкая — lifecycle-команды (build/seed/ingest/doctor/setup-full) делегируют
+scripts/lifecycle.py (ОДНА реализация на CLI и MCP, H4), остальное оборачивает
+preflight/scaffold. Реальные вопросы юзеру
 задаёт скилл разговором (см. SKILL.md «Онбординг»), сюда приходят уже структурные ответы.
 Рендер: ризонинг (скилл/хост) строит canon-объект заседания, СКРИПТ детерминированно рендерит
 под surface; контур/гейт 🔵 проходят до рендера. Хост сам решает, в какой surface отдать
@@ -61,11 +63,11 @@ def cmd_principis(args):
 
 
 def cmd_ingest_telegram(args):
-    from ingest_telegram import ingest
+    import lifecycle
     if not args:
         print("дай @handle публичного канала")
         return 1
-    res = ingest(args[0])
+    res = lifecycle.do_ingest(args[0], root=_root())
     print(f"[telegram] @{res['handle']}: {res['posts']} постов → {res['out']}")
     if res["posts"] == 0:
         print("0 постов — приватный/пустой канал, неверный handle, или сеть заблокирована.")
@@ -94,11 +96,11 @@ def cmd_validate_manifest(args):
 
 
 def cmd_build_advisor(args):
-    from build_orchestrator import build_advisor_full
+    import lifecycle
     if not args:
         print("дай advisors/{имя}")
         return 1
-    res = build_advisor_full(args[0], run_kernels="--no-kernels" not in args,
+    res = lifecycle.do_build(args[0], run_kernels="--no-kernels" not in args,
                              run_index="--no-index" not in args)
     if not res["ok"]:
         print(f"✗ остановлено на {res['stopped_at']}: {len(res['problems'])} проблем манифеста")
@@ -114,8 +116,8 @@ def cmd_build_advisor(args):
 
 
 def cmd_doctor(args):
-    from doctor import run_doctor
-    r = run_doctor(_root())
+    import lifecycle
+    r = lifecycle.doctor(root=_root())
     print(f"Consilium-Principis — health-check: {'✓ ЗДОРОВ' if r['healthy'] else '✗ ЕСТЬ ПРОБЛЕМЫ'}")
     for c in r["checks"]:
         print(f"  {'✓' if c['ok'] else '✗'} {c['name']:<16} {c['detail']}")
@@ -123,11 +125,12 @@ def cmd_doctor(args):
 
 
 def cmd_seed_council(args):
-    from seed import run_seed_council, SEED_ADVISORS
+    import lifecycle
+    from seed import SEED_ADVISORS
     print(f"Собираю стартовый совет ({len(SEED_ADVISORS)} PD-мудрецов): "
           f"{', '.join(s['display'] for s in SEED_ADVISORS)}")
     print("Fetch → манифест → валидация-гейт → corpus → kernels. Минуты (kernels нужен ollama).")
-    results = run_seed_council(_root())
+    results = lifecycle.do_seed(root=_root())["results"]
     ok = 0
     for r in results:
         if r["ok"]:
@@ -142,10 +145,10 @@ def cmd_seed_council(args):
 
 
 def cmd_setup_full(args):
-    from setup_full import run_setup
+    import lifecycle
     print("Настройка FULL-тира (семантик-ретрив). Системный ollama не ставлю молча — даю команду;")
     print("модель bge-m3 в стоящий ollama тяну сам.")
-    out = run_setup(consent="--no-pull" not in args)
+    out = lifecycle.setup_full(consent="--no-pull" not in args)
     for r in out["results"]:
         print(f"  [{r['step']}] {'✓ сделано' if r.get('ran') else '→ ' + r['detail']}")
     f = out["final"]

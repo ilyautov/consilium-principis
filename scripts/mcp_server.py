@@ -30,6 +30,7 @@ from situation import Move, node, analyze
 from governance import _verify_corpus
 from calibration import calibrate as _calibrate_fn, parse_decision_log
 from corpusbuild.paths import corpus_path, project_root
+import lifecycle
 from federation.coordinator import open_session as _fed_open, poll_session as _fed_poll, assemble as _fed_assemble
 from federation.executor import claim_brief as _fed_claim, submit_candidate as _fed_submit, heartbeat_task as _fed_hb
 
@@ -1746,43 +1747,25 @@ def _job_status(job_id):
 
 
 def _doctor():
-    from doctor import run_doctor
-    return run_doctor(_root())
+    return lifecycle.doctor(root=_root())
 
 
 # do-функции синхронны (их и зовёт board.py CLI без таймаута); тул-обёртки — фоновые джобы.
+# Реализация ОДНА — в scripts/lifecycle.py (H4: board.py держал расходящиеся копии). Тут —
+# тонкие делегаты: write-гард не копируем, а передаём СВОЙ _resolve_under_root коллбэком
+# (он резолвит _root() в момент вызова → monkeypatch mcp_server._root в тестах действует).
 def _do_build(advisor_dir, author=None, run_kernels=True, run_index=True):
-    from build_orchestrator import build_advisor_full
-    d, err = _resolve_under_root(advisor_dir)         # write-side traversal-гард
-    if err:
-        return err
-    return build_advisor_full(d, author=author,
-                              run_kernels=run_kernels, run_index=run_index)
+    return lifecycle.do_build(advisor_dir, author=author, run_kernels=run_kernels,
+                              run_index=run_index, resolve_under_root=_resolve_under_root)
 
 
 def _do_seed():
-    from seed import run_seed_council
-    return {"results": run_seed_council(_root())}
+    return lifecycle.do_seed(root=_root())
 
 
 def _do_ingest(handle, out_path=None):
-    from ingest_telegram import ingest
-    if out_path:
-        op, err = _resolve_under_root(out_path)       # write-side traversal-гард
-        if err:
-            return err
-        # H1: запись — ТОЛЬКО файл прямо в principis_corpus/ и ТОЛЬКО новый. Иначе
-        # out_path=".env" молча уничтожал секреты, а out_path="scripts/mcp_server.py"
-        # перезаписывал код сервера (RCE при рестарте) — гард был шире угрозы.
-        corpus_dir = os.path.realpath(os.path.join(_root(), "principis_corpus"))
-        if os.path.dirname(op) != corpus_dir:
-            return {"error": "out_path должен быть новым файлом прямо в principis_corpus/ "
-                             "(запись в код, конфиги и секреты запрещена)."}
-        if os.path.exists(op):
-            return {"error": "файл уже существует — перезапись запрещена: %s" % op}
-    else:
-        op = os.path.join(_root(), "principis_corpus", "telegram.jsonl")
-    return ingest(handle, op)
+    return lifecycle.do_ingest(handle, out_path=out_path, root=_root(),
+                               resolve_under_root=_resolve_under_root)
 
 
 def _build_advisor(advisor_dir, author=None, run_kernels=True, run_index=True):
@@ -1804,8 +1787,7 @@ def _ingest_telegram(handle, out_path=None):
 def _setup_full(consent=True):
     """Поднять FULL-тир: системный ollama НИКОГДА не ставим молча (вернём инструкцию),
     pull модели bge-m3 — авто при consent. Возвращает шаги + финальный probe()."""
-    from setup_full import run_setup
-    return run_setup(consent=consent)
+    return lifecycle.setup_full(consent=consent)
 
 
 # ── PD-онбординг корпуса: каталог общественного достояния ──

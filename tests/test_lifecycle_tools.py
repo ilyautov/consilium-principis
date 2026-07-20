@@ -223,6 +223,29 @@ def test_resolve_under_root_edges(monkeypatch, tmp_path):
     assert err2 and "traversal" in err2["error"].lower()
 
 
+def test_ingest_out_path_env_rejected(tmp_path, monkeypatch):
+    monkeypatch.setattr(mcp_server, "_root", lambda: str(tmp_path))
+    (tmp_path / ".env").write_text("SECRET=1\n", encoding="utf-8")
+    out = mcp_server._do_ingest("somehandle", out_path=".env")
+    assert "error" in out
+    assert (tmp_path / ".env").read_text(encoding="utf-8") == "SECRET=1\n"
+
+def test_ingest_out_path_code_overwrite_rejected(tmp_path, monkeypatch):
+    monkeypatch.setattr(mcp_server, "_root", lambda: str(tmp_path))
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "scripts" / "mcp_server.py").write_text("# code\n", encoding="utf-8")
+    out = mcp_server._do_ingest("somehandle", out_path="scripts/mcp_server.py")
+    assert "error" in out
+
+def test_ingest_out_path_existing_file_rejected(tmp_path, monkeypatch):
+    monkeypatch.setattr(mcp_server, "_root", lambda: str(tmp_path))
+    d = tmp_path / "principis_corpus"
+    d.mkdir()
+    (d / "x.jsonl").write_text("{}\n", encoding="utf-8")
+    out = mcp_server._do_ingest("somehandle", out_path="principis_corpus/x.jsonl")
+    assert "error" in out
+
+
 def test_embed_batch_rejects_count_mismatch(monkeypatch):
     pytest.importorskip("numpy")   # H8: tier_full тянет numpy транзитивно → SKIP без numpy
     import tier_full

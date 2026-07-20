@@ -4,7 +4,7 @@
     "rule_count": 19,
     "recipe_count": 16,
     "script_count": 69,
-    "test_count": 157,
+    "test_count": 158,
     "glossary_count": 113
   },
   "tools": [
@@ -2449,6 +2449,10 @@
     {
       "path": "tests/test_fidelity_tiers.py",
       "covers": "fidelity tiers"
+    },
+    {
+      "path": "tests/test_firewall_check.py",
+      "covers": "firewall check"
     },
     {
       "path": "tests/test_gate_simple_tier_inert.py",

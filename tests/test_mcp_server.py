@@ -485,3 +485,41 @@ def test_instructions_has_ondemand_citation_transparency():
     assert "покажи, что проверено" in INSTRUCTIONS
     assert "source_ref" in INSTRUCTIONS
     assert "НЕ выдумывай" in INSTRUCTIONS or "не выдумывай источники" in INSTRUCTIONS
+
+
+def test_cite_query_list_capped(tmp_path, monkeypatch):
+    # DoS-кап (M2): 50 формулировок в списке → внутренний пул запросов режется до 8.
+    # Наблюдаемый контракт: _cite не делает >8 retrieve-проходов — патчим retrieve счётчиком.
+    import mcp_server as m
+    import eval as _eval
+    calls = {"n": 0}
+    def counting(q, adv, top_k=6):
+        calls["n"] += 1
+        return []
+    monkeypatch.setattr(_eval, "retrieve", counting)
+    adv = tmp_path / "adv"; adv.mkdir()
+    (adv / "corpus.jsonl").write_text("", encoding="utf-8")
+    monkeypatch.setattr(m, "_root", lambda: str(tmp_path))
+    m._cite("adv", ["q%d" % i for i in range(50)])
+    assert calls["n"] <= 8
+
+
+def test_cite_top_k_clamped_and_numeric_garbage_fails_closed(tmp_path, monkeypatch):
+    # DoS-кап (M2): top_k=10**6 клампится к ≤32 (наблюдаемо через подменённый retrieve),
+    # мусор в числовых параметрах → fail-closed 🟡 без исключения.
+    import mcp_server as m
+    import eval as _eval
+    seen = {"top_k": None}
+    def spy(q, adv, top_k=6):
+        seen["top_k"] = top_k
+        return []
+    monkeypatch.setattr(_eval, "retrieve", spy)
+    adv = tmp_path / "adv"; adv.mkdir()
+    (adv / "corpus.jsonl").write_text("", encoding="utf-8")
+    monkeypatch.setattr(m, "_root", lambda: str(tmp_path))
+    m._cite("adv", "anything", top_k=10**6)
+    assert seen["top_k"] is not None and seen["top_k"] <= 32
+    r = m._cite("adv", "anything", top_k="junk")
+    assert r["quotes"] == [] and r["marker"] == "🟡"
+    r = m._cite("adv", "anything", limit="junk")
+    assert r["quotes"] == [] and r["marker"] == "🟡"

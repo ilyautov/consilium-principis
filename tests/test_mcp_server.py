@@ -246,6 +246,25 @@ def test_unknown_tool_reports_unknown():
     assert r["error"]["code"] == -32601 and "неизвестн" in r["error"]["message"]
 
 
+def test_rpc_error_hides_absolute_paths(monkeypatch, capsys):
+    # Текст исключения может нести абсолютный путь (FileNotFoundError и т.п.) — хосту
+    # уходит обобщённое сообщение, деталь остаётся в stderr сервера.
+    from mcp_server import _handle_rpc, TOOLS
+
+    def _boom(**kw):
+        raise ValueError("/secret/path/leaked")
+
+    monkeypatch.setitem(TOOLS, "_probe_leak", {
+        "name": "_probe_leak", "description": "x",
+        "input_schema": {"type": "object", "properties": {}, "required": []},
+        "handler": _boom})
+    r = _handle_rpc({"jsonrpc": "2.0", "id": 7, "method": "tools/call",
+                     "params": {"name": "_probe_leak", "arguments": {}}})
+    assert r["error"]["code"] == -32603
+    assert "/secret/path" not in r["error"]["message"]
+    assert "/secret/path" in capsys.readouterr().err          # деталь — в stderr
+
+
 def test_retrieve_attaches_verbatim_quoting_hint():
     # point-of-use: выдача retrieve несёт директиву «цитируй text дословно», гасит конфабуляцию 🟡
     import os

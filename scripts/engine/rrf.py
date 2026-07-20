@@ -13,7 +13,9 @@ from . import Passage
 
 
 def _key(text: str) -> str:
-    return re.sub(r"\s+", " ", re.sub(r"[^\w\s]", " ", (text or "").lower())).strip()
+    # ё→е — в синхроне с engine/fidelity._norm: дедуп ключа не должен разводить «ё»/«е»-варианты
+    # одной строки в два пассажа (иначе слитый список несёт дубль цитаты).
+    return re.sub(r"\s+", " ", re.sub(r"[^\w\s]", " ", (text or "").lower().replace("ё", "е"))).strip()
 
 
 def rrf_fuse(ranked_lists, k: int = 60, top_k=None, weights=None):

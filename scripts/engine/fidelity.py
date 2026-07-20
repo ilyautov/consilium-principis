@@ -50,7 +50,9 @@ def _crop_severs_negation(q: str, raw_text: str) -> bool:
 
 
 def _norm(s: str) -> str:
-    s = re.sub(r"[^\w\s]", " ", (s or "").lower())
+    # ё→е: печатный русский волебен к диакритике (корпус «ё», цитата «е» и наоборот) —
+    # орфографическая вариативность не должна топить дословный матч в 🟡.
+    s = re.sub(r"[^\w\s]", " ", (s or "").lower().replace("ё", "е"))
     return re.sub(r"\s+", " ", s).strip()
 
 

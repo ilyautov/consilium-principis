@@ -516,13 +516,17 @@ def _gate_verdict(advisor_dir, nonce, ratings=None):
     Детерминированно, ноль LLM. Nonce single-use + TTL. M-1 (review): advisor-матч
     валидируется ДО pop (под локом) — чужой advisor_dir получает 🟡, но НЕ сжигает nonce
     (иначе self-DoS-грифинг); сжигаем только при валидном заборе законным советником."""
-    adv_res = _resolve(advisor_dir)
+    adv_res = _resolve(advisor_dir or "")
     now = time.time()
     key = str(nonce or "")
     with _VERDICT_LOCK:
         _purge_expired_verdicts(now)                   # TTL: протухшие недоступны ниже
         st = _PENDING_VERDICTS.get(key)
-        if st is not None and os.path.realpath(st["advisor_dir"]) == os.path.realpath(adv_res):
+        # advisor_dir=None/"" → adv_res пуст: НЕ матчится ни с одним nonce (короткое
+        # замыкание до realpath — realpath(None) кинул бы TypeError вне try и ушёл бы
+        # RPC-ошибкой вместо чистого fail-closed 🟡).
+        if st is not None and adv_res and \
+                os.path.realpath(st["advisor_dir"]) == os.path.realpath(adv_res):
             _PENDING_VERDICTS.pop(key, None)           # single-use: сжигаем ТОЛЬКО валидный забор
         else:
             st = None
@@ -2458,7 +2462,11 @@ def _handle_rpc(msg):
             return _rpc_result(req_id, {
                 "content": [{"type": "text", "text": json.dumps(out, ensure_ascii=False)}]})
         except Exception as e:
-            return _rpc_error(req_id, -32603, f"ошибка тула: {e}")
+            # Текст исключения может нести абсолютный путь (/Users/<user>/…) — хосту это
+            # разметка ФС сервера. Наружу — обобщённое сообщение; деталь — в stderr.
+            print(f"consilium: ошибка тула {name!r}: {e!r}", file=sys.stderr)
+            return _rpc_error(req_id, -32603,
+                              f"внутренняя ошибка тула {name!r} (деталь — в stderr сервера)")
     if req_id is not None:
         return _rpc_error(req_id, -32601, f"метод не поддержан: {method}")
     return None

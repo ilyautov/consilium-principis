@@ -99,3 +99,12 @@ def test_form_auto_defaults_to_metric_when_unit_present(mc):
     m = _valid_map()
     pred = dc.build_prediction_from_mc(m, mc, "ship_public", horizon_days=90)
     assert pred["kind"] == "metric"      # D-развилка: metric по умолчанию, когда есть единицы
+
+
+def test_builder_requires_horizon(mc):
+    """Fail-closed: билдер без horizon_days собирал прогноз, который validate_prediction
+    отвергает (horizon_days=None). Теперь отказ ДО возврата."""
+    m = _valid_map()
+    for bad in (None, 0, -5, 2.5, True, "90"):
+        with pytest.raises(ValueError, match="horizon"):
+            dc.build_prediction_from_mc(m, mc, "ship_public", horizon_days=bad)

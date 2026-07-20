@@ -267,3 +267,35 @@ def test_write_jsonl_empty_list(tmp_path):
     synth_eval.write_jsonl(path, [])
     assert os.path.isfile(path)
     assert open(path).read() == ""
+
+
+# ── filter_answerable (автопроверка меток «unanswerable», 6.6) ────────────────
+
+def test_filter_answerable_excludes_corpus_answered():
+    # Отвечаемый корпусом вопрос с меткой OOC → НЕ включается в набор (флагается),
+    # иначе abstention_eval краснил бы контур за честно отвечаемый вопрос.
+    rows = [{"q": "отвечаемый корпусом?", "why": "помечен OOC по замыслу"},
+            {"q": "неотвечаемый?", "why": "далёк от корпуса"}]
+
+    def fake_retrieve(q, d, top_k=3):
+        return [{"text": "t", "score": 0.9}] if q.startswith("отвеч") \
+            else [{"text": "t", "score": 0.1}]
+
+    kept, flagged = synth_eval.filter_answerable(rows, "adv", retrieve_fn=fake_retrieve,
+                                                 threshold=0.5)
+    assert [r["q"] for r in kept] == ["неотвечаемый?"]
+    assert len(flagged) == 1 and flagged[0]["max_score"] == 0.9
+
+
+def test_filter_answerable_boundary_and_empty_hits():
+    # score == threshold → считаем отвечаемым (>=, зеркало abstention_eval);
+    # пустая выдача ретрива → неотвечаем (kept, mx=0.0).
+    rows = [{"q": "boundary"}, {"q": "empty"}]
+
+    def fake_retrieve(q, d, top_k=3):
+        return [{"text": "t", "score": 0.5}] if q == "boundary" else []
+
+    kept, flagged = synth_eval.filter_answerable(rows, "adv", retrieve_fn=fake_retrieve,
+                                                 threshold=0.5)
+    assert [r["q"] for r in kept] == ["empty"]
+    assert [r["q"] for r in flagged] == ["boundary"]

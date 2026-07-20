@@ -4,7 +4,7 @@ exit!=0 если любой forbidden (секрет/копирайт/лично�
 import sys, fnmatch
 
 FORBIDDEN = [
-    ".env", "*.log", "mcp.json", "board_config.json", "gov_heads.local.json",
+    ".env*", "*.log", "mcp.json", "board_config.json", "gov_heads.local.json",
     "principis.md", "relationship.md",
     "reference-library-raw/*", "reference-library/*", "*-raw/*",
     "principis_corpus/*", "council/*", "decisions/*", "consults/*", ".consilium/*",
@@ -13,7 +13,9 @@ FORBIDDEN = [
     "data/embeddings*.npy", "data/embeddings*.meta.json", "scripts/golden/*",
 ]
 ALLOW = ["advisors/machiavelli/corpus.jsonl", "advisors/marcus-aurelius/corpus.jsonl",
-         "advisors/sun-tzu/corpus.jsonl"]
+         "advisors/sun-tzu/corpus.jsonl",
+         # публичные env-шаблоны — НЕ секреты (исключение из ".env*")
+         ".env.example", ".env.sample", ".env.template"]
 
 def offending(paths):
     bad = []
@@ -21,9 +23,15 @@ def offending(paths):
         p = p.strip()
         while p.startswith("./"):
             p = p[2:]
-        if not p or p in ALLOW:
+        if not p:
             continue
-        if any(fnmatch.fnmatch(p, pat) for pat in FORBIDDEN):
+        # Паттерн без слеша ("mcp.json", ".env*") обязан ловить и ВЛОЖЕННЫЙ файл
+        # (sub/mcp.json) — иначе гард слеп к секрету в подкаталоге. Матчим и полный
+        # путь, и basename; ALLOW-пути (полные) и ALLOW-шаблоны (basename) честны оба.
+        base = p.rsplit("/", 1)[-1]
+        if p in ALLOW or base in ALLOW:
+            continue
+        if any(fnmatch.fnmatch(p, pat) or fnmatch.fnmatch(base, pat) for pat in FORBIDDEN):
             bad.append(p)
     return bad
 

@@ -4,7 +4,7 @@
     "rule_count": 19,
     "recipe_count": 16,
     "script_count": 69,
-    "test_count": 156,
+    "test_count": 157,
     "glossary_count": 113
   },
   "tools": [
@@ -2737,6 +2737,10 @@
     {
       "path": "tests/test_stability.py",
       "covers": "stability"
+    },
+    {
+      "path": "tests/test_swallow.py",
+      "covers": "swallow"
     },
     {
       "path": "tests/test_synth_eval.py",

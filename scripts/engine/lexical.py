@@ -15,8 +15,9 @@ from . import Engine, Passage   # relative — пакетный стиль
 
 
 # intentional copy of _norm (floor isolation: lexical depends on stdlib only, not on fidelity/eval)
+# ё→е держим в синхроне с engine/fidelity._norm — иначе ретрив и гейт нормализуют по-разному.
 def _norm(s: str) -> str:
-    s = re.sub(r"[^\w\s]", " ", (s or "").lower())
+    s = re.sub(r"[^\w\s]", " ", (s or "").lower().replace("ё", "е"))
     return re.sub(r"\s+", " ", s).strip()
 
 

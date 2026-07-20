@@ -88,3 +88,13 @@ def test_empty_inputs_do_not_crash():
     assert pts[0]["honest_abstain"] == 0.0
     assert pts[0]["false_abstain"] == 0.0
     assert best_operating_point([]) is None
+
+
+def test_curve_eval_marks_in_sample(monkeypatch, tmp_path):
+    # 6.6: Youden-точка выбирается и отчитывается на ТЕХ ЖЕ скорах — артефакт обязан
+    # нести маркер in_sample (оптимистичная оценка, held-out набора нет).
+    import eval as ev
+    monkeypatch.setattr(ev, "collect_abstention_scores",
+                        lambda p: ([0.1, 0.2, 0.3], [0.6, 0.7, 0.8]))
+    c = ev.abstention_curve_eval(str(tmp_path / "adv"))
+    assert c["in_sample"] is True

@@ -87,3 +87,15 @@ def test_later_clean_sentence_match_remains_eligible():
     assert fidelity._crop_severs_negation(
         "endorse war", "He did not endorse war. Endorse war now."
     ) is False
+
+
+def test_verbatim_quote_with_sentence_separator_remains_eligible(tmp_path):
+    """Дословная цитата может содержать разделитель предложений сама.
+
+    Такой разделитель не должен выглядеть как склейка двух фрагментов корпуса:
+    иначе guard C2 понижает честные длинные цитаты до 🟡.
+    """
+    from engine import fidelity
+    quote = "The universe is change; our life is what our thoughts make it."
+    adv = _mk_advisor(tmp_path, quote)
+    assert fidelity.marker_status(quote, adv)["status"] == "🔵"

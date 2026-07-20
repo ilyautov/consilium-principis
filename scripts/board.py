@@ -79,7 +79,7 @@ def cmd_validate_manifest(args):
     sd = os.path.join(adv, "sources")
     mp = os.path.join(sd, "manifest.json")
     if not os.path.isfile(mp):
-        print(f"нет манифеста {mp} (без него всё P1 — бэк-компат)")
+        print(f"нет манифеста {mp} — все чанки тиром A (🟡-only; задекларируй manifest для 🔵)")
         return 0
     res = validate_manifest(json.load(open(mp, encoding="utf-8")), sd)
     if res["ok"]:

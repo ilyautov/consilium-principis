@@ -376,8 +376,8 @@ def _force_semantic_cite(monkeypatch, judge_ret):
     _semantic(monkeypatch)
     # подставной пул кандидатов с in-band score (0.50) — так гейт активируется
     fake = [{"text": "All warfare is based on deception.", "score": 0.50, "source": "src"}]
-    import eval as _eval_mod
-    monkeypatch.setattr(_eval_mod, "retrieve", lambda q, d, top_k=8: list(fake))
+    from engine import retrieval
+    monkeypatch.setattr(retrieval, "retrieve", lambda q, d, top_k=8: list(fake))
     # дословность реальна (verbatim-тир не трогаем) — форсим 🔵 через _fidelity_check
     monkeypatch.setattr(mcp_server, "_fidelity_check",
                         lambda t, d: {"status": "🔵", "verbatim": True, "source": "src"})
@@ -405,8 +405,8 @@ def test_cite_wiring_lexical_unaffected(monkeypatch):
     _semantic(monkeypatch, val=False)
     _judge_avail(monkeypatch, val=False)               # M4: иначе доступный судья судил бы
     fake = [{"text": "All warfare is based on deception.", "score": 0.50, "source": "src"}]
-    import eval as _eval_mod
-    monkeypatch.setattr(_eval_mod, "retrieve", lambda q, d, top_k=8: list(fake))
+    from engine import retrieval
+    monkeypatch.setattr(retrieval, "retrieve", lambda q, d, top_k=8: list(fake))
     monkeypatch.setattr(mcp_server, "_fidelity_check",
                         lambda t, d: {"status": "🔵", "verbatim": True, "source": "src"})
     import relevance_judge
@@ -433,8 +433,8 @@ def test_cite_wiring_secondary_query_quote_still_judged(monkeypatch):
             return [{"text": quote, "score": 0.90, "source": "src"}]
         return []
 
-    import eval as _eval_mod
-    monkeypatch.setattr(_eval_mod, "retrieve", fake_retrieve)
+    from engine import retrieval
+    monkeypatch.setattr(retrieval, "retrieve", fake_retrieve)
     monkeypatch.setattr(mcp_server, "_fidelity_check",
                         lambda t, d: {"status": "🔵", "verbatim": True, "source": "src"})
     import relevance_judge
@@ -454,8 +454,8 @@ def test_cite_subband_candidate_judged_and_withheld(monkeypatch):
     import mcp_server
     _semantic(monkeypatch)
     fake = [{"text": "All warfare is based on deception.", "score": 0.44, "source": "src"}]
-    import eval as _eval_mod
-    monkeypatch.setattr(_eval_mod, "retrieve", lambda q, d, top_k=8: list(fake))
+    from engine import retrieval
+    monkeypatch.setattr(retrieval, "retrieve", lambda q, d, top_k=8: list(fake))
     monkeypatch.setattr(mcp_server, "_fidelity_check",
                         lambda t, d: {"status": "🔵", "verbatim": True, "source": "src"})
     import relevance_judge
@@ -475,8 +475,8 @@ def test_cite_passes_source_into_judge(monkeypatch):
     _semantic(monkeypatch)
     fake = [{"text": "All warfare is based on deception.", "score": 0.50,
              "source": "Art of War, ch. I"}]
-    import eval as _eval_mod
-    monkeypatch.setattr(_eval_mod, "retrieve", lambda q, d, top_k=8: list(fake))
+    from engine import retrieval
+    monkeypatch.setattr(retrieval, "retrieve", lambda q, d, top_k=8: list(fake))
     monkeypatch.setattr(mcp_server, "_fidelity_check",
                         lambda t, d: {"status": "🔵", "verbatim": True,
                                       "source": "Art of War, ch. I"})
@@ -496,8 +496,8 @@ def test_retrieve_passes_source_into_judge(monkeypatch):
     import mcp_server
     _semantic(monkeypatch)
     fake = [{"text": "topical passage", "score": 0.50, "source": "Meditations, book II"}]
-    import eval as _eval_mod
-    monkeypatch.setattr(_eval_mod, "retrieve", lambda q, d, top_k=3: list(fake))
+    from engine import retrieval
+    monkeypatch.setattr(retrieval, "retrieve", lambda q, d, top_k=3: list(fake))
     import relevance_judge
     seen = {}
     def _spy(q, p, model=None, source=None):
@@ -621,8 +621,8 @@ def test_cite_wiring_nonsemantic_judge_available_withholds(monkeypatch):
     _semantic(monkeypatch, val=False)
     _judge_avail(monkeypatch)
     fake = [{"text": "All warfare is based on deception.", "score": 0.44, "source": "src"}]
-    import eval as _eval_mod
-    monkeypatch.setattr(_eval_mod, "retrieve", lambda q, d, top_k=8: list(fake))
+    from engine import retrieval
+    monkeypatch.setattr(retrieval, "retrieve", lambda q, d, top_k=8: list(fake))
     monkeypatch.setattr(mcp_server, "_fidelity_check",
                         lambda t, d: {"status": "🔵", "verbatim": True, "source": "src"})
     import relevance_judge
@@ -644,8 +644,8 @@ def test_cite_wiring_raw_score_from_retrieve_gates_blend(monkeypatch):
     _semantic(monkeypatch)
     fake = [{"text": "All warfare is based on deception.", "score": 0.9,
              "raw_score": 0.3, "source": "src"}]
-    import eval as _eval_mod
-    monkeypatch.setattr(_eval_mod, "retrieve", lambda q, d, top_k=8: list(fake))
+    from engine import retrieval
+    monkeypatch.setattr(retrieval, "retrieve", lambda q, d, top_k=8: list(fake))
     monkeypatch.setattr(mcp_server, "_fidelity_check",
                         lambda t, d: {"status": "🔵", "verbatim": True, "source": "src"})
     import relevance_judge
@@ -659,16 +659,16 @@ def test_cite_wiring_raw_score_from_retrieve_gates_blend(monkeypatch):
     assert r["quotes"] and r["best"]["marker"] == "🔵"
 
 
-def test_eval_retrieve_forwards_raw_score(monkeypatch):
+def test_retrieve_forwards_raw_score(monkeypatch):
     # Прокидка M4: Passage.raw_score → dict retrieve (без неё _cite не видит сырой косинус).
-    import eval as _eval_mod
-    from engine import Passage
+    import engine
+    from engine import retrieval, Passage
     class _FakeEng:
         def retrieve(self, q, d, top_k=3):
             return [Passage("t", 0.9, "s", None, raw_score=0.3),
                     Passage("u", 0.8, "s", None)]      # чистая семантика — без raw
-    monkeypatch.setattr(_eval_mod._engine, "resolve_engine", lambda d, prefer=None: _FakeEng())
-    out = _eval_mod.retrieve("q", "adv", top_k=2)
+    monkeypatch.setattr(engine, "resolve_engine", lambda d, prefer=None: _FakeEng())
+    out = retrieval.retrieve("q", "adv", top_k=2)
     assert out[0]["raw_score"] == 0.3
     assert "raw_score" not in out[1]                   # нет raw — ключа нет (форма прежняя)
 

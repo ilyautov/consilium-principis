@@ -15,7 +15,7 @@ sys.path.insert(0, os.path.join(ROOT, "scripts"))
 import pytest
 import mcp_server
 import relevance_gate
-import eval as _eval
+from engine import retrieval
 
 
 def _pool(n, start=0.95, step=0.02):
@@ -28,7 +28,7 @@ def _pool(n, start=0.95, step=0.02):
 def cite_env(monkeypatch):
     """Мокнутый пул из 20 кандидатов + все verbatim-🔵 + судья-счётчик через gate_quote."""
     pool = _pool(20)
-    monkeypatch.setattr(_eval, "retrieve", lambda q, adv, top_k=8: list(pool))
+    monkeypatch.setattr(retrieval, "retrieve", lambda q, adv, top_k=8: list(pool))
     monkeypatch.setattr(mcp_server, "_fidelity_check",
                         lambda quote, adv: {"status": "🔵", "verbatim": True, "source": "src"})
     calls = []
@@ -98,7 +98,7 @@ def test_candidates_without_primary_score_sort_last(cite_env, monkeypatch):
 
     def retrieve(q, adv, top_k=8):
         return list(primary) if q == "q" else list(kernel_only)
-    monkeypatch.setattr(_eval, "retrieve", retrieve)
+    monkeypatch.setattr(retrieval, "retrieve", retrieve)
     monkeypatch.setattr(relevance_gate, "gate_quote", make_gate())
     monkeypatch.setattr(mcp_server, "_kernel_themes", lambda adv, limit=6: ["kernel theme"])
     r = mcp_server._cite("advisors/x", "q", use_kernels=True, limit=4)

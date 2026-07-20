@@ -491,12 +491,12 @@ def test_cite_query_list_capped(tmp_path, monkeypatch):
     # DoS-кап (M2): 50 формулировок в списке → внутренний пул запросов режется до 8.
     # Наблюдаемый контракт: _cite не делает >8 retrieve-проходов — патчим retrieve счётчиком.
     import mcp_server as m
-    import eval as _eval
+    from engine import retrieval
     calls = {"n": 0}
     def counting(q, adv, top_k=6):
         calls["n"] += 1
         return []
-    monkeypatch.setattr(_eval, "retrieve", counting)
+    monkeypatch.setattr(retrieval, "retrieve", counting)
     adv = tmp_path / "adv"; adv.mkdir()
     (adv / "corpus.jsonl").write_text("", encoding="utf-8")
     monkeypatch.setattr(m, "_root", lambda: str(tmp_path))
@@ -508,12 +508,12 @@ def test_cite_top_k_clamped_and_numeric_garbage_fails_closed(tmp_path, monkeypat
     # DoS-кап (M2): top_k=10**6 клампится к ≤32 (наблюдаемо через подменённый retrieve),
     # мусор в числовых параметрах → fail-closed 🟡 без исключения.
     import mcp_server as m
-    import eval as _eval
+    from engine import retrieval
     seen = {"top_k": None}
     def spy(q, adv, top_k=6):
         seen["top_k"] = top_k
         return []
-    monkeypatch.setattr(_eval, "retrieve", spy)
+    monkeypatch.setattr(retrieval, "retrieve", spy)
     adv = tmp_path / "adv"; adv.mkdir()
     (adv / "corpus.jsonl").write_text("", encoding="utf-8")
     monkeypatch.setattr(m, "_root", lambda: str(tmp_path))

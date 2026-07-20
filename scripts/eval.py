@@ -43,8 +43,10 @@ except Exception:
 
 try:
     import engine as _engine
+    from engine import retrieval as _retrieval  # M11: прод-путь retrieve живёт в engine-пакете
     ENGINE_OK = True
 except Exception:
+    _retrieval = None
     ENGINE_OK = False
 
 # Гейт верности eval'а ДЕЛЕГИРУЕТ проду: та же per-chunk формула, что энфорсит скилл
@@ -68,6 +70,8 @@ GROUNDED_MARKERS = ("🔵", "T1", "T2")
 EXTRAPOLATION_MARKERS = ("🟡", "T3")
 
 
+# intentional copy of engine.retrieval.norm (floor isolation, как engine/lexical.py:_norm):
+# якорь-матчинг golden'ов не тянет engine-пакет ради 3-строчного нормализатора.
 def norm(s):
     s = s.lower()
     s = re.sub(r"[^\w\s]", " ", s, flags=re.U)
@@ -111,38 +115,16 @@ def _corpus_present(adv_dir):
     return os.path.isfile(corpus_path(adv_dir))
 
 
-def _fallback_verbatim_per_chunk(quote, adv_dir):
-    """СТРОГИЙ per-chunk fallback на случай, если engine.fidelity не импортировался
-    (FIDELITY_OK=False). Зеркалит ядро best_match: норм. + MIN_QUOTE_WORDS≥3 + подстрока
-    в ОДНОМ чанке (без склейки). Нет negation-crop guard'а прода — но всё равно НЕ мягче
-    прежней склейки-всех-чанков (не даёт матч на стыке чанков). Живой путь сюда не заходит:
-    fidelity backend-независим и обычно доступен."""
-    nq = norm(quote)
-    if len(nq.split()) < 3:
-        return False
-    cj = corpus_path(adv_dir)
-    if not os.path.isfile(cj):
-        return False
-    for line in open(cj, encoding="utf-8"):
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            txt = json.loads(line).get("text", "")
-        except Exception:
-            continue
-        if nq in norm(txt):
-            return True
-    return False
-
-
 def verbatim_ok(quote, adv_dir):
     """Дословна ли цитата ПО ОДНОМУ чанку — РОВНО как энфорсит прод-гейт скилла.
     Делегирует engine.fidelity.best_match (несёт Phase-2 гарды: MIN_QUOTE_WORDS≥3,
-    negation-crop guard, tier). eval меряет ИМЕННО то, что прод отвергает/пропускает."""
-    if FIDELITY_OK:
-        return _best_match(quote, adv_dir) is not None
-    return _fallback_verbatim_per_chunk(quote, adv_dir)
+    negation-crop guard, tier). eval меряет ИМЕННО то, что прод отвергает/пропускает.
+    Мягкой копии гейта в eval.py НЕТ (M11): engine.fidelity недоступен → ГРОМКОЕ падение,
+    а не подсчёт копией без Phase-2 гардов (та над-репортила бы верность)."""
+    if not FIDELITY_OK:
+        raise RuntimeError("engine.fidelity недоступен: гейт верности eval'а не считается "
+                           "мягкой копией — чините engine-пакет, не деградируйте проверку.")
+    return _best_match(quote, adv_dir) is not None
 
 
 def fidelity_eval(adv_dir):
@@ -197,79 +179,25 @@ def load_abstain_threshold():
         return ABSTAIN_THRESHOLD_DEFAULT
 
 
-def split_corpus_units(adv_dir):
-    """Корпус → [(предложение, tier)] кандидатов для ретрива. Один чанк corpus.jsonl бьём по
-    предложениям, чтобы top-1/top-3 имели нетривиальный выбор (иначе ретрив бессмыслен на
-    1 чанке). Тир едет с текстом — контракт Passage/retrieve его отдаёт; нет поля → None."""
-    cj = corpus_path(adv_dir)
-    if not os.path.isfile(cj):
-        return []
-    units = []
-    for line in open(cj, encoding="utf-8"):
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            rec = json.loads(line)
-        except Exception:
-            continue
-        txt = rec.get("text", "")
-        tier = rec.get("tier")
-        for sent in re.split(r"(?<=[.!?])\s+", txt):
-            sent = sent.strip()
-            if len(sent) >= 8:
-                units.append((sent, tier))
-    return units
-
-
-def _char_ngrams(s, n=3):
-    s = norm(s)
-    s = "  " + s + "  "
-    return {s[i:i + n] for i in range(len(s) - n + 1)}
+def retrieve(question, adv_dir, top_k=3, prefer=None):
+    """Бэк-компат обёртка engine.retrieval.retrieve (M11: прод-путь retrieve вынесен из
+    eval.py в engine-пакет). Eval-контур по-прежнему честит EVAL_ENGINE (форс бэкенда из
+    CLI --engine) и прокидывает его ЯВНЫМ prefer=; прод-путь (mcp_server._retrieve/_cite)
+    зовёт engine.retrieval.retrieve напрямую — env там не читается. Без engine-пакета —
+    громкое падение: мягкой копии ретрива в eval.py больше нет."""
+    if _retrieval is None:
+        raise RuntimeError("engine.retrieval недоступен: прод-ретрив живёт в engine-пакете, "
+                           "eval без него не считает (мягкой копии больше нет).")
+    if prefer is None:
+        prefer = os.getenv("EVAL_ENGINE")      # EVAL_ENGINE читает ТОЛЬКО eval-контур
+    return _retrieval.retrieve(question, adv_dir, top_k=top_k, prefer=prefer)
 
 
 def lexical_retrieve(question, adv_dir, top_k=3):
-    """Fallback-ретрив (tier=SIMPLE): char-3gram Jaccard юзер-вопроса против юнитов корпуса.
-    Возвращает контракт tier_full.retrieve: [{text, score, source}], score∈[0,1] по убыванию."""
-    units = split_corpus_units(adv_dir)
-    if not units:
-        return []
-    qg = _char_ngrams(question)
-    if not qg:
-        return []
-    scored = []
-    for u, tier in units:
-        ug = _char_ngrams(u)
-        inter = len(qg & ug)
-        union = len(qg | ug) or 1
-        scored.append({"text": u, "score": inter / union, "source": "corpus.jsonl",
-                       "tier": tier})
-    scored.sort(key=lambda d: d["score"], reverse=True)
-    return scored[:top_k]
-
-
-def retrieve(question, adv_dir, top_k=3):
-    """Единая точка: через Engine-контракт (resolve_engine), с graceful-деградацией.
-    Fallback на старый лексический путь, если engine-пакет недоступен."""
-    if ENGINE_OK:
-        prefer = os.getenv("EVAL_ENGINE")  # 'lexical'|'semantic'|None
-        eng = _engine.resolve_engine(adv_dir, prefer=prefer)
-        try:
-            out = []
-            for p in eng.retrieve(question, adv_dir, top_k=top_k):
-                d = {"text": p.text, "score": p.score, "source": p.source, "tier": p.tier}
-                # M4: сырой косинус поверх hybrid_alpha-смеси/RRF — гейт релевантности
-                # режет полосой ЕГО, не смесь. Нет raw (чистая семантика/lexical) — ключа нет.
-                if getattr(p, "raw_score", None) is not None:
-                    d["raw_score"] = p.raw_score
-                out.append(d)
-            return out
-        except Exception as e:
-            # НЕ молча: деградация семантики до лексич. пола наблюдаема (иначе FULL «как бы есть»,
-            # а recall тихо рухнул). Гейт верности при этом не страдает — но качество да.
-            print(f"[retrieve] {type(eng).__name__} упал ({e}); деградация → лексический пол",
-                  file=sys.stderr)
-    return lexical_retrieve(question, adv_dir, top_k=top_k)
+    """Бэк-компат обёртка engine.retrieval.lexical_retrieve (лексич. пол, tier=SIMPLE)."""
+    if _retrieval is None:
+        raise RuntimeError("engine.retrieval недоступен: лексический пол живёт в engine-пакете.")
+    return _retrieval.lexical_retrieve(question, adv_dir, top_k=top_k)
 
 
 def load_golden(name, kind, advisor_dir=None, lang=None):

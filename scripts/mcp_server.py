@@ -258,14 +258,14 @@ def _retrieve(query, advisor_dir, top_k=3):
     # ленивый семантический build в tier_full.retrieve при отсутствии индекса на FULL-тире,
     # но нормальный поток строит индекс джобом build_advisor; джоббинг же cite/retrieve сломал
     # бы inline-UX fidelity-гейта (хост обязан вызывать их в момент цитирования). Не конвертируем.
-    import eval as _eval                     # ленивый импорт (тянет corpusbuild/engine)
+    from engine import retrieval             # ленивый импорт (тянет corpusbuild/engine)
     import relevance_gate
     import judge_backend
     import lang_check
     adv_res = _resolve_read(advisor_dir)                # H5 read-гард: traversal → пусто, не читаем
     if adv_res is None:
         return {"passages": []}
-    passages = _eval.retrieve(query, adv_res, top_k=top_k)
+    passages = retrieval.retrieve(query, adv_res, top_k=top_k)
     # Borderline-гейт релевантности: топически-близкий-но-не-отвечающий пассаж (камуфляж
     # смежного домена) флагуется relevance_gated (не выбрасываем — прозрачность). Инертен,
     # когда серверный судья недоступен (SIMPLE-пол без ollama); на semantic судит только
@@ -540,7 +540,7 @@ def _cite(advisor_dir, query, top_k=8, use_kernels=True, limit=4):
         limit = min(max(int(limit), 1), 16)
     except (TypeError, ValueError, OverflowError):
         return _cite_result([], {})
-    import eval as _eval
+    from engine import retrieval
     import relevance_gate
     import judge_backend
     import lang_check
@@ -568,7 +568,7 @@ def _cite(advisor_dir, query, top_k=8, use_kernels=True, limit=4):
     primary_score_by_text = {}                         # score текста ТОЛЬКО из primary-запроса
     primary_raw_by_text = {}                           # M4: сырой косинус поверх смеси/RRF
     for q in uniq_q:
-        for p in _eval.retrieve(q, adv_res, top_k=top_k):
+        for p in retrieval.retrieve(q, adv_res, top_k=top_k):
             t = (p.get("text") or "").strip()
             if not t:
                 continue

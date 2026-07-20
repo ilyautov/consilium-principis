@@ -22,7 +22,7 @@ import pytest
 import mcp_server
 import relevance_gate
 import relevance_judge
-import eval as _eval
+from engine import retrieval
 from mcp_server import dispatch, list_tools
 
 
@@ -49,7 +49,7 @@ def host_env(monkeypatch, tmp_path):
     """Пул 20 кандидатов (убывающий primary-косинус), все verbatim-🔵, tmp-советник
     (аудит-jsonl не должен писаться в репо)."""
     pool = _pool(20)
-    monkeypatch.setattr(_eval, "retrieve", lambda q, adv, top_k=8: list(pool))
+    monkeypatch.setattr(retrieval, "retrieve", lambda q, adv, top_k=8: list(pool))
     monkeypatch.setattr(mcp_server, "_fidelity_check",
                         lambda quote, adv: {"status": "🔵", "verbatim": True, "source": "src"})
     return pool, str(tmp_path / "adv")
@@ -129,7 +129,7 @@ def test_semantic_above_band_auto_keep_skips_host_judgment(monkeypatch, host_env
               {"text": "sure-hit beta", "score": 0.80, "source": "s"},
               {"text": "borderline gamma", "score": 0.60, "source": "s"},
               {"text": "borderline delta", "score": 0.50, "source": "s"}]
-    monkeypatch.setattr(_eval, "retrieve", lambda q, a, top_k=8: list(scored))
+    monkeypatch.setattr(retrieval, "retrieve", lambda q, a, top_k=8: list(scored))
     r = mcp_server._cite(adv, "q", use_kernels=False, limit=4)
     assert r["phase"] == "judgment_request"
     assert [c["text"] for c in r["candidates"]] == ["borderline gamma", "borderline delta"]
@@ -143,7 +143,7 @@ def test_semantic_all_above_band_is_single_phase(monkeypatch, host_env):
     pool, adv = host_env
     monkeypatch.setattr(relevance_gate, "is_semantic", lambda a, prefer=None: True)
     scored = [{"text": f"hit-{i}", "score": 0.9 - i * 0.01, "source": "s"} for i in range(6)]
-    monkeypatch.setattr(_eval, "retrieve", lambda q, a, top_k=8: list(scored))
+    monkeypatch.setattr(retrieval, "retrieve", lambda q, a, top_k=8: list(scored))
     r = mcp_server._cite(adv, "q", use_kernels=False, limit=4)
     assert "phase" not in r
     assert _texts(r) == ["hit-0", "hit-1", "hit-2", "hit-3"]
@@ -191,7 +191,7 @@ def test_phase1_display_order_is_tier_blind(monkeypatch, host_env):
     # слепые к тиру: чистый primary-косинус desc. Глубокий 🔵 НЕ всплывает первым.
     pool, adv = host_env
     six = _pool(6)
-    monkeypatch.setattr(_eval, "retrieve", lambda q, a, top_k=8: list(six))
+    monkeypatch.setattr(retrieval, "retrieve", lambda q, a, top_k=8: list(six))
     monkeypatch.setattr(mcp_server, "_fidelity_check", _fidelity_by_blue_set(("passage-05",)))
     r = _phase1(adv, limit=2)
     assert [c["text"] for c in r["candidates"]] == [p["text"] for p in six]  # косинус, не тир
@@ -203,7 +203,7 @@ def test_markers_come_from_server_tier_and_blue_inclusion_priority(monkeypatch, 
     # 🔵 последний по косинусу — в вердикте всё равно ПЕРВЫЙ; маркеры хост не подаёт
     pool, adv = host_env
     six = _pool(6)
-    monkeypatch.setattr(_eval, "retrieve", lambda q, a, top_k=8: list(six))
+    monkeypatch.setattr(retrieval, "retrieve", lambda q, a, top_k=8: list(six))
     monkeypatch.setattr(mcp_server, "_fidelity_check", _fidelity_by_blue_set(("passage-05",)))
     r = _phase1(adv, limit=2)
     v = mcp_server._gate_verdict(adv, r["nonce"], {c["id"]: 3 for c in r["candidates"]})
@@ -327,7 +327,7 @@ def test_server_judge_modes_stay_single_phase(monkeypatch, host_env, backend):
 
 def test_retrieve_host_mode_attaches_unjudged_directive(monkeypatch, host_env):
     pool, adv = host_env
-    monkeypatch.setattr(_eval, "retrieve", lambda q, a, top_k=3: _pool(3))
+    monkeypatch.setattr(retrieval, "retrieve", lambda q, a, top_k=3: _pool(3))
     r = mcp_server._retrieve("q", adv)
     assert r["passages_unjudged"] is True
     assert "🟡" in r["how_to_quote"] and "не отвеча" in r["how_to_quote"].lower()
@@ -337,7 +337,7 @@ def test_retrieve_host_mode_attaches_unjudged_directive(monkeypatch, host_env):
 def test_retrieve_server_judge_mode_has_no_directive(monkeypatch, host_env):
     pool, adv = host_env
     monkeypatch.setenv("CONSILIUM_JUDGE_BACKEND", "ollama")
-    monkeypatch.setattr(_eval, "retrieve", lambda q, a, top_k=3: _pool(3))
+    monkeypatch.setattr(retrieval, "retrieve", lambda q, a, top_k=3: _pool(3))
     r = mcp_server._retrieve("q", adv)
     assert "passages_unjudged" not in r
 

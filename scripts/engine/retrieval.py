@@ -19,7 +19,9 @@ from corpusbuild.paths import corpus_path
 
 
 def norm(s):
-    s = s.lower()
+    # ё→е держим в синхроне с engine/fidelity._norm — иначе прод-ретрив и гейт нормализуют
+    # по-разному (ревью 2026-07-20, Minor).
+    s = s.lower().replace("ё", "е")
     s = re.sub(r"[^\w\s]", " ", s, flags=re.U)
     return re.sub(r"\s+", " ", s).strip()
 

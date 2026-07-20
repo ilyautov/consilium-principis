@@ -11,6 +11,7 @@
 """
 import os
 import sys
+import threading
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.join(HERE, "..")
@@ -77,6 +78,84 @@ def test_job_status_survives_until_evicted(clean_jobs):
         jid = "job-%d" % M._JOB_SEQ[0]
         M._JOBS[jid] = {"status": "done", "label": "x", "result": 42, "error": None}
     assert M._job_status(jid)["result"] == 42
+
+
+def test_start_job_rejects_when_all_records_are_running(clean_jobs, monkeypatch):
+    """При полном реестре running-задач новую задачу не запускаем и не вытесняем старую."""
+    with M._JOBS_LOCK:
+        for i in range(M._MAX_JOBS):
+            M._JOBS["job-%d" % i] = {
+                "status": "running", "label": "long", "result": None, "error": None,
+            }
+
+    starts = []
+    monkeypatch.setattr(M.threading.Thread, "start", lambda thread: starts.append(thread))
+
+    result = M._start_job(lambda: None, "one-too-many")
+
+    assert result == {"error": "слишком много активных фоновых задач; дождись job_status"}
+    assert starts == []
+    with M._JOBS_LOCK:
+        assert len(M._JOBS) == M._MAX_JOBS
+        assert all(job["status"] == "running" for job in M._JOBS.values())
+
+
+def test_worker_ignores_record_removed_before_delayed_work_completes(clean_jobs, monkeypatch):
+    """Завершение воркера не падает, если его запись уже удалена из реестра."""
+    started = threading.Event()
+    release = threading.Event()
+    completed = threading.Event()
+    errors = []
+    real_thread = threading.Thread
+
+    class RecordingThread:
+        def __init__(self, target, daemon):
+            self._target = target
+            self.daemon = daemon
+
+        def start(self):
+            def run():
+                try:
+                    self._target()
+                except BaseException as error:
+                    errors.append(error)
+                finally:
+                    completed.set()
+
+            real_thread(target=run, daemon=self.daemon).start()
+
+    def delayed():
+        started.set()
+        assert release.wait(timeout=1)
+        return "finished"
+
+    monkeypatch.setattr(M.threading, "Thread", RecordingThread)
+    result = M._start_job(delayed, "delayed")
+    assert started.wait(timeout=1)
+    with M._JOBS_LOCK:
+        M._JOBS.pop(result["job_id"])
+    release.set()
+
+    assert completed.wait(timeout=1)
+    assert errors == []
+
+
+def test_start_job_removes_record_when_thread_cannot_start(clean_jobs, monkeypatch):
+    """Сбой запуска потока не оставляет невидимую running-запись в admission-реестре."""
+    def cannot_start(thread):
+        raise RuntimeError("thread creation failed")
+
+    monkeypatch.setattr(M.threading.Thread, "start", cannot_start)
+    with pytest.raises(RuntimeError, match="thread creation failed"):
+        M._start_job(lambda: None, "will-not-run")
+    with M._JOBS_LOCK:
+        assert M._JOBS == {}
+
+    starts = []
+    monkeypatch.setattr(M.threading.Thread, "start", lambda thread: starts.append(thread))
+    result = M._start_job(lambda: None, "admitted-after-failure")
+    assert result["status"] == "running"
+    assert len(starts) == 1
 
 
 # ─────────────────── ITEM 1: _PENDING_VERDICTS кап ───────────────────

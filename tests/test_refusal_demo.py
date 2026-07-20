@@ -4,8 +4,8 @@
 шли из ЖИВОГО гейта верности, а не из хардкода: выдуманная цитата ОБЯЗАНА отвергаться,
 реальная — давать 🔵 дословно. Плюс кадр чист от техношума (ни путей, ни JSON, ни тир-кодов).
 
-Корпус советника gitignored (собирается локально) → без build/corpus.jsonl тесты
-ПРОПУСКАЮТСЯ (как прочие корпус-зависимые тесты), CI остаётся зелёным офлайн.
+Корпус советника gitignored → в CI его размораживает закоммиченная фикстура
+tests/fixtures/demo_corpora/marcus-aurelius.jsonl (conftest материализует, если живого нет).
 """
 import os
 import sys
@@ -16,10 +16,14 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_ROOT, "scripts"))
 sys.path.insert(0, os.path.join(_ROOT, "scripts", "demo"))
 
-_CORPUS = os.path.join(_ROOT, "advisors", "marcus-aurelius", "build", "corpus.jsonl")
-pytestmark = pytest.mark.skipif(
-    not os.path.isfile(_CORPUS),
-    reason="корпус marcus-aurelius не собран (gitignored) — демо-гард пропущен")
+import conftest
+
+pytestmark = [
+    pytest.mark.skipif(
+        not conftest.demo_corpus_available("marcus-aurelius"),
+        reason="нет корпуса marcus-aurelius ни живого, ни фикстуры — демо-гард пропущен"),
+    pytest.mark.usefixtures("demo_pd_corpora"),
+]
 
 import refusal_demo as demo
 

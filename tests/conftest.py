@@ -13,9 +13,23 @@ host-протокол и сама резолюция тестируются в �
 адреса. Loopback (127.0.0.0/8, ::1, localhost) РАЗРЕШЁН намеренно: офлайн-инвариант
 целит OLLAMA_HOST в мёртвый 127.0.0.1:59999 и живёт на естественном ConnectionRefused →
 graceful fallback; блокировать loopback = сломать этот путь. DNS/AF_UNIX не трогаем.
+
+Плюс FS-ПЕСОЧНИЦА (M7): симметрия сокет-гарду на запись — тест, забывший запатчить
+_root/_root-подобный резолвер и ПИШУЩИЙ в трекаемые файлы репо, падает громко, а не
+молча пачкает рабочее дерево. Post-test сверка `git status --porcelain -uno`:
+  • -uno скрывает UNTRACKED (статьи в корне, .superpowers/) — фейлит только изменение
+    ТРЕКАЕМЫХ путей (M/D/A в индексе или рабочем дереве);
+  • gitignored-записи (advisors/*, .consilium/, __pycache__/, .pytest_cache/) git не
+    показывает вовсе → легальные кэши/стейт сьюта песочницу не задевают;
+  • дельта снимков ДО→ПОСЛЕ теста: заранее грязное дерево (незакоммиченная работа)
+    само по себе не фейлит — фейлит только ИЗМЕНЕНИЕ за время теста;
+  • оптимизация: ОДИН git-вызов на тест — «после» предыдущего теста = «до» следующего
+    (бегущий снимок в _fs_state), атрибуция по дельте соседних снимков.
 """
 import ipaddress
+import os
 import socket
+import subprocess
 
 import pytest
 
@@ -69,3 +83,86 @@ def _block_external_network():
     finally:
         socket.socket.connect = orig_connect
         socket.socket.connect_ex = orig_connect_ex
+
+
+# ───────────────────────── FS-песочница (M7) ─────────────────────────
+
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def _tracked_changes():
+    """Снимок изменённых ТРЕКАЕМЫХ путей (`git status --porcelain -uno`); None — git недоступен."""
+    try:
+        r = subprocess.run(["git", "status", "--porcelain", "-uno"],
+                           cwd=_REPO_ROOT, capture_output=True, text=True, timeout=30)
+    except Exception:
+        return None
+    return r.stdout if r.returncode == 0 else None
+
+
+_fs_state = {"last": None, "active": True}
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _fs_sandbox_baseline():
+    """Базовый снимок дерева до первого теста. Нет git/не репо → песочница выключается молча."""
+    _fs_state["last"] = _tracked_changes()
+    _fs_state["active"] = _fs_state["last"] is not None
+    yield
+
+
+@pytest.fixture(autouse=True)
+def _fs_write_sandbox(_fs_sandbox_baseline):
+    """Post-test гард: тест ИЗМЕНИЛ трекаемый путь вне tmp_path → громкий фейл с именами файлов."""
+    yield
+    if not _fs_state["active"]:
+        return
+    cur = _tracked_changes()
+    last = _fs_state["last"]
+    _fs_state["last"] = cur
+    if cur is None or cur == last:
+        return
+    new = sorted(set(cur.splitlines()) - set(last.splitlines()))
+    gone = sorted(set(last.splitlines()) - set(cur.splitlines()))
+    pytest.fail(
+        "Тест изменил ТРЕКАЕМЫЕ файлы репо вне tmp_path (забыл monkeypatch _root / tmp_path?):\n"
+        "  появились: %s\n  исчезли: %s\n"
+        "Запись в корпус/стейт делай в tmp_path; gitignored-пути (advisors/*, .consilium/) "
+        "песочница не видит." % (new or "—", gone or "—"),
+        pytrace=False)
+
+
+# ───────────────── демо-фикстура PD-корпусов (M7, CI) ─────────────────
+
+_DEMO_FIXTURES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures", "demo_corpora")
+_DEMO_SLUGS = ("marcus-aurelius", "machiavelli")          # только PD-фигуры, приватных слагов нет
+
+
+def demo_corpus_available(slug):
+    """Реальный (gitignored) корпус ИЛИ закоммиченная фикстура — условие skip демо-тестов."""
+    real = os.path.join(_REPO_ROOT, "advisors", slug, "build", "corpus.jsonl")
+    return os.path.isfile(real) or os.path.isfile(os.path.join(_DEMO_FIXTURES, slug + ".jsonl"))
+
+
+@pytest.fixture(scope="session")
+def demo_pd_corpora():
+    """Материализует синтетический PD-корпус в advisors/<slug>/build/corpus.jsonl, ТОЛЬКО если
+    реальный не собран (CI). Локально — no-op: демо гоняется по живому корпусу. Созданное
+    прибирается на teardown; advisors/* gitignored → FS-песочница запись не видит."""
+    import shutil
+    created = []
+    for slug in _DEMO_SLUGS:
+        dest = os.path.join(_REPO_ROOT, "advisors", slug, "build", "corpus.jsonl")
+        if os.path.isfile(dest):
+            continue                                        # живой корпус НЕ трогаем никогда
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+        shutil.copyfile(os.path.join(_DEMO_FIXTURES, slug + ".jsonl"), dest)
+        created.append(dest)
+    yield
+    for dest in created:
+        os.remove(dest)
+        for d in (os.path.dirname(dest), os.path.dirname(os.path.dirname(dest))):
+            try:
+                os.rmdir(d)                                 # убираем build/ и advisors/<slug>/, если пусты
+            except OSError:
+                pass                                        # не пусто (свои артефакты) — оставляем

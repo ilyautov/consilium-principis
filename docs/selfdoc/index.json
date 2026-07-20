@@ -4,7 +4,7 @@
     "rule_count": 19,
     "recipe_count": 16,
     "script_count": 69,
-    "test_count": 152,
+    "test_count": 156,
     "glossary_count": 113
   },
   "tools": [
@@ -2231,6 +2231,10 @@
       "covers": "cite early exit"
     },
     {
+      "path": "tests/test_collect_strip.py",
+      "covers": "collect strip"
+    },
+    {
       "path": "tests/test_config_set.py",
       "covers": "config set"
     },
@@ -2451,6 +2455,10 @@
       "covers": "gate simple tier inert"
     },
     {
+      "path": "tests/test_gen_golden.py",
+      "covers": "gen golden"
+    },
+    {
       "path": "tests/test_gen_selfdoc.py",
       "covers": "gen selfdoc"
     },
@@ -2567,6 +2575,10 @@
       "covers": "mcp server bounds"
     },
     {
+      "path": "tests/test_mcp_server_stdio.py",
+      "covers": "mcp server stdio"
+    },
+    {
       "path": "tests/test_mirror.py",
       "covers": "mirror"
     },
@@ -2577,6 +2589,10 @@
     {
       "path": "tests/test_montecarlo_demo.py",
       "covers": "montecarlo demo"
+    },
+    {
+      "path": "tests/test_multi_query.py",
+      "covers": "multi query"
     },
     {
       "path": "tests/test_network_sandbox.py",

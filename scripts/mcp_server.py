@@ -1664,7 +1664,7 @@ def _validate_manifest(advisor_dir):
     sd = os.path.join(d, "sources")
     mp = os.path.join(sd, "manifest.json")
     if not os.path.isfile(mp):
-        return {"ok": True, "problems": [], "note": "нет манифеста → всё P1 (бэк-компат)"}
+        return {"ok": True, "problems": [], "note": "нет манифеста → все чанки тиром A (🟡-only; задекларируй manifest для 🔵)"}
     return validate_manifest(_json.load(open(mp, encoding="utf-8")), sd)
 
 

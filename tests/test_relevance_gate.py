@@ -5,10 +5,12 @@
 дословный 🔵-пассаж про обман, но он НЕ отвечает на вопрос). Судья это ловит.
 
 Инварианты (тесты стерегут):
-  • INERT на lexical (полоса калибрована под semantic) → CI без ollama = 0 изменений.
-  • Судья зовётся ТОЛЬКО для in-band на semantic (латентный контракт → call-count).
-  • FAIL-CLOSED: судья упал/неуверен in-band → gated (пассаж флагнут / цитата снята).
-Всё офлайн: judge_fn мокается, is_semantic монки-патчится.
+  • Судья недоступен (SIMPLE-пол без ollama) → гейт инертен → CI без ollama = 0 изменений.
+  • M4: вне semantic-режима с ДОСТУПНЫМ судьёй verbatim-кандидаты судятся все; полоса
+    band — только на semantic-шкале (сырой косинус, при смеси — поле raw_score).
+  • Судья зовётся на semantic ТОЛЬКО для in-band (латентный контракт → call-count).
+  • FAIL-CLOSED: судья упал/неуверен → gated (пассаж флагнут / цитата снята).
+Всё офлайн: judge_fn мокается, is_semantic/_judge_available монки-патчатся.
 """
 import os
 import sys
@@ -38,6 +40,12 @@ class Counter:
 
 def _semantic(monkeypatch, val=True):
     monkeypatch.setattr(relevance_gate, "is_semantic", lambda advisor_dir: val)
+
+
+def _judge_avail(monkeypatch, val=True):
+    """M4: пин доступности серверного судьи (ollama/api жив). Вне semantic-режима гейт
+    судит только когда судья доступен; пин делает тест герметичным (без пробинга сети)."""
+    monkeypatch.setattr(relevance_gate, "_judge_available", lambda advisor_dir: val)
 
 
 # ───────────────────────── gate_passage ─────────────────────────
@@ -82,6 +90,7 @@ def test_gate_passage_below_band_no_judge(monkeypatch):
 
 def test_gate_passage_not_semantic_no_judge(monkeypatch):
     _semantic(monkeypatch, val=False)                  # lexical → гейт инертен
+    _judge_avail(monkeypatch, val=False)               # судья недоступен (M4: иначе судили бы)
     j = Counter(0)
     p = {"text": "x", "score": 0.50, "source": "s"}
     out = relevance_gate.gate_passage("q", p, "adv", judge_fn=j)
@@ -131,14 +140,16 @@ def test_gate_quote_above_band_hi_keeps_no_judge(monkeypatch):
 
 def test_gate_quote_not_semantic_keeps_no_judge(monkeypatch):
     _semantic(monkeypatch, val=False)
+    _judge_avail(monkeypatch, val=False)               # судья недоступен → прежний keep
     j = Counter(0)
     assert relevance_gate.gate_quote("q", "text", 0.50, "adv", judge_fn=j) is True
     assert j.calls == 0
 
 
 def test_gate_quote_not_semantic_subband_keeps_no_judge(monkeypatch):
-    # lexical → sub-band тоже инертен (полоса калибрована под semantic, CI без изменений)
+    # lexical + судья недоступен → sub-band тоже инертен (CI без ollama без изменений)
     _semantic(monkeypatch, val=False)
+    _judge_avail(monkeypatch, val=False)
     j = Counter(0)
     assert relevance_gate.gate_quote("q", "text", 0.30, "adv", judge_fn=j) is True
     assert j.calls == 0
@@ -389,9 +400,10 @@ def test_cite_wiring_judge_accepts_returns_quotes(monkeypatch):
 
 
 def test_cite_wiring_lexical_unaffected(monkeypatch):
-    """CI (lexical) — гейт инертен: судья не зван, поведение как раньше."""
+    """CI (lexical, судья недоступен) — гейт инертен: судья не зван, поведение как раньше."""
     import mcp_server
     _semantic(monkeypatch, val=False)
+    _judge_avail(monkeypatch, val=False)               # M4: иначе доступный судья судил бы
     fake = [{"text": "All warfare is based on deception.", "score": 0.50, "source": "src"}]
     import eval as _eval_mod
     monkeypatch.setattr(_eval_mod, "retrieve", lambda q, d, top_k=8: list(fake))
@@ -495,3 +507,167 @@ def test_retrieve_passes_source_into_judge(monkeypatch):
     r = mcp_server._retrieve("q", "advisors/machiavelli")
     assert r["passages"]
     assert seen["source"] == "Meditations, book II"
+
+
+# ── M4 (вариант A): гейт защищает и вне semantic-cosine мира ─────────────
+# Политика: verbatim-кандидаты СУДЯТСЯ независимо от retrieval-движка, когда
+# серверный судья доступен (_judge_available). Полоса band — ТОЛЬКО на
+# semantic-шкале (сырой косинус; при hybrid_alpha-смеси/RRF — поле raw_score);
+# вне semantic-шкалы судим всех. Судья недоступен → прежний путь
+# (keep/pass-through) — офлайн-инвариант SIMPLE-пола не ломается.
+
+def test_gate_quote_nonsemantic_judge_available_zero_withheld(monkeypatch):
+    # retrieval_mode=hybrid (is_semantic False) + ЖИВОЙ судья: не-отвечающая verbatim
+    # цитата (judge=0) снимается — раньше был молчаливый keep (дыра M4).
+    _semantic(monkeypatch, val=False)
+    _judge_avail(monkeypatch)
+    j = Counter(0)
+    assert relevance_gate.gate_quote("q", "text", 0.50, "adv", judge_fn=j) is False
+    assert j.calls == 1
+
+
+def test_gate_quote_nonsemantic_judge_available_high_kept(monkeypatch):
+    _semantic(monkeypatch, val=False)
+    _judge_avail(monkeypatch)
+    j = Counter(3)
+    assert relevance_gate.gate_quote("q", "text", 0.50, "adv", judge_fn=j) is True
+    assert j.calls == 1
+
+
+def test_gate_quote_nonsemantic_high_score_still_judged(monkeypatch):
+    # lexical/RRF-скор 0.95 — НЕ semantic-шкала: auto-keep по band_hi не срабатывает,
+    # судим (зеркало host-фазы-1: на lexical судятся все verbatim-кандидаты).
+    _semantic(monkeypatch, val=False)
+    _judge_avail(monkeypatch)
+    j = Counter(1)
+    assert relevance_gate.gate_quote("q", "text", 0.95, "adv", judge_fn=j) is False
+    assert j.calls == 1
+
+
+def test_gate_quote_raw_score_preferred_over_blend(monkeypatch):
+    # hybrid_alpha>0: score=0.9 — СМЕСЬ ((1-a)·cos + a·lex), raw_score=0.3 — сырой
+    # косинус. Гейт обязан судить по raw (0.3 ≤ band_hi), а не auto-keep по смеси.
+    _semantic(monkeypatch)
+    j = Counter(0)
+    assert relevance_gate.gate_quote("q", "text", 0.9, "adv", judge_fn=j,
+                                     raw_score=0.3) is False
+    assert j.calls == 1
+
+
+def test_gate_quote_raw_above_band_hi_auto_keep(monkeypatch):
+    # Смесь in-band (0.60), но сырой косинус 0.90 > band_hi → калиброванный auto-keep.
+    _semantic(monkeypatch)
+    j = Counter(0)
+    assert relevance_gate.gate_quote("q", "text", 0.60, "adv", judge_fn=j,
+                                     raw_score=0.90) is True
+    assert j.calls == 0
+
+
+def test_gate_passage_blend_above_band_raw_inband_judged(monkeypatch):
+    # Смесь 0.9 подняла пассаж над полосой, но сырой косинус 0.50 in-band → судим по raw.
+    _semantic(monkeypatch)
+    j = Counter(1)
+    p = {"text": "x", "score": 0.9, "raw_score": 0.50, "source": "s"}
+    out = relevance_gate.gate_passage("q", p, "adv", judge_fn=j)
+    assert out.get("relevance_gated") is True
+    assert j.calls == 1
+
+
+def test_gate_passage_nonsemantic_judge_available_judged(monkeypatch):
+    # lexical + живой судья: пассаж судится (раньше — молчаливый pass-through).
+    _semantic(monkeypatch, val=False)
+    _judge_avail(monkeypatch)
+    j = Counter(3)
+    p = {"text": "x", "score": 0.5, "source": "s"}
+    out = relevance_gate.gate_passage("q", p, "adv", judge_fn=j)
+    assert not out.get("relevance_gated")
+    assert out.get("relevance") == 3
+    assert j.calls == 1
+
+
+def test_gate_quote_nonsemantic_judge_unavailable_keeps(monkeypatch):
+    # Судья недоступен (ollama мёртв) → прежний путь: keep, судья НЕ зван.
+    _semantic(monkeypatch, val=False)
+    _judge_avail(monkeypatch, val=False)
+    j = Counter(0)
+    assert relevance_gate.gate_quote("q", "text", 0.50, "adv", judge_fn=j) is True
+    assert j.calls == 0
+
+
+def test_gate_passage_nonsemantic_judge_unavailable_passthrough(monkeypatch):
+    _semantic(monkeypatch, val=False)
+    _judge_avail(monkeypatch, val=False)
+    j = Counter(0)
+    p = {"text": "x", "score": 0.5, "source": "s"}
+    out = relevance_gate.gate_passage("q", p, "adv", judge_fn=j)
+    assert not out.get("relevance_gated")
+    assert j.calls == 0
+
+
+def test_gate_quote_nonsemantic_judge_raises_fail_closed(monkeypatch):
+    # Судья доступен, но бросил → fail-closed withhold (как на semantic).
+    _semantic(monkeypatch, val=False)
+    _judge_avail(monkeypatch)
+    j = Counter(RuntimeError("boom"))
+    assert relevance_gate.gate_quote("q", "text", 0.50, "adv", judge_fn=j) is False
+    assert j.calls == 1
+
+
+# ── M4 wiring: _cite/_retrieve на не-semantic движке с доступным судьёй ────
+
+def test_cite_wiring_nonsemantic_judge_available_withholds(monkeypatch):
+    # hybrid/lexical ретрив (is_semantic False), судья доступен и режет → честный 🟡.
+    import mcp_server
+    _semantic(monkeypatch, val=False)
+    _judge_avail(monkeypatch)
+    fake = [{"text": "All warfare is based on deception.", "score": 0.44, "source": "src"}]
+    import eval as _eval_mod
+    monkeypatch.setattr(_eval_mod, "retrieve", lambda q, d, top_k=8: list(fake))
+    monkeypatch.setattr(mcp_server, "_fidelity_check",
+                        lambda t, d: {"status": "🔵", "verbatim": True, "source": "src"})
+    import relevance_judge
+    calls = {"n": 0}
+    def _spy(q, p, model=None, source=None):
+        calls["n"] += 1
+        return 0
+    monkeypatch.setattr(relevance_judge, "judge", _spy)
+    r = mcp_server._cite("advisors/machiavelli", "adjacent-domain camouflage q",
+                         use_kernels=False)
+    assert calls["n"] == 1                              # судья ЗВАН (раньше 0 — дыра M4)
+    assert r["quotes"] == [] and r["marker"] == "🟡"
+
+
+def test_cite_wiring_raw_score_from_retrieve_gates_blend(monkeypatch):
+    # hybrid_alpha>0: retrieve отдал смесь 0.9 + raw 0.3 — _cite прокидывает raw в гейт,
+    # гейт судит по raw (без raw_score смесь 0.9 > band_hi ушла бы в auto-keep — дыра M4).
+    import mcp_server
+    _semantic(monkeypatch)
+    fake = [{"text": "All warfare is based on deception.", "score": 0.9,
+             "raw_score": 0.3, "source": "src"}]
+    import eval as _eval_mod
+    monkeypatch.setattr(_eval_mod, "retrieve", lambda q, d, top_k=8: list(fake))
+    monkeypatch.setattr(mcp_server, "_fidelity_check",
+                        lambda t, d: {"status": "🔵", "verbatim": True, "source": "src"})
+    import relevance_judge
+    calls = {"n": 0}
+    def _spy(q, p, model=None, source=None):
+        calls["n"] += 1
+        return 3
+    monkeypatch.setattr(relevance_judge, "judge", _spy)
+    r = mcp_server._cite("advisors/machiavelli", "deception in war", use_kernels=False)
+    assert calls["n"] == 1                              # судья ЗВАН несмотря на смесь 0.9
+    assert r["quotes"] and r["best"]["marker"] == "🔵"
+
+
+def test_eval_retrieve_forwards_raw_score(monkeypatch):
+    # Прокидка M4: Passage.raw_score → dict retrieve (без неё _cite не видит сырой косинус).
+    import eval as _eval_mod
+    from engine import Passage
+    class _FakeEng:
+        def retrieve(self, q, d, top_k=3):
+            return [Passage("t", 0.9, "s", None, raw_score=0.3),
+                    Passage("u", 0.8, "s", None)]      # чистая семантика — без raw
+    monkeypatch.setattr(_eval_mod._engine, "resolve_engine", lambda d, prefer=None: _FakeEng())
+    out = _eval_mod.retrieve("q", "adv", top_k=2)
+    assert out[0]["raw_score"] == 0.3
+    assert "raw_score" not in out[1]                   # нет raw — ключа нет (форма прежняя)

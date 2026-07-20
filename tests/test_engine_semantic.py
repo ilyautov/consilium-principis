@@ -37,3 +37,25 @@ def test_build_index_returns_chunk_chars(monkeypatch):
     from engine.semantic import SemanticEngine
     meta = SemanticEngine().build_index("/tmp/adv")
     assert meta == {"chunk_chars": 500}
+
+
+def test_blend_sets_raw_score_to_cosine(monkeypatch):
+    # M4: hybrid_alpha>0 → score = (1-a)·cos + a·lex (смесь), сырой косинус сохраняется
+    # в raw_score — гейт релевантности калиброван под косинус и не должен резать смесь.
+    monkeypatch.setitem(sys.modules, "tier_full", _fake_tier_full())
+    monkeypatch.setenv("HYBRID_ALPHA", "0.5")
+    from engine.semantic import SemanticEngine
+    hits = SemanticEngine().retrieve("retire into thyself", "/tmp/adv", top_k=1)
+    p = hits[0]
+    # «retire into thyself» == запрос → lex=1.0 → смесь 0.5·0.61 + 0.5·1.0 = 0.805
+    assert abs(p.score - 0.805) < 1e-9
+    assert p.raw_score == 0.61                       # сырой косинус tier_full
+
+def test_pure_semantic_raw_score_none(monkeypatch):
+    # alpha=0 → score и есть косинус → raw_score не нужен (None, форма прежняя).
+    monkeypatch.setitem(sys.modules, "tier_full", _fake_tier_full())
+    monkeypatch.setenv("HYBRID_ALPHA", "0.0")
+    from engine.semantic import SemanticEngine
+    hits = SemanticEngine().retrieve("retire into thyself", "/tmp/adv", top_k=1)
+    assert hits[0].score == 0.61
+    assert hits[0].raw_score is None

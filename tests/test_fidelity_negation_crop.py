@@ -80,3 +80,10 @@ def test_cross_sentence_negation_not_blue(tmp_path):
     from engine import fidelity
     adv = _mk_advisor(tmp_path, "He did not endorse war. Pursue peace and mercy.")
     assert fidelity.marker_status("endorse war pursue peace", adv)["status"] == "🟡"
+
+
+def test_later_clean_sentence_match_remains_eligible():
+    from engine import fidelity
+    assert fidelity._crop_severs_negation(
+        "endorse war", "He did not endorse war. Endorse war now."
+    ) is False

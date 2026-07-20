@@ -54,9 +54,10 @@ def _crop_severs_negation(q: str, raw_text: str) -> bool:
         if i < 0:
             continue
         found = True
-        if any(tok in _NEG for tok in ns[:i].split()):
-            return True                        # обрезка срезала отрицание
-        return False                           # чистое вхождение без отрицания в префиксе
+        if not any(tok in _NEG for tok in ns[:i].split()):
+            return False                       # чистое вхождение без отрицания в префиксе
+    if found:
+        return True                            # все вхождения с отрицанием → обрезка
     return not found                           # match only across sentence boundary → fail-closed
 
 

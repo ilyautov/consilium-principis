@@ -8,9 +8,13 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
 
+from corpusbuild.paths import project_root  # noqa: E402
 
-def _root(root=None):
-    return root or ROOT
+
+def _default_root(root=None):
+    # Иная сигнатура, чем у _root() в соседних скриптах (root-override) — потому не _root,
+    # чтобы не коллидировать (M11). Дефолт делегирует каноничному project_root().
+    return root or project_root()
 
 
 def _load_mcp():
@@ -23,7 +27,7 @@ def _load_mcp():
 
 def _internal_registry(root=None):
     """Множество id внутренних тулов из ```text```-блока docs/dev/internal-tools.md."""
-    path = os.path.join(_root(root), "docs", "dev", "internal-tools.md")
+    path = os.path.join(_default_root(root), "docs", "dev", "internal-tools.md")
     if not os.path.exists(path):
         return set()
     text = open(path, encoding="utf-8").read()
@@ -34,7 +38,7 @@ def _internal_registry(root=None):
 
 
 def _recipes_raw(root=None):
-    path = os.path.join(_root(root), "recipes.json")
+    path = os.path.join(_default_root(root), "recipes.json")
     return open(path, encoding="utf-8").read() if os.path.exists(path) else "[]"
 
 
@@ -108,7 +112,7 @@ def _first_docline(path):
 
 
 def extract_scripts(root=None):
-    d = os.path.join(_root(root), "scripts")
+    d = os.path.join(_default_root(root), "scripts")
     out = []
     for name in sorted(os.listdir(d)):
         if not name.endswith(".py"):
@@ -120,7 +124,7 @@ def extract_scripts(root=None):
 
 
 def extract_tests(root=None):
-    d = os.path.join(_root(root), "tests")
+    d = os.path.join(_default_root(root), "tests")
     out = []
     for name in sorted(os.listdir(d)):
         if not (name.startswith("test_") and name.endswith(".py")):
@@ -132,7 +136,7 @@ def extract_tests(root=None):
 
 def extract_glossary(root=None):
     """Термины '**Термин** — определение' из docs/GLOSSARY.md (многострочные до пустой строки)."""
-    path = os.path.join(_root(root), "docs", "GLOSSARY.md")
+    path = os.path.join(_default_root(root), "docs", "GLOSSARY.md")
     if not os.path.exists(path):
         return []
     lines = open(path, encoding="utf-8").read().splitlines()

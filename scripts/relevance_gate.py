@@ -41,6 +41,8 @@ import time
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
+from corpusbuild.paths import project_root  # noqa: E402
+
 # Дефолты — семантически-калиброванная полоса неуверенности + порог «релевантно».
 # band_hi=0.65 НАМЕРЕННО выше камуфляж-потолка 0.612 (Machiavelli) / 0.596 (Marcus) из
 # adversarial-eval: OOC-камуфляж и отвечающие спаны (0.537–0.689) ПЕРЕСЕКАЮТСЯ на
@@ -54,7 +56,8 @@ JUDGE_BACKEND_DEFAULT = "auto"          # §2.2: host|ollama|api|auto (резо�
 
 
 def _root():
-    return os.path.dirname(HERE)
+    # Делегат каноничного corpusbuild.paths.project_root (M11, было 5 копий).
+    return project_root()
 
 
 def _config_path():

@@ -58,6 +58,19 @@ def test_card_path_traversal_refused(tmp_path, monkeypatch):
     assert not os.path.exists(os.path.join(str(tmp_path), "..", "..", "etc", "evil.card.json"))
 
 
+def test_card_collision_gets_suffix_not_overwrite(tmp_path, monkeypatch):
+    """Коллизия имени Card → суффикс -2, а не перезапись (тот же контракт, что у карты)."""
+    monkeypatch.setattr(mcp_server, "_root", lambda: str(tmp_path))
+    a = dispatch("save_decision_card", {"map": _valid_map(), "chosen_option": "ship_public",
+                                        "review_horizon_days": 90, "slug": "same"})
+    b = dispatch("save_decision_card", {"map": _valid_map(), "chosen_option": "ship_public",
+                                        "review_horizon_days": 90, "slug": "same"})
+    assert a.get("ok") and b.get("ok")
+    assert a["path"] != b["path"]
+    assert os.path.isfile(os.path.join(str(tmp_path), a["path"]))
+    assert os.path.isfile(os.path.join(str(tmp_path), b["path"]))
+
+
 def test_close_card_path_traversal_refused(tmp_path, monkeypatch):
     monkeypatch.setattr(mcp_server, "_root", lambda: str(tmp_path))
     r = dispatch("close_decision_card", {"path": "../../etc/passwd",

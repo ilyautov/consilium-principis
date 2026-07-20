@@ -137,7 +137,7 @@ description: >
    `validate_decision_map`/`run_calculation`/`save_decision_map` (📐 карта решения, см. ниже).
    Это та же дисциплина, что уже действует в Claude Code (SKILL = инструкции, ты = ризонер,
    скрипты = инструменты). **Host-facing источник истины для MCP-хоста — блок INSTRUCTIONS в
-   `scripts/mcp_server.py` (правила 0-17);** этот SKILL.md — их зеркало для Claude-Code-поверхности.
+   `scripts/mcp_server.py` (правила 0-18);** этот SKILL.md — их зеркало для Claude-Code-поверхности.
    **ВЕСЬ цикл — через MCP, юзер не выходит из агента.** Не только ризонинг-тулы: сборка и админка
    тоже тулы (раньше жили в `board.py` CLI → в чистом MCP-хосте без шелла были недоступны) —
    `doctor` (готова ли машина), `seed_council` (холодный старт), `build_advisor` (советник под ключ),

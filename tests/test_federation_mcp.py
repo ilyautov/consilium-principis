@@ -81,6 +81,39 @@ def test_federation_open_rejects_non_dict_item(tmp_path, monkeypatch):
     assert "error" in out
 
 
+def test_federation_open_rejects_oversize_field_before_backend(tmp_path, monkeypatch):
+    backend = m._make_fed_backend(str(tmp_path / "f.sqlite3"))
+    calls = []
+
+    def backend_spy():
+        calls.append(True)
+        return backend
+
+    monkeypatch.setattr(m, "_fed_backend", backend_spy)
+    out = m.dispatch("federation_open", {"session_id": "s1", "plan": [{
+        "role": "role", "advisor_dir": "advisors/a", "question": "q" * 4097,
+    }]})
+    assert "error" in out
+    assert calls == []
+
+
+def test_federation_open_rejects_oversize_expanded_questions_before_backend(tmp_path, monkeypatch):
+    backend = m._make_fed_backend(str(tmp_path / "f.sqlite3"))
+    calls = []
+
+    def backend_spy():
+        calls.append(True)
+        return backend
+
+    monkeypatch.setattr(m, "_fed_backend", backend_spy)
+    plan = [{"role": "role%d" % i, "advisor_dir": "advisors/a%d" % i,
+             "question": "q" * 4096, "replicas": 32}
+            for i in range(3)]
+    out = m.dispatch("federation_open", {"session_id": "s1", "plan": plan})
+    assert "error" in out
+    assert calls == []
+
+
 def test_federation_claim_timeout_capped(tmp_path, monkeypatch):
     monkeypatch.setattr(m, "_root", lambda: str(tmp_path))
     monkeypatch.setattr(m, "_FED_BACKEND", None)

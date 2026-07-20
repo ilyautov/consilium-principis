@@ -6,6 +6,8 @@ cite_fn / retrieve_fn / judge_fn подаются как test seams.
 import os
 import sys
 
+import pytest
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "scripts"))
 
@@ -270,6 +272,27 @@ class TestJudgeGateEfficacy:
             FAKE_ADVISOR, [{"q": "ooc1"}], [],
             retrieve_fn=retrieve_fn, judge_fn=judge_fn, top_k=1)
         assert calls == ["ooc1"]
+
+    @pytest.mark.parametrize("n_samples", [6, "3", True])
+    def test_n_samples_rejects_invalid_values(self, n_samples):
+        with pytest.raises(ValueError, match="n_samples must be an integer from 1 to 5"):
+            sge.judge_gate_efficacy(
+                FAKE_ADVISOR, [], [],
+                retrieve_fn=lambda q, d, k: [], judge_fn=lambda q, p: 0,
+                n_samples=n_samples)
+
+    def test_n_samples_five_invokes_judge_five_times(self):
+        calls = []
+
+        def judge_fn(q, p):
+            calls.append((q, p))
+            return 3
+
+        sge.judge_gate_efficacy(
+            FAKE_ADVISOR, [{"q": "ooc1"}], [],
+            retrieve_fn=lambda q, d, k: [{"text": "p", "score": 0.9, "source": "s"}],
+            judge_fn=judge_fn, top_k=1, n_samples=5)
+        assert len(calls) == 5
 
     def test_judge_exception_fail_closed_zero(self):
         """Исключение судьи в сэмпле → 0 (fail-closed, идиома poison_eval):

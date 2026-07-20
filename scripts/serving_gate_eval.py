@@ -107,6 +107,9 @@ def judge_gate_efficacy(advisor_dir, ooc_questions, answerable_questions,
             "n_ans": int,
         }
     """
+    if (isinstance(n_samples, bool) or not isinstance(n_samples, int)
+            or not 1 <= n_samples <= 5):
+        raise ValueError("n_samples must be an integer from 1 to 5")
     if retrieve_fn is None:
         from eval import retrieve as _retrieve
         retrieve_fn = _retrieve
@@ -116,7 +119,7 @@ def judge_gate_efficacy(advisor_dir, ooc_questions, answerable_questions,
 
     def _judge_median(q, passage_text):
         samples = []
-        for _ in range(max(1, n_samples)):
+        for _ in range(n_samples):
             try:
                 samples.append(int(judge_fn(q, passage_text)))
             except Exception:

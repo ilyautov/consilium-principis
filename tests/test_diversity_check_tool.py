@@ -38,6 +38,34 @@ def test_diversity_tool_traversal_rejected(tmp_path, monkeypatch):
                               {"advisor_dirs": ["advisors/a1", "/etc"]})
     assert "error" in out
 
+
+def test_diversity_tool_rejects_more_than_32_before_check(tmp_path, monkeypatch):
+    import diversity_check
+
+    monkeypatch.setattr(mcp_server, "_root", lambda: str(tmp_path))
+    _mk_advisors(tmp_path)
+    calls = []
+    monkeypatch.setattr(diversity_check, "check", lambda dirs: calls.append(dirs))
+
+    out = mcp_server.dispatch("diversity_check", {"advisor_dirs": ["advisors/a1"] * 33})
+    assert "error" in out
+    assert calls == []
+
+
+def test_diversity_tool_deduplicates_equivalent_paths_before_minimum(tmp_path, monkeypatch):
+    import diversity_check
+
+    monkeypatch.setattr(mcp_server, "_root", lambda: str(tmp_path))
+    _mk_advisors(tmp_path)
+    calls = []
+    monkeypatch.setattr(diversity_check, "check", lambda dirs: calls.append(dirs))
+
+    out = mcp_server.dispatch("diversity_check",
+                              {"advisor_dirs": ["advisors/a1", "advisors/a1/."]})
+    assert "error" in out
+    assert calls == []
+
+
 def _mk_bare_advisors(root):
     # persona.md без lenses/domains во фронтматере — метаданных нет, судить нельзя
     for slug in ("x1", "x2"):

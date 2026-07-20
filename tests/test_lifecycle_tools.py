@@ -329,3 +329,31 @@ def test_add_source_clean_mode_writes_clean_file(tmp_path):
     corpus = [json.loads(l) for l in open(paths.corpus_path(r["advisor_dir"]))]
     assert corpus and all(c["tier"] == "P1" for c in corpus)        # только чистый автор, без A-мусора
     assert not any("Tu Mu" in c["text"] for c in corpus)            # аппарат исчез из корпуса
+
+
+def test_add_source_env_path_rejected(tmp_path, monkeypatch):
+    monkeypatch.setattr(mcp_server, "_root", lambda: str(tmp_path))
+    (tmp_path / ".env").write_text("OPENROUTER_API_KEY=sk-x\n", encoding="utf-8")
+    with pytest.raises(ValueError):
+        mcp_server._load_source_text(path=".env")
+
+def test_load_source_pem_key_rejected(tmp_path, monkeypatch):
+    monkeypatch.setattr(mcp_server, "_root", lambda: str(tmp_path))
+    (tmp_path / "server.pem").write_text("-----BEGIN\n", encoding="utf-8")
+    with pytest.raises(ValueError):
+        mcp_server._load_source_text(path="server.pem")
+
+def test_load_source_regular_file_ok(tmp_path, monkeypatch):
+    monkeypatch.setattr(mcp_server, "_root", lambda: str(tmp_path))
+    (tmp_path / "book.txt").write_text("some public domain text\n", encoding="utf-8")
+    text, hint, prov, lic = mcp_server._load_source_text(path="book.txt")
+    assert "public domain" in text
+
+
+def test_load_source_env_example_template_allowed(tmp_path, monkeypatch):
+    # задокументированное исключение denylist: .env.example/.sample/.template — публичные
+    # шаблоны, не секреты → читаемы (без исключения regex ловил бы их как .env*).
+    monkeypatch.setattr(mcp_server, "_root", lambda: str(tmp_path))
+    (tmp_path / ".env.example").write_text("OPENROUTER_API_KEY=\n", encoding="utf-8")
+    text, hint, prov, lic = mcp_server._load_source_text(path=".env.example")
+    assert "OPENROUTER_API_KEY" in text

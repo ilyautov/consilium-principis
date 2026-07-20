@@ -17,6 +17,7 @@
 в __main__, тонкий; при желании заменяется официальным SDK, дёргающим тот же dispatch.
 """
 import os
+import re
 import sys
 import json
 import time
@@ -76,6 +77,23 @@ def _resolve_read(p):
     rp = os.path.realpath(_resolve(p))          # _resolve: rel→от корня, abs→как есть; затем realpath
     root = os.path.realpath(_root())
     return rp if (rp == root or rp.startswith(root + os.sep)) else None
+
+
+# M1: read-гарды пропускают ЛЮБОЙ файл под корнем → add_source(path=".env")/build_lens
+# затягивали секрет в корпус, откуда cite/retrieve выносят его в контекст хоста.
+_SENSITIVE_RE = re.compile(
+    r"(^|/)(\.env[^/]*|\.git|id_rsa[^/]*|credentials[^/]*|[^/]*\.(pem|key|p12|pfx))$", re.I)
+
+# Публичные шаблоны env — НЕ секреты: задокументированное исключение denylist (без него
+# regex ловил бы .env.example как .env* — ложный отказ на легитном файле).
+_ENV_TEMPLATE_NAMES = (".env.example", ".env.sample", ".env.template")
+
+
+def _is_sensitive_path(rp):
+    """True для секретов/ключей/VCS-метаданных — запрещены к чтению в корпус."""
+    if os.path.basename(rp).lower() in _ENV_TEMPLATE_NAMES:
+        return False
+    return bool(_SENSITIVE_RE.search(rp.replace(os.sep, "/")))
 
 
 def _fidelity_check(quote, advisor_dir):
@@ -705,9 +723,10 @@ def _ollama_ensure():
 
 
 def _load_source_text(url=None, path=None, text=None, license=None):
-    """Безопасно достать текст источника: url (SSRF-гард + Gutenberg-strip) | path (traversal-гард,
-    только внутри репо) | text. Возвращает (text, hint, provenance, license_note) или поднимает
-    ValueError с понятной причиной. Общий рычаг для add_source и build_lens (DRY)."""
+    """Безопасно достать текст источника: url (SSRF-гард + Gutenberg-strip) | path (read-кламп
+    _resolve_read + M1-denylist секретов/ключей/.git) | text. Возвращает (text, hint, provenance,
+    license_note) или поднимает ValueError с понятной причиной. Общий рычаг для add_source и
+    build_lens (DRY)."""
     import collect_common as cc
     if url:
         if not (cc.is_pd_host(url) or license == "public-domain"):
@@ -719,10 +738,11 @@ def _load_source_text(url=None, path=None, text=None, license=None):
         hint = cc.host_of(url) + "-" + url.rstrip("/").rsplit("/", 1)[-1]
         return raw, hint, url, (license or "public-domain")
     if path:
-        rp = os.path.realpath(_resolve(path))
-        root = os.path.realpath(_root())               # path traversal: только внутри репо
-        if not (rp == root or rp.startswith(root + os.sep)):
+        rp = _resolve_read(path)                       # единый read-кламп (не третья копия)
+        if rp is None:
             raise ValueError("path вне корня репо запрещён (traversal). Внешний файл — через text= или копию в репо.")
+        if _is_sensitive_path(rp):
+            raise ValueError("чтение чувствительных файлов (секреты, ключи, .git) в корпус запрещено.")
         return open(rp, encoding="utf-8").read(), os.path.basename(rp), f"file:{rp}", (license or "unknown")
     if text:
         return text, "pasted-source", "(вставка)", (license or "unknown")

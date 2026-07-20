@@ -35,8 +35,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 SCRIPTS_DIR = os.path.dirname(HERE)
 REPO_ROOT = os.path.dirname(SCRIPTS_DIR)
-if SCRIPTS_DIR not in sys.path:
-    sys.path.insert(0, SCRIPTS_DIR)
+sys.path.insert(0, SCRIPTS_DIR)
 
 from federation.queue import SqliteBackend
 from federation.coordinator import open_session, assemble

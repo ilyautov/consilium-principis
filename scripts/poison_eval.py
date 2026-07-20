@@ -24,8 +24,7 @@ import re
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-if HERE not in sys.path:
-    sys.path.insert(0, HERE)
+sys.path.insert(0, HERE)
 
 DEFAULT_BATTERY = os.path.join(HERE, "moat_battery", "poisoned.jsonl")
 REQUIRED_KEYS = ("id", "kind", "lang", "position", "q", "clean", "injection")

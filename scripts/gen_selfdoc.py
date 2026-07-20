@@ -6,6 +6,7 @@ import os, sys, json, re, importlib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
+sys.path.insert(0, HERE)
 
 
 def _root(root=None):
@@ -16,8 +17,6 @@ def _load_mcp():
     # Тулы/правила интроспектируются из ЖИВОГО импортированного mcp_server ПО ДИЗАЙНУ (само-док
     # документирует РАБОТАЮЩИЙ сервер, не foreign-root копию); `root` в остальных extract_* правит
     # только файловыми источниками (recipes.json, internal-tools.md, scripts/, tests/, GLOSSARY.md).
-    if HERE not in sys.path:
-        sys.path.insert(0, HERE)
     import mcp_server
     return mcp_server
 

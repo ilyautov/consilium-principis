@@ -13,8 +13,7 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SCRIPTS_DIR = os.path.dirname(HERE)
-if SCRIPTS_DIR not in sys.path:
-    sys.path.insert(0, SCRIPTS_DIR)
+sys.path.insert(0, SCRIPTS_DIR)
 
 from federation.coordinator import open_session, assemble
 from federation.executor import claim_brief, submit_candidate
@@ -196,7 +195,6 @@ if __name__ == "__main__":
     from federation.queue import SqliteBackend
 
     ROOT = os.path.dirname(SCRIPTS_DIR)
-    sys.path.insert(0, SCRIPTS_DIR)
     from mcp_server import _fidelity_check
     from corpusbuild.paths import corpus_path
 

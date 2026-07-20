@@ -29,9 +29,7 @@ import secrets
 import sys
 import time
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-if HERE not in sys.path:
-    sys.path.insert(0, HERE)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from decision_map import _is_number, _nonempty_str  # те же числовые/строковые гейты
 

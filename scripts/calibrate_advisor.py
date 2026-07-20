@@ -48,8 +48,7 @@ import sys
 import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-if HERE not in sys.path:
-    sys.path.insert(0, HERE)
+sys.path.insert(0, HERE)
 
 BATTERY_DIR = os.path.join(HERE, "moat_battery")
 LO_MARGIN = 0.05          # band_lo = threshold − LO_MARGIN (зеркало глобальных 0.50→0.45)

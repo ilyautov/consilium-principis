@@ -18,6 +18,8 @@ import sys
 import json
 import html as _html
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 MSG_RE = re.compile(r'<div class="tgme_widget_message_text[^"]*"[^>]*>(.*?)</div>', re.S)
 
 
@@ -61,7 +63,6 @@ def fetch_channel_html(handle, timeout=20):
     """Скачать web-превью публичного канала через collect_common.fetch — тот же SSRF-гард
     (схема/публичный IP/ре-валидация редиректов), что у add_source. Сеть нужна (sandbox может
     блокировать — тогда агент отдаёт HTML через WebFetch в parse_telegram_html напрямую)."""
-    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from collect_common import fetch as _cc_fetch
     return _cc_fetch(f"https://t.me/s/{_safe_handle(handle)}", timeout=timeout)
 

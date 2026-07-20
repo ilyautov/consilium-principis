@@ -18,11 +18,9 @@ translate-query, см. memory: translate query not corpus).
 """
 import os
 import json
-import sys as _sys
+import sys
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-if HERE not in _sys.path:
-    _sys.path.insert(0, HERE)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from corpusbuild.paths import corpus_path
 
 # ISO-коды языков на кириллице; всё прочее известное считаем латиницей (наши корпуса —

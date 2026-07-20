@@ -48,9 +48,8 @@ from collections import Counter
 
 _SCRIPTS = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 HERE = os.path.dirname(os.path.abspath(__file__))
-for _p in (_SCRIPTS, HERE):
-    if _p not in sys.path:
-        sys.path.insert(0, _p)
+sys.path.insert(0, _SCRIPTS)
+sys.path.insert(0, HERE)
 
 RESULTS_DIR = os.path.join(HERE, "results")
 DEFAULT_MODELS = "openai/gpt-4.1,z-ai/glm-5.2"   # пара, отработавшая в Tier-2 догфуде

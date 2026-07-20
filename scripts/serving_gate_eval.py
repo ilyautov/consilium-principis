@@ -71,7 +71,8 @@ def cite_misapplication_rate(advisor_dir, ooc_questions, cite_fn=None):
 # ───────────────────────── 2. judge-gate efficacy ─────────────────────────────
 
 def judge_gate_efficacy(advisor_dir, ooc_questions, answerable_questions,
-                        retrieve_fn=None, judge_fn=None, top_k=3, rel_threshold=2):
+                        retrieve_fn=None, judge_fn=None, top_k=3, rel_threshold=2,
+                        n_samples=1):
     """Measures how well an LLM-judge gate separates OOC from answerable questions.
 
     For each question: retrieve top_k passages, judge each, take max_judge.
@@ -87,6 +88,13 @@ def judge_gate_efficacy(advisor_dir, ooc_questions, answerable_questions,
                   TEST SEAM — default: relevance_judge.judge
         top_k: int
         rel_threshold: min judge score to count as "answered" (default 2)
+        n_samples: сэмплов судьи на пассаж, рейтинг = МЕДИАНА (идиома
+                   poison_eval.inflation_eval): живой судья на границе уровней
+                   (1↔2) шумит ±1 в одиночном сэмпле — одиночный флип конфаундит
+                   шум с решением гейта (ревью M6: при n=12 флип = 8.3 п.п.).
+                   Исключение судьи в сэмпле → 0 (fail-closed: упавшее ≠
+                   релевантное). Дефолт 1 = прежнее поведение (детерминированные
+                   сеамы в тестах); живые прогоны — n_samples=3.
 
     Returns:
         {
@@ -106,12 +114,22 @@ def judge_gate_efficacy(advisor_dir, ooc_questions, answerable_questions,
         from relevance_judge import judge as _judge
         judge_fn = _judge
 
+    def _judge_median(q, passage_text):
+        samples = []
+        for _ in range(max(1, n_samples)):
+            try:
+                samples.append(int(judge_fn(q, passage_text)))
+            except Exception:
+                samples.append(0)                # fail-closed, как в poison_eval
+        samples.sort()
+        return samples[len(samples) // 2]        # медиана
+
     def _eval_question(q):
         passages = retrieve_fn(q, advisor_dir, top_k)
         if not passages:
             max_judge = 0
         else:
-            max_judge = max(judge_fn(q, p["text"]) for p in passages)
+            max_judge = max(_judge_median(q, p["text"]) for p in passages)
         decision = "PASS" if max_judge >= rel_threshold else "GATE"
         return {"q": q, "max_judge": max_judge, "decision": decision}
 
@@ -181,16 +199,33 @@ def cosine_false_accept_rate(advisor_dir, ooc_questions, retrieve_fn=None,
 
 # ───────────────────────── 4. main ────────────────────────────────────────────
 
+def _default_out_path():
+    """Дефолт пути вердикта — внутри репо (docs/demo/), не scratchpad в /private/tmp
+    (ревью M6: хардкод claude-501-пути делал прогон невоспроизводимым вне этой машины)."""
+    return os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                        "docs", "demo", "serving-gate-verdict.md")
+
+
+def _write_verdict(out_path, lines):
+    """Пишет markdown-вердикт; родительские каталоги создаются."""
+    os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
+    with open(out_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+
+
 def main():
+    import argparse
+    ap = argparse.ArgumentParser(description="eval серверной поверхности "
+                                             "(cite-misapplication, judge-gate, cosine-baseline)")
+    ap.add_argument("--out", default=_default_out_path(),
+                    help="куда писать markdown-вердикт "
+                         "(дефолт: docs/demo/serving-gate-verdict.md в репо)")
+    args = ap.parse_args()
+
     import llm_local
     if not llm_local.available():
         print("ollama недоступен — реальный прогон невозможен. Проверь: ollama serve")
         return
-
-    SCRATCHPAD = (
-        "/private/tmp/claude-501/-Users-ilyautov-personal-Projects-personal-board-skill-2026-06-10"
-        "/aad15b73-fcfe-410d-966a-da6dcc8e2bac/scratchpad/serving-gate-verdict.md"
-    )
 
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -269,7 +304,7 @@ def main():
         jg = judge_gate_efficacy(
             adv_dir, ooc_questions, answerable,
             retrieve_fn=_retfn, judge_fn=_judge,
-            top_k=3, rel_threshold=2,
+            top_k=3, rel_threshold=2, n_samples=3,
         )
         print(f"  ooc_true_negative_rate = {jg['ooc_true_negative_rate']:.3f}")
         print(f"  ans_true_positive_rate = {jg['ans_true_positive_rate']:.3f}")
@@ -315,10 +350,8 @@ def main():
             "",
         ]
 
-    os.makedirs(os.path.dirname(SCRATCHPAD), exist_ok=True)
-    with open(SCRATCHPAD, "w", encoding="utf-8") as f:
-        f.write("\n".join(lines) + "\n")
-    print(f"\n=== Вердикт записан: {SCRATCHPAD} ===")
+    _write_verdict(args.out, lines)
+    print(f"\n=== Вердикт записан: {args.out} ===")
 
 
 if __name__ == "__main__":

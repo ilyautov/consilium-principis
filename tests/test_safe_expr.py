@@ -212,3 +212,14 @@ def test_env_missing_id_raises_eval_error():
     fn = compile_expr("x + y", ALLOWED)
     with pytest.raises(SafeExprEvalError):
         fn({"x": 1.0})
+
+
+def test_pure_int_overflow_raises_eval_error():
+    # ~20 чисто-целочисленных литералов по 19 цифр: произведение — bigint ~1e380,
+    # float() над ним бросал сырой OverflowError мимо RU-контракта ошибок (ревью M5)
+    lit = "9" * 19
+    expr = " * ".join([lit] * 20)
+    fn = compile_expr(expr, set())
+    with pytest.raises(SafeExprEvalError) as e:
+        fn({})
+    assert any("а" <= ch <= "я" or ch == "ё" for ch in str(e.value).lower())

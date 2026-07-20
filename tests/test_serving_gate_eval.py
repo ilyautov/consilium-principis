@@ -218,6 +218,75 @@ class TestJudgeGateEfficacy:
         assert result["n_ooc"] == 0
         assert result["n_ans"] == 0
 
+    def test_median_stabilizes_flipping_judge(self):
+        """Судья-флиппер 0/3/0 на границе порога: одиночный сэмпл шумит (ревью M6,
+        при n=12 один флип = 8.3 п.п.); медиана из n_samples=3 гасит флип — гейт держит."""
+        import itertools
+        flipper = itertools.cycle([0, 3])
+
+        def judge_fn(q, p):
+            return next(flipper)
+
+        def retrieve_fn(q, d, k):
+            return [{"text": "p", "score": 0.9, "source": "s"}]
+
+        res = sge.judge_gate_efficacy(
+            FAKE_ADVISOR, [{"q": "ooc1"}], [],
+            retrieve_fn=retrieve_fn, judge_fn=judge_fn,
+            top_k=1, rel_threshold=2, n_samples=3)
+        assert res["ooc_per_q"][0]["max_judge"] == 0       # медиана [0, 3, 0] = 0
+        assert res["ooc_true_negative_rate"] == 1.0
+
+    def test_median_passes_when_two_of_three_samples_high(self):
+        """Обратная сторона медианы: 3/0/3 → медиана 3 → PASS (медиана ≠ минимум)."""
+        import itertools
+        flipper = itertools.cycle([3, 0])
+
+        def judge_fn(q, p):
+            return next(flipper)
+
+        def retrieve_fn(q, d, k):
+            return [{"text": "p", "score": 0.9, "source": "s"}]
+
+        res = sge.judge_gate_efficacy(
+            FAKE_ADVISOR, [], [{"q": "ans1"}],
+            retrieve_fn=retrieve_fn, judge_fn=judge_fn,
+            top_k=1, rel_threshold=2, n_samples=3)
+        assert res["ans_per_q"][0]["max_judge"] == 3       # медиана [0, 3, 3] = 3
+        assert res["ans_true_positive_rate"] == 1.0
+
+    def test_n_samples_default_keeps_single_call_per_passage(self):
+        """Без n_samples поведение прежнее: один вызов судьи на пассаж."""
+        calls = []
+
+        def judge_fn(q, p):
+            calls.append(q)
+            return 3
+
+        def retrieve_fn(q, d, k):
+            return [{"text": "p", "score": 0.9, "source": "s"}]
+
+        sge.judge_gate_efficacy(
+            FAKE_ADVISOR, [{"q": "ooc1"}], [],
+            retrieve_fn=retrieve_fn, judge_fn=judge_fn, top_k=1)
+        assert calls == ["ooc1"]
+
+    def test_judge_exception_fail_closed_zero(self):
+        """Исключение судьи в сэмпле → 0 (fail-closed, идиома poison_eval):
+        упавшее ≠ релевантное."""
+        def judge_fn(q, p):
+            raise RuntimeError("ollama упал")
+
+        def retrieve_fn(q, d, k):
+            return [{"text": "p", "score": 0.9, "source": "s"}]
+
+        res = sge.judge_gate_efficacy(
+            FAKE_ADVISOR, [{"q": "ooc1"}], [],
+            retrieve_fn=retrieve_fn, judge_fn=judge_fn,
+            top_k=1, rel_threshold=2, n_samples=3)
+        assert res["ooc_per_q"][0]["max_judge"] == 0
+        assert res["ooc_true_negative_rate"] == 1.0
+
 
 # ─────────────────────────── cosine_false_accept_rate ────────────────────────
 
@@ -305,3 +374,34 @@ class TestCosineVsJudgeComparison:
 
         assert abs(cosine_res["false_accept_rate"] - 2/3) < 0.001
         assert judge_res["ooc_false_accept"] == 0.0
+
+
+# ─────────────────────────── main(): --out (ревью M6) ─────────────────────────
+
+class TestOutPath:
+
+    def test_default_out_path_inside_repo(self):
+        """SCRATCHPAD в /private/tmp/claude-501 убран: дефолт — внутри репо, docs/demo/."""
+        p = sge._default_out_path()
+        repo_root = os.path.dirname(os.path.dirname(os.path.abspath(sge.__file__)))
+        assert os.path.commonpath((repo_root, p)) == repo_root
+        assert p.endswith(os.path.join("docs", "demo", "serving-gate-verdict.md"))
+        assert "claude-501" not in p and not p.startswith("/private/tmp")
+
+    def test_main_writes_verdict_to_given_out(self, tmp_path, monkeypatch):
+        """--out <tmp>: вердикт пишется туда (каталоги создаются), даже когда все
+        советники софт-фейлятся офлайн (генерация OOC падает → секции пропущены)."""
+        import llm_local
+        import synth_eval
+        monkeypatch.setattr(llm_local, "available", lambda: True)
+
+        def _boom(adv_dir, author, n=12):
+            raise RuntimeError("офлайн: ollama недоступен")
+
+        monkeypatch.setattr(synth_eval, "gen_adversarial_ooc", _boom)
+        out = tmp_path / "nested" / "verdict.md"
+        monkeypatch.setattr(sys, "argv", ["serving_gate_eval.py", "--out", str(out)])
+        sge.main()
+        text = out.read_text(encoding="utf-8")
+        assert "Serving Gate Eval" in text
+        assert "ОШИБКА генерации OOC" in text

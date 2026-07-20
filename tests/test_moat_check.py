@@ -51,7 +51,8 @@ def test_improvement_is_green():
 
 
 def test_degradation_within_tolerance_green():
-    """+5 п.п. misapply и −5 п.п. coverage — ровно на границе допуска → зелёный."""
+    """+5 п.п. misapply и −5 п.п. coverage — внутри эффективного допуска → зелёный.
+    (при n=12 допуск поднят разрешением батареи до 1/12 ≈ 8.3 п.п., см. M6-тесты ниже)."""
     v = moat_check.compare(_baseline(0.20, 0.90), _run(mis=0.25, cov=0.85))
     assert v["ok"], v["failures"]
 
@@ -59,12 +60,13 @@ def test_degradation_within_tolerance_green():
 # ───────────────────────── compare: деградации ───────────────────────────────
 
 def test_misapply_beyond_tolerance_fails():
-    v = moat_check.compare(_baseline(0.20), _run(mis=0.26))
+    # деградация сверх эффективного допуска (при n=12 это > 1/12 ≈ 8.3 п.п.)
+    v = moat_check.compare(_baseline(0.20), _run(mis=0.30))
     assert not v["ok"] and any("misapply" in f for f in v["failures"])
 
 
 def test_coverage_beyond_tolerance_fails():
-    v = moat_check.compare(_baseline(cov=0.90), _run(cov=0.84))
+    v = moat_check.compare(_baseline(cov=0.90), _run(cov=0.80))
     assert not v["ok"] and any("coverage" in f for f in v["failures"])
 
 
@@ -86,8 +88,32 @@ def test_missing_baseline_advisor_fails():
 def test_custom_tolerances_override_defaults():
     v = moat_check.compare(_baseline(0.20), _run(mis=0.26), {"misapply_pp": 0.10})
     assert v["ok"]
-    v2 = moat_check.compare(_baseline(0.20), _run(mis=0.22), {"misapply_pp": 0.01})
+    # override не опускает допуск ниже разрешения батареи (M6): 0.01 при n=12
+    # эффективно = 1/12 — деградация должна превышать вес одного флипа
+    v2 = moat_check.compare(_baseline(0.20), _run(mis=0.30), {"misapply_pp": 0.01})
     assert not v2["ok"]
+
+
+# ───────────────────────── compare: разрешение батареи (M6) ──────────────────
+
+def test_single_flip_at_n12_is_noise_not_degradation():
+    """При n=12 один флип судьи весит 1/12 = 8.3 п.п. — больше базового допуска
+    5 п.п. (ревью M6): допуск поднимается до разрешения батареи, одиночный флип
+    — шум, гейт не красный."""
+    b = _baseline(mis=0.1667, cov=0.9167)      # n_camouflage=12, n_ans=12
+    r = _run(mis=0.25, cov=0.8333)             # ровно +1/12 misapply и −1/12 coverage
+    v = moat_check.compare(b, r)
+    assert v["ok"], v["failures"]
+
+
+def test_two_flips_at_n12_exceed_resolution_fail():
+    """Два флипа (2/12 = 16.7 п.п.) — выше разрешения батареи → красный."""
+    b = _baseline(mis=0.1667, cov=0.9167)
+    r = _run(mis=0.3333, cov=0.75)
+    v = moat_check.compare(b, r)
+    assert not v["ok"]
+    assert any("misapply" in f for f in v["failures"])
+    assert any("coverage" in f for f in v["failures"])
 
 
 # ───────────────────────── compare: warnings (не валят) ──────────────────────

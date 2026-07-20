@@ -644,9 +644,17 @@ def _config_set(key, value):
     """Записать ключ в board_config.json (тюнинг из хоста). Persistent change — хост обязан
     подтвердить у юзера ПЕРЕД вызовом (см. правила).
 
+    Moat-guard (M3): пишутся ТОЛЬКО ключи из _KNOWN_CONFIG — иначе config_set("relevance_gate",
+    {"enabled": false}) или любая опечатка/инъекция молча переписывала конфиг контура.
+    Неизвестный ключ отвергается fail-closed: файл НЕ трогается.
     Moat-guard (M7): числовые ключи валидируются ПЕРЕД записью — иначе abstain_threshold=0
     тихо отключил бы весь ров воздержания, а hybrid_alpha вне [0,1] сломал бы смешивание.
     Невалидное значение отвергается fail-closed: файл НЕ трогается."""
+    # M3: whitelist ПЕРЕД любыми валидаторами/записью (M7 покрывал лишь 2 числовых ключа).
+    if key not in _KNOWN_CONFIG:
+        return {"key": key, "rejected": value,
+                "error": "неизвестный ключ. Известные: %s. Произвольные ключи не пишутся — "
+                         "защита контура от опечаток и инъекций." % ", ".join(_KNOWN_CONFIG)}
     from decision_map import _is_number  # тот же числовой гейт (конечный, не bool)
     if key == "abstain_threshold" and not (_is_number(value) and 0.0 < value < 1.0):
         return {"key": key, "rejected": value,
@@ -665,8 +673,6 @@ def _config_set(key, value):
     with open(p, "w", encoding="utf-8") as f:
         json.dump(cfg, f, ensure_ascii=False, indent=2)
     out = {"key": key, "old": old, "new": value, "config": cfg}
-    if key not in _KNOWN_CONFIG:
-        out["warning"] = f"ключ '{key}' не из известных {list(_KNOWN_CONFIG)} — опечатка?"
     return out
 
 

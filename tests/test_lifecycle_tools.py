@@ -27,10 +27,12 @@ def test_config_set_get_roundtrip_persists(monkeypatch, tmp_path):
     assert "retrieval_mode" in r["config"] and "known_keys" in r
 
 
-def test_config_set_warns_on_unknown_key(monkeypatch, tmp_path):
+def test_config_set_rejects_unknown_key(monkeypatch, tmp_path):
+    # M3 (breaking): было «warning на неизвестном ключе» — теперь fail-closed reject
     monkeypatch.setattr("mcp_server._config_path", lambda: str(tmp_path / "c.json"))
     r = dispatch("config_set", {"key": "frobnicate", "value": 1})
-    assert "warning" in r and r["new"] == 1
+    assert "error" in r and r["rejected"] == 1
+    assert not (tmp_path / "c.json").exists()
 
 
 def test_ollama_status_shape_no_crash():

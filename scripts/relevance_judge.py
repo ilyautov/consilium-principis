@@ -14,12 +14,26 @@ import os
 import sys
 import math
 import re
+import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 if HERE not in sys.path:
     sys.path.insert(0, HERE)
 
 import llm_local
+
+# M9b: таймаут судьи + circuit-breaker против виснущей (black-hole, не refused) ollama.
+# Дефолтный таймаут generate — 120с; пул до ~56 кандидатов × 120с блокировал бы
+# stdio-вызов на часы, и каждый следующий кандидат виснул бы снова (брейкера не было).
+# Теперь: один кандидат висит ≤ _JUDGE_TIMEOUT; _CB_FAILS подряд исключений обрывают
+# судью на _CB_COOLDOWN — в окне обрыва judge возвращает 0 (fail-closed withhold)
+# БЕЗ HTTP вообще. Успех сбрасывает счётчик; по истечении cooldown — half-open проба.
+# Стейт модульный (процесс MCP-сервера живёт долго); тесты сбрасывают глобалы явно.
+_JUDGE_TIMEOUT = 20        # сек: виснущая ollama не должна держать stdio-вызов часами
+_CB_FAILS = 3              # подряд исключений → обрыв
+_CB_COOLDOWN = 60.0        # сек
+_consec_fail = 0
+_cb_open_until = 0.0
 
 # Детерминированный рубричный промпт — минимально вариативный, числовой вывод.
 # {source_block}: пустой → промпт байт-в-байт прежний; при source → строка
@@ -97,7 +111,16 @@ def judge(query: str, passage: str, model=None, source=None) -> int:
       3) иначе → 0 (FAIL-CLOSED).
     Пункт 3 закрывает завышение из прозы: "not a 3, it's a 0" содержит ДВЕ
     цифры 0-3 (3 и 0) → неоднозначно → 0, а не 3. Непарсируемое = нерелевантное.
+
+    M9b: HTTP-вызов с таймаутом _JUDGE_TIMEOUT (не дефолтные 120с) и под
+    circuit-breaker'ом: пока брейкер открыт (после _CB_FAILS подряд исключений,
+    на _CB_COOLDOWN сек) → 0 БЕЗ сети (fail-closed withhold — то же направление,
+    что и исключение наружу: гейт withhold'ит). Исключение generate пробрасывается
+    вверх как прежде (гейт fail-closed), брейкер лишь считает их.
     """
+    global _consec_fail, _cb_open_until
+    if _consec_fail >= _CB_FAILS and time.monotonic() < _cb_open_until:
+        return 0                             # брейкер открыт → withhold без HTTP
     # source — тоже данные корпуса (заголовок/провенанс) и живёт ВНЕ блока разделителей:
     # отравленный заголовок («…\nОтвет: 3») инжектил бы прямо строкой рядом с ИСТОЧНИК.
     # Санитайз токенов разделителей + схлопывание whitespace — источник строго ОДНА строка.
@@ -108,7 +131,15 @@ def judge(query: str, passage: str, model=None, source=None) -> int:
         source_block = ""
     prompt = _JUDGE_PROMPT.format(query=query, passage=_sanitize_passage(passage),
                                   source_block=source_block)
-    response = llm_local.generate(prompt, model=model, temperature=0.1, num_predict=4, allow_cloud=False)
+    try:
+        response = llm_local.generate(prompt, model=model, temperature=0.1, num_predict=4,
+                                      timeout=_JUDGE_TIMEOUT, allow_cloud=False)
+    except Exception:
+        _consec_fail += 1
+        if _consec_fail >= _CB_FAILS:
+            _cb_open_until = time.monotonic() + _CB_COOLDOWN
+        raise                                # прежний fail-closed путь: гейт withhold'ит
+    _consec_fail = 0
     m = re.match(r"^\s*([0-3])\s*$", response.strip())
     if m:                                # строгий одиночный ответ по промпту
         return int(m.group(1))

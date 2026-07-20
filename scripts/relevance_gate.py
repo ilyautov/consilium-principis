@@ -36,6 +36,7 @@ X» вытягивает дословный пассаж про обман). Х�
 import os
 import sys
 import json
+import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 if HERE not in sys.path:
@@ -165,6 +166,14 @@ def is_semantic(advisor_dir, prefer=None) -> bool:
         return False
 
 
+# M9b (review-4.2): TTL-мемо доступности судьи. Раньше КАЖДЫЙ вызов гейта делал
+# HTTP-проб ollama (/api/tags) — при виснущей (black-hole) ollama это +таймаут пробы
+# на КАЖДОГО кандидата ещё до circuit-breaker'а судьи. В окне TTL — ответ из мемо,
+# сеть не трогаем; по истечении — свежий проб (self-healing при поднявшейся ollama).
+_JUDGE_AVAIL_TTL = 45.0      # сек (окно 30-60 из брифа Task 4.4)
+_judge_avail_memo = {}       # str(advisor_dir) -> (expires_at_monotonic, bool)
+
+
 def _judge_available(advisor_dir) -> bool:
     """Серверный судья (relevance_judge.judge) реально callable СЕЙЧАС — вне semantic-
     режима гейт судит только тогда (M4). judge_backend.resolve выбирает УРОВЕНЬ
@@ -172,18 +181,27 @@ def _judge_available(advisor_dir) -> bool:
     → False; "ollama"/"api" → проверяем ЖИВОСТЬ бэкенда (пробинг ollama / наличие
     api-ключа): env-пин CONSILIUM_JUDGE_BACKEND=ollama при мёртвой ollama судью
     доступным НЕ делает — иначе каждый вызов судьи падал бы в fail-closed withhold
-    (регресс офлайн-пола). Любая ошибка → False (инертен = поведение до M4)."""
+    (регресс офлайн-пола). Любая ошибка → False (инертен = поведение до M4).
+    Результат мемоизируется на _JUDGE_AVAIL_TTL (см. выше); ошибки НЕ мемоизируются —
+    временный сбой пробы не залипает."""
+    key = str(advisor_dir)
+    hit = _judge_avail_memo.get(key)
+    if hit is not None and time.monotonic() < hit[0]:
+        return hit[1]
     try:
         import judge_backend
         import llm_local
         b = judge_backend.resolve(advisor_dir)
         if b == "ollama":
-            return bool(llm_local.available())
-        if b == "api":
-            return bool(llm_local.api_available())
-        return False
+            ok = bool(llm_local.available())
+        elif b == "api":
+            ok = bool(llm_local.api_available())
+        else:
+            ok = False
     except Exception:
         return False
+    _judge_avail_memo[key] = (time.monotonic() + _JUDGE_AVAIL_TTL, ok)
+    return ok
 
 
 def _default_judge(query, passage, source=None):

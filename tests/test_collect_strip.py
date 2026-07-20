@@ -65,6 +65,22 @@ def test_html_to_text_selector_picks_container():
     assert "Second block." in out and "First block." not in out
 
 
+def test_html_to_text_fallback_without_bs4(monkeypatch):
+    """CI-нога без bs4: sys.modules['bs4']=None → import внутри html_to_text падает →
+    stdlib-фолбэк (regex-стрип). Контракт фолбэка слабее bs4-пути: теги сняты, script/style
+    вырезаны С содержимым, текст сохранён — но nav/header/footer-хром НЕ убирается."""
+    monkeypatch.setitem(sys.modules, "bs4", None)   # import bs4 → ImportError
+    html = ("<html><body><nav>menu junk</nav><header>hdr junk</header>"
+            "<article><h1>Title</h1><p>Real content here.</p>"
+            "<script>evil()</script><style>.x{}</style></article>"
+            "<footer>foot junk</footer></body></html>")
+    out = cc.html_to_text(html)
+    assert "Real content here." in out and "Title" in out
+    assert "evil" not in out and ".x{}" not in out     # script/style вырезаны с телом
+    assert "<" not in out and ">" not in out           # все теги сняты
+    assert "menu junk" in out                          # хром остаётся — осознанная цена фолбэка
+
+
 # ───────────────────────── collect_web.extract_telegram ─────────────────────────
 
 def test_extract_telegram_joins_message_divs():

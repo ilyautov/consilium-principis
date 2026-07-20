@@ -1848,6 +1848,12 @@ def _obj(props, required):
 # ── Tier-2 федерация: MCP-поверхность (стейт в .consilium/, gitignored, приватно) ──
 _FED_BACKEND = None
 
+# DoS-капы (M2): plan/replicas/timeout приходят от хоста — без потолка это 1e9 INSERT'ов
+# в sqlite (диск+hang) или блокировка однопоточного RPC-цикла.
+_FED_MAX_REPLICAS = 32
+_FED_MAX_PLAN = 64
+_FED_MAX_TIMEOUT = 60.0
+
 
 def _make_fed_backend(db_path):
     from federation.queue import SqliteBackend
@@ -1864,6 +1870,15 @@ def _fed_backend():
 
 
 def _federation_open(session_id, plan, replicas_default=3):
+    # DoS-капы (M2): валидация ПЕРЕД созданием бэкенда — без потолка plan/replicas
+    # от хоста это 1e9 INSERT'ов в sqlite (диск+hang).
+    if not isinstance(plan, list) or not plan or len(plan) > _FED_MAX_PLAN:
+        return {"error": "plan должен быть непустым списком ≤ %d ролей" % _FED_MAX_PLAN}
+    try:
+        replicas_default = int(replicas_default)
+    except (TypeError, ValueError):
+        replicas_default = 3
+    replicas_default = max(1, min(replicas_default, _FED_MAX_REPLICAS))
     return _fed_open(_fed_backend(), session_id, plan, replicas_default)
 
 
@@ -1877,6 +1892,12 @@ def _federation_assemble(session_id):
 
 
 def _federation_claim(worker_id, roles=None, timeout=1.0):
+    # DoS-кап (M2): timeout от хоста клампим — иначе блокировка однопоточного RPC-цикла.
+    try:
+        timeout = float(timeout)
+    except (TypeError, ValueError):
+        timeout = 1.0
+    timeout = max(0.0, min(timeout, _FED_MAX_TIMEOUT))
     return _fed_claim(_fed_backend(), worker_id, roles, timeout)
 
 

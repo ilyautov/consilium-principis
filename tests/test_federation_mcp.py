@@ -41,3 +41,32 @@ def test_federation_claim_submit_assemble_roundtrip(tmp_path, monkeypatch):
     role0 = out["roles"][0]
     assert role0["representative"]["quotes"][0]["status"] == "🔵"   # сервер-сверка через _fidelity_check
     assert role0["worker_models"] == ["claude-sonnet-5"]
+
+
+def test_federation_open_caps_plan_and_replicas(tmp_path, monkeypatch):
+    monkeypatch.setattr(m, "_root", lambda: str(tmp_path))
+    monkeypatch.setattr(m, "_FED_BACKEND", None)
+    out = m.dispatch("federation_open",
+                     {"session_id": "s1",
+                      "plan": [{"role": "r%d" % i} for i in range(500)]})
+    assert "error" in out
+    # replicas_default без потолка → кламп к 32 на роль (иначе 1e9 INSERT'ов в sqlite)
+    out = m.dispatch("federation_open",
+                     {"session_id": "s2",
+                      "plan": [{"role": "aurelius", "advisor_dir": "advisors/aurelius",
+                                "question": "Q"}],
+                      "replicas_default": 100})
+    assert out["enqueued"] <= 32
+
+
+def test_federation_claim_timeout_capped(tmp_path, monkeypatch):
+    monkeypatch.setattr(m, "_root", lambda: str(tmp_path))
+    monkeypatch.setattr(m, "_FED_BACKEND", None)
+    # timeout=10**9 не должен блокировать RPC-цикл: кламп к 60с — проверяем кламп, не сон.
+    seen = {}
+    def spy(backend, worker_id, roles, timeout):
+        seen["timeout"] = timeout
+        return {"tasks": []}
+    monkeypatch.setattr(m, "_fed_claim", spy)
+    m.dispatch("federation_claim", {"worker_id": "w", "timeout": 10**9})
+    assert seen["timeout"] <= 60.0

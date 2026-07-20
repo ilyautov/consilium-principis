@@ -179,3 +179,14 @@ def test_doctor_tier_fields_ok_when_tiers_present(tmp_path):
         encoding="utf-8")
     checks = {c["name"]: c for c in doctor.run_doctor(str(tmp_path))["checks"]}
     assert checks["corpus-tier-fields"]["ok"] is True
+
+
+def test_doctor_flags_tierless_lens_corpus(tmp_path):
+    import doctor
+    lens = tmp_path / "lenses" / "legacy" / "build"
+    lens.mkdir(parents=True)
+    (lens / "corpus.jsonl").write_text(
+        json.dumps({"source": "s", "text": "some words here"}) + "\n", encoding="utf-8")
+    check = doctor.check_corpus_tier_fields(str(tmp_path))
+    assert check["ok"] is False
+    assert "lenses/legacy" in check["detail"]

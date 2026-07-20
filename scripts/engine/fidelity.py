@@ -44,8 +44,9 @@ def _crop_severs_negation(q: str, raw_text: str) -> bool:
     предложение целиком считается отрицанным, даже когда q позже в нём встречается
     чисто (fail-closed: лучше ложный 🟡, чем перевернутый смысл). «Чистое вхождение
     → False (🔵 легитимен)» верно поэтому лишь для первой встречи в её предложении.
-    q через шов предложений (не найден ни в одном) → False: это честная дословная
-    подстрока by design. Оба аргумента: q норм. (_norm), raw_text — НЕнормализованный."""
+    q через шов предложений (не найден ни в одном) → True: нормализация склеила разные
+    предложения, поэтому матч fail-closed. Оба аргумента: q норм. (_norm), raw_text —
+    НЕнормализованный."""
     found = False
     for sent in _SENT_SPLIT.split(raw_text or ""):
         ns = _norm(sent)
@@ -53,9 +54,10 @@ def _crop_severs_negation(q: str, raw_text: str) -> bool:
         if i < 0:
             continue
         found = True
-        if not any(tok in _NEG for tok in ns[:i].split()):
-            return False                       # чистое вхождение без отрицания в префиксе
-    return found                               # все вхождения с отрицанием → обрезка
+        if any(tok in _NEG for tok in ns[:i].split()):
+            return True                        # обрезка срезала отрицание
+        return False                           # чистое вхождение без отрицания в префиксе
+    return not found                           # match only across sentence boundary → fail-closed
 
 
 def _norm(s: str) -> str:

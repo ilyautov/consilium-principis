@@ -74,3 +74,9 @@ def test_clean_quote_after_colon_still_blue(tmp_path):
     from engine import fidelity
     adv = _mk_advisor(tmp_path, "He said: do the right thing wholly.")
     assert fidelity.marker_status("do the right thing", adv)["status"] == "🔵"
+
+
+def test_cross_sentence_negation_not_blue(tmp_path):
+    from engine import fidelity
+    adv = _mk_advisor(tmp_path, "He did not endorse war. Pursue peace and mercy.")
+    assert fidelity.marker_status("endorse war pursue peace", adv)["status"] == "🟡"

@@ -278,10 +278,12 @@ def check_corpus_tier_fields(root="."):
     try:
         from corpusbuild.paths import corpus_path
         tierless, tiered = [], 0
-        adv_root = os.path.join(root, "advisors")
-        if os.path.isdir(adv_root):
-            for d in sorted(os.listdir(adv_root)):
-                p = os.path.join(adv_root, d)
+        for sub in ("advisors", "lenses"):
+            corpus_root = os.path.join(root, sub)
+            if not os.path.isdir(corpus_root):
+                continue
+            for d in sorted(os.listdir(corpus_root)):
+                p = os.path.join(corpus_root, d)
                 if not (os.path.isdir(p) and os.path.isfile(corpus_path(p))):
                     continue
                 seen, with_tier = 0, 0
@@ -297,7 +299,7 @@ def check_corpus_tier_fields(root="."):
                         if "tier" in r:
                             with_tier += 1
                 if seen and not with_tier:
-                    tierless.append(d)
+                    tierless.append(f"{sub}/{d}")
                 elif seen:
                     tiered += 1
         if tierless:

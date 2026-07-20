@@ -518,6 +518,15 @@ def _cite(advisor_dir, query, top_k=8, use_kernels=True, limit=4):
     Пул дедуплицируется, verbatim-гейт — по всему пулу, судья — лениво до набора limit; 🔵
     (первоисточник) приоритетнее 🟢 (комментарий) и для ВКЛЮЧЕНИЯ, и для подачи. Нет → [].
     В host-режиме судьи (§2.1) возвращает phase=judgment_request — см. _host_judgment_phase1."""
+    # DoS-капы (M2): 10-МБ stdio-строка вмещает ~1e5 запросов, каждый — полный проход
+    # ретрива (re-parse корпуса + n-граммы). Числа клампим к int с потолками 32/16
+    # (дефолты 8/4 ниже — легитимные вызовы не задеты); мусор → fail-closed 🟡,
+    # как read-гард ниже. OverflowError — int(float("inf")) из JSON-литерала 1e999.
+    try:
+        top_k = min(max(int(top_k), 1), 32)
+        limit = min(max(int(limit), 1), 16)
+    except (TypeError, ValueError, OverflowError):
+        return _cite_result([], {})
     import eval as _eval
     import relevance_gate
     import judge_backend
@@ -535,6 +544,10 @@ def _cite(advisor_dir, query, top_k=8, use_kernels=True, limit=4):
     for q in queries:
         if q and q not in seen_q:
             seen_q.add(q); uniq_q.append(q)
+    # DoS-кап (M2): ≤8 проходов ретрива на вызов (та же 10-МБ stdio-строка). Порядок
+    # дедупа сохранён: формулировки хоста идут первыми, кернел-темы — хвостом, кап
+    # срезает только хвост recall-экспансии (легитимные 2-4 формулировки не задеты).
+    uniq_q = uniq_q[:8]
     cand, seen_t = [], set()                          # пул кандидатов из всех запросов, дедуп по тексту
     # Гейтим по score ПЕРВИЧНОГО запроса (реальный вопрос юзера), НЕ по max-across-queries:
     # иначе кернел/вторичный запрос вытащил бы цитату на высоком косинусе к СВОЕЙ теме и она

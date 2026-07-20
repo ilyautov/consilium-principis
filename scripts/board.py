@@ -25,10 +25,12 @@ import sys
 import json
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from corpusbuild.paths import project_root  # noqa: E402
 
 
 def _root():
-    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    # Делегат каноничного corpusbuild.paths.project_root (M11, было 5 копий).
+    return project_root()
 
 
 def cmd_status(args):

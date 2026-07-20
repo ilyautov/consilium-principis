@@ -29,7 +29,7 @@ from engine.fidelity import best_match
 from situation import Move, node, analyze
 from governance import _verify_corpus
 from calibration import calibrate as _calibrate_fn, parse_decision_log
-from corpusbuild.paths import corpus_path
+from corpusbuild.paths import corpus_path, project_root
 from federation.coordinator import open_session as _fed_open, poll_session as _fed_poll, assemble as _fed_assemble
 from federation.executor import claim_brief as _fed_claim, submit_candidate as _fed_submit, heartbeat_task as _fed_hb
 
@@ -37,7 +37,10 @@ from federation.executor import claim_brief as _fed_claim, submit_candidate as _
 # ───────────────────────── обёртки чистых функций ─────────────────────────
 
 def _root():
-    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    # Делегат каноничного corpusbuild.paths.project_root (M11, было 5 копий). Остаётся
+    # функцией ЭТОГО модуля: тесты патчат mcp_server._root (monkeypatch.setattr) — гард
+    # и артефакты наводятся на tmp_path, project_root при этом не трогается.
+    return project_root()
 
 
 def _resolve(p):
@@ -59,6 +62,16 @@ def _resolve_under_root(p):
     return None, {"error": "путь вне корня репо запрещён (path-traversal). Используй путь внутри проекта.",
                   "hint": "Этот файл вне проекта — я не могу к нему обратиться. Вставь текст напрямую "
                           "или положи файл внутрь проекта."}
+
+
+def _load_json(path, default):
+    """json.load из path с default на отсутствующем/битом файле — единый with вместо голых
+    json.load(open(...)) без закрытия (M11). Только чтение: default отдаётся как есть."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return default
 
 
 def _resolve_read(p):
@@ -292,10 +305,7 @@ def _kernel_themes(advisor_dir, limit=6):
     kp = os.path.join(os.path.dirname(corpus_path(advisor_dir)), "kernels.json")
     if not os.path.isfile(kp):
         return []
-    try:
-        data = json.load(open(kp, encoding="utf-8"))
-    except Exception:
-        return []
+    data = _load_json(kp, [])
     themes = []
     for k in data if isinstance(data, list) else []:
         name = k.get("name", "") if isinstance(k, dict) else str(k)
@@ -642,10 +652,7 @@ def _config_path():
 
 def _config_get(key=None):
     """Прочитать board_config.json целиком или один ключ (тюнинг без правки файла руками)."""
-    try:
-        cfg = json.load(open(_config_path(), encoding="utf-8"))
-    except Exception:
-        cfg = {}
+    cfg = _load_json(_config_path(), {})
     if key is None:
         return {"config": cfg, "known_keys": list(_KNOWN_CONFIG),
                 "hint": "Это внутренние настройки — обычно трогать не нужно. Если что-то «не так» "
@@ -677,10 +684,7 @@ def _config_set(key, value):
         return {"key": key, "rejected": value,
                 "error": "hybrid_alpha должен быть числом в диапазоне [0, 1] включительно."}
     p = _config_path()
-    try:
-        cfg = json.load(open(p, encoding="utf-8"))
-    except Exception:
-        cfg = {}
+    cfg = _load_json(p, {})
     old = cfg.get(key)
     cfg[key] = value
     with open(p, "w", encoding="utf-8") as f:
@@ -845,10 +849,7 @@ def _add_source(advisor_dir, url=None, text=None, path=None, basename=None,
             appa = {"mode": "raw"}
 
     man_p = os.path.join(d, "sources", "manifest.json")
-    try:
-        man = json.load(open(man_p, encoding="utf-8"))
-    except Exception:
-        man = {}
+    man = _load_json(man_p, {})
     man[fn] = {"tier": tier, "apparatus": appa}
     with open(man_p, "w", encoding="utf-8") as f:
         json.dump(man, f, ensure_ascii=False, indent=2)
@@ -1197,6 +1198,29 @@ _SLUG_RE = r"[a-z0-9][a-z0-9-]{0,62}"   # строгий слаг: fail-closed �
                                         # '../x', абсолютный путь, юникод НЕ превращаем в «похожий»
 
 
+def _validate_slug(slug):
+    """Строгий слаг (fail-closed, без тихой санации): сам слаг при fullmatch _SLUG_RE,
+    иначе None. Общий гард save_decision_map/save_decision_card (M11: была копия в каждом);
+    тексты отказа остаются на стороне вызывающего (у карты и Card они свои)."""
+    return slug if (isinstance(slug, str) and re.fullmatch(_SLUG_RE, slug)) else None
+
+
+def _unique_path_under_root(base, ext):
+    """Первый свободный путь base+ext под корнем репо: коллизия имени → суффикс -2, -3, …
+    (не перезапись), traversal-гард в цикле (пояс+подтяжки). Общий хелпер save_* (M11).
+    Возвращает (abs_path, None) или (None, error) — идиома _resolve_under_root."""
+    p, err = _resolve_under_root(base + ext)
+    if err:
+        return None, err
+    i = 1
+    while os.path.exists(p):
+        i += 1
+        p, err = _resolve_under_root("%s-%d%s" % (base, i, ext))
+        if err:
+            return None, err
+    return p, None
+
+
 def _decision_predicted(map, res):
     """RU-сводка прогноза из результата МК: лучший вариант по P(лучший) + ожидание метрики.
     Это `predicted` записи §4.3/§6 — при резолюции ⏳→✅/❌ сравнивается с фактом."""
@@ -1223,11 +1247,11 @@ def _save_decision_map(map, slug=None, seed=_CALC_SEED_DEFAULT, n=None):
                          "(fail-closed).",
                 "errors": errors, "hint": _RELAY_AS_QUESTIONS_HINT}
     if slug is not None:
-        if not isinstance(slug, str) or not re.fullmatch(_SLUG_RE, slug):
+        s = _validate_slug(slug)                      # общий строгий гард (M11)
+        if s is None:
             return {"error": "Слаг карты должен быть из строчной латиницы, цифр и дефисов "
                              "(a-z0-9-), без путей и юникода — например ship-or-wait.",
                     "hint": "Дай простой латинский слаг или опусти его — я построю сам."}
-        s = slug
     else:
         s = re.sub(r"[^a-z0-9]+", "-",
                    str(map.get("question") or "").lower()).strip("-")[:40] or "decision"
@@ -1238,15 +1262,9 @@ def _save_decision_map(map, slug=None, seed=_CALC_SEED_DEFAULT, n=None):
         return {"error": str(e)}
     day = time.strftime("%Y-%m-%d")
     base = os.path.join(_DECISIONS_DIR, "%s-%s" % (day, s))
-    p, err = _resolve_under_root(base + ".json")      # write-side traversal-гард (пояс+подтяжки)
+    p, err = _unique_path_under_root(base, ".json")   # write-side traversal-гард (пояс+подтяжки)
     if err:
         return err
-    i = 1
-    while os.path.exists(p):                          # коллизия имени → суффикс, не перезапись
-        i += 1
-        p, err = _resolve_under_root("%s-%d.json" % (base, i))
-        if err:
-            return err
     predicted = _decision_predicted(map, res)
     rel = os.path.relpath(p, os.path.realpath(_root())).replace(os.sep, "/")
     os.makedirs(os.path.dirname(p), exist_ok=True)
@@ -1368,23 +1386,17 @@ def _save_decision_card(map, chosen_option, slug=None, seed=_CALC_SEED_DEFAULT, 
 
     # слаг: тот же строгий контракт, что save_decision_map (fail-closed, без тихой санации)
     if slug is not None:
-        if not isinstance(slug, str) or not re.fullmatch(_SLUG_RE, slug):
+        s = _validate_slug(slug)                      # общий строгий гард (M11)
+        if s is None:
             return {"error": "Слаг Card — строчная латиница/цифры/дефисы (a-z0-9-), без путей "
                              "и юникода.", "hint": "Дай простой латинский слаг или опусти его."}
-        s = slug
     else:
         s = re.sub(r"[^a-z0-9]+", "-", str(map.get("question") or "").lower()).strip("-")[:40] \
             or "decision"
     base = os.path.join(_DECISIONS_DIR, "%s-%s" % (created, s))
-    p, err = _resolve_under_root(base + ".card.json")     # write-side traversal-гард (§7)
+    p, err = _unique_path_under_root(base, ".card.json")    # write-side traversal-гард (§7)
     if err:
         return err
-    i = 1
-    while os.path.exists(p):
-        i += 1
-        p, err = _resolve_under_root("%s-%d.card.json" % (base, i))
-        if err:
-            return err
 
     rel = os.path.relpath(p, os.path.realpath(_root())).replace(os.sep, "/")
     os.makedirs(os.path.dirname(p), exist_ok=True)

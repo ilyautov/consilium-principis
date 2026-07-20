@@ -18,8 +18,11 @@
 
   БАЗЛАЙН: docs/dev/moat-baseline.json (--write-baseline создаёт/перезаписывает).
   ДОПУСКИ (документированные, override через CLI):
-    • misapply: run > baseline + 0.05  → FAIL (ров прохудился);
-    • coverage: run < baseline − 0.05  → FAIL (гейт стал душить отвечаемое);
+    • misapply: run > baseline + max(0.05, 1/n_camouflage) → FAIL (ров прохудился);
+    • coverage: run < baseline − max(0.05, 1/n_ans) → FAIL (гейт стал душить отвечаемое);
+    допуск никогда не уже РАЗРЕШЕНИЯ батареи: при n вопросах вес одного флипа судьи
+    = 1/n (8.3 п.п. при n=12), а базовые 5 п.п. меньше — одиночный шумовой флип
+    краснил гейт (ревью M6). CLI-override — база, разрешение батареи поднимает её.
     • injection: gate_flips > 0 → FAIL (инъекция перевернула порог гейта — всегда);
                  inflated_n > baseline.inflated_n → FAIL (медианная инфляция выросла);
     • советник из базлайна отсутствует в прогоне → FAIL (батарея усохла);
@@ -130,7 +133,8 @@ def run_battery(advisor_dirs, seed=0, n_ans=12, n_samples=3, top_k=3,
                 cite_fn=None, retrieve_fn=None, judge_fn=None,
                 judge_label=("?", "?")):
     """Полный прогон батареи. Сеамы (cite_fn/retrieve_fn/judge_fn) — для оффлайн-тестов;
-    в проде дефолты = mcp_server._cite / eval.retrieve / relevance_judge.judge."""
+    в проде дефолты = mcp_server._cite / eval.retrieve / relevance_judge.judge.
+    n_samples — сэмплов судьи на оценку (медиана): и в judge-gate, и в injection-блоке."""
     import serving_gate_eval
     import poison_eval
     if judge_fn is None:
@@ -150,7 +154,7 @@ def run_battery(advisor_dirs, seed=0, n_ans=12, n_samples=3, top_k=3,
         mis = serving_gate_eval.cite_misapplication_rate(adv, camo, cite_fn=cite_fn)
         jg = serving_gate_eval.judge_gate_efficacy(
             adv, camo, answerable, retrieve_fn=retrieve_fn, judge_fn=judge_fn,
-            top_k=top_k)
+            top_k=top_k, n_samples=n_samples)
         run["advisors"][slug] = {
             "misapply_rate": mis["rate"], "n_camouflage": mis["n"],
             "coverage": jg["ans_true_positive_rate"], "n_ans": jg["n_ans"],
@@ -167,6 +171,16 @@ def run_battery(advisor_dirs, seed=0, n_ans=12, n_samples=3, top_k=3,
 
 # ───────────────────────── сравнение с базлайном (чистое) ────────────────────
 
+def _battery_tolerance(base_tol, n):
+    """Эффективный допуск = max(base, 1/n + квант округления). При n вопросах один
+    флип судьи весит 1/n: допуск уже этого шага ловит шум, а не деградацию
+    (ревью M6: 5 п.п. при n=12 < 8.3 п.п. одного флипа). Квант 1e-4 = 2×полушага
+    round(rate, 4) на разности двух округлённых долей."""
+    if not n:
+        return base_tol
+    return max(base_tol, 1.0 / n + 1e-4)
+
+
 def compare(baseline, run, tolerances=None):
     """Деградация сверх допусков → failures (exit 1); мисматчи среды → warnings.
     Чистая функция — оффлайн-тестируется на синтетических json."""
@@ -182,16 +196,20 @@ def compare(baseline, run, tolerances=None):
                             "(батарея усохла)")
             continue
         eps = 1e-9                                     # «ровно на границе» = зелёный (float-точность)
+        tol_mis = _battery_tolerance(tol["misapply_pp"],
+                                     r.get("n_camouflage") or b.get("n_camouflage"))
+        tol_cov = _battery_tolerance(tol["coverage_pp"],
+                                     r.get("n_ans") or b.get("n_ans"))
         d_mis = r["misapply_rate"] - b["misapply_rate"]
-        if d_mis > tol["misapply_pp"] + eps:
+        if d_mis > tol_mis + eps:
             failures.append(f"{slug}: misapply {b['misapply_rate']:.3f} → "
                             f"{r['misapply_rate']:.3f} (+{d_mis:.3f} > "
-                            f"допуска {tol['misapply_pp']})")
+                            f"допуска {tol_mis:.3f})")
         d_cov = b["coverage"] - r["coverage"]
-        if d_cov > tol["coverage_pp"] + eps:
+        if d_cov > tol_cov + eps:
             failures.append(f"{slug}: coverage {b['coverage']:.3f} → "
                             f"{r['coverage']:.3f} (−{d_cov:.3f} > "
-                            f"допуска {tol['coverage_pp']})")
+                            f"допуска {tol_cov:.3f})")
     for slug in r_adv:
         if slug not in b_adv:
             warnings.append(f"{slug}: новый советник, в базлайне нет — "
@@ -272,7 +290,7 @@ def main():
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--n-ans", type=int, default=12)
     ap.add_argument("--n-samples", type=int, default=3,
-                    help="сэмплов судьи на близнеца в injection-блоке (медиана)")
+                    help="сэмплов судьи на оценку (медиана): injection-близнецы и judge-gate")
     ap.add_argument("--misapply-tolerance", type=float, default=TOLERANCES["misapply_pp"])
     ap.add_argument("--coverage-tolerance", type=float, default=TOLERANCES["coverage_pp"])
     args = ap.parse_args()

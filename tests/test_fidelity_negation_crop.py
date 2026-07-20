@@ -54,3 +54,23 @@ def test_clean_quote_unaffected(tmp_path):
     from engine import fidelity
     adv = _mk_advisor(tmp_path, "The impediment to action advances action.")
     assert fidelity.marker_status("the impediment to action", adv)["status"] == "🔵"
+
+
+# Финальное ревью 2026-07-20 (Important): сплиттер НЕ режет по «:» и кавычкам — иначе
+# отрицание до двоеточия/кавычек отрывается от цитаты и C2-гард пропускает обрезку.
+
+def test_negation_before_colon_not_blue(tmp_path):
+    from engine import fidelity
+    adv = _mk_advisor(tmp_path, "He did not recommend: win by cheating when cornered, ever.")
+    assert fidelity.marker_status("win by cheating", adv)["status"] == "🟡"
+
+def test_negation_before_quotes_not_blue(tmp_path):
+    from engine import fidelity
+    adv = _mk_advisor(tmp_path, 'He never said "believe in omens lightly".')
+    assert fidelity.marker_status("believe in omens lightly", adv)["status"] == "🟡"
+
+def test_clean_quote_after_colon_still_blue(tmp_path):
+    # позитивный контроль: чистая цитата после двоеточия без отрицания остаётся 🔵
+    from engine import fidelity
+    adv = _mk_advisor(tmp_path, "He said: do the right thing wholly.")
+    assert fidelity.marker_status("do the right thing", adv)["status"] == "🔵"

@@ -72,8 +72,9 @@ EXTRAPOLATION_MARKERS = ("🟡", "T3")
 
 # intentional copy of engine.retrieval.norm (floor isolation, как engine/lexical.py:_norm):
 # якорь-матчинг golden'ов не тянет engine-пакет ради 3-строчного нормализатора.
+# ё→е держим в синхроне с engine/fidelity._norm (ревью 2026-07-20, Minor).
 def norm(s):
-    s = s.lower()
+    s = s.lower().replace("ё", "е")
     s = re.sub(r"[^\w\s]", " ", s, flags=re.U)
     return re.sub(r"\s+", " ", s).strip()
 

@@ -54,10 +54,21 @@ _AXES_HINT = {
 
 def check(paths):
     """Ортогональность состава совета → dict (без печати). paths — abs пути advisor'ов.
-    <2 валидных persona.md → {"error": ...}."""
+    <2 валидных persona.md → {"error": ...}. Если у ≥2 советников пусты И lenses,
+    И domains — метаданных нет, судить нельзя: verdict="insufficient_data",
+    diversity=None (fail-closed: без фронтматера similarity-математика выдавала бы
+    ложное 1.0/«ok» — финальное ревью 2026-07-20, Minor-2)."""
     advisors = [a for a in (load_advisor(p) for p in paths) if a]
     if len(advisors) < 2:
         return {"error": "Не нашёл persona.md минимум у двоих."}
+    bare = [a["name"] for a in advisors if not a["lenses"] and not a["domains"]]
+    if len(bare) >= 2:
+        return {"advisors": [a["name"] for a in advisors], "pairs": [],
+                "diversity": None, "verdict": "insufficient_data", "missing_axes": [],
+                "hint": ("Недостаточно данных: у %d советников (%s) нет ни lenses, ни domains "
+                         "во фронтматере persona.md — разнообразие судить нельзя. "
+                         "Заполни метаданные (lenses/domains) и перезапусти."
+                         % (len(bare), ", ".join(bare)))}
     pairs = []
     for x, y in itertools.combinations(advisors, 2):
         lj, dj = jaccard(x["lenses"], y["lenses"]), jaccard(x["domains"], y["domains"])
@@ -94,6 +105,11 @@ def main():
     print(f"Состав совета ({len(advisors)}):")
     for a in advisors:
         print(f"  · {a['name']}: линзы {sorted(a['lenses'])}")
+
+    if out["verdict"] == "insufficient_data":
+        # метаданных нет — судить нельзя: честный hint вместо ложного score 1.0
+        print(f"\n⚠️ {out['hint']}")
+        return
 
     print("\nПопарное перекрытие (линзы взвешены ×2, домены ×1):")
     for p in out["pairs"]:

@@ -37,3 +37,21 @@ def test_diversity_tool_traversal_rejected(tmp_path, monkeypatch):
     out = mcp_server.dispatch("diversity_check",
                               {"advisor_dirs": ["advisors/a1", "/etc"]})
     assert "error" in out
+
+def _mk_bare_advisors(root):
+    # persona.md без lenses/domains во фронтматере — метаданных нет, судить нельзя
+    for slug in ("x1", "x2"):
+        d = root / "advisors" / slug
+        d.mkdir(parents=True)
+        (d / "persona.md").write_text("---\nname: %s\n---\nbody\n" % slug, encoding="utf-8")
+
+def test_diversity_tool_insufficient_data(tmp_path, monkeypatch):
+    # финальное ревью 2026-07-20 (Minor-2): два советника без lenses/domains давали
+    # diversity 1.0 / verdict "ok" — ложная уверенность. Должно быть insufficient_data.
+    monkeypatch.setattr(mcp_server, "_root", lambda: str(tmp_path))
+    _mk_bare_advisors(tmp_path)
+    out = mcp_server.dispatch("diversity_check",
+                              {"advisor_dirs": ["advisors/x1", "advisors/x2"]})
+    assert out["verdict"] == "insufficient_data"
+    assert out["diversity"] is None
+    assert out.get("hint")

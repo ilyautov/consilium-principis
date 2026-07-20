@@ -27,13 +27,18 @@ def test_norm_collapses_ws_and_punct():
 
 
 def test_norm_yo_maps_to_e_across_copies():
-    # ё/е — орфографическая вариативность печатного русского, не различие: все три копии
-    # нормализации (fidelity-гейт, lexical-ретрив, rrf-дедуп) обязаны схлопывать её одинаково.
+    # ё/е — орфографическая вариативность печатного русского, не различие: все копии
+    # нормализации (fidelity-гейт, lexical-ретрив, rrf-дедуп, retrieval-прод, eval-харнесс)
+    # обязаны схлопывать её одинаково.
     from engine.lexical import _norm as lex_norm
     from engine.rrf import _key as rrf_key
+    from engine.retrieval import norm as retrieval_norm
+    import eval as ev
     assert _norm("Ёлка ЁЖ") == "елка еж"
     assert lex_norm("Ёлка ЁЖ") == "елка еж"
     assert rrf_key("Ёлка ЁЖ") == "елка еж"
+    assert retrieval_norm("Ёлка ЁЖ") == "елка еж"
+    assert ev.norm("Ёлка ЁЖ") == "елка еж"
 
 
 def test_verbatim_yo_e_cross_match():

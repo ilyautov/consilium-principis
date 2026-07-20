@@ -35,8 +35,11 @@ class SemanticEngine(Engine):
         for d in raw:
             dt = toks(d["text"])
             lex = len(qt & dt) / (len(qt) or 1)
-            score = (1 - alpha) * float(d["score"]) + alpha * lex
-            rescored.append(Passage(d["text"], score, d["source"], d.get("tier")))
+            cos = float(d["score"])
+            score = (1 - alpha) * cos + alpha * lex
+            # M4: смесь — в score, сырой косинус — в raw_score (гейт режет полосой косинус).
+            rescored.append(Passage(d["text"], score, d["source"], d.get("tier"),
+                                    raw_score=cos))
         rescored.sort(key=lambda p: p.score, reverse=True)
         return rescored[:top_k]
 

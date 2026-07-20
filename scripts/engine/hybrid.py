@@ -27,11 +27,24 @@ class HybridEngine(Engine):
         self.lex = LexicalEngine()
 
     def retrieve(self, question, advisor_dir, top_k=3, query_lex=None):
-        from .rrf import rrf_fuse
+        from .rrf import rrf_fuse, _key
         pool = max(top_k, int(os.getenv("HYBRID_POOL", "20")))
         sem = self.sem.retrieve(question, advisor_dir, top_k=pool)
         lex = self.lex.retrieve(query_lex or question, advisor_dir, top_k=pool)
-        return rrf_fuse([sem, lex], k=int(os.getenv("RRF_K", "60")), top_k=top_k)
+        fused = rrf_fuse([sem, lex], k=int(os.getenv("RRF_K", "60")), top_k=top_k)
+        # M4: RRF-score — не косинус; сырой косинус semantic-ноги прокидываем в raw_score,
+        # чтобы гейт релевантности (калиброван под косинус) не резал полосой слитый скор.
+        # Если сама semantic-нога со смесью (hybrid_alpha>0) — берём её raw (pre-blend).
+        # У lexical-only пассажей косинуса нет → raw_score остаётся None (гейт судит явно).
+        cos_by_key = {}
+        for p in sem:
+            cos = p.raw_score if isinstance(p.raw_score, (int, float)) else p.score
+            cos_by_key.setdefault(_key(p.text), cos)
+        for p in fused:
+            cos = cos_by_key.get(_key(p.text))
+            if cos is not None:
+                p.raw_score = cos
+        return fused
 
     def build_index(self, advisor_dir):
         return self.sem.build_index(advisor_dir)

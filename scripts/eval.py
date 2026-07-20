@@ -256,8 +256,15 @@ def retrieve(question, adv_dir, top_k=3):
         prefer = os.getenv("EVAL_ENGINE")  # 'lexical'|'semantic'|None
         eng = _engine.resolve_engine(adv_dir, prefer=prefer)
         try:
-            return [{"text": p.text, "score": p.score, "source": p.source, "tier": p.tier}
-                    for p in eng.retrieve(question, adv_dir, top_k=top_k)]
+            out = []
+            for p in eng.retrieve(question, adv_dir, top_k=top_k):
+                d = {"text": p.text, "score": p.score, "source": p.source, "tier": p.tier}
+                # M4: сырой косинус поверх hybrid_alpha-смеси/RRF — гейт релевантности
+                # режет полосой ЕГО, не смесь. Нет raw (чистая семантика/lexical) — ключа нет.
+                if getattr(p, "raw_score", None) is not None:
+                    d["raw_score"] = p.raw_score
+                out.append(d)
+            return out
         except Exception as e:
             # НЕ молча: деградация семантики до лексич. пола наблюдаема (иначе FULL «как бы есть»,
             # а recall тихо рухнул). Гейт верности при этом не страдает — но качество да.

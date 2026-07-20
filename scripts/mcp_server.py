@@ -253,8 +253,10 @@ def _retrieve(query, advisor_dir, top_k=3):
         return {"passages": []}
     passages = _eval.retrieve(query, adv_res, top_k=top_k)
     # Borderline-гейт релевантности: топически-близкий-но-не-отвечающий пассаж (камуфляж
-    # смежного домена) флагуется relevance_gated (не выбрасываем — прозрачность). Инертен
-    # на lexical и вне полосы неуверенности (латентный контракт). cfg читаем ОДИН раз (не per-пассаж).
+    # смежного домена) флагуется relevance_gated (не выбрасываем — прозрачность). Инертен,
+    # когда серверный судья недоступен (SIMPLE-пол без ollama); на semantic судит только
+    # in-band (латентный контракт), вне semantic с живым судьёй — всех (M4), полосу
+    # применяя к сырому косинусу (raw_score), не к смеси. cfg читаем ОДИН раз (не per-пассаж).
     #
     # §2.1 host-режим: независимого судьи НЕТ → сервер пассажи не судит. retrieve — поверхность
     # ПРОЗРАЧНОСТИ (пассажи = сырой контекст, не сертификат): двухфазность тут не строим,
@@ -553,6 +555,7 @@ def _cite(advisor_dir, query, top_k=8, use_kernels=True, limit=4):
     # иначе кернел/вторичный запрос вытащил бы цитату на высоком косинусе к СВОЕЙ теме и она
     # прошла бы мимо судьи, хотя primary её не находил (тот же класс утечки, что чинит гейт).
     primary_score_by_text = {}                         # score текста ТОЛЬКО из primary-запроса
+    primary_raw_by_text = {}                           # M4: сырой косинус поверх смеси/RRF
     for q in uniq_q:
         for p in _eval.retrieve(q, adv_res, top_k=top_k):
             t = (p.get("text") or "").strip()
@@ -562,6 +565,10 @@ def _cite(advisor_dir, query, top_k=8, use_kernels=True, limit=4):
             if q == primary and isinstance(s, (int, float)) and (
                     t not in primary_score_by_text or s > primary_score_by_text[t]):
                 primary_score_by_text[t] = s
+            rs = p.get("raw_score")
+            if q == primary and isinstance(rs, (int, float)) and (
+                    t not in primary_raw_by_text or rs > primary_raw_by_text[t]):
+                primary_raw_by_text[t] = rs
             if t not in seen_t:
                 seen_t.add(t); cand.append(t)
     # Early-exit судейство (§1.2 moat-v2, двухпроходное — review HIGH-1).
@@ -575,7 +582,10 @@ def _cite(advisor_dir, query, top_k=8, use_kernels=True, limit=4):
     # Кандидат не судится дважды; вызовов судьи ≈ limit + K (встреченные реджекты).
     #
     # Borderline-гейт релевантности ПОВЕРХ verbatim-тиринга: снимаем дословные-но-НЕ-
-    # отвечающие цитаты (снятая → честный 🟡-путь ниже). Инертен на lexical/disabled.
+    # отвечающие цитаты (снятая → честный 🟡-путь ниже). Инертен, когда гейт выключен
+    # или серверный судья недоступен (SIMPLE-пол без ollama); вне semantic-режима с
+    # живым судьёй судит ВСЕХ verbatim-кандидатов (M4), полосу применяя к сырому
+    # косинусу (raw_score), не к hybrid_alpha-смеси/RRF-скору.
     # Для ЦИТАТ судью пропускает ТОЛЬКО primary-score > band_hi (M1 sub-band bypass:
     # низкий косинус ≠ безопасно — verbatim не-отвечающая цитата на 0.44 уходила как 🔵
     # без судьи, abstention-пола у cite нет). None-score (кандидат вторичного запроса,
@@ -609,9 +619,12 @@ def _cite(advisor_dir, query, top_k=8, use_kernels=True, limit=4):
         if len(ranked) >= limit:
             break                                     # набрали limit — остальных НЕ судим
         try:
+            # M4: raw_score — сырой косинус поверх hybrid_alpha-смеси/RRF; гейт режет
+            # полосой ЕГО, и вне semantic-режима судит всех при доступном судье.
             keep = relevance_gate.gate_quote(primary, c["text"],
                                              primary_score_by_text.get(c["text"]),
-                                             adv_res, cfg=gcfg, source=c["source"])
+                                             adv_res, cfg=gcfg, source=c["source"],
+                                             raw_score=primary_raw_by_text.get(c["text"]))
         except Exception:
             keep = False                              # fail-closed: гейт/судья бросил → кандидат снят
         if keep:

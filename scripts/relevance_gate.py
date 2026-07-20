@@ -14,14 +14,22 @@ X» вытягивает дословный пассаж про обман). Х�
 Выше band_hi уверенность высока (истинное попадание) → судью НЕ зовём, латентность
 ограничена.
 
-Инварианты:
-  • INERT на lexical-бэкенде — полоса калибрована под semantic-скор. CI (ollama-free →
-    lexical) не видит изменений.
+Инварианты (после M4, вариант A):
+  • Судья гейтит verbatim НЕЗАВИСИМО от retrieval-движка, когда серверный судья
+    доступен (_judge_available: judge_backend.resolve → ollama/api И бэкенд жив).
+    Раньше молчаливый keep на не-semantic оставлял hybrid/lexical без анти-misapply
+    защиты вовсе (M4).
+  • Полоса band — ТОЛЬКО на semantic-шкале: сырой косинус, при hybrid_alpha-смеси/RRF —
+    поле raw_score пассажа (к смеси полосу применять НЕЛЬЗЯ: sub-band камуфляж с
+    высоким токен-оверлапом улетал бы за band_hi в auto-keep без судьи). Вне
+    semantic-шкалы полосы нет — судим ВСЕХ (зеркало host-фазы-1).
+  • Судья НЕДОСТУПЕН (SIMPLE-пол без ollama) → прежнее поведение: keep/pass-through.
+    Офлайн-инвариант CI (ollama-free → lexical, судья мёртв) не ломается.
   • FAIL-CLOSED: судья упал/неуверен → gated (пассаж флагнут / цитата снята),
     НИКОГДА не выдаём 🔵 «на всякий».
   • ADDITIVE: слой релевантности ПОВЕРХ verbatim-тиринга — _fidelity_check не трогаем.
-  • Судья зовётся ТОЛЬКО на semantic; retrieve — только in-band (латентный контракт),
-    cite — всё, что не выше band_hi.
+  • Латентный контракт: на semantic retrieve судит только in-band, cite — всё, что не
+    выше band_hi; вне semantic (судья жив) — без полосы (шкала не калибрована).
 
 `judge_fn` — TEST SEAM (в проде = relevance_judge.judge).
 """
@@ -154,6 +162,27 @@ def is_semantic(advisor_dir) -> bool:
         return False
 
 
+def _judge_available(advisor_dir) -> bool:
+    """Серверный судья (relevance_judge.judge) реально callable СЕЙЧАС — вне semantic-
+    режима гейт судит только тогда (M4). judge_backend.resolve выбирает УРОВЕНЬ
+    судейства: "host" → сервер не судит (судит хост через двухфазный протокол _cite)
+    → False; "ollama"/"api" → проверяем ЖИВОСТЬ бэкенда (пробинг ollama / наличие
+    api-ключа): env-пин CONSILIUM_JUDGE_BACKEND=ollama при мёртвой ollama судью
+    доступным НЕ делает — иначе каждый вызов судьи падал бы в fail-closed withhold
+    (регресс офлайн-пола). Любая ошибка → False (инертен = поведение до M4)."""
+    try:
+        import judge_backend
+        import llm_local
+        b = judge_backend.resolve(advisor_dir)
+        if b == "ollama":
+            return bool(llm_local.available())
+        if b == "api":
+            return bool(llm_local.api_available())
+        return False
+    except Exception:
+        return False
+
+
 def _default_judge(query, passage, source=None):
     import relevance_judge
     return relevance_judge.judge(query, passage, source=source)
@@ -174,14 +203,24 @@ def _in_band(score, cfg):
 
 
 def gate_passage(query, passage, advisor_dir, judge_fn=None, cfg=None) -> dict:
-    """Пассаж {text,score,source}. Вне semantic ИЛИ score вне полосы → возврат КАК ЕСТЬ.
-    In-band → судья: <threshold → COPY с relevance_gated=True (пассаж НЕ выбрасываем —
-    прозрачность), >=threshold → без флага (+ annotate relevance=judge).
+    """Пассаж {text,score,source[,raw_score]}. Судья недоступен (вне semantic) ИЛИ скор
+    вне полосы НА SEMANTIC-ШКАЛЕ → возврат КАК ЕСТЬ. In-band (сырой косинус: raw_score
+    предпочтён score-смеси) ИЛИ вне semantic-шкалы при живом судье → судья:
+    <threshold → COPY с relevance_gated=True (пассаж НЕ выбрасываем — прозрачность),
+    >=threshold → без флага (+ annotate relevance=judge).
     FAIL-CLOSED: судья бросил → gated (relevance_gated=True)."""
     cfg = cfg or _gate_config(advisor_dir)
     if not cfg.get("enabled", True):
         return passage
-    if not is_semantic(advisor_dir) or not _in_band(passage.get("score"), cfg):
+    semantic = is_semantic(advisor_dir)
+    if not semantic and not _judge_available(advisor_dir):
+        return passage                                 # судьи нет → прежний путь (SIMPLE-пол)
+    # Эффективный скор на калиброванной semantic-шкале: raw_score (сырой косинус поверх
+    # hybrid_alpha-смеси/RRF) предпочтён score-смеси; вне semantic без raw шкалы нет —
+    # полоса неприменима → судим (eff=None).
+    raw = passage.get("raw_score")
+    eff = raw if isinstance(raw, (int, float)) else (passage.get("score") if semantic else None)
+    if eff is not None and not _in_band(eff, cfg):
         return passage
     jf = judge_fn if judge_fn is not None else _default_judge
     try:
@@ -200,28 +239,36 @@ def gate_passage(query, passage, advisor_dir, judge_fn=None, cfg=None) -> dict:
 
 
 def gate_quote(query, quote_text, score, advisor_dir, judge_fn=None, cfg=None,
-               source=None) -> bool:
-    """keep=True / withhold=False. Вне semantic → keep (True). На semantic судью
-    пропускает ТОЛЬКО score > band_hi (калибровано: top-edge утечек на 0.65 не
-    наблюдалось); всё остальное (in-band, SUB-BAND, None-score) → судья: keep iff
-    judge>=threshold. FAIL-CLOSED: судья бросил → withhold (False).
+               source=None, raw_score=None) -> bool:
+    """keep=True / withhold=False. Судья недоступен (вне semantic) → keep (прежний путь,
+    SIMPLE-пол). Иначе судью пропускает ТОЛЬКО скор > band_hi НА SEMANTIC-ШКАЛЕ — сырой
+    косинус: raw_score предпочтён score-смеси при hybrid_alpha>0/RRF (калибровано:
+    top-edge утечек на 0.65 не наблюдалось); lexical/RRF-скор сам по себе auto-keep НЕ
+    даёт (шкала не калибрована — судим всех, зеркало host-фазы-1). Всё остальное
+    (in-band, SUB-BAND, None-score) → судья: keep iff judge>=threshold.
+    FAIL-CLOSED: судья бросил → withhold (False).
 
     Для ЦИТАТ низкий косинус ≠ безопасно — асимметрия с gate_passage. У retrieve
     низкий скор и так уходит в 🟡-путь (host abstention 0.50), а _cite БЕЗ пола
     abstention возвращал дословную цитату на косинусе 0.44 как 🔵 — verbatim
     не-отвечающая цитата и есть сетап misapply (измерено: M1, 4 утечки Marcus,
     судья по ним давал сплошные нули → судить sub-band = снять все четыре).
-    Снятая цитата → путь схлопывается в честный 🟡 «дословного ответа нет»."""
+    Снятая цитата → путь схлопывается в честный 🟡 «дословного ответа нет».
+    M4: тот же bypass существовал и ВНЕ semantic-режима (hybrid/lexical — молчаливый
+    keep без судьи; смесь hybrid_alpha вместо косинуса под полосой) — закрыт судьёй
+    при его доступности."""
     cfg = cfg or _gate_config(advisor_dir)
     if not cfg.get("enabled", True):
         return True
-    if not is_semantic(advisor_dir):
-        return True
-    if isinstance(score, (int, float)) and score > cfg["band_hi"]:
-        return True                                    # единственный не-судимый путь
+    semantic = is_semantic(advisor_dir)
+    if not semantic and not _judge_available(advisor_dir):
+        return True                                      # судьи нет → прежний keep
+    eff = raw_score if isinstance(raw_score, (int, float)) else (score if semantic else None)
+    if isinstance(eff, (int, float)) and eff > cfg["band_hi"]:
+        return True                                      # единственный не-судимый путь
     jf = judge_fn if judge_fn is not None else _default_judge
     try:
         rel = _call_judge(jf, query, quote_text, source)
     except Exception:
-        return False                                   # fail-closed withhold
+        return False                                     # fail-closed withhold
     return rel >= cfg["rel_threshold"]

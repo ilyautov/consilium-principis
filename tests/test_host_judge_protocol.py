@@ -317,7 +317,7 @@ def test_server_judge_modes_stay_single_phase(monkeypatch, host_env, backend):
     pool, adv = host_env
     monkeypatch.setenv("CONSILIUM_JUDGE_BACKEND", backend)
     monkeypatch.setattr(relevance_gate, "gate_quote",
-                        lambda q, t, s, a, cfg=None, source=None: True)
+                        lambda q, t, s, a, cfg=None, source=None, raw_score=None: True)
     r = mcp_server._cite(adv, "q", use_kernels=False, limit=4)
     assert "phase" not in r and "nonce" not in r
     assert _texts(r) == [p["text"] for p in pool[:4]]

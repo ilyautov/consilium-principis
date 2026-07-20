@@ -34,7 +34,7 @@ def cite_env(monkeypatch):
     calls = []
 
     def make_gate(reject=(), boom=()):
-        def gate(query, text, score, advisor_dir, cfg=None, source=None):
+        def gate(query, text, score, advisor_dir, cfg=None, source=None, raw_score=None):
             calls.append(text)
             if any(r in text for r in boom):
                 raise RuntimeError("судья упал")

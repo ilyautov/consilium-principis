@@ -215,6 +215,13 @@ def test_initialize_exposes_instructions_to_host():
     assert "дефект корпуса" in instr.lower()                       # запрет конфабуляции дефекта гейта
 
 
+def test_instructions_rule18_moat_directives():
+    import mcp_server as m
+    assert "18." in m.INSTRUCTIONS
+    for kw in ("ДИССЕНТ", "РЕЙМ-ЧЕК", "never_quote", "diversity_check", "эхо-камер"):
+        assert kw in m.INSTRUCTIONS, "INSTRUCTIONS не несёт ров-директиву: %s" % kw
+
+
 def test_handler_keyerror_not_mislabeled_as_unknown_tool(monkeypatch):
     # KeyError ВНУТРИ хендлера (напр. неполный объект) → -32603 «ошибка тула», НЕ -32601
     from mcp_server import _handle_rpc, TOOLS

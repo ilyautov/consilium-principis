@@ -36,6 +36,11 @@
 """
 import hashlib
 import json
+import os
+import sys
+import tempfile
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # 0 = самый авторитетный (дословные слова автора); A = апокриф/неустановленное.
 TIER_ORDER = {"P1": 0, "P2": 1, "S1": 2, "S2": 3, "B": 4, "A": 5}
@@ -98,7 +103,6 @@ def promote_gate(current_tier, requested_tier, evidence=None):
 
 def _lock_head(lock_json):
     """gov_head из build.lock.json (эталонный отпечаток корпуса), или None если нет."""
-    import os
     if not os.path.isfile(lock_json):
         return None
     try:
@@ -110,8 +114,6 @@ def _lock_head(lock_json):
 def expected_head_for(advisor_dir):
     """Эталонный gov_head советника: build.lock (локальная сборка) ИЛИ трекаемый corpus.lock.json
     (шипованный корпус — переживает клон). None, если ни одного нет."""
-    import sys, os
-    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from corpusbuild.paths import lock_path, head_lock_path
     return _lock_head(lock_path(advisor_dir)) or _lock_head(head_lock_path(advisor_dir))
 
@@ -136,21 +138,17 @@ LOCAL_REGISTRY_NAME = "gov_heads.local.json"
 def _registry_root(root=None):
     if root is not None:
         return root
-    import sys, os
-    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from corpusbuild.paths import project_root
     return project_root()
 
 
 def registry_path(root=None):
     """Путь ТРЕКАЕМОГО реестра (шипуемое: lenses/*)."""
-    import os
     return os.path.join(_registry_root(root), REGISTRY_NAME)
 
 
 def local_registry_path(root=None):
     """Путь ЛОКАЛЬНОГО (gitignored) реестра приватных советников (advisors/*)."""
-    import os
     return os.path.join(_registry_root(root), LOCAL_REGISTRY_NAME)
 
 
@@ -168,7 +166,6 @@ def _registry_path_for_key(key, root=None):
 def _advisor_key(advisor_dir, root):
     """Ключ реестра = путь советника ОТНОСИТЕЛЬНО корня доски (forward-slash, кросс-платформенно).
     Советник вне корня (tmp/внешний каталог) → None: якорить нечем, реестр не трогаем."""
-    import os
     rel = os.path.relpath(os.path.realpath(advisor_dir), os.path.realpath(root))
     if rel == ".." or rel.startswith(".." + os.sep) or os.path.isabs(rel):
         return None
@@ -180,7 +177,6 @@ def _read_registry_file(path):
     ОТСУТСТВУЮЩИЙ: truncated/невалидный JSON — это ПОРЧА (оборванная запись / подмена / внешняя
     порча), а НЕ «ещё не мигрировали». Отсутствие → мягкое предупреждение (миграция); порча →
     громкий провал (fail-closed) — иначе битый реестр молча отключал бы детект подмены."""
-    import os
     if not os.path.isfile(path):
         return "absent", {}
     try:
@@ -241,7 +237,6 @@ def _atomic_write_json(path, obj):
     """Атомарная запись: пишем во временный файл в ТОЙ ЖЕ директории, затем os.replace (атомарно
     на POSIX/Windows). Оборванная/конкурентная запись НЕ оставляет усечённый gov_heads.json —
     читатель видит либо старую, либо новую полную версию (закрывает и гонку параллельных сборок)."""
-    import os, tempfile
     d = os.path.dirname(path) or "."
     fd, tmp = tempfile.mkstemp(dir=d, prefix=".gov_heads.", suffix=".tmp")
     try:
@@ -290,8 +285,6 @@ def verify_advisor(advisor_dir, root=None):
     самосогласованным двойником → цепь сходится, внутренние lock'и сходятся, но голова ≠ якорю
     → swap_suspect=True, tampered=True (громкий вердикт). Якорь не зарегистрирован →
     anchor_registered=False (предупреждение, НЕ провал: миграция старых советников)."""
-    import sys, os
-    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from corpusbuild.paths import corpus_path
     res = _verify_corpus(corpus_path(advisor_dir), expected_head=expected_head_for(advisor_dir))
     if res is None:
@@ -315,8 +308,6 @@ def freeze(advisor_dir, root=None):
     """Записать трекаемый corpus.lock.json = {gov_head} над ТЕКУЩИМ corpus.jsonl советника
     И зарегистрировать якорь в gov_heads.json (корень доски). Для шипованных корпусов (lenses/*)
     даёт git-переносимый эталон; для владельца — one-shot регистрация якоря старого советника."""
-    import sys, os
-    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from corpusbuild.paths import corpus_path, head_lock_path
     res = _verify_corpus(corpus_path(advisor_dir))
     if res is None:
@@ -334,7 +325,6 @@ def _verify_corpus(corpus_jsonl, expected_head=None):
     тиров. Если передан expected_head (сохранённый в build.lock при сборке) — СВЕРИТЬ с ним:
     несовпадение = подмена corpus.jsonl ПОСЛЕ сборки (раньше цепь сверялась сама с собой —
     тавтология, ничего не ловила). head_match=None, если эталонной головы нет."""
-    import os
     if not os.path.isfile(corpus_jsonl):
         return None
     records, tiers = [], {}
@@ -358,11 +348,9 @@ def _verify_corpus(corpus_jsonl, expected_head=None):
 
 
 if __name__ == "__main__":
-    import sys, os
     if len(sys.argv) < 3 or sys.argv[1] not in ("verify", "freeze"):
         print("Использование: python governance.py verify|freeze <dir | путь.jsonl>")
         sys.exit(1)
-    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from corpusbuild.paths import corpus_path  # резолвер, не литерал
     target = sys.argv[2]
     if sys.argv[1] == "freeze":                          # записать трекаемый эталон corpus.lock.json

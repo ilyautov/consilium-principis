@@ -42,9 +42,8 @@ import sys
 
 _SCRIPTS = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 HERE = os.path.dirname(os.path.abspath(__file__))
-for _p in (_SCRIPTS, HERE):
-    if _p not in sys.path:
-        sys.path.insert(0, _p)
+sys.path.insert(0, _SCRIPTS)
+sys.path.insert(0, HERE)
 
 from antisycophancy_probe import _bootstrap_ci, _mean, SEED, _safe_call  # noqa: E402
 from tier_pool_probe import anchor_rank, blue_share, has_blue, load_golden, _norm  # noqa: E402

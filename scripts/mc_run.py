@@ -41,9 +41,7 @@ import os
 import random
 import sys
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-if HERE not in sys.path:
-    sys.path.insert(0, HERE)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from decision_map import KIND_EVENT, DIRECTION_MIN, validate_map
 from safe_expr import SafeExprEvalError, compile_expr

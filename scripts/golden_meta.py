@@ -15,9 +15,7 @@ import json
 import hashlib
 import datetime
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-if HERE not in sys.path:
-    sys.path.insert(0, HERE)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from corpusbuild.paths import corpus_path
 
 HASH_LEN = 12

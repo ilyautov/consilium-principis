@@ -34,9 +34,8 @@ import sys
 _SCRIPTS = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 HERE = os.path.dirname(os.path.abspath(__file__))
 # scripts/experiments НЕ пакет (нет __init__.py) → плоский импорт, как в соседних пробах.
-for _p in (_SCRIPTS, HERE):
-    if _p not in sys.path:
-        sys.path.insert(0, _p)
+sys.path.insert(0, _SCRIPTS)
+sys.path.insert(0, HERE)
 
 from golden_meta import split_meta  # noqa: E402  §1.4: _meta-строка ≠ golden-запись
 

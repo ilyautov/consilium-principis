@@ -14,9 +14,7 @@ import math
 import os
 import sys
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-if HERE not in sys.path:
-    sys.path.insert(0, HERE)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from decision_map import _is_number, _nonempty_str
 from decision_card import (_ulid, _CROCKFORD, _parse_date, validate_prediction,

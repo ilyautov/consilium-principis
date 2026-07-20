@@ -4,7 +4,7 @@
     "rule_count": 19,
     "recipe_count": 16,
     "script_count": 67,
-    "test_count": 151,
+    "test_count": 152,
     "glossary_count": 113
   },
   "tools": [
@@ -2583,6 +2583,10 @@
     {
       "path": "tests/test_outcome_loop.py",
       "covers": "outcome loop"
+    },
+    {
+      "path": "tests/test_path_idiom.py",
+      "covers": "path idiom"
     },
     {
       "path": "tests/test_perturbation.py",

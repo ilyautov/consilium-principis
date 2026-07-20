@@ -18,9 +18,7 @@ corpus_sha256. Сравнение честно ТОЛЬКО при совпад�
 import os
 import sys
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-if HERE not in sys.path:
-    sys.path.insert(0, HERE)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from abstention_curve import curve_auc  # чистая математика разделимости
 
 # Направление «лучше» по метрике: +1 — выше лучше (регресс = падение), -1 — ниже лучше (рост).

@@ -12,8 +12,7 @@ import random
 
 # Модуль в scripts/experiments/, а зависит от scripts/llm_local.py и scripts/mcp_server.py.
 _SCRIPTS = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if _SCRIPTS not in sys.path:
-    sys.path.insert(0, _SCRIPTS)
+sys.path.insert(0, _SCRIPTS)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_BATTERY = os.path.join(HERE, "antisycophancy_battery.jsonl")

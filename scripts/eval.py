@@ -32,8 +32,7 @@ GOLDEN_DIR = os.path.join(HERE, "golden")
 
 # Контракт с движком tier-FULL (другой агент пишет scripts/tier_full.py).
 # Defensive import: если нет/сломан — деградируем в лексический fallback (tier=SIMPLE).
-if HERE not in sys.path:
-    sys.path.insert(0, HERE)
+sys.path.insert(0, HERE)
 from corpusbuild.paths import corpus_path
 try:
     import tier_full            # tier_full.retrieve(q, advisor_dir, top_k) / tier_full.available()

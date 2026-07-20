@@ -2,6 +2,7 @@
 import math
 import os
 import sys
+import threading
 
 import pytest
 
@@ -485,3 +486,103 @@ class TestJudgeCircuitBreaker:
         monkeypatch.setattr(llm_local, "generate", lambda *a, **kw: "1")
         assert relevance_judge.judge("q", "p") == 1
         assert relevance_judge._consec_fail == 0
+
+    def test_concurrent_failures_open_breaker_without_serializing_network_calls(self, monkeypatch):
+        """Одновременные сбои открывают breaker; новые вызовы не идут в LLM.
+
+        Барьер также доказывает, что mutex состояния не удерживается во время сети:
+        все _CB_FAILS вызовов должны одновременно дойти до generate.
+        """
+        barrier = threading.Barrier(relevance_judge._CB_FAILS)
+        calls = []
+        calls_lock = threading.Lock()
+        outcomes = []
+
+        def boom(*args, **kwargs):
+            with calls_lock:
+                calls.append(1)
+            barrier.wait(timeout=1)
+            raise RuntimeError("ollama down")
+
+        def fail_judge():
+            try:
+                relevance_judge.judge("q", "p")
+            except RuntimeError:
+                outcomes.append("raise")
+
+        monkeypatch.setattr(llm_local, "generate", boom)
+        workers = [threading.Thread(target=fail_judge) for _ in range(relevance_judge._CB_FAILS)]
+        for worker in workers:
+            worker.start()
+        for worker in workers:
+            worker.join(timeout=1)
+
+        assert outcomes == ["raise"] * relevance_judge._CB_FAILS
+        assert len(calls) == relevance_judge._CB_FAILS
+        assert relevance_judge._consec_fail == relevance_judge._CB_FAILS
+
+        blocked_results = []
+        blocked = [threading.Thread(target=lambda: blocked_results.append(
+            relevance_judge.judge("q", "p"))) for _ in range(2)]
+        for worker in blocked:
+            worker.start()
+        for worker in blocked:
+            worker.join(timeout=1)
+
+        assert blocked_results == [0, 0]
+        assert len(calls) == relevance_judge._CB_FAILS
+        assert hasattr(relevance_judge, "_CB_LOCK")
+
+    def test_open_breaker_survives_stale_inflight_success(self, monkeypatch):
+        """Успех, начавшийся до серии ошибок, не закрывает уже открытый cooldown."""
+        success_started = threading.Event()
+        release_success = threading.Event()
+        failure_barrier = threading.Barrier(relevance_judge._CB_FAILS)
+        calls = []
+        calls_lock = threading.Lock()
+        success_results = []
+        failures = []
+
+        def controlled_generate(prompt, *args, **kwargs):
+            if "ВОПРОС: stale-success" in prompt:
+                with calls_lock:
+                    calls.append("stale-success")
+                success_started.set()
+                assert release_success.wait(timeout=1)
+                return "3"
+            if "ВОПРОС: after-open" in prompt:
+                with calls_lock:
+                    calls.append("after-open")
+                return "3"
+            with calls_lock:
+                calls.append("failure")
+            failure_barrier.wait(timeout=1)
+            raise RuntimeError("ollama down")
+
+        def run_stale_success():
+            success_results.append(relevance_judge.judge("stale-success", "p"))
+
+        def run_failure():
+            try:
+                relevance_judge.judge("failure", "p")
+            except RuntimeError:
+                failures.append("raise")
+
+        monkeypatch.setattr(llm_local, "generate", controlled_generate)
+        stale_success = threading.Thread(target=run_stale_success)
+        stale_success.start()
+        assert success_started.wait(timeout=1)
+        failure_workers = [threading.Thread(target=run_failure)
+                           for _ in range(relevance_judge._CB_FAILS)]
+        for worker in failure_workers:
+            worker.start()
+        for worker in failure_workers:
+            worker.join(timeout=1)
+        assert failures == ["raise"] * relevance_judge._CB_FAILS
+
+        release_success.set()
+        stale_success.join(timeout=1)
+        assert success_results == [3]
+
+        assert relevance_judge.judge("after-open", "p") == 0
+        assert calls.count("after-open") == 0

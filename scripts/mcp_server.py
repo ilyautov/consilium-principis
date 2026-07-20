@@ -1239,34 +1239,44 @@ _JOB_SEQ = [0]
 _MAX_JOBS = 256               # кап реестра: без него долгоживущий сервер = утечка памяти (реестр не чистится)
 
 
-def _evict_jobs_over_cap():
+def _evict_jobs_over_cap(reserve=0):
     """Ограничить рост _JOBS. FIFO по возрасту (dict хранит порядок вставки), но НЕ
     выбрасываем running-джоб, который вызывающий ещё может опрашивать: сперва самые старые
-    ТЕРМИНАЛЬНЫЕ (done/error), и лишь если терминальных нет — старейший вообще (крайне
-    маловероятно при 256). Зовётся под _JOBS_LOCK."""
-    while len(_JOBS) > _MAX_JOBS:
+    ТЕРМИНАЛЬНЫЕ. Зовётся под _JOBS_LOCK. reserve оставляет место для новой джобы."""
+    while len(_JOBS) + reserve > _MAX_JOBS:
         victim = next((k for k, j in _JOBS.items() if j["status"] != "running"), None)
         if victim is None:
-            victim = next(iter(_JOBS))     # все running — жертвуем старейшим
+            return                         # все running — не теряем наблюдаемую задачу
         _JOBS.pop(victim, None)
 
 
 def _start_job(fn, label):
     with _JOBS_LOCK:
+        _evict_jobs_over_cap(reserve=1)
+        if len(_JOBS) >= _MAX_JOBS:
+            return {"error": "слишком много активных фоновых задач; дождись job_status"}
         _JOB_SEQ[0] += 1
         jid = "job-%d" % _JOB_SEQ[0]
         _JOBS[jid] = {"status": "running", "label": label, "result": None, "error": None}
-        _evict_jobs_over_cap()             # кап реестра (утечка памяти)
 
     def _run():
         try:
             r = fn()
             with _JOBS_LOCK:
-                _JOBS[jid].update(status="done", result=r)
+                job = _JOBS.get(jid)
+                if job is not None:
+                    job.update(status="done", result=r)
         except Exception as e:
             with _JOBS_LOCK:
-                _JOBS[jid].update(status="error", error=str(e))
-    threading.Thread(target=_run, daemon=True).start()
+                job = _JOBS.get(jid)
+                if job is not None:
+                    job.update(status="error", error=str(e))
+    try:
+        threading.Thread(target=_run, daemon=True).start()
+    except Exception:
+        with _JOBS_LOCK:
+            _JOBS.pop(jid, None)
+        raise
     return {"job_id": jid, "status": "running", "label": label,
             "note": "долгая операция в фоне — опрашивай job_status(job_id), не жди в этом вызове"}
 

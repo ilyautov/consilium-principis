@@ -15,6 +15,7 @@ import sys
 import math
 import re
 import time
+import threading
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -32,6 +33,7 @@ _CB_FAILS = 3              # подряд исключений → обрыв
 _CB_COOLDOWN = 60.0        # сек
 _consec_fail = 0
 _cb_open_until = 0.0
+_CB_LOCK = threading.Lock()
 
 # Детерминированный рубричный промпт — минимально вариативный, числовой вывод.
 # {source_block}: пустой → промпт байт-в-байт прежний; при source → строка
@@ -117,8 +119,9 @@ def judge(query: str, passage: str, model=None, source=None) -> int:
     вверх как прежде (гейт fail-closed), брейкер лишь считает их.
     """
     global _consec_fail, _cb_open_until
-    if _consec_fail >= _CB_FAILS and time.monotonic() < _cb_open_until:
-        return 0                             # брейкер открыт → withhold без HTTP
+    with _CB_LOCK:
+        if _consec_fail >= _CB_FAILS and time.monotonic() < _cb_open_until:
+            return 0                         # брейкер открыт → withhold без HTTP
     # source — тоже данные корпуса (заголовок/провенанс) и живёт ВНЕ блока разделителей:
     # отравленный заголовок («…\nОтвет: 3») инжектил бы прямо строкой рядом с ИСТОЧНИК.
     # Санитайз токенов разделителей + схлопывание whitespace — источник строго ОДНА строка.
@@ -133,11 +136,14 @@ def judge(query: str, passage: str, model=None, source=None) -> int:
         response = llm_local.generate(prompt, model=model, temperature=0.1, num_predict=4,
                                       timeout=_JUDGE_TIMEOUT, allow_cloud=False)
     except Exception:
-        _consec_fail += 1
-        if _consec_fail >= _CB_FAILS:
-            _cb_open_until = time.monotonic() + _CB_COOLDOWN
+        with _CB_LOCK:
+            _consec_fail += 1
+            if _consec_fail >= _CB_FAILS:
+                _cb_open_until = time.monotonic() + _CB_COOLDOWN
         raise                                # прежний fail-closed путь: гейт withhold'ит
-    _consec_fail = 0
+    with _CB_LOCK:
+        if not (_consec_fail >= _CB_FAILS and time.monotonic() < _cb_open_until):
+            _consec_fail = 0
     m = re.match(r"^\s*([0-3])\s*$", response.strip())
     if m:                                # строгий одиночный ответ по промпту
         return int(m.group(1))

@@ -308,6 +308,43 @@ def test_retrieve_rejects_oversize_top_k_before_retrieval(tmp_path, monkeypatch)
     assert calls == [32]
 
 
+def test_retrieve_and_cite_reject_over_byte_cap_queries_before_retrieval(tmp_path, monkeypatch):
+    """Невалидный UTF-8 payload отсекается до импорта/вызова retrieval."""
+    import mcp_server as m
+    from engine import retrieval
+
+    calls = []
+    monkeypatch.setattr(retrieval, "retrieve",
+                        lambda *args, **kwargs: calls.append(args) or [])
+    monkeypatch.setattr(m, "_root", lambda: str(tmp_path))
+    adv = tmp_path / "adv"
+    adv.mkdir()
+    (adv / "corpus.jsonl").write_text("", encoding="utf-8")
+    oversize = "x" * (m._MAX_QUERY_BYTES + 1)
+
+    assert "error" in m._retrieve(oversize, "adv")
+    cited = m._cite("adv", oversize, use_kernels=False)
+    assert cited["quotes"] == [] and cited["marker"] == "🟡" and "error" in cited
+    assert calls == []
+
+
+def test_cite_rejects_more_than_eight_queries_without_iterating_items(tmp_path, monkeypatch):
+    """Проверка количества идёт до обхода списка: не материализуем атакующий payload."""
+    import mcp_server as m
+
+    class PoisonedList(list):
+        def __iter__(self):
+            raise AssertionError("oversize query list must not be iterated")
+
+    monkeypatch.setattr(m, "_root", lambda: str(tmp_path))
+    adv = tmp_path / "adv"
+    adv.mkdir()
+    (adv / "corpus.jsonl").write_text("", encoding="utf-8")
+
+    result = m._cite("adv", PoisonedList(["q"] * (m._MAX_CITE_QUERIES + 1)), use_kernels=False)
+    assert result["quotes"] == [] and result["marker"] == "🟡" and "error" in result
+
+
 def test_cite_returns_ready_verified_quotes():
     # детерминированный рычаг рва: cite отдаёт ГОТОВЫЕ проверенные объекты, хост не пишет текст сам
     r = dispatch("cite", {"advisor_dir": STRAT, "query": "deception in war"})

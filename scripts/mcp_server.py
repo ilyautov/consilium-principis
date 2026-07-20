@@ -285,6 +285,28 @@ def _validate_session_attribution(session):
     return ns, violations, reconciliations
 
 
+_MAX_QUERY_BYTES = 16 * 1024
+_MAX_CITE_QUERIES = 8
+
+
+def _utf8_byte_len(value):
+    """Размер UTF-8 без создания временного bytes-объекта размером с недоверенный input."""
+    size = 0
+    for char in value:
+        codepoint = ord(char)
+        size += 1 if codepoint <= 0x7f else 2 if codepoint <= 0x7ff else 3 if codepoint <= 0xffff else 4
+    return size
+
+
+def _validate_bounded_string(value, field, max_bytes):
+    """Вернуть ошибку для нестрокового/слишком большого UTF-8 поля, иначе None."""
+    if not isinstance(value, str):
+        return "%s должен быть строкой" % field
+    if _utf8_byte_len(value) > max_bytes:
+        return "%s превышает лимит %d байт UTF-8" % (field, max_bytes)
+    return None
+
+
 def _retrieve(query, advisor_dir, top_k=3):
     # M7-refuted: retrieve/cite — синхронны НАМЕРЕННО (не джобы). Работают поверх УЖЕ
     # собранного индекса; тяжёлая сборка вынесена в фоновый джоб build_advisor. Массовый
@@ -295,6 +317,9 @@ def _retrieve(query, advisor_dir, top_k=3):
     if (isinstance(top_k, bool) or not isinstance(top_k, int)
             or not 1 <= top_k <= _RETRIEVE_MAX_TOP_K):
         return {"error": "top_k must be an integer from 1 to %d" % _RETRIEVE_MAX_TOP_K}
+    error = _validate_bounded_string(query, "query", _MAX_QUERY_BYTES)
+    if error:
+        return {"error": error}
     from engine import retrieval             # ленивый импорт (тянет corpusbuild/engine)
     import relevance_gate
     import judge_backend
@@ -411,6 +436,13 @@ def _cite_result(ranked, lang_out):
     out.update({"quotes": [], "best": None, "marker": "🟡",
             "note": ("Дословного нет — НЕ выдумывай, иди 🟡. Дай query в языке корпуса (English) "
                      "или другой формулировкой; гейт исправен.")})
+    return out
+
+
+def _cite_error(error):
+    """Fail-closed ответ cite сохраняет его обычную MCP-форму."""
+    out = _cite_result([], {})
+    out["error"] = error
     return out
 
 
@@ -584,6 +616,27 @@ def _cite(advisor_dir, query, top_k=8, use_kernels=True, limit=4):
         limit = min(max(int(limit), 1), 16)
     except (TypeError, ValueError, OverflowError):
         return _cite_result([], {})
+    if isinstance(query, str):
+        error = _validate_bounded_string(query, "query", _MAX_QUERY_BYTES)
+        queries = [query] if not error else []
+    elif isinstance(query, list):
+        # Проверяем count ДО обхода: хостовая JSON-коллекция уже создана транспортом, но
+        # сервер не должен ещё раз материализовывать/дедуплицировать атакующий fan-out.
+        if len(query) > _MAX_CITE_QUERIES:
+            return _cite_error("query содержит больше %d формулировок" % _MAX_CITE_QUERIES)
+        error = None
+        queries = []
+        for index, value in enumerate(query):
+            error = _validate_bounded_string(value, "query[%d]" % index, _MAX_QUERY_BYTES)
+            if error:
+                break
+            if value:
+                queries.append(value)
+    else:
+        error = "query должен быть строкой или списком строк"
+        queries = []
+    if error:
+        return _cite_error(error)
     from engine import retrieval
     import relevance_gate
     import judge_backend
@@ -591,7 +644,6 @@ def _cite(advisor_dir, query, top_k=8, use_kernels=True, limit=4):
     adv_res = _resolve_read(advisor_dir)                # H5 read-гард: traversal → пустой 🟡, не читаем
     if adv_res is None:
         return _cite_result([], {})
-    queries = [query] if isinstance(query, str) else [q for q in (query or []) if q]
     # Судить релевантность против РЕАЛЬНОГО вопроса юзера, НЕ против кернел-тем (те — recall-
     # экспансия ретрива, не то, на что цитата обязана отвечать).
     primary = query if isinstance(query, str) else (query[0] if query else "")
@@ -1409,8 +1461,10 @@ _FED_MAX_PLAN = 64
 _FED_MAX_TIMEOUT = 60.0
 _RETRIEVE_MAX_TOP_K = 32
 _DIVERSITY_MAX_ADVISORS = 32
-_FED_MAX_FIELD_CHARS = 4096
-_FED_MAX_EXPANDED_TEXT_CHARS = 256 * 1024
+_FED_MAX_IDENTIFIER_BYTES = 256
+_FED_MAX_FIELD_BYTES = 4096
+_FED_MAX_ROLES = 64
+_FED_MAX_EXPANDED_PAYLOAD_BYTES = 256 * 1024
 
 
 def _make_fed_backend(db_path):
@@ -1430,6 +1484,9 @@ def _fed_backend():
 def _federation_open(session_id, plan, replicas_default=3):
     # DoS-капы (M2): валидация ПЕРЕД созданием бэкенда — без потолка plan/replicas
     # от хоста это 1e9 INSERT'ов в sqlite (диск+hang).
+    error = _validate_bounded_string(session_id, "session_id", _FED_MAX_IDENTIFIER_BYTES)
+    if error:
+        return {"error": error}
     if not isinstance(plan, list) or not plan or len(plan) > _FED_MAX_PLAN:
         return {"error": "plan должен быть непустым списком ≤ %d ролей" % _FED_MAX_PLAN}
     try:
@@ -1441,41 +1498,62 @@ def _federation_open(session_id, plan, replicas_default=3):
     # [{"replicas": 1e9}] внутри plan обходил бы кап дефолта. Коэрсим/клампим
     # на КОПИЯХ элементов — вход хоста не мутируем.
     clean_plan = []
-    expanded_text_chars = 0
+    expanded_payload_bytes = 0
     for item in plan:
         if not isinstance(item, dict):
             return {"error": "элемент plan должен быть объектом {role, advisor_dir, question, replicas?}"}
         item = dict(item)
         for field in ("role", "advisor_dir", "question"):
             value = item.get(field)
-            if not isinstance(value, str) or len(value) > _FED_MAX_FIELD_CHARS:
-                return {"error": "%s должен быть строкой не длиннее %d символов" %
-                        (field, _FED_MAX_FIELD_CHARS)}
+            error = _validate_bounded_string(value, field, _FED_MAX_FIELD_BYTES)
+            if error:
+                return {"error": error}
         if "replicas" in item:
             try:
                 n = int(item["replicas"])
             except (TypeError, ValueError, OverflowError):
                 n = replicas_default
             item["replicas"] = max(1, min(n, _FED_MAX_REPLICAS))
-        expanded_text_chars += len(item["question"]) * item.get("replicas", replicas_default)
+        replicas = item.get("replicas", replicas_default)
+        # SQLite хранит все поля RoleTask на КАЖДОЙ реплике: считаем полный повторяемый
+        # payload, включая session_id, а не только text вопроса.
+        expanded_payload_bytes += replicas * sum(_utf8_byte_len(value) for value in (
+            session_id, item["role"], item["advisor_dir"], item["question"]
+        ))
         clean_plan.append(item)
-    if expanded_text_chars > _FED_MAX_EXPANDED_TEXT_CHARS:
-        return {"error": "суммарный развёрнутый текст вопросов превышает %d символов" %
-                _FED_MAX_EXPANDED_TEXT_CHARS}
+    if expanded_payload_bytes > _FED_MAX_EXPANDED_PAYLOAD_BYTES:
+        return {"error": "суммарный развёрнутый payload превышает %d байт UTF-8" %
+                _FED_MAX_EXPANDED_PAYLOAD_BYTES}
     return _fed_open(_fed_backend(), session_id, clean_plan, replicas_default)
 
 
 def _federation_poll(session_id):
+    error = _validate_bounded_string(session_id, "session_id", _FED_MAX_IDENTIFIER_BYTES)
+    if error:
+        return {"error": error}
     return _fed_poll(_fed_backend(), session_id)
 
 
 def _federation_assemble(session_id):
     # централизованный гейт: наш _fidelity_check инъектится как verify_fn (воркер не сертифицирует)
+    error = _validate_bounded_string(session_id, "session_id", _FED_MAX_IDENTIFIER_BYTES)
+    if error:
+        return {"error": error}
     return _fed_assemble(_fed_backend(), session_id, verify_fn=_fidelity_check)
 
 
 def _federation_claim(worker_id, roles=None, timeout=1.0):
     # DoS-кап (M2): timeout от хоста клампим — иначе блокировка однопоточного RPC-цикла.
+    error = _validate_bounded_string(worker_id, "worker_id", _FED_MAX_IDENTIFIER_BYTES)
+    if error:
+        return {"error": error}
+    if roles is not None:
+        if not isinstance(roles, list) or len(roles) > _FED_MAX_ROLES:
+            return {"error": "roles должен быть списком не длиннее %d ролей" % _FED_MAX_ROLES}
+        for index, role in enumerate(roles):
+            error = _validate_bounded_string(role, "roles[%d]" % index, _FED_MAX_FIELD_BYTES)
+            if error:
+                return {"error": error}
     try:
         timeout = float(timeout)
     except (TypeError, ValueError):
@@ -1485,10 +1563,20 @@ def _federation_claim(worker_id, roles=None, timeout=1.0):
 
 
 def _federation_submit(task_id, worker_id, claim_token, worker_model, candidate):
+    for field, value in (("task_id", task_id), ("worker_id", worker_id),
+                         ("claim_token", claim_token), ("worker_model", worker_model)):
+        error = _validate_bounded_string(value, field, _FED_MAX_IDENTIFIER_BYTES)
+        if error:
+            return {"error": error}
     return _fed_submit(_fed_backend(), task_id, worker_id, claim_token, worker_model, candidate)
 
 
 def _federation_heartbeat(task_id, worker_id, claim_token):
+    for field, value in (("task_id", task_id), ("worker_id", worker_id),
+                         ("claim_token", claim_token)):
+        error = _validate_bounded_string(value, field, _FED_MAX_IDENTIFIER_BYTES)
+        if error:
+            return {"error": error}
     return _fed_hb(_fed_backend(), task_id, worker_id, claim_token)
 
 

@@ -114,6 +114,16 @@ def test_candidates_capped_and_drop_count_logged(host_env):
     assert [c["id"] for c in r["candidates"]] == ["c%02d" % i for i in range(1, 13)]
 
 
+def test_host_cite_rejects_oversize_query_before_nonce_allocation(host_env):
+    """Негабаритный запрос не попадает ни в retrieval, ни в host nonce-state."""
+    pool, adv = host_env
+    oversized = "x" * (mcp_server._MAX_QUERY_BYTES + 1)
+
+    result = mcp_server._cite(adv, oversized, use_kernels=False)
+    assert result["quotes"] == [] and result["marker"] == "🟡" and "error" in result
+    assert mcp_server._PENDING_VERDICTS == {}
+
+
 def test_lexical_no_band_all_verbatim_candidates_judged(monkeypatch, host_env):
     # на lexical скоры выше band_hi (0.95 > 0.65) НЕ дают auto-keep — судятся все
     pool, adv = host_env

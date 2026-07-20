@@ -127,6 +127,44 @@ def test_federation_claim_timeout_capped(tmp_path, monkeypatch):
     assert seen["timeout"] <= 60.0
 
 
+def test_federation_rejects_invalid_identifiers_and_roles_before_backend(monkeypatch):
+    """Каждый публичный вход отсекает плохие id/метаданные до SQLite."""
+    calls = []
+
+    def backend_spy():
+        calls.append(True)
+        raise AssertionError("invalid federation input reached backend")
+
+    monkeypatch.setattr(m, "_fed_backend", backend_spy)
+    long_id = "x" * (m._FED_MAX_IDENTIFIER_BYTES + 1)
+    item = {"role": "role", "advisor_dir": "advisors/a", "question": "Q"}
+
+    for result in (
+        m._federation_open(None, [item]),
+        m._federation_open(long_id, [item]),
+        m._federation_poll(None),
+        m._federation_assemble(long_id),
+        m._federation_claim(None),
+        m._federation_claim("worker", roles=["role"] * (m._FED_MAX_ROLES + 1)),
+        m._federation_submit("task", "worker", "token", None, {}),
+        m._federation_heartbeat("task", long_id, "token"),
+    ):
+        assert "error" in result
+    assert calls == []
+
+
+def test_federation_expanded_budget_counts_replicated_session_identifier(monkeypatch):
+    """Бюджет очереди включает session_id на каждую реплику, не только question."""
+    calls = []
+    monkeypatch.setattr(m, "_FED_MAX_EXPANDED_PAYLOAD_BYTES", 10)
+    monkeypatch.setattr(m, "_fed_backend", lambda: calls.append(True))
+    item = {"role": "r", "advisor_dir": "a", "question": "q", "replicas": 2}
+
+    result = m._federation_open("session", [item])
+    assert "error" in result
+    assert calls == []
+
+
 def test_federation_full_cycle_open_claim_submit_poll_assemble(tmp_path, monkeypatch):
     """Сквозной e2e на ЖИВОМ sqlite-бэкенде: _root → tmp (стейт пишется в tmp/.consilium/),
     _FED_BACKEND сброшен → _fed_backend() сам строит SqliteBackend, как в проде. Верность

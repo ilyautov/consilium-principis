@@ -357,3 +357,31 @@ def test_load_source_env_example_template_allowed(tmp_path, monkeypatch):
     (tmp_path / ".env.example").write_text("OPENROUTER_API_KEY=\n", encoding="utf-8")
     text, hint, prov, lic = mcp_server._load_source_text(path=".env.example")
     assert "OPENROUTER_API_KEY" in text
+
+
+def test_load_source_git_config_rejected(tmp_path, monkeypatch):
+    # M1-follow: файлы ВНУТРИ .git/ запрещены (в .git/config remote-URL часто с токеном) —
+    # старый regex был заякорен на $ и ловил только хвост '.git', пропуская '.git/config'.
+    monkeypatch.setattr(mcp_server, "_root", lambda: str(tmp_path))
+    gitdir = tmp_path / ".git"
+    gitdir.mkdir()
+    (gitdir / "config").write_text("[remote]\n\turl = https://tok@example/x.git\n", encoding="utf-8")
+    with pytest.raises(ValueError):
+        mcp_server._load_source_text(path=".git/config")
+
+
+def test_load_source_pem_bak_rejected(tmp_path, monkeypatch):
+    # M1-follow: бэкап ключа server.pem.bak — старый regex требовал .pem строго в КОНЦЕ пути.
+    monkeypatch.setattr(mcp_server, "_root", lambda: str(tmp_path))
+    (tmp_path / "server.pem.bak").write_text("-----BEGIN\n", encoding="utf-8")
+    with pytest.raises(ValueError):
+        mcp_server._load_source_text(path="server.pem.bak")
+
+
+def test_load_source_gitignore_ok(tmp_path, monkeypatch):
+    # позитивный контроль: .gitignore — НЕ VCS-метаданные и не секрет, читается нормально
+    # (расширение .git-правила на весь сегмент не должно задевать имена с префиксом .git*).
+    monkeypatch.setattr(mcp_server, "_root", lambda: str(tmp_path))
+    (tmp_path / ".gitignore").write_text("*.pyc\n", encoding="utf-8")
+    text, hint, prov, lic = mcp_server._load_source_text(path=".gitignore")
+    assert "*.pyc" in text

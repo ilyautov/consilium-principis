@@ -147,23 +147,23 @@ def test_rrf_preserves_tier():
         "RRF пересобирает Passage и роняет тир"
 
 
-# --- eval.retrieve: граница, через которую ходит cite ---
+# --- engine.retrieval.retrieve: граница, через которую ходит cite ---
 
-def test_eval_retrieve_exposes_tier(monkeypatch):
+def test_engine_retrieve_exposes_tier(monkeypatch):
     monkeypatch.setitem(sys.modules, "tier_full", _fake_tier_full(_ROWS))
     monkeypatch.delenv("HYBRID_ALPHA", raising=False)
-    monkeypatch.setenv("EVAL_ENGINE", "semantic")
-    import eval as _eval
-    hits = _eval.retrieve("где покой?", "/tmp/adv", top_k=2)
-    assert all("tier" in h for h in hits), "eval.retrieve — та граница, где cite теряет тир"
+    from engine import retrieval
+    # prefer= явно (M11): прод-retrieve env EVAL_ENGINE не читает — форс даёт eval-CLI.
+    hits = retrieval.retrieve("где покой?", "/tmp/adv", top_k=2, prefer="semantic")
+    assert all("tier" in h for h in hits), "retrieval.retrieve — та граница, где cite теряет тир"
     assert hits[0]["tier"] == "P1"
 
 
-def test_eval_lexical_fallback_exposes_tier(tmp_path):
+def test_lexical_fallback_exposes_tier(tmp_path):
     """Деградация на лексический пол не должна ослеплять потребителя по тиру."""
-    import eval as _eval
+    from engine import retrieval
     adv = _corpus(tmp_path, [
         {"source": "p.txt", "tier": "P1", "text": "Power is held by appearances alone."},
     ])
-    hits = _eval.lexical_retrieve("appearances power", adv, top_k=1)
+    hits = retrieval.lexical_retrieve("appearances power", adv, top_k=1)
     assert hits and hits[0]["tier"] == "P1"

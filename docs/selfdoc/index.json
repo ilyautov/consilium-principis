@@ -3,7 +3,7 @@
     "tool_count": 61,
     "rule_count": 19,
     "recipe_count": 16,
-    "script_count": 67,
+    "script_count": 68,
     "test_count": 152,
     "glossary_count": 113
   },
@@ -1967,6 +1967,11 @@
       "path": "scripts/lenses.py",
       "subsystem": "other",
       "doc": "Загрузчик функциональных линз (`lenses/`) — бизнес-функции как советники."
+    },
+    {
+      "path": "scripts/lifecycle.py",
+      "subsystem": "other",
+      "doc": "Единый lifecycle сборки доски: build / seed / ingest / doctor / setup-full (H4)."
     },
     {
       "path": "scripts/llm_local.py",

@@ -3,7 +3,7 @@
     "tool_count": 61,
     "rule_count": 19,
     "recipe_count": 16,
-    "script_count": 68,
+    "script_count": 69,
     "test_count": 152,
     "glossary_count": 113
   },
@@ -1987,6 +1987,11 @@
       "path": "scripts/mc_run.py",
       "subsystem": "other",
       "doc": "Детерминированное Монте-Карло-ядро карты решения («Principis-расчёт», спека §3)."
+    },
+    {
+      "path": "scripts/mcp_decisions.py",
+      "subsystem": "other",
+      "doc": "Decisions-домен MCP-сервера: карта решения, Decision Card, петля исхода, calibrated consult."
     },
     {
       "path": "scripts/mcp_install.py",

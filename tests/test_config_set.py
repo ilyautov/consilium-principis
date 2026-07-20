@@ -74,7 +74,24 @@ def test_non_numeric_known_key_still_writes(_root_in_tmp):
     assert json.load(open(_cfg_path(_root_in_tmp), encoding="utf-8"))["retrieval_mode"] == "hybrid"
 
 
-def test_unknown_key_still_writes_with_warning(_root_in_tmp):
+def test_unknown_key_rejected_and_file_not_written(_root_in_tmp):
+    # M3 (breaking): было «писалось с warning» — теперь fail-closed reject, файл не трогается
     r = dispatch("config_set", {"key": "frobnicate", "value": 1})
-    assert "warning" in r and r["new"] == 1
-    assert json.load(open(_cfg_path(_root_in_tmp), encoding="utf-8"))["frobnicate"] == 1
+    assert "error" in r and r["rejected"] == 1
+    assert not _cfg_path(_root_in_tmp).exists()
+
+
+def test_config_set_rejects_unknown_key(_root_in_tmp):
+    # M3: fail-closed whitelist — неизвестный ключ НЕ пишется (даже с warning).
+    # relevance_gate — боевой пример: {"enabled": false} молча снимал гейт цитат.
+    p = _cfg_path(_root_in_tmp)
+    p.write_text("{}", encoding="utf-8")
+    out = mcp_server._config_set("relevance_gate", {"enabled": False})
+    assert "rejected" in out or "error" in out
+    assert json.load(open(p, encoding="utf-8")) == {}
+
+
+def test_config_set_known_key_still_works(_root_in_tmp):
+    _cfg_path(_root_in_tmp).write_text("{}", encoding="utf-8")
+    out = mcp_server._config_set("retrieval_mode", "hybrid")
+    assert out.get("new") == "hybrid"

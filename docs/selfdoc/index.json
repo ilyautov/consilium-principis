@@ -1,10 +1,10 @@
 {
   "meta": {
-    "tool_count": 60,
+    "tool_count": 61,
     "rule_count": 19,
     "recipe_count": 16,
     "script_count": 67,
-    "test_count": 150,
+    "test_count": 151,
     "glossary_count": 113
   },
   "tools": [
@@ -571,6 +571,28 @@
       "referenced_in": [
         "rule:12",
         "rule:13"
+      ]
+    },
+    {
+      "name": "diversity_check",
+      "description": "Ортогональность состава совета (read-only, эхо-камера-детектор): diversity 0..1, дубли-голоса (similarity >= 0.5 → flag=dup), непокрытые оси мышления. ОБЯЗАТЕЛЬНО перед созывом совета (правило 18в): diversity < 0.5 = эхо-камера — предупреди юзера, предложи контр-голос.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "advisor_dirs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "advisor_dirs"
+        ]
+      },
+      "status": "surfaced",
+      "referenced_in": [
+        "rule:18"
       ]
     },
     {
@@ -2293,6 +2315,10 @@
     {
       "path": "tests/test_disclosure_plate.py",
       "covers": "disclosure plate"
+    },
+    {
+      "path": "tests/test_diversity_check_tool.py",
+      "covers": "diversity check tool"
     },
     {
       "path": "tests/test_doctor.py",

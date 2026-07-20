@@ -43,60 +43,76 @@ def jaccard(a, b):
         return 0.0
     return len(a & b) / len(a | b) if (a | b) else 0.0
 
+# грубая эвристика — частые ортогональные оси мышления (для missing_axes)
+_AXES_HINT = {
+    "скепсис/risk": {"инверсия", "memento-mori", "pre-mortem", "via-negativa"},
+    "оптимизм/рост": {"compounding", "четыре-леверижа", "judgment-over-effort"},
+    "антихрупкость/хаос": {"barbell", "optionality", "black-swan"},
+    "этика/смысл": {"дихотомия-контроля", "externals-as-indifferent", "is-this-necessary"},
+    "системы/2-й порядок": {"second-order", "mental-models", "incentives"},
+}
+
+def check(paths):
+    """Ортогональность состава совета → dict (без печати). paths — abs пути advisor'ов.
+    <2 валидных persona.md → {"error": ...}."""
+    advisors = [a for a in (load_advisor(p) for p in paths) if a]
+    if len(advisors) < 2:
+        return {"error": "Не нашёл persona.md минимум у двоих."}
+    pairs = []
+    for x, y in itertools.combinations(advisors, 2):
+        lj, dj = jaccard(x["lenses"], y["lenses"]), jaccard(x["domains"], y["domains"])
+        sim = (2 * lj + dj) / 3
+        flag = "dup" if sim >= 0.5 else ("close" if sim >= 0.34 else "")
+        pairs.append({"a": x["name"], "b": y["name"], "similarity": round(sim, 3),
+                      "lenses_j": round(lj, 3), "domains_j": round(dj, 3), "flag": flag})
+    mean_sim = sum(p["similarity"] for p in pairs) / len(pairs)
+    diversity = round(1 - mean_sim, 3)
+    verdict = ("ok" if diversity >= 0.7 else
+               "overlap" if diversity >= 0.5 else "echo_chamber")
+    covered = set().union(*[a["lenses"] for a in advisors])
+    missing = [ax for ax, kws in _AXES_HINT.items() if not (covered & kws)]
+    return {"advisors": [a["name"] for a in advisors], "pairs": pairs,
+            "diversity": diversity, "verdict": verdict, "missing_axes": missing}
+
+_VERDICT_LINE = {
+    "ok": "✅ здоровое разнообразие — углы реально разные",
+    "overlap": "⚠️ приемлемо, но есть перекрытия — проверь флаги ниже",
+    "echo_chamber": "🚩 ЭХО-КАМЕРА: состав думает слишком похоже, совет даст ложный консенсус",
+}
+
 def main():
     paths = sys.argv[1:]
     if len(paths) < 2:
         print("Дай минимум 2 советников: python diversity_check.py advisors/x advisors/y ...", file=sys.stderr)
         sys.exit(1)
-    advisors = [a for a in (load_advisor(p) for p in paths) if a]
-    if len(advisors) < 2:
-        print("Не нашёл persona.md минимум у двоих.", file=sys.stderr)
+    out = check(paths)
+    if "error" in out:
+        print(out["error"], file=sys.stderr)
         sys.exit(1)
 
+    advisors = [a for a in (load_advisor(p) for p in paths) if a]  # для показа линз
     print(f"Состав совета ({len(advisors)}):")
     for a in advisors:
         print(f"  · {a['name']}: линзы {sorted(a['lenses'])}")
 
-    sims = []
     print("\nПопарное перекрытие (линзы взвешены ×2, домены ×1):")
-    for x, y in itertools.combinations(advisors, 2):
-        lj = jaccard(x["lenses"], y["lenses"])
-        dj = jaccard(x["domains"], y["domains"])
-        sim = (2 * lj + dj) / 3
-        sims.append((sim, x, y, lj, dj))
-        flag = "  🚩 дубль голоса" if sim >= 0.5 else ("  ⚠️ близки" if sim >= 0.34 else "")
-        print(f"  {x['name']} ↔ {y['name']}: similarity {sim:.2f} (линзы {lj:.2f}, домены {dj:.2f}){flag}")
+    for p in out["pairs"]:
+        flag = ("  🚩 дубль голоса" if p["flag"] == "dup"
+                else ("  ⚠️ близки" if p["flag"] == "close" else ""))
+        print(f"  {p['a']} ↔ {p['b']}: similarity {p['similarity']:.2f} "
+              f"(линзы {p['lenses_j']:.2f}, домены {p['domains_j']:.2f}){flag}")
 
-    mean_sim = sum(s[0] for s in sims) / len(sims)
-    diversity = 1 - mean_sim
-    print(f"\nDiversity score: {diversity:.2f}  (1.0 = полностью ортогональны, 0 = клоны)")
-
-    if diversity >= 0.7:
-        verdict = "✅ здоровое разнообразие — углы реально разные"
-    elif diversity >= 0.5:
-        verdict = "⚠️ приемлемо, но есть перекрытия — проверь флаги ниже"
-    else:
-        verdict = "🚩 ЭХО-КАМЕРА: состав думает слишком похоже, совет даст ложный консенсус"
-    print(verdict)
+    print(f"\nDiversity score: {out['diversity']:.2f}  (1.0 = полностью ортогональны, 0 = клоны)")
+    print(_VERDICT_LINE[out["verdict"]])
 
     # рекомендации по оси
-    redundant = [s for s in sims if s[0] >= 0.5]
+    redundant = [p for p in out["pairs"] if p["flag"] == "dup"]
     if redundant:
         print("\nИзбыточные пары (один можно заменить на контр-голос):")
-        for sim, x, y, lj, dj in redundant:
-            print(f"  · {x['name']} и {y['name']} (sim {sim:.2f}) — оставь одного, добавь кого-то с другой осью")
-    # какие оси НЕ покрыты (грубая эвристика — частые ортогональные оси)
-    covered = set().union(*[a["lenses"] for a in advisors])
-    axes_hint = {
-        "скепсис/risk": {"инверсия", "memento-mori", "pre-mortem", "via-negativa"},
-        "оптимизм/рост": {"compounding", "четыре-леверижа", "judgment-over-effort"},
-        "антихрупкость/хаос": {"barbell", "optionality", "black-swan"},
-        "этика/смысл": {"дихотомия-контроля", "externals-as-indifferent", "is-this-necessary"},
-        "системы/2-й порядок": {"second-order", "mental-models", "incentives"},
-    }
-    missing = [ax for ax, kws in axes_hint.items() if not (covered & kws)]
-    if missing:
-        print(f"\nНе покрытые оси мышления (кандидаты добавить для разнообразия): {', '.join(missing)}")
+        for p in redundant:
+            print(f"  · {p['a']} и {p['b']} (sim {p['similarity']:.2f}) — оставь одного, добавь кого-то с другой осью")
+    if out["missing_axes"]:
+        print(f"\nНе покрытые оси мышления (кандидаты добавить для разнообразия): {', '.join(out['missing_axes'])}")
 
 if __name__ == "__main__":
     main()

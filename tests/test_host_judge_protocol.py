@@ -117,14 +117,14 @@ def test_candidates_capped_and_drop_count_logged(host_env):
 def test_lexical_no_band_all_verbatim_candidates_judged(monkeypatch, host_env):
     # на lexical скоры выше band_hi (0.95 > 0.65) НЕ дают auto-keep — судятся все
     pool, adv = host_env
-    monkeypatch.setattr(relevance_gate, "is_semantic", lambda a: False)
+    monkeypatch.setattr(relevance_gate, "is_semantic", lambda a, prefer=None: False)
     r = mcp_server._cite(adv, "q", use_kernels=False, limit=4)
     assert len(r["candidates"]) == 12                  # ни один не ушёл в auto-keep
 
 
 def test_semantic_above_band_auto_keep_skips_host_judgment(monkeypatch, host_env):
     pool, adv = host_env
-    monkeypatch.setattr(relevance_gate, "is_semantic", lambda a: True)
+    monkeypatch.setattr(relevance_gate, "is_semantic", lambda a, prefer=None: True)
     scored = [{"text": "sure-hit alpha", "score": 0.90, "source": "s"},
               {"text": "sure-hit beta", "score": 0.80, "source": "s"},
               {"text": "borderline gamma", "score": 0.60, "source": "s"},
@@ -141,7 +141,7 @@ def test_semantic_above_band_auto_keep_skips_host_judgment(monkeypatch, host_env
 def test_semantic_all_above_band_is_single_phase(monkeypatch, host_env):
     # судить нечего (всё auto-keep) → вторая фаза не нужна, отдаём цитаты сразу
     pool, adv = host_env
-    monkeypatch.setattr(relevance_gate, "is_semantic", lambda a: True)
+    monkeypatch.setattr(relevance_gate, "is_semantic", lambda a, prefer=None: True)
     scored = [{"text": f"hit-{i}", "score": 0.9 - i * 0.01, "source": "s"} for i in range(6)]
     monkeypatch.setattr(_eval, "retrieve", lambda q, a, top_k=8: list(scored))
     r = mcp_server._cite(adv, "q", use_kernels=False, limit=4)

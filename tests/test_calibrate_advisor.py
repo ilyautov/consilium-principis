@@ -177,7 +177,7 @@ def test_calibrate_skips_without_camouflage_set(tmp_path):
 
 def test_calibrate_skips_without_semantic(tmp_path, monkeypatch):
     adv = _mk_corpus(tmp_path)
-    monkeypatch.setattr(relevance_gate, "is_semantic", lambda d: False)
+    monkeypatch.setattr(relevance_gate, "is_semantic", lambda d, prefer=None: False)
     r = ca.calibrate(adv)                              # retrieve_fn=None → семантик-гейт
     assert r["calibrated"] is False and "semantic" in r["reason"]
     assert not os.path.isfile(ca.calibration_file(adv))

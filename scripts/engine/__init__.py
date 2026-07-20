@@ -207,9 +207,10 @@ def _advisor_key(advisor_dir):
 
 def resolve_engine(advisor_dir, prefer: Optional[str] = None) -> Engine:
     """Возвращает лучший доступный бэкенд: semantic(ollama) → lexical.
-    Кэширует per advisor. prefer='lexical'|'semantic' форсит бэкенд (для eval --engine).
-    Примечание: вызов с prefer перезаписывает кэш advisor'а выбранным бэкендом
-    (ephemeral-форс для eval --engine; в auto-режиме результат кэшируется per advisor)."""
+    Кэширует per advisor. prefer='lexical'|'semantic'|'hybrid' форсит бэкенд
+    ТРАНЗИЕНТНО (для eval --engine / EVAL_ENGINE): вызов с prefer ни читает,
+    ни пишет кэш (M9a — eval-форс не протекает в персистентный кэш advisor'а,
+    следующий auto-вызов резолвит дефолтный движок)."""
     from .lexical import LexicalEngine
     from .semantic import SemanticEngine
     key = _advisor_key(advisor_dir)
@@ -225,7 +226,8 @@ def resolve_engine(advisor_dir, prefer: Optional[str] = None) -> Engine:
         eng = SemanticEngine()
     else:
         eng = LexicalEngine()
-    _ENGINE_CACHE[key] = eng
+    if prefer is None:
+        _ENGINE_CACHE[key] = eng
     return eng
 
 

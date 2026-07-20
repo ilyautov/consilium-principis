@@ -151,12 +151,15 @@ def _gate_config(advisor_dir=None):
     return cfg
 
 
-def is_semantic(advisor_dir) -> bool:
+def is_semantic(advisor_dir, prefer=None) -> bool:
     """True iff резолвнутый бэкенд = semantic (полоса калибрована под его скор).
+    prefer=None — прод-путь: смотрим ТОЛЬКО на реальный движок. EVAL_ENGINE здесь
+    НАМЕРЕННО не читается (M9a): забытый env в шелле юзера не должен молча гасить
+    или форсить гейт в проде — eval-входы передают prefer ЯВНО в точке вызова.
     Любая ошибка → False (гейт инертен = безопасно)."""
     try:
         import engine as _engine
-        eng = _engine.resolve_engine(advisor_dir, prefer=os.getenv("EVAL_ENGINE"))
+        eng = _engine.resolve_engine(advisor_dir, prefer=prefer)
         return getattr(eng, "name", "") == "semantic"
     except Exception:
         return False
@@ -202,17 +205,19 @@ def _in_band(score, cfg):
             and cfg["band_lo"] <= score <= cfg["band_hi"])
 
 
-def gate_passage(query, passage, advisor_dir, judge_fn=None, cfg=None) -> dict:
+def gate_passage(query, passage, advisor_dir, judge_fn=None, cfg=None, *, prefer=None) -> dict:
     """Пассаж {text,score,source[,raw_score]}. Судья недоступен (вне semantic) ИЛИ скор
     вне полосы НА SEMANTIC-ШКАЛЕ → возврат КАК ЕСТЬ. In-band (сырой косинус: raw_score
     предпочтён score-смеси) ИЛИ вне semantic-шкалы при живом судье → судья:
     <threshold → COPY с relevance_gated=True (пассаж НЕ выбрасываем — прозрачность),
     >=threshold → без флага (+ annotate relevance=judge).
-    FAIL-CLOSED: судья бросил → gated (relevance_gated=True)."""
+    FAIL-CLOSED: судья бросил → gated (relevance_gated=True).
+    prefer — keyword-only транзиентный форс движка для eval-входов (M9a);
+    None (дефолт) = прод-поведение: реальный движок, без env."""
     cfg = cfg or _gate_config(advisor_dir)
     if not cfg.get("enabled", True):
         return passage
-    semantic = is_semantic(advisor_dir)
+    semantic = is_semantic(advisor_dir, prefer=prefer)
     if not semantic and not _judge_available(advisor_dir):
         return passage                                 # судьи нет → прежний путь (SIMPLE-пол)
     # Эффективный скор на калиброванной semantic-шкале: raw_score (сырой косинус поверх
@@ -239,7 +244,7 @@ def gate_passage(query, passage, advisor_dir, judge_fn=None, cfg=None) -> dict:
 
 
 def gate_quote(query, quote_text, score, advisor_dir, judge_fn=None, cfg=None,
-               source=None, raw_score=None) -> bool:
+               source=None, raw_score=None, *, prefer=None) -> bool:
     """keep=True / withhold=False. Судья недоступен (вне semantic) → keep (прежний путь,
     SIMPLE-пол). Иначе судью пропускает ТОЛЬКО скор > band_hi НА SEMANTIC-ШКАЛЕ — сырой
     косинус: raw_score предпочтён score-смеси при hybrid_alpha>0/RRF (калибровано:
@@ -256,11 +261,13 @@ def gate_quote(query, quote_text, score, advisor_dir, judge_fn=None, cfg=None,
     Снятая цитата → путь схлопывается в честный 🟡 «дословного ответа нет».
     M4: тот же bypass существовал и ВНЕ semantic-режима (hybrid/lexical — молчаливый
     keep без судьи; смесь hybrid_alpha вместо косинуса под полосой) — закрыт судьёй
-    при его доступности."""
+    при его доступности.
+    prefer — keyword-only транзиентный форс движка для eval-входов (M9a);
+    None (дефолт) = прод-поведение: реальный движок, без env."""
     cfg = cfg or _gate_config(advisor_dir)
     if not cfg.get("enabled", True):
         return True
-    semantic = is_semantic(advisor_dir)
+    semantic = is_semantic(advisor_dir, prefer=prefer)
     if not semantic and not _judge_available(advisor_dir):
         return True                                      # судьи нет → прежний keep
     eff = raw_score if isinstance(raw_score, (int, float)) else (score if semantic else None)

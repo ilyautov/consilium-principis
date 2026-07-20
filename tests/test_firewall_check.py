@@ -24,6 +24,21 @@ def test_firewall_check_accepts_clean_repo_with_only_allowed_advisors(tmp_path):
     assert "firewall-check: OK" in result.stdout
 
 
+def test_firewall_check_accepts_clean_repo_without_advisors_directory(tmp_path):
+    repo = tmp_path / "repo"
+    script = repo / "scripts" / "firewall_check.sh"
+    script.parent.mkdir(parents=True)
+    shutil.copyfile(Path(__file__).parents[1] / "scripts" / "firewall_check.sh", script)
+
+    subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+    subprocess.run(["git", "add", "scripts/firewall_check.sh"], cwd=repo, check=True)
+    result = subprocess.run(["sh", "scripts/firewall_check.sh"], cwd=repo,
+                            text=True, capture_output=True)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "firewall-check: OK" in result.stdout
+
+
 def test_firewall_check_fails_closed_when_advisors_cannot_be_listed(tmp_path):
     repo = tmp_path / "repo"
     script = repo / "scripts" / "firewall_check.sh"

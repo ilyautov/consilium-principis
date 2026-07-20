@@ -59,6 +59,27 @@ def test_federation_open_caps_plan_and_replicas(tmp_path, monkeypatch):
     assert out["enqueued"] <= 32
 
 
+def test_federation_open_caps_per_item_replicas(tmp_path, monkeypatch):
+    monkeypatch.setattr(m, "_fed_backend", lambda: m._make_fed_backend(str(tmp_path / "f.sqlite3")))
+    item = {"role": "x", "advisor_dir": "advisors/x", "question": "Q"}
+    # per-item replicas без потолка обходил кап дефолта (M2-follow) → кламп к 32
+    out = m.dispatch("federation_open", {"session_id": "s1", "plan": [dict(item, replicas=2000)]})
+    assert out["enqueued"] <= 32
+    # мусор в per-item replicas → фолбэк на replicas_default, без сырого исключения
+    out = m.dispatch("federation_open", {"session_id": "s2", "plan": [dict(item, replicas="junk")],
+                                         "replicas_default": 2})
+    assert out["enqueued"] == 2
+    # регресс-контроль: легитимный per-item replicas доезжает как был
+    out = m.dispatch("federation_open", {"session_id": "s3", "plan": [dict(item, replicas=2)]})
+    assert out["enqueued"] == 2
+
+
+def test_federation_open_rejects_non_dict_item(tmp_path, monkeypatch):
+    monkeypatch.setattr(m, "_fed_backend", lambda: m._make_fed_backend(str(tmp_path / "f.sqlite3")))
+    out = m.dispatch("federation_open", {"session_id": "s1", "plan": ["not-a-dict"]})
+    assert "error" in out
+
+
 def test_federation_claim_timeout_capped(tmp_path, monkeypatch):
     monkeypatch.setattr(m, "_root", lambda: str(tmp_path))
     monkeypatch.setattr(m, "_FED_BACKEND", None)

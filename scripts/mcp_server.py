@@ -88,6 +88,26 @@ def _load_json(path, default):
         return default
 
 
+def _swallow(what, fn, default):
+    """Выполнить fn(); при Exception — вернуть default И оставить след: строка
+    (время + what + repr(e)) дописывается в gitignored .consilium/swallow.log.
+    M8: тихий except на audit-critical сайте теряет доказательства сбоя — лог делает
+    их наблюдаемыми, НЕ меняя fail-closed семантику. Сам лог упасть не должен
+    (диск переполнен/прав нет → молча отдаём default, как раньше).
+    Применять ТОЧЕЧНО (judge audit, kernel themes), не массово."""
+    try:
+        return fn()
+    except Exception as e:
+        try:
+            p = os.path.join(_root(), ".consilium", "swallow.log")
+            os.makedirs(os.path.dirname(p), exist_ok=True)
+            with open(p, "a", encoding="utf-8") as f:
+                f.write("%s %s: %r\n" % (time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), what, e))
+        except Exception:
+            pass
+        return default
+
+
 def _resolve_read(p):
     """Read-side path-traversal гард (H5). `_resolve` НЕ ограничивал результат корнем → read-тул
     с advisor_dir/path от хоста читал файлы ВНЕ репо (симметрия write-side _resolve_under_root
@@ -314,19 +334,22 @@ def _retrieve(query, advisor_dir, top_k=3):
 
 def _kernel_themes(advisor_dir, limit=6):
     """Сигнатурные темы советника из kernels.json (`**Theme** — …`) — доп-запросы для якорения
-    ретрива к его ключевым идеям (рычаг recall #4). Пусто, если кернелов нет."""
-    import re
-    kp = os.path.join(os.path.dirname(corpus_path(advisor_dir)), "kernels.json")
-    if not os.path.isfile(kp):
-        return []
-    data = _load_json(kp, [])
-    themes = []
-    for k in data if isinstance(data, list) else []:
-        name = k.get("name", "") if isinstance(k, dict) else str(k)
-        m = re.findall(r"\*\*(.+?)\*\*", name)
-        if m:
-            themes.append(m[0].strip())
-    return themes[:limit]
+    ретрива к его ключевым идеям (рычаг recall #4). Пусто, если кернелов нет.
+    M8: сбой чтения/разбора — в swallow.log (тихая потеря recall-рычага наблюдаема)."""
+    def _read():
+        import re
+        kp = os.path.join(os.path.dirname(corpus_path(advisor_dir)), "kernels.json")
+        if not os.path.isfile(kp):
+            return []
+        data = _load_json(kp, [])
+        themes = []
+        for k in data if isinstance(data, list) else []:
+            name = k.get("name", "") if isinstance(k, dict) else str(k)
+            m = re.findall(r"\*\*(.+?)\*\*", name)
+            if m:
+                themes.append(m[0].strip())
+        return themes[:limit]
+    return _swallow("kernel_themes", _read, [])
 
 
 # ── §2.1 moat-v2: двухфазный host-протокол судейства релевантности ──
@@ -477,15 +500,15 @@ def _judge_audit_path(adv_dir):
 
 def _append_judge_audit(adv_dir, record):
     """Дописать аудит-запись. Возврат bool (audit_logged) — сбой лога не блокирует вердикт,
-    но виден в ответе (честность > удобство)."""
-    try:
+    но виден в ответе (честность > удобство). M8: сбой дополнительно пишется в swallow.log —
+    тихая потеря аудит-цепочки недопустима незамеченной."""
+    def _write():
         p = _judge_audit_path(adv_dir)
         os.makedirs(os.path.dirname(p), exist_ok=True)
         with open(p, "a", encoding="utf-8") as f:
             f.write(json.dumps(record, ensure_ascii=False) + "\n")
         return True
-    except Exception:
-        return False
+    return _swallow("judge_audit", _write, False)
 
 
 def _gate_verdict(advisor_dir, nonce, ratings=None):

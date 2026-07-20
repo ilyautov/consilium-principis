@@ -32,7 +32,7 @@ _NEG = {"not", "no", "never", "nt", "t", "cannot", "without", "nor",
 _SENT_SPLIT = re.compile(r"[.!?…;\n]+")
 
 
-def _crop_severs_negation(q: str, raw_text: str) -> bool:
+def _crop_severs_negation(q: str, raw_text: str, quote: str = None) -> bool:
     """True, если обрезка отсекла отрицание из исходного ПРЕДЛОЖЕНИЯ (C2).
 
     _norm стирает пунктуацию, поэтому гард по окну токенов двойно ошибался: пропускал
@@ -45,8 +45,10 @@ def _crop_severs_negation(q: str, raw_text: str) -> bool:
     чисто (fail-closed: лучше ложный 🟡, чем перевернутый смысл). «Чистое вхождение
     → False (🔵 легитимен)» верно поэтому лишь для первой встречи в её предложении.
     q через шов предложений (не найден ни в одном) → True: нормализация склеила разные
-    предложения, поэтому матч fail-closed. Оба аргумента: q норм. (_norm), raw_text —
-    НЕнормализованный."""
+    предложения, поэтому матч fail-closed. Исключение: если исходная quote сама несёт
+    те же разделители, сверяем её сегменты по предложениям и проверяем префикс каждого
+    из них — это честная многопредложная цитата, а не склейка. Оба аргумента: q норм.
+    (_norm), raw_text/quote — НЕнормализованные."""
     found = False
     for sent in _SENT_SPLIT.split(raw_text or ""):
         ns = _norm(sent)
@@ -58,7 +60,25 @@ def _crop_severs_negation(q: str, raw_text: str) -> bool:
             return False                       # чистое вхождение без отрицания в префиксе
     if found:
         return True                            # все вхождения с отрицанием → обрезка
-    return not found                           # match only across sentence boundary → fail-closed
+    quote_parts = [_norm(part) for part in _SENT_SPLIT.split(quote or "") if _norm(part)]
+    source_parts = [_norm(part) for part in _SENT_SPLIT.split(raw_text or "") if _norm(part)]
+    if len(quote_parts) < 2:
+        return True                            # match only across sentence boundary → fail-closed
+    for start, source_part in enumerate(source_parts):
+        first_at = source_part.find(quote_parts[0])
+        if first_at < 0:
+            continue
+        if start + len(quote_parts) > len(source_parts):
+            continue
+        if any(quote_part not in source_parts[start + offset]
+               for offset, quote_part in enumerate(quote_parts)):
+            continue
+        if any(any(tok in _NEG for tok in source_parts[start + offset][:
+            source_parts[start + offset].find(quote_part)].split())
+               for offset, quote_part in enumerate(quote_parts)):
+            continue
+        return False                           # quote itself preserves sentence boundaries
+    return True                                # no clean, delimiter-preserving match → fail-closed
 
 
 def _norm(s: str) -> str:
@@ -131,7 +151,7 @@ def best_match(quote: str, advisor_dir: str):
         return None
     best = None  # (rank, tier, source)
     for ch in _load_chunks(advisor_dir):
-        if q in ch["_norm"] and not _crop_severs_negation(q, ch.get("text") or ""):
+        if q in ch["_norm"] and not _crop_severs_negation(q, ch.get("text") or "", quote):
             t = ch.get("tier", "A")
             rank = _TIER_ORDER.get(t, 9)
             if best is None or rank < best[0]:

@@ -18,19 +18,35 @@ MIN_QUOTE_WORDS = 3
 # извлекаемого кавычного спана) — это ОТДЕЛЬНАЯ ось, гейтом верности больше не служит.
 MIN_QUOTE_CHARS = 8
 
-# Токены-отрицания (C1): обрезка, отсекающая ведущее отрицание, переворачивает смысл цитаты.
-_NEG = {"not", "no", "never", "nt", "не", "ни", "нет"}
+# Токены-отрицания (C1+C2): обрезка, отсекающая ведущее отрицание, переворачивает смысл
+# цитаты. «t» — хвост контракций после _norm («don't»→«don t»); «nt» оставлен бэк-компатно.
+_NEG = {"not", "no", "never", "nt", "t", "cannot", "without", "nor",
+        "не", "ни", "нет", "никогда", "никто", "нельзя", "без", "вовсе"}
+
+# Разделители предложений: скоуп гарда — предложение (см. ниже).
+_SENT_SPLIT = re.compile(r"[.!?…;:\n»«\"“”]+")
 
 
-def _crop_severs_negation(q: str, chunk: str) -> bool:
-    """True, если непосредственно ПЕРЕД позицией матча q в чанке стоит токен-отрицание —
-    значит обрезка отсекла отрицание из исходного предложения (напр. «not only… but» →
-    «only… but»). Такой матч честной цитатой не является → не 🔵. Оба аргумента норм. (_norm)."""
-    i = chunk.find(q)
-    if i <= 0:
-        return False
-    prefix = chunk[:i].split()
-    return bool(prefix) and prefix[-1] in _NEG
+def _crop_severs_negation(q: str, raw_text: str) -> bool:
+    """True, если обрезка отсекла отрицание из исходного ПРЕДЛОЖЕНИЯ (C2).
+
+    _norm стирает пунктуацию, поэтому гард по окну токенов двойно ошибался: пропускал
+    дистанционное «did not in any real sense believe…» (ложный 🔵) и топил бы цитаты
+    из-за «not» в СОСЕДНЕМ предложении (ложный 🟡). Режем СЫРОЙ текст на предложения,
+    каждое нормализуем; префикс q внутри его предложения сканируем ЦЕЛИКОМ по _NEG.
+    Есть хотя бы одно чистое вхождение → False (🔵 легитимен). q через шов предложений
+    (не найден ни в одном) → False: это честная дословная подстрока by design.
+    Оба аргумента: q норм. (_norm), raw_text — НЕнормализованный."""
+    found = False
+    for sent in _SENT_SPLIT.split(raw_text or ""):
+        ns = _norm(sent)
+        i = ns.find(q) if ns else -1
+        if i < 0:
+            continue
+        found = True
+        if not any(tok in _NEG for tok in ns[:i].split()):
+            return False                       # чистое вхождение без отрицания в префиксе
+    return found                               # все вхождения с отрицанием → обрезка
 
 
 def _norm(s: str) -> str:
@@ -101,7 +117,7 @@ def best_match(quote: str, advisor_dir: str):
         return None
     best = None  # (rank, tier, source)
     for ch in _load_chunks(advisor_dir):
-        if q in ch["_norm"] and not _crop_severs_negation(q, ch["_norm"]):  # C1: обрезка не рвёт отрицание
+        if q in ch["_norm"] and not _crop_severs_negation(q, ch.get("text") or ""):
             t = ch.get("tier", "A")
             rank = _TIER_ORDER.get(t, 9)
             if best is None or rank < best[0]:

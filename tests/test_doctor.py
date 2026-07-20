@@ -151,3 +151,31 @@ def test_gov_anchor_match_is_quiet_ok(tmp_path):
     freeze(adv, root=root)
     c = check_gov_anchors(root)
     assert c["ok"] is True and "якорь совпал: 1" in c["detail"]
+
+
+# ─────────────── corpus-tier-fields: legacy-сборка без тиров = 🟡-only тупик ───────────────
+
+def test_doctor_flags_tierless_corpus(tmp_path):
+    # corpus.jsonl без tier-полей (legacy build_advisor.py) → doctor предупреждает:
+    # 🔵 структурно недостижим, а check_corpus_tiering без build.lock это не ловит.
+    import doctor
+    adv = tmp_path / "advisors" / "x"
+    adv.mkdir(parents=True)
+    (adv / "corpus.jsonl").write_text(
+        json.dumps({"source": "s", "text": "some words here"}) + "\n", encoding="utf-8")
+    checks = {c["name"]: c for c in doctor.run_doctor(str(tmp_path))["checks"]}
+    assert "corpus-tier-fields" in checks
+    assert checks["corpus-tier-fields"]["ok"] is False
+    assert "build-advisor" in checks["corpus-tier-fields"]["detail"]
+
+
+def test_doctor_tier_fields_ok_when_tiers_present(tmp_path):
+    # Корпус с тирами (хотя бы одна запись несёт tier) → чек тихий, здоровье не роняет.
+    import doctor
+    adv = tmp_path / "advisors" / "x"
+    adv.mkdir(parents=True)
+    (adv / "corpus.jsonl").write_text(
+        json.dumps({"source": "s", "text": "some words here", "tier": "P1"}) + "\n",
+        encoding="utf-8")
+    checks = {c["name"]: c for c in doctor.run_doctor(str(tmp_path))["checks"]}
+    assert checks["corpus-tier-fields"]["ok"] is True

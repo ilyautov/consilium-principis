@@ -30,7 +30,8 @@ def build_advisor_full(advisor_dir, author=None, run_kernels=True, run_index=Tru
                     "problems": val["problems"], "steps": steps}
         steps.append({"step": "manifest", "ok": True})
     else:
-        steps.append({"step": "manifest", "ok": True, "note": "нет манифеста → всё P1 (бэк-компат)"})
+        steps.append({"step": "manifest", "ok": True,
+                      "note": "нет манифеста → все чанки тиром A (🟡-only; задекларируй manifest для 🔵)"})
 
     # 2) CORPUS (детерминированно, без модели)
     from corpusbuild import pipeline

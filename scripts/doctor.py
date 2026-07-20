@@ -267,6 +267,51 @@ def check_corpus_tiering(root="."):
         return {"name": "corpus-tiering", "ok": True, "detail": f"не определено ({e})"}
 
 
+def check_corpus_tier_fields(root="."):
+    """Наличие tier-ПОЛЯ в записях корпуса. check_corpus_tiering стережёт СВЕЖЕСТЬ разметки,
+    но его юрисдикция — только корпуса с build.lock.json; legacy build_advisor.py лока не пишет
+    И tier-полей не проставляет → такой корпус проходит оба фильтра молча, а 🔵 в нём
+    СТРУКТУРНО недостижим (тир нужен для синего маркера, записи без tier = 🟡-only тупик).
+    Ловим сам факт: сэмпл до 200 записей, записи есть, а ключа tier нет НИ В ОДНОЙ → провал
+    с указанием пути пересборки. Частично размеченный корпус — не сюда (это зона свежести)."""
+    import json
+    try:
+        from corpusbuild.paths import corpus_path
+        tierless, tiered = [], 0
+        adv_root = os.path.join(root, "advisors")
+        if os.path.isdir(adv_root):
+            for d in sorted(os.listdir(adv_root)):
+                p = os.path.join(adv_root, d)
+                if not (os.path.isdir(p) and os.path.isfile(corpus_path(p))):
+                    continue
+                seen, with_tier = 0, 0
+                with open(corpus_path(p), encoding="utf-8") as f:
+                    for line in f:
+                        if seen >= 200:
+                            break
+                        try:
+                            r = json.loads(line)
+                        except Exception:
+                            continue
+                        seen += 1
+                        if "tier" in r:
+                            with_tier += 1
+                if seen and not with_tier:
+                    tierless.append(d)
+                elif seen:
+                    tiered += 1
+        if tierless:
+            return {"name": "corpus-tier-fields", "ok": False,
+                    "detail": ("✗ корпус собран legacy-путём без tier-разметки → 🔵 недостижим "
+                               f"(🟡-only): {', '.join(tierless)} — пересобери: "
+                               "python3 scripts/board.py build-advisor <dir>")}
+        return {"name": "corpus-tier-fields", "ok": True,
+                "detail": (f"✓ tier-поля на месте: {tiered}" if tiered
+                           else "пропущен (нет собранных советников)")}
+    except Exception as e:                             # диагностика не должна ронять doctor
+        return {"name": "corpus-tier-fields", "ok": True, "detail": f"не определено ({e})"}
+
+
 def check_semantic_index(root="."):
     """Свежесть семантического индекса (data/embeddings_<slug>). Индекс несёт fingerprint
     {corpus_sha256, embed_model, chunk_chars, index_version}; рассинхрон → retrieve fail-closed
@@ -328,7 +373,7 @@ def run_doctor(root="."):
     checks = [check_python(), check_skill_installed(), check_response_language(),
               check_tier(), check_judge(), check_ollama_endpoint(),
               check_calibration(root), check_gov_anchors(root), check_corpus_tiering(root),
-              check_semantic_index(root)]
+              check_corpus_tier_fields(root), check_semantic_index(root)]
     adv_root = os.path.join(root, "advisors")
     tested = False
     if os.path.isdir(adv_root):

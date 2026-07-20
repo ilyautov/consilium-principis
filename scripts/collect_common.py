@@ -266,5 +266,5 @@ def require_advisor_dir(advisor_dir):
 
 def summary(path, text, kind):
     print(f"  ✓ {kind}: {len(text)} симв (~{len(text)//4} токенов) → {path}")
-    print(f"    дальше: python scripts/build_advisor.py {os.path.dirname(os.path.dirname(path))} "
-          f"--name \"{{Имя}}\"  → corpus.jsonl + quote_candidates")
+    print(f"    дальше: python3 scripts/board.py build-advisor {os.path.dirname(os.path.dirname(path))} "
+          f"(манифест→тиринг→корпус; legacy build_advisor.py не проставляет тиры → 🟡-only)")

@@ -1879,7 +1879,22 @@ def _federation_open(session_id, plan, replicas_default=3):
     except (TypeError, ValueError):
         replicas_default = 3
     replicas_default = max(1, min(replicas_default, _FED_MAX_REPLICAS))
-    return _fed_open(_fed_backend(), session_id, plan, replicas_default)
+    # DoS-кап (M2): per-item replicas — тот же вектор, что и replicas_default:
+    # [{"replicas": 1e9}] внутри plan обходил бы кап дефолта. Коэрсим/клампим
+    # на КОПИЯХ элементов — вход хоста не мутируем.
+    clean_plan = []
+    for item in plan:
+        if not isinstance(item, dict):
+            return {"error": "элемент plan должен быть объектом {role, advisor_dir, question, replicas?}"}
+        item = dict(item)
+        if "replicas" in item:
+            try:
+                n = int(item["replicas"])
+            except (TypeError, ValueError, OverflowError):
+                n = replicas_default
+            item["replicas"] = max(1, min(n, _FED_MAX_REPLICAS))
+        clean_plan.append(item)
+    return _fed_open(_fed_backend(), session_id, clean_plan, replicas_default)
 
 
 def _federation_poll(session_id):

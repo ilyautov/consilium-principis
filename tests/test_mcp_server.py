@@ -284,6 +284,30 @@ def test_retrieve_attaches_verbatim_quoting_hint():
     assert "дословно" in r["how_to_quote"].lower() and "🟡" in r["how_to_quote"]
 
 
+def test_retrieve_rejects_oversize_top_k_before_retrieval(tmp_path, monkeypatch):
+    import mcp_server as m
+    from engine import retrieval
+
+    calls = []
+
+    def spy(query, advisor_dir, top_k=3):
+        calls.append(top_k)
+        return []
+
+    monkeypatch.setattr(retrieval, "retrieve", spy)
+    monkeypatch.setattr(m, "_root", lambda: str(tmp_path))
+    monkeypatch.setenv("CONSILIUM_JUDGE_BACKEND", "host")
+    (tmp_path / "advisors" / "a").mkdir(parents=True)
+
+    rejected = m._retrieve("q", "advisors/a", top_k=33)
+    assert "error" in rejected
+    assert calls == []
+
+    accepted = m._retrieve("q", "advisors/a", top_k=32)
+    assert accepted["passages"] == []
+    assert calls == [32]
+
+
 def test_cite_returns_ready_verified_quotes():
     # детерминированный рычаг рва: cite отдаёт ГОТОВЫЕ проверенные объекты, хост не пишет текст сам
     r = dispatch("cite", {"advisor_dir": STRAT, "query": "deception in war"})

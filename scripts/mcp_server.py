@@ -292,6 +292,9 @@ def _retrieve(query, advisor_dir, top_k=3):
     # ленивый семантический build в tier_full.retrieve при отсутствии индекса на FULL-тире,
     # но нормальный поток строит индекс джобом build_advisor; джоббинг же cite/retrieve сломал
     # бы inline-UX fidelity-гейта (хост обязан вызывать их в момент цитирования). Не конвертируем.
+    if (isinstance(top_k, bool) or not isinstance(top_k, int)
+            or not 1 <= top_k <= _RETRIEVE_MAX_TOP_K):
+        return {"error": "top_k must be an integer from 1 to %d" % _RETRIEVE_MAX_TOP_K}
     from engine import retrieval             # ленивый импорт (тянет corpusbuild/engine)
     import relevance_gate
     import judge_backend
@@ -1356,14 +1359,20 @@ def _catalog_verify():
 def _diversity_check_tool(advisor_dirs):
     """Эхо-камера-детектор состава совета (read-only). Пути клампятся read-гардом."""
     import diversity_check
-    if not isinstance(advisor_dirs, list) or len(advisor_dirs) < 2:
-        return {"error": "дай минимум 2 advisor_dirs"}
+    if not isinstance(advisor_dirs, list):
+        return {"error": "advisor_dirs должен быть списком"}
     resolved = []
+    seen = set()
     for d in advisor_dirs:
         r = _resolve_read(d)
         if r is None or not os.path.isdir(r):
             return {"error": "advisor_dir вне корня репо или не существует: %r" % (d,)}
-        resolved.append(r)
+        canonical = os.path.realpath(r)
+        if canonical not in seen:
+            seen.add(canonical)
+            resolved.append(canonical)
+    if not 2 <= len(resolved) <= _DIVERSITY_MAX_ADVISORS:
+        return {"error": "дай от 2 до %d уникальных advisor_dirs" % _DIVERSITY_MAX_ADVISORS}
     return diversity_check.check(resolved)
 
 
@@ -1388,6 +1397,10 @@ _FED_BACKEND = None
 _FED_MAX_REPLICAS = 32
 _FED_MAX_PLAN = 64
 _FED_MAX_TIMEOUT = 60.0
+_RETRIEVE_MAX_TOP_K = 32
+_DIVERSITY_MAX_ADVISORS = 32
+_FED_MAX_FIELD_CHARS = 4096
+_FED_MAX_EXPANDED_TEXT_CHARS = 256 * 1024
 
 
 def _make_fed_backend(db_path):
@@ -1418,17 +1431,27 @@ def _federation_open(session_id, plan, replicas_default=3):
     # [{"replicas": 1e9}] внутри plan обходил бы кап дефолта. Коэрсим/клампим
     # на КОПИЯХ элементов — вход хоста не мутируем.
     clean_plan = []
+    expanded_text_chars = 0
     for item in plan:
         if not isinstance(item, dict):
             return {"error": "элемент plan должен быть объектом {role, advisor_dir, question, replicas?}"}
         item = dict(item)
+        for field in ("role", "advisor_dir", "question"):
+            value = item.get(field)
+            if not isinstance(value, str) or len(value) > _FED_MAX_FIELD_CHARS:
+                return {"error": "%s должен быть строкой не длиннее %d символов" %
+                        (field, _FED_MAX_FIELD_CHARS)}
         if "replicas" in item:
             try:
                 n = int(item["replicas"])
             except (TypeError, ValueError, OverflowError):
                 n = replicas_default
             item["replicas"] = max(1, min(n, _FED_MAX_REPLICAS))
+        expanded_text_chars += len(item["question"]) * item.get("replicas", replicas_default)
         clean_plan.append(item)
+    if expanded_text_chars > _FED_MAX_EXPANDED_TEXT_CHARS:
+        return {"error": "суммарный развёрнутый текст вопросов превышает %d символов" %
+                _FED_MAX_EXPANDED_TEXT_CHARS}
     return _fed_open(_fed_backend(), session_id, clean_plan, replicas_default)
 
 

@@ -143,6 +143,35 @@ def gen_adversarial_ooc(advisor_dir, author, n, seed_failures=None, model=None):
     return results[:n]
 
 
+def filter_answerable(rows, advisor_dir, retrieve_fn=None, threshold=None, top_k=3):
+    """Отсев ОТВЕЧАЕМЫХ вопросов из «unanswerable»-набора ДО включения в golden (6.6).
+
+    LLM-генератор помечает вопрос как OOC по ЗАМЫСЛУ («звучит вне домена»), не по
+    измерению: топиковый камуфляж режет в обе стороны, и вопрос может отвечаться
+    корпусом. Такой ряд в adversarial-наборе — ложная «галлюцинация» ретрива:
+    abstention_eval краснит контур за вопрос, на который корпус честно отвечает.
+
+    Механизм — зеркало abstention_eval: вопрос неотвечаем ⇔ max score по чанкам
+    < threshold (тот же порог, что резолвит abstention-гейт советника). retrieve_fn —
+    TEST SEAM (прод = eval.retrieve). Возврат (kept, flagged): kept — в набор,
+    flagged — [{**row, "max_score"}] для отчёта (в набор НЕ идут).
+    """
+    if retrieve_fn is None:
+        from eval import retrieve as retrieve_fn
+    if threshold is None:
+        import engine as _engine
+        threshold = _engine.resolve_engine(advisor_dir).abstain_threshold(advisor_dir)
+    kept, flagged = [], []
+    for row in rows:
+        hits = retrieve_fn(row["q"], advisor_dir, top_k=top_k)
+        mx = hits[0]["score"] if hits else 0.0
+        if mx >= threshold:
+            flagged.append({**row, "max_score": round(mx, 4)})
+        else:
+            kept.append(row)
+    return kept, flagged
+
+
 # ── 2. Обоснованные вопросы ────────────────────────────────────────────────────
 
 def gen_answerable(advisor_dir, n, model=None):
@@ -253,8 +282,13 @@ def main():
         advisor_dir = os.path.join(project_root, "advisors", slug)
         print(f"\n=== {slug} ({author}) ===")
 
-        # 1. Adversarial OOC
+        # 1. Adversarial OOC (с автопроверкой меток: отвечаемое корпусом — не OOC)
         ooc = gen_adversarial_ooc(advisor_dir, author, n)
+        ooc, flagged = filter_answerable(ooc, advisor_dir)
+        if flagged:
+            print(f"  [ooc-валидация] отсеяно отвечаемых корпусом: {len(flagged)}")
+            for item in flagged[:3]:
+                print(f"    ✗ {item['q'][:80]} (max_score={item['max_score']})")
         path = os.path.join(golden_dir, f"{slug}.adversarial.jsonl")
         write_jsonl(path, ooc, advisor_dir=advisor_dir)
         print(f"  adversarial OOC : {len(ooc):3d} → {path}")

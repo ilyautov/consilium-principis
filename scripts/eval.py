@@ -309,7 +309,10 @@ def collect_abstention_scores(adv_dir):
 
 def abstention_curve_eval(adv_dir, n_points=21):
     """Кривая trade-off (honest_abstain ↔ false_abstain) по порогу + рабочая точка + AUC.
-    Заменяет вводящий-в-заблуждение headline-%: один порог не виден без цены ложных отказов."""
+    Заменяет вводящий-в-заблуждение headline-%: один порог не виден без цены ложных отказов.
+    IN-SAMPLE: рабочая точка (Youden-knee) ВЫБРАНА и ОЦЕНЕНА на одних и тех же скорах —
+    её honest/false% оптимистичны; честная оценка требует held-out набора (его нет).
+    Поле in_sample=True — машинный маркер этой оговорки для потребителей артефакта."""
     from abstention_curve import (curve_from_scores, best_operating_point,
                                    thresholds_from_scores, curve_auc)
     ooc_scores, ans_scores = collect_abstention_scores(adv_dir)
@@ -322,6 +325,7 @@ def abstention_curve_eval(adv_dir, n_points=21):
         "n_ooc": len(ooc_scores), "n_ans": len(ans_scores),
         "auc": curve_auc(ooc_scores, ans_scores),
         "best": best_operating_point(points), "points": points,
+        "in_sample": True,
     }
 
 
@@ -443,6 +447,7 @@ def _abstention_stratum(a, curve, threshold):
         st["false_abstain_rate"] = a["false_abstain"] / a["ans_n"]
     if curve:
         st["auc"] = curve["auc"]
+        st["curve_in_sample"] = True   # Youden-точка выбрана и оценена на тех же скорах
     return st
 
 
@@ -689,6 +694,10 @@ def main(argv=None):
     # ── 3b) ABSTENTION-CURVE (честная замена headline-%) ────────────────────────────────────
     print("\n=== ABSTENTION-CURVE — trade-off (честный отказ ↔ ложный отказ) по порогу ===")
     print("  Один % завышает безопасность: не виден ценой ложных отказов. Кривая + рабочая точка.")
+    print("  IN-SAMPLE: рабочая точка выбрана и оценена на ТЕХ ЖЕ скорах — её honest/false% "
+          "оптимистичны;")
+    print("  честная оценка порога требует held-out набора (сейчас его нет — читай как верхнюю "
+          "границу).")
     any_curve = False
     for p in paths:
         c = abstention_curve_eval(p)

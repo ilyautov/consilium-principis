@@ -15,12 +15,17 @@ fail=0
 # новый советник запрещён к появлению в git, пока его имя явно не внесено в PD-allowlist.
 PD_ALLOW='machiavelli|marcus-aurelius|sun-tzu|epictetus|seneca|aristotle'
 # Список приватных имён = каталоги в advisors/ минус README минус PD-allowlist.
-PRIV=$(ls advisors 2>/dev/null | grep -v '^README.md$' | grep -ivE "^($PD_ALLOW)$" | paste -sd'|' -)
+# Одно имя на строку (НЕ |-regex как раньше): имена интерполировались в grep -iE без
+# экранирования — метасимволы в имени каталога (zzz$^ и т.п.) ломали regex и детект
+# молча деградировал (fail-open). Теперь матчим grep -F: имя — ЛИТЕРАЛЬНАЯ строка.
+PRIV=$(ls advisors 2>/dev/null | grep -v '^README.md$' | grep -ivE "^($PD_ALLOW)$")
 
 # 1. приватные имена в именах ИЛИ теле трекаемых файлов (если локально есть советники)
 if [ -n "$PRIV" ]; then
-  if git ls-files | grep -iE "$PRIV"; then echo "FAIL: приватное имя в имени трекаемого файла"; fail=1; fi
-  if git grep -liE "$PRIV" -- . ":!$self"; then echo "FAIL: приватное имя в теле трекаемого файла"; fail=1; fi
+  for name in $PRIV; do
+    if git ls-files | grep -iF -e "$name"; then echo "FAIL: приватное имя в имени трекаемого файла"; fail=1; fi
+    if git grep -liF -e "$name" -- . ":!$self"; then echo "FAIL: приватное имя в теле трекаемого файла"; fail=1; fi
+  done
 fi
 
 # 2. секреты — паттерн ловит РЕАЛЬНЫЙ ключ (префикс+хвост), не голый префикс из доков.
@@ -31,9 +36,14 @@ if git grep -lE 'sk-or-v1-[A-Za-z0-9]{20,}|sk-ant-[A-Za-z0-9-]{20,}|AKIA[0-9A-Z]
 fi
 
 # 3. файлы, которые НИКОГДА не должны трекаться
-for f in .env gov_heads.local.json principis.md relationship.md board_config.json; do
+for f in gov_heads.local.json principis.md relationship.md board_config.json; do
   if git ls-files --error-unmatch "$f" >/dev/null 2>&1; then echo "FAIL: $f трекается"; fail=1; fi
 done
+# .env в ЛЮБОМ вкусе и на ЛЮБОЙ глубине (.env.local, sub/.env.production, …);
+# публичные шаблоны (.env.example/.sample/.template) — задокументированное исключение.
+if git ls-files | grep -iE '(^|/)\.env' | grep -vE '(^|/)\.env\.(example|sample|template)$' | grep -q .; then
+  echo "FAIL: .env* трекается"; fail=1
+fi
 if git ls-files | grep -E '^advisors/' | grep -qv '^advisors/README.md'; then
   echo "FAIL: advisors/* трекается (кроме README)"; fail=1
 fi

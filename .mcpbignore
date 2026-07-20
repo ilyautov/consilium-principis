@@ -1,5 +1,6 @@
 # СЕКРЕТЫ
-.env
+.env*
+!.env.example
 *.log
 # КОПИРАЙТНЫЕ ИСХОДНИКИ И СОБРАННЫЕ КОРПУСА
 reference-library-raw/

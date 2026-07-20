@@ -250,14 +250,18 @@ def build_prediction_from_mc(map, mc_result, chosen, form=None, horizon_days=Non
       • event  — probability ← p_best[chosen] («выбранный вариант окажется лучшим»);
       • metric — p10/p50/p90 ← options[chosen].{p10,median,p90}; unit ← stakes.metric;
         direction ← stakes.direction.
-    resolves_on выводится из created + horizon_days, если оба даны. Fail-closed: неизвестный
-    вариант / кривой mc_result → ValueError.
+    resolves_on выводится из created + horizon_days, если created — ISO-дата. Fail-closed:
+    неизвестный вариант / кривой mc_result → ValueError; horizon_days обязателен
+    (целое > 0) — иначе билдер вернул бы прогноз, который отвергает validate_prediction.
     """
     if not isinstance(mc_result, dict) or "p_best" not in mc_result or "options" not in mc_result:
         raise ValueError("mc_result не похож на результат mc_run (нет p_best/options).")
     if chosen not in mc_result["p_best"] or chosen not in mc_result["options"]:
         raise ValueError("Вариант «%s» отсутствует в результате расчёта — прогноз не собрать."
                          % (chosen,))
+    if not isinstance(horizon_days, int) or isinstance(horizon_days, bool) or horizon_days <= 0:
+        raise ValueError("Горизонт прогноза (horizon_days) обязателен — целое число дней > 0; "
+                         "без горизонта прогноз неразрешим и не пройдёт validate_prediction.")
 
     stakes = map.get("stakes", {}) if isinstance(map, dict) else {}
     unit = stakes.get("metric")

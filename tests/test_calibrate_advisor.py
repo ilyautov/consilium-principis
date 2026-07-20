@@ -77,6 +77,26 @@ def test_compute_calibration_fail_closed_on_inseparable():
     assert r["valid"] is False
 
 
+def test_compute_calibration_rejects_low_auc():
+    """Пол разделимости: AUC ~0.7 (наборы перекрыты, хотя youden-точка формально есть) →
+    калибровка ОТКЛОНЕНА fail-closed — порог с такой разделимостью не имеет права
+    заменить валидированные глобальные дефолты."""
+    ooc = [0.40, 0.45, 0.50, 0.52, 0.58, 0.61]
+    ans = [0.48, 0.50, 0.55, 0.60, 0.65, 0.70]          # AUC = 25.5/36 ≈ 0.71
+    from abstention_curve import curve_auc
+    assert curve_auc(ooc, ans) < ca.AUC_FLOOR
+    r = ca.compute_calibration(ooc, ans, camouflage_scores=ooc)
+    assert r["valid"] is False and "AUC" in r["reason"]
+
+
+def test_compute_calibration_accepts_above_auc_floor():
+    """Граничный допуск: существующий overlapping-кейс (AUC ≈ 0.875) проходит пол."""
+    ooc = [0.40, 0.45, 0.50, 0.55, 0.58, 0.61]
+    ans = [0.54, 0.58, 0.62, 0.66, 0.70, 0.74]
+    r = ca.compute_calibration(ooc, ans, camouflage_scores=ooc)
+    assert r["valid"] and r["auc"] >= ca.AUC_FLOOR
+
+
 # ───────────────────────── сэмплинг проб ──────────────────────────────────────
 
 def _mk_corpus(tmp_path, n=30):

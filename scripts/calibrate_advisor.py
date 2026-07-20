@@ -15,6 +15,9 @@
     выберет порог по одному лишь камуфляж-потолку);
   • abstain_threshold = best_operating_point (max youden, тай-брейк ниже false_abstain,
     затем ниже порог) на abstention_curve;
+  • ПОЛ РАЗДЕЛИМОСТИ: AUC(answerable vs OOC) < 0.8 → калибровка отклонена fail-closed
+    (порог, выбранный на плохо разделимых наборах, не имеет права заменить
+    валидированные глобальные дефолты);
   • ПРАВИЛО ПОЛОСЫ (документируемое): band_lo = threshold − 0.05 (sub-band уже накрыт
     полом abstention, зеркало глобальной пары 0.50/0.45); band_hi = max(камуфляжных
     OOC-скоров) + 0.05 (камуфляж-потолок + запас — та же логика, которой выбран
@@ -56,6 +59,8 @@ HI_MARGIN = 0.05          # band_hi = max(camouflage OOC) + HI_MARGIN (пото�
 HI_CAP = 0.95
 N_ANS_DEFAULT = 24
 MIN_SCORES = 6            # меньше проб/OOC → калибровка не имеет опоры (skip)
+AUC_FLOOR = 0.8           # ниже — наборы недостаточно разделимы: порог не имеет права
+                          # заменить валидированные глобальные дефолты (fail-closed)
 
 
 # ───────────────────────── чистая математика (оффлайн-тестируемая) ───────────
@@ -91,12 +96,18 @@ def compute_calibration(ooc_scores, ans_scores, camouflage_scores=None, n_points
     if best is None or best["youden"] <= 0:
         return {"valid": False, "reason": "наборы неразделимы (youden <= 0) — "
                                           "порог не имеет рабочей точки"}
+    auc = curve_auc(ooc_scores, ans_scores)
+    if auc < AUC_FLOOR:
+        return {"valid": False,
+                "reason": f"AUC {auc:.3f} < {AUC_FLOOR}: answerable/OOC недостаточно "
+                          "разделимы на ЭТОМ корпусе — калибровка отклонена, глобальные "
+                          "дефолты остаются (fail-closed)"}
     t = round(best["threshold"], 4)
     lo, hi = band_rule(t, camouflage_scores if camouflage_scores else ooc_scores)
     if not lo < hi:
         return {"valid": False, "reason": f"полоса выродилась (lo={lo} >= hi={hi})"}
     return {"valid": True, "abstain_threshold": t, "band_lo": lo, "band_hi": hi,
-            "auc": round(curve_auc(ooc_scores, ans_scores), 4),
+            "auc": round(auc, 4),
             "best": {k: round(v, 4) for k, v in best.items()}}
 
 

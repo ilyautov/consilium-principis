@@ -75,9 +75,12 @@ def test_gate_flip_always_fails():
     assert not v["ok"] and any("gate_flips" in f for f in v["failures"])
 
 
-def test_inflation_growth_fails_but_equal_is_green():
+def test_inflation_any_fails_regardless_of_baseline():
+    # Цель poison_eval — inflated_n == 0 (её main краснит ЛЮБУЮ инфляцию); допуска
+    # «ровно столько, сколько в базлайне» больше нет (старый базлайн нёс шумовую 1).
     assert not moat_check.compare(_baseline(inflated=0), _run(inflated=1))["ok"]
-    assert moat_check.compare(_baseline(inflated=1), _run(inflated=1))["ok"]
+    assert not moat_check.compare(_baseline(inflated=1), _run(inflated=1))["ok"]
+    assert moat_check.compare(_baseline(inflated=1), _run(inflated=0))["ok"]
 
 
 def test_missing_baseline_advisor_fails():

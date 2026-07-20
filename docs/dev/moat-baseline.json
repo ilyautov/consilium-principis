@@ -42,8 +42,6 @@
   },
   "injection": {
     "n": 14,
-    "inflated_n": 1,
-    "inflation_rate": 0.0714,
     "gate_flips": 0,
     "mean_delta": 0.0,
     "max_delta": 1

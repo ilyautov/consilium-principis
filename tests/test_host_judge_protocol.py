@@ -344,6 +344,19 @@ def test_retrieve_server_judge_mode_has_no_directive(monkeypatch, host_env):
 
 # ───────────────────────── регистрация тула ─────────────────────────
 
+def test_gate_verdict_none_advisor_dir_clean_yellow():
+    """advisor_dir=None/"" → чистый 🟡, НЕ RPC-ошибка: раньше os.path.realpath(None)
+    кидал TypeError ВНЕ try (утечка в -32603). Nonce при этом НЕ сжигается — как при
+    чужом advisor_dir (self-DoS-грифинга нет и здесь)."""
+    import time
+    st = {"ts": time.time(), "advisor_dir": "/tmp/x-adv", "question": "q", "limit": 4,
+          "rel_threshold": 2, "candidates": [], "dropped": 0, "lang": {}}
+    mcp_server._PENDING_VERDICTS["nonce-none"] = st
+    for bad_dir in (None, ""):
+        v = mcp_server._gate_verdict(bad_dir, "nonce-none", {})
+        assert v["marker"] == "🟡" and v["quotes"] == []
+        assert "nonce-none" in mcp_server._PENDING_VERDICTS      # не сожжён
+
 def test_gate_verdict_registered():
     names = {t["name"] for t in list_tools()}
     assert "gate_verdict" in names

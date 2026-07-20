@@ -26,6 +26,26 @@ def test_norm_collapses_ws_and_punct():
     assert _norm("Teach  them,  better!") == "teach them better"
 
 
+def test_norm_yo_maps_to_e_across_copies():
+    # ё/е — орфографическая вариативность печатного русского, не различие: все три копии
+    # нормализации (fidelity-гейт, lexical-ретрив, rrf-дедуп) обязаны схлопывать её одинаково.
+    from engine.lexical import _norm as lex_norm
+    from engine.rrf import _key as rrf_key
+    assert _norm("Ёлка ЁЖ") == "елка еж"
+    assert lex_norm("Ёлка ЁЖ") == "елка еж"
+    assert rrf_key("Ёлка ЁЖ") == "елка еж"
+
+
+def test_verbatim_yo_e_cross_match():
+    # корпус с «ё», цитата с «е» (и наоборот) → дословный матч находится, не падает в мисс
+    with tempfile.TemporaryDirectory() as t:
+        adv = _mk_corpus(t, "Пчёлы не берут мёд у мёртвых цветов.")
+        assert verbatim_in_corpus("Пчелы не берут мед", adv) == "src.txt"
+    with tempfile.TemporaryDirectory() as t:
+        adv = _mk_corpus(t, "Пчелы не берут мед у мертвых цветов.")
+        assert verbatim_in_corpus("Пчёлы не берут мёд", adv) == "src.txt"
+
+
 def test_no_cross_chunk_false_positive():
     # "teach them better" does NOT exist verbatim; it only appears if chunks are joined.
     import tempfile, os, json

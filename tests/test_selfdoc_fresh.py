@@ -39,3 +39,25 @@ def test_manual_matches_committed():
     narr = bm._load_narrative(ROOT)
     rebuilt = bm.assemble(idx, narr)
     assert rebuilt == committed, "docs/MANUAL.md дрейфит — запусти scripts/build_manual.py и закоммить"
+
+
+import re
+
+def test_narrative_counters_fresh():
+    """Рукописные narrative/*.md не протухают по счётчикам: H6 показал, что
+    test_manual_matches_committed проверяет ВОСПРОИЗВОДИМОСТЬ генерации, не АКТУАЛЬНОСТЬ
+    нарратива (MANUAL нёс «правила 0–14» при живых 0–17, и сьют был зелёный)."""
+    idx = _committed()
+    rule_max = max(r["n"] for r in idx["rules"])
+    tool_n = idx["meta"]["tool_count"]
+    narr_dir = os.path.join(ROOT, "docs", "selfdoc", "narrative")
+    for fn in sorted(os.listdir(narr_dir)):
+        if not fn.endswith(".md"):
+            continue
+        text = open(os.path.join(narr_dir, fn), encoding="utf-8").read()
+        for m in re.finditer(r"правил[а-я]*\s+0\s*[–—-]\s*(\d+)", text):
+            assert int(m.group(1)) == rule_max, \
+                "%s: «правила 0–%s» протухло (живых 0–%d)" % (fn, m.group(1), rule_max)
+        for m in re.finditer(r"\b(\d+)\s*тул(?:ов|а)?\b", text):
+            assert int(m.group(1)) == tool_n, \
+                "%s: «%s тулов» протухло (живых %d)" % (fn, m.group(1), tool_n)

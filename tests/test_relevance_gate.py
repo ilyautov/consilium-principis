@@ -743,3 +743,77 @@ def test_gate_prefer_defaults_none(monkeypatch):
     j = Counter(3)
     assert relevance_gate.gate_quote("q", "text", 0.90, "adv", judge_fn=j) is True
     assert seen == [None]
+
+
+# ── M9b / review-4.2: TTL-мемо доступности судьи в _judge_available ─────────
+# Раньше КАЖДЫЙ вызов гейта делал HTTP-проб ollama (/api/tags) — при виснущей
+# (black-hole) ollama это +таймаут пробы на КАЖДОГО кандидата до срабатывания
+# circuit-breaker'а судьи. Мемо на TTL: в окне — ответ без пробы; по истечении —
+# свежий проб (self-healing).
+
+class TestJudgeAvailableMemo:
+    @pytest.fixture(autouse=True)
+    def _reset_memo(self):
+        relevance_gate._judge_avail_memo.clear()
+        yield
+        relevance_gate._judge_avail_memo.clear()
+
+    def _pin_ollama_backend(self, monkeypatch, probes):
+        import judge_backend
+        import llm_local
+        monkeypatch.setattr(judge_backend, "resolve", lambda advisor_dir=None: "ollama")
+        monkeypatch.setattr(llm_local, "available",
+                            lambda timeout=5: probes.__setitem__("n", probes["n"] + 1) or True)
+
+    def test_judge_available_memoized_within_ttl(self, monkeypatch):
+        probes = {"n": 0}
+        self._pin_ollama_backend(monkeypatch, probes)
+        assert relevance_gate._judge_available("adv") is True
+        assert relevance_gate._judge_available("adv") is True
+        assert relevance_gate._judge_available("adv") is True
+        assert probes["n"] == 1                      # второй/третий вызов — без HTTP-пробы
+
+    def test_judge_available_reprobes_after_ttl(self, monkeypatch):
+        probes = {"n": 0}
+        self._pin_ollama_backend(monkeypatch, probes)
+        assert relevance_gate._judge_available("adv") is True
+        assert probes["n"] == 1
+        # TTL истёк (моделируем просроченную запись) → свежий проб
+        relevance_gate._judge_avail_memo["adv"] = (0.0, False)
+        assert relevance_gate._judge_available("adv") is True
+        assert probes["n"] == 2
+
+    def test_judge_available_memoizes_unavailable(self, monkeypatch):
+        # Мёртвая ollama: False тоже мемоизируется — гейт не пробит сеть на каждого кандидата.
+        import judge_backend
+        import llm_local
+        probes = {"n": 0}
+        monkeypatch.setattr(judge_backend, "resolve", lambda advisor_dir=None: "ollama")
+
+        def dead(timeout=5):
+            probes["n"] += 1
+            return False
+
+        monkeypatch.setattr(llm_local, "available", dead)
+        assert relevance_gate._judge_available("adv") is False
+        assert relevance_gate._judge_available("adv") is False
+        assert probes["n"] == 1
+
+    def test_judge_available_exception_not_memoized(self, monkeypatch):
+        # Ошибка резолюции/пробы → False БЕЗ записи в мемо: следующий вызов пробует снова
+        # (fail-closed, но без залипания на временной ошибке).
+        import judge_backend
+        import llm_local
+        probes = {"n": 0}
+        monkeypatch.setattr(judge_backend, "resolve", lambda advisor_dir=None: "ollama")
+
+        def flaky(timeout=5):
+            probes["n"] += 1
+            if probes["n"] == 1:
+                raise RuntimeError("transient")
+            return True
+
+        monkeypatch.setattr(llm_local, "available", flaky)
+        assert relevance_gate._judge_available("adv") is False
+        assert relevance_gate._judge_available("adv") is True
+        assert probes["n"] == 2

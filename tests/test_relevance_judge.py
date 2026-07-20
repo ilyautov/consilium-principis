@@ -401,3 +401,87 @@ def test_retrieval_eval_judged_fewer_passages_than_topk(monkeypatch):
     # 1 реальный (rel=3) + 2 паддинг (rel=0)
     assert pq["rels"] == [3, 0, 0]
     assert pq["hit_at_k"] == 1
+
+
+# ── M9b: таймаут судьи + circuit-breaker против виснущей (black-hole) ollama ─
+# Проблема: пул до ~56 кандидатов × дефолтный таймаут 120с при виснущей ollama
+# блокировал stdio-вызов на часы, каждый следующий кандидат виснул снова.
+# Контракт: _JUDGE_TIMEOUT=20 тредится в generate; 3 подряд исключения → брейкер
+# открыт на 60с: judge возвращает 0 (fail-closed withhold) БЕЗ HTTP; успех
+# сбрасывает счётчик; по истечении cooldown — half-open проба.
+
+class TestJudgeCircuitBreaker:
+    @pytest.fixture(autouse=True)
+    def _reset_cb(self):
+        """Модульный стейт брейкера — глобалы; чистим до/после, чтобы тесты файла
+        (и сьюта в одном процессе) не зависели от порядка."""
+        relevance_judge._consec_fail = 0
+        relevance_judge._cb_open_until = 0.0
+        yield
+        relevance_judge._consec_fail = 0
+        relevance_judge._cb_open_until = 0.0
+
+    def test_judge_circuit_breaker(self, monkeypatch):
+        calls = {"n": 0}
+
+        def boom(*a, **kw):
+            calls["n"] += 1
+            raise RuntimeError("ollama down")
+
+        monkeypatch.setattr(llm_local, "generate", boom)
+        results = []
+        for _ in range(6):
+            try:
+                results.append(relevance_judge.judge("q", "p"))
+            except Exception:
+                results.append("raise")
+        assert calls["n"] == 3                      # после 3 подряд — обрыв, HTTP не зовём
+        # 3 исключения (прежний fail-closed путь вверх), затем мгновенные 0 без HTTP
+        assert results == ["raise", "raise", "raise", 0, 0, 0]
+
+    def test_judge_timeout_threaded(self, monkeypatch):
+        seen = {}
+
+        def fake(prompt, **kw):
+            seen.update(kw)
+            return "2"
+
+        monkeypatch.setattr(llm_local, "generate", fake)
+        assert relevance_judge.judge("q", "p") == 2
+        assert seen.get("timeout", 999) <= 20
+
+    def test_success_resets_fail_counter(self, monkeypatch):
+        state = {"fail": True, "n": 0}
+
+        def flaky(*a, **kw):
+            state["n"] += 1
+            if state["fail"]:
+                raise RuntimeError("x")
+            return "3"
+
+        monkeypatch.setattr(llm_local, "generate", flaky)
+        for _ in range(2):                          # 2 промаха — брейкер ещё закрыт
+            with pytest.raises(RuntimeError):
+                relevance_judge.judge("q", "p")
+        state["fail"] = False
+        assert relevance_judge.judge("q", "p") == 3  # успех → счётчик сброшен
+        assert relevance_judge._consec_fail == 0
+        state["fail"] = True
+        for _ in range(2):                          # снова 2 промаха — HTTP всё ещё зовётся
+            with pytest.raises(RuntimeError):
+                relevance_judge.judge("q", "p")
+        assert state["n"] == 5
+        with pytest.raises(RuntimeError):           # третий подряд → брейкер открыт
+            relevance_judge.judge("q", "p")
+        assert state["n"] == 6
+        assert relevance_judge.judge("q", "p") == 0  # открытый брейкер → 0 БЕЗ HTTP
+        assert state["n"] == 6
+
+    def test_breaker_retries_after_cooldown(self, monkeypatch):
+        import time
+        # брейкер открыт, но cooldown истёк → half-open: HTTP зовём, успех закрывает
+        relevance_judge._consec_fail = relevance_judge._CB_FAILS
+        relevance_judge._cb_open_until = time.monotonic() - 1.0
+        monkeypatch.setattr(llm_local, "generate", lambda *a, **kw: "1")
+        assert relevance_judge.judge("q", "p") == 1
+        assert relevance_judge._consec_fail == 0

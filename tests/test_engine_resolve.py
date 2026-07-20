@@ -51,3 +51,27 @@ def test_runtime_failure_degrades_and_invalidates(monkeypatch):
     hits = eng.safe_retrieve("q", "/tmp/adv")  # корпуса нет → lexical вернёт []
     assert hits == []
     assert isinstance(eng.resolve_engine("/tmp/adv"), LexicalEngine)  # кэш инвалидирован вниз
+
+
+def test_prefer_does_not_pollute_cache(monkeypatch):
+    # M9a: транзиентный форс (eval --engine / EVAL_ENGINE) НЕ пишет в кэш advisor'а —
+    # следующий вызов без prefer резолвит дефолтный движок.
+    eng.reset_engine_cache()
+    _force_mode(monkeypatch, "auto")
+    monkeypatch.setattr(SemanticEngine, "available", staticmethod(lambda: True))
+    e = eng.resolve_engine("/tmp/adv-prefer", prefer="lexical")
+    assert isinstance(e, LexicalEngine)
+    assert "/tmp/adv-prefer" not in eng._ENGINE_CACHE     # форс не закэширован
+    e2 = eng.resolve_engine("/tmp/adv-prefer")
+    assert isinstance(e2, SemanticEngine)                 # дефолтный путь нетронут
+
+
+def test_prefer_does_not_overwrite_existing_cache(monkeypatch):
+    eng.reset_engine_cache()
+    _force_mode(monkeypatch, "auto")
+    monkeypatch.setattr(SemanticEngine, "available", staticmethod(lambda: True))
+    e1 = eng.resolve_engine("/tmp/adv-cached")
+    assert isinstance(e1, SemanticEngine)
+    e2 = eng.resolve_engine("/tmp/adv-cached", prefer="lexical")
+    assert isinstance(e2, LexicalEngine)                  # форс работает транзиентно
+    assert eng.resolve_engine("/tmp/adv-cached") is e1    # кэш не перезаписан

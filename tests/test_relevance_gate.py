@@ -39,7 +39,7 @@ class Counter:
 
 
 def _semantic(monkeypatch, val=True):
-    monkeypatch.setattr(relevance_gate, "is_semantic", lambda advisor_dir: val)
+    monkeypatch.setattr(relevance_gate, "is_semantic", lambda advisor_dir, prefer=None: val)
 
 
 def _judge_avail(monkeypatch, val=True):
@@ -671,3 +671,75 @@ def test_eval_retrieve_forwards_raw_score(monkeypatch):
     out = _eval_mod.retrieve("q", "adv", top_k=2)
     assert out[0]["raw_score"] == 0.3
     assert "raw_score" not in out[1]                   # нет raw — ключа нет (форма прежняя)
+
+
+# ───────────────── M9a: EVAL_ENGINE не протекает в прод-гейт ─────────────────
+
+class _EngStub:
+    def __init__(self, name):
+        self.name = name
+
+
+def test_is_semantic_ignores_eval_engine_env(monkeypatch):
+    # Прод-путь (без prefer) смотрит ТОЛЬКО на реальный движок — env-форс из шелла
+    # юзера не должен ГАСИТЬ семантику (lexical-env при живом semantic).
+    import engine as _engine
+    seen = []
+    monkeypatch.setattr(_engine, "resolve_engine",
+                        lambda d, prefer=None: seen.append(prefer) or _EngStub("semantic"))
+    monkeypatch.setenv("EVAL_ENGINE", "lexical")
+    assert relevance_gate.is_semantic("adv") is True
+    assert seen == [None]                                # env НЕ дошла до резолвера
+
+
+def test_is_semantic_env_cannot_enable_semantic(monkeypatch):
+    # ...и не должен ВКЛЮЧАТЬ её (semantic-env при реальном lexical-поле).
+    import engine as _engine
+    monkeypatch.setattr(_engine, "resolve_engine",
+                        lambda d, prefer=None: _EngStub("lexical"))
+    monkeypatch.setenv("EVAL_ENGINE", "semantic")
+    assert relevance_gate.is_semantic("adv") is False
+
+
+def test_is_semantic_prefer_explicit_forwarded(monkeypatch):
+    # Eval-вход: prefer ЯВНЫЙ — доходит до резолвера и решает.
+    import engine as _engine
+    seen = []
+    monkeypatch.setattr(_engine, "resolve_engine",
+                        lambda d, prefer=None: seen.append(prefer) or _EngStub(prefer or "?"))
+    assert relevance_gate.is_semantic("adv", prefer="semantic") is True
+    assert relevance_gate.is_semantic("adv", prefer="lexical") is False
+    assert seen == ["semantic", "lexical"]
+
+
+def test_gate_quote_threads_prefer_to_is_semantic(monkeypatch):
+    seen = []
+    monkeypatch.setattr(relevance_gate, "is_semantic",
+                        lambda advisor_dir, prefer=None: seen.append(prefer) or False)
+    _judge_avail(monkeypatch, True)
+    j = Counter(3)
+    assert relevance_gate.gate_quote("q", "text", 0.50, "adv", judge_fn=j,
+                                     prefer="lexical") is True
+    assert seen == ["lexical"]
+
+
+def test_gate_passage_threads_prefer_to_is_semantic(monkeypatch):
+    seen = []
+    monkeypatch.setattr(relevance_gate, "is_semantic",
+                        lambda advisor_dir, prefer=None: seen.append(prefer) or False)
+    _judge_avail(monkeypatch, True)
+    j = Counter(3)
+    out = relevance_gate.gate_passage("q", {"text": "t", "score": 0.50, "source": "s"},
+                                      "adv", judge_fn=j, prefer="hybrid")
+    assert out.get("relevance_gated") is None            # judge=3 >= threshold → пропущен
+    assert seen == ["hybrid"]
+
+
+def test_gate_prefer_defaults_none(monkeypatch):
+    # Прод-вызов без prefer — is_semantic получает None (никакого скрытого env-канала).
+    seen = []
+    monkeypatch.setattr(relevance_gate, "is_semantic",
+                        lambda advisor_dir, prefer=None: seen.append(prefer) or True)
+    j = Counter(3)
+    assert relevance_gate.gate_quote("q", "text", 0.90, "adv", judge_fn=j) is True
+    assert seen == [None]

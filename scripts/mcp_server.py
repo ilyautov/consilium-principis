@@ -1765,6 +1765,20 @@ def _catalog_verify():
     return catalog.verify_catalog(_root(), fetch=cc.fetch)
 
 
+def _diversity_check_tool(advisor_dirs):
+    """Эхо-камера-детектор состава совета (read-only). Пути клампятся read-гардом."""
+    import diversity_check
+    if not isinstance(advisor_dirs, list) or len(advisor_dirs) < 2:
+        return {"error": "дай минимум 2 advisor_dirs"}
+    resolved = []
+    for d in advisor_dirs:
+        r = _resolve_read(d)
+        if r is None or not os.path.isdir(r):
+            return {"error": "advisor_dir вне корня репо или не существует: %r" % (d,)}
+        resolved.append(r)
+    return diversity_check.check(resolved)
+
+
 def _explain_self(topic=None):
     import selfdoc_query
     return selfdoc_query.explain(topic, root=_root())
@@ -1877,6 +1891,17 @@ TOOLS = {
                        "PD-basis, репортить дрейф. Без сборки.",
         "input_schema": _obj({}, []),
         "handler": _catalog_verify,
+    },
+    "diversity_check": {
+        "description": "Ортогональность состава совета (read-only, эхо-камера-детектор): "
+                       "diversity 0..1, дубли-голоса (similarity >= 0.5 → flag=dup), непокрытые "
+                       "оси мышления. ОБЯЗАТЕЛЬНО перед созывом совета (правило 18в): "
+                       "diversity < 0.5 = эхо-камера — предупреди юзера, предложи контр-голос.",
+        "input_schema": {"type": "object",
+                         "properties": {"advisor_dirs": {"type": "array",
+                                                        "items": {"type": "string"}}},
+                         "required": ["advisor_dirs"]},
+        "handler": _diversity_check_tool,
     },
     "explain_self": {
         "description": "Объяснить устройство самого проекта: что это, как работает конкретный тул/"

@@ -1702,6 +1702,15 @@ def _do_ingest(handle, out_path=None):
         op, err = _resolve_under_root(out_path)       # write-side traversal-гард
         if err:
             return err
+        # H1: запись — ТОЛЬКО файл прямо в principis_corpus/ и ТОЛЬКО новый. Иначе
+        # out_path=".env" молча уничтожал секреты, а out_path="scripts/mcp_server.py"
+        # перезаписывал код сервера (RCE при рестарте) — гард был шире угрозы.
+        corpus_dir = os.path.realpath(os.path.join(_root(), "principis_corpus"))
+        if os.path.dirname(op) != corpus_dir:
+            return {"error": "out_path должен быть новым файлом прямо в principis_corpus/ "
+                             "(запись в код, конфиги и секреты запрещена)."}
+        if os.path.exists(op):
+            return {"error": "файл уже существует — перезапись запрещена: %s" % op}
     else:
         op = os.path.join(_root(), "principis_corpus", "telegram.jsonl")
     return ingest(handle, op)

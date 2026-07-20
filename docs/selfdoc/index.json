@@ -3116,7 +3116,7 @@
     },
     {
       "term": "INSTRUCTIONS",
-      "definition": "серверный императив, который MCP-хост ВИДИТ (поле в ответе `initialize`). **MCP-хост НЕ читает SKILL.md** — видит только tool descriptions + INSTRUCTIONS. Всё поведенческое для MCP живёт здесь (нумерованные правила 0–13). `test_initialize_exposes_instructions` лочит канал."
+      "definition": "серверный императив, который MCP-хост ВИДИТ (поле в ответе `initialize`). **MCP-хост НЕ читает SKILL.md** — видит только tool descriptions + INSTRUCTIONS. Всё поведенческое для MCP живёт здесь (нумерованные правила 0–18). `test_initialize_exposes_instructions` лочит канал."
     },
     {
       "term": "SKILL.md",

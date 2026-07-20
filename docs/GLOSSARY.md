@@ -505,7 +505,7 @@ protocol-gate (🔵 разрешён, только если `fidelity_check` п�
 
 **INSTRUCTIONS** — серверный императив, который MCP-хост ВИДИТ (поле в ответе
 `initialize`). **MCP-хост НЕ читает SKILL.md** — видит только tool descriptions +
-INSTRUCTIONS. Всё поведенческое для MCP живёт здесь (нумерованные правила 0–13).
+INSTRUCTIONS. Всё поведенческое для MCP живёт здесь (нумерованные правила 0–18).
 `test_initialize_exposes_instructions` лочит канал.
 
 **SKILL.md** — файл скилл-системы Claude Code (режим CLI). До MCP-хоста НЕ доходит

@@ -18,12 +18,15 @@ PD_ALLOW='machiavelli|marcus-aurelius|sun-tzu|epictetus|seneca|aristotle'
 # Одно имя на строку (НЕ |-regex как раньше): имена интерполировались в grep -iE без
 # экранирования — метасимволы в имени каталога (zzz$^ и т.п.) ломали regex и детект
 # молча деградировал (fail-open). Теперь матчим grep -F: имя — ЛИТЕРАЛЬНАЯ строка.
-if PRIV=$(ls advisors 2>/dev/null); then
-  PRIV=$(printf '%s\n' "$PRIV" | grep -v '^README.md$' | grep -ivE "^($PD_ALLOW)$" || true)
-else
-  echo "FAIL: не удалось прочитать advisors/"
-  fail=1
-  PRIV=''
+PRIV=''
+if [ -d advisors ]; then
+  if PRIV=$(ls advisors 2>/dev/null); then
+    PRIV=$(printf '%s\n' "$PRIV" | grep -v '^README.md$' | grep -ivE "^($PD_ALLOW)$" || true)
+  else
+    echo "FAIL: не удалось прочитать advisors/"
+    fail=1
+    PRIV=''
+  fi
 fi
 
 # 1. приватные имена в именах ИЛИ теле трекаемых файлов (если локально есть советники)

@@ -56,3 +56,4 @@ mcp.json
 # Внутренние позиционные/стратегические заметки (ров + открытые слабости) — не в public-репо
 POSITIONING-*.md
 .worktrees/
+.superpowers/

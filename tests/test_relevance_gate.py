@@ -817,3 +817,31 @@ class TestJudgeAvailableMemo:
         assert relevance_gate._judge_available("adv") is False
         assert relevance_gate._judge_available("adv") is True
         assert probes["n"] == 2
+
+
+# ── _use_cloud: облако ТОЛЬКО для явного api-тира (opt-in); иначе H4-локаль ────
+
+def test_use_cloud_true_only_for_api(monkeypatch):
+    import judge_backend
+    monkeypatch.setattr(judge_backend, "resolve", lambda advisor_dir: "api")
+    assert relevance_gate._use_cloud("adv") is True
+    for other in ("ollama", "host"):
+        monkeypatch.setattr(judge_backend, "resolve", lambda advisor_dir, _o=other: _o)
+        assert relevance_gate._use_cloud("adv") is False
+
+
+def test_gate_passage_prod_threads_cloud_only_for_api(monkeypatch):
+    """Прод-путь (judge_fn=None): backend=='api' → judge зовётся с allow_cloud=True;
+    ollama/host → False (H4). Test-seam judge_fn остаётся без allow_cloud."""
+    _semantic(monkeypatch)
+    import judge_backend
+    import relevance_judge
+    cap = {}
+    monkeypatch.setattr(relevance_judge, "judge",
+        lambda q, p, source=None, allow_cloud=False: cap.__setitem__("ac", allow_cloud) or 3)
+    monkeypatch.setattr(judge_backend, "resolve", lambda advisor_dir: "api")
+    relevance_gate.gate_passage("q", {"text": "t", "score": 0.55}, "adv")
+    assert cap["ac"] is True
+    monkeypatch.setattr(judge_backend, "resolve", lambda advisor_dir: "ollama")
+    relevance_gate.gate_passage("q", {"text": "t", "score": 0.55}, "adv")
+    assert cap["ac"] is False

@@ -37,6 +37,7 @@ import os
 import sys
 import json
 import time
+import functools
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -206,8 +207,23 @@ def _judge_available(advisor_dir) -> bool:
     return ok
 
 
-def _default_judge(query, passage, source=None):
+def _use_cloud(advisor_dir) -> bool:
+    """Судья идёт в облако ТОЛЬКО когда бэкенд явно "api" (opt-in согласие юзера:
+    config judge_backend="api" или env-пин). Любой другой бэкенд/ошибка → False —
+    H4-дефолт (локальный судья; MOAT/eval не зависят от внешнего API)."""
+    try:
+        import judge_backend
+        return judge_backend.resolve(advisor_dir) == "api"
+    except Exception:
+        return False
+
+
+def _default_judge(query, passage, source=None, allow_cloud=False):
     import relevance_judge
+    # kwarg добавляем ТОЛЬКО в api-opt-in ветке: дефолтный локальный путь зовёт judge
+    # прежней сигнатурой (query, passage, source=) — бэк-совместимо со всеми test-seam.
+    if allow_cloud:
+        return relevance_judge.judge(query, passage, source=source, allow_cloud=True)
     return relevance_judge.judge(query, passage, source=source)
 
 
@@ -247,7 +263,8 @@ def gate_passage(query, passage, advisor_dir, judge_fn=None, cfg=None, *, prefer
     eff = raw if isinstance(raw, (int, float)) else (passage.get("score") if semantic else None)
     if eff is not None and not _in_band(eff, cfg):
         return passage
-    jf = judge_fn if judge_fn is not None else _default_judge
+    jf = (judge_fn if judge_fn is not None
+          else functools.partial(_default_judge, allow_cloud=_use_cloud(advisor_dir)))
     try:
         rel = _call_judge(jf, query, passage.get("text", ""), passage.get("source"))
     except Exception:
@@ -293,7 +310,8 @@ def gate_quote(query, quote_text, score, advisor_dir, judge_fn=None, cfg=None,
     eff = raw_score if isinstance(raw_score, (int, float)) else (score if semantic else None)
     if isinstance(eff, (int, float)) and eff > cfg["band_hi"]:
         return True                                      # единственный не-судимый путь
-    jf = judge_fn if judge_fn is not None else _default_judge
+    jf = (judge_fn if judge_fn is not None
+          else functools.partial(_default_judge, allow_cloud=_use_cloud(advisor_dir)))
     try:
         rel = _call_judge(jf, query, quote_text, source)
     except Exception:

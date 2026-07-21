@@ -18,7 +18,7 @@ PUBLIC_DOCS = [
     ROOT / "README.md",  # витрина GitHub — английский
     ROOT / "README.ru.md",
     ROOT / "SKILL.md",
-    ROOT / "install-skill" / "SKILL.md",
+    ROOT / "docs" / "onboarding-recipe.md",
 ]
 
 # Подстрекательство к клонированию ЛИЧНОСТИ (не софта). Многословные, чтобы «git clone» /

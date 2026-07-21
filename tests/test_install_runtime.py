@@ -26,9 +26,11 @@ def test_runtime_ships_lenses_and_gov_heads():
 
 
 def test_runtime_does_not_ship_dead_nested_skill():
-    # install-skill/SKILL.md приземляется на уровень глубже, чем ищет Claude Code
-    # (~/.claude/skills/*/SKILL.md) → как под-скилл он не регистрируется. Не шипуем мёртвый.
+    # install-skill/SKILL.md переехал в docs/onboarding-recipe.md (2026-07-21) — как
+    # под-скилл он приземлялся глубже, чем ищет Claude Code (~/.claude/skills/*/SKILL.md).
+    # Гард: ни старый путь, ни онбординг-док не попадают в RUNTIME (docs/ не шипуется).
     assert "install-skill" not in install.RUNTIME
+    assert "docs" not in install.RUNTIME
 
 
 def test_copy_runtime_ships_working_strategist_lens(tmp_path):

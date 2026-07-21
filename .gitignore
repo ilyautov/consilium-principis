@@ -23,7 +23,17 @@ board_config.json
 # ЛОКАЛЬНЫЙ реестр якорей приватных советников (advisors/* = реальные живые люди). Трекается
 # только gov_heads.json (шипуемые lenses/*); имена приватных советников НИКОГДА не в git.
 gov_heads.local.json
-scripts/golden/
+# golden локально-приватен ЦЕЛИКОМ, КРОМЕ 5 PD-retrieval-слайсов ниже: их морозим в git,
+# чтобы moat-базлайн (docs/dev/moat-baseline.json) воспроизводился на чистой машине/CI.
+# Провенанс и правила заморозки — docs/dev/moat-baseline-provenance.md. НИКОГДА не un-ignore
+# слайсы приватных советников (реальные живые люди) и *.answerable.v2/*.abstention/*.auto
+# (базлайну не нужны). Un-ignore ТОЛЬКО поимённо PD-слайсы, как ниже.
+scripts/golden/*
+!scripts/golden/machiavelli.retrieval.en.jsonl
+!scripts/golden/machiavelli.retrieval.jsonl
+!scripts/golden/marcus-aurelius.retrieval.en.jsonl
+!scripts/golden/marcus-aurelius.retrieval.jsonl
+!scripts/golden/sun-tzu.retrieval.en.jsonl
 data/embeddings*.npy
 data/embeddings*.meta.json
 # Шипуем lenses/<name>/{corpus.jsonl,sources/manifest.json,*.md} (PD/CC), но НЕ локальные

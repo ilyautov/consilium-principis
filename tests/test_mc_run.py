@@ -312,7 +312,7 @@ def test_n_at_cap_accepted_boundary():
 # ── гистограмма (Ф3, opt-in): бины детерминированы, дефолтный выход не тронут ──
 
 _BASE_KEYS = {"options", "pairwise", "p_best", "expected_regret",
-              "tornado", "top_uncertainties", "label"}
+              "tornado", "tornado_caveat", "top_uncertainties", "label"}
 
 
 def test_default_output_has_no_histogram_and_same_keys():

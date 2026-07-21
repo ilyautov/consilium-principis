@@ -50,8 +50,9 @@ def generate(prompt, model=None, temperature=0.3, timeout=120, num_predict=None,
     (вызыватели-судьи трактуют исключение как gated/withheld). Детерминизм в тестах — моки raw-функций.
 
     num_predict (опц.): потолок токенов ответа, пробрасывается в оба raw-вызова.
-    allow_cloud (H4): False → облачный (openrouter) бэкенд НЕ трогается даже при LLM_BACKEND=openrouter;
-    судья релевантности зовёт с allow_cloud=False, чтобы независимость гейта не зависела от внешнего API.
+    allow_cloud (H4): False → облачный (openrouter) бэкенд НЕ трогается даже при LLM_BACKEND=openrouter.
+    Судья релевантности зовёт с False ПО УМОЛЧАНИЮ (независимость гейта и воспроизводимость MOAT/eval не
+    зависят от внешнего API); True — только прод-путь relevance_gate при judge_backend="api" (opt-in юзера).
 
     Проброс num_predict — условный (kwarg только когда задан): держит старые моки raw-функций
     с сигнатурой (p, m, t, to) рабочими без правок."""

@@ -110,10 +110,15 @@ def _sanitize_passage(passage: str) -> str:
     return _escape_untrusted_data(passage)
 
 
-def judge(query: str, passage: str, model=None, source=None) -> int:
+def judge(query: str, passage: str, model=None, source=None, allow_cloud=False) -> int:
     """Оценивает релевантность passage к query.
 
     Возвращает int ∈ {0,1,2,3}.
+
+    allow_cloud (H4): дефолт False — судья остаётся ЛОКАЛЬНЫМ, чтобы независимость гейта
+    (и воспроизводимость MOAT/eval) не зависела от внешнего API. True прокидывает ТОЛЬКО
+    прод-путь relevance_gate, когда judge_backend.resolve=="api" (ЯВНОЕ opt-in согласие
+    юзера на облако). Прямые вызовы moat_check/poison_eval параметр не подают → остаются локальны.
 
     source (опционально): провенанс пассажа («The Prince, ch. XII») — структурный
     контекст в промпте (PageIndex-inspired). Обостряет различение «отвечает» vs
@@ -160,7 +165,7 @@ def judge(query: str, passage: str, model=None, source=None) -> int:
                                   source_block=source_block)
     try:
         response = llm_local.generate(prompt, model=model, temperature=0.1, num_predict=4,
-                                      timeout=_JUDGE_TIMEOUT, allow_cloud=False)
+                                      timeout=_JUDGE_TIMEOUT, allow_cloud=allow_cloud)
     except Exception:
         with _CB_LOCK:
             if request_generation == _cb_generation:

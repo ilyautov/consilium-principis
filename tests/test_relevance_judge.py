@@ -731,3 +731,28 @@ class TestJudgeCircuitBreaker:
         assert outcomes == ["raised"] * relevance_judge._CB_FAILS
         assert relevance_judge._consec_fail == relevance_judge._CB_FAILS
         assert relevance_judge.judge("must-be-blocked", "p") == 0
+
+
+# ── allow_cloud: H4-дефолт локальный, api opt-in пробрасывает True ────────────
+
+def _capture_generate(cap):
+    def _g(*a, **kw):
+        cap["ac"] = kw.get("allow_cloud")
+        return "2"
+    return _g
+
+
+def test_judge_defaults_allow_cloud_false(monkeypatch):
+    """H4: прямой вызов judge (moat_check/poison_eval) НЕ уходит в облако — дефолт False."""
+    cap = {}
+    monkeypatch.setattr(llm_local, "generate", _capture_generate(cap))
+    relevance_judge.judge("q", "p")
+    assert cap["ac"] is False
+
+
+def test_judge_threads_allow_cloud_true(monkeypatch):
+    """api opt-in: allow_cloud=True доходит до llm_local.generate."""
+    cap = {}
+    monkeypatch.setattr(llm_local, "generate", _capture_generate(cap))
+    relevance_judge.judge("q", "p", allow_cloud=True)
+    assert cap["ac"] is True

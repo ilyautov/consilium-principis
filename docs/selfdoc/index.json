@@ -4,7 +4,7 @@
     "rule_count": 19,
     "recipe_count": 16,
     "script_count": 69,
-    "test_count": 158,
+    "test_count": 159,
     "glossary_count": 113
   },
   "tools": [
@@ -2613,6 +2613,10 @@
     {
       "path": "tests/test_outcome_loop.py",
       "covers": "outcome loop"
+    },
+    {
+      "path": "tests/test_owner_gated_followups.py",
+      "covers": "owner gated followups"
     },
     {
       "path": "tests/test_path_idiom.py",

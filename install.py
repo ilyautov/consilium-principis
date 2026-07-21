@@ -31,8 +31,8 @@ SKILLS_HOME = Path.home() / ".claude" / "skills"
 
 # Машинерия — копируется/обновляется. (scripts/golden и advisors-доска сохраняются, см. ниже.)
 # lenses/ + gov_heads.json — ГРУНТОВАННЫЙ контент из коробки (Сунь-цзы 🔵-линза + якорь целостности):
-# без них skill-install приезжал с ПУСТОЙ доской (HIGH #1 pre-publish аудита). install-skill НЕ шипуем —
-# как под-скилл он приземляется глубже, чем ищет Claude Code (~/.claude/skills/*/SKILL.md), т.е. мёртв;
+# без них skill-install приезжал с ПУСТОЙ доской (HIGH #1 pre-publish аудита). Онбординг-рецепт
+# переехал в docs/onboarding-recipe.md (2026-07-21) и НЕ шипуется в RUNTIME (docs/ не копируем);
 # онбординг покрыт README/QUICKSTART + тулами board_status/doctor/seed_council/setup_full.
 # catalog/ — указатели PD-фигур (pd_figures.json) для catalog_add/search/preview: без него
 # эти тулы на установленном скилле бьют по несуществующему файлу.

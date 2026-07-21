@@ -189,7 +189,12 @@ def mc_run(m, seed, n=N_DEFAULT, histogram=False):
             }
 
         # торнадо: |corr(сэмплы величины, исход лучшего варианта сценария)|;
-        # сортировка по вкладу, при равенстве — порядок величин в карте (stable sort)
+        # сортировка по вкладу, при равенстве — порядок величин в карте (stable sort).
+        # ВАЖНО (F #4 честности, 2026-07-21): impact = |Пирсон| — ЛИНЕЙНАЯ/монотонная
+        # чувствительность. Слеп к U-образной (немонотонной) зависимости: величина с
+        # сильным, но немонотонным влиянием получит низкий impact. Ранг читать как
+        # «линейное влияние», НЕ как «влияние вообще». Spearman тут не помог бы — он
+        # тоже монотонный; честный фикс = оговорка, а не подмена такого же слепого оценщика.
         tornado = [{"id": u["id"], "impact": _pearson(u_samples[u["id"]], best_values)}
                    for u in uncertainties]
         tornado.sort(key=lambda t: -t["impact"])
@@ -205,6 +210,8 @@ def mc_run(m, seed, n=N_DEFAULT, histogram=False):
         "p_best": {oid: win_share[oid] / n for oid in option_ids},
         "expected_regret": {oid: regret_sum[oid] / n for oid in option_ids},
         "tornado": tornado,
+        "tornado_caveat": ("impact = |Пирсон| (линейная/монотонная чувствительность); "
+                           "слеп к U-образным немонотонным эффектам — низкий impact ≠ нет влияния"),
         "top_uncertainties": [t["id"] for t in tornado[:2]],
         # «📐 рамка» (Ф2): модель юзера — K величин, подтверждены им, сид S, n прогонов
         "label": {"n_uncertainties": len(uncertainties), "seed": seed, "n": n,

@@ -76,7 +76,7 @@ python3 scripts/board.py build-advisor   advisors/<имя>     # собрать 
 python3 scripts/eval.py advisors/<имя>                       # 🔵 verified X/X, честные отказы
 ```
 Полный рецепт сборки советника (откуда брать источники, как писать `persona.md`, проверка каждой
-цитаты контуром) лежит в [`install-skill/SKILL.md`](install-skill/SKILL.md) и [`advisors/README.md`](advisors/README.md).
+цитаты контуром) лежит в [`docs/onboarding-recipe.md`](docs/onboarding-recipe.md) и [`advisors/README.md`](advisors/README.md).
 
 ---
 

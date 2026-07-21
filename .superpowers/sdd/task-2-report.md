@@ -29,3 +29,26 @@ git diff --check
 ```
 
 The environment variables are required by the existing gate tests to force their documented offline lexical mode; without them a locally available semantic engine changes their intended assertions.
+
+## Review follow-up: RED/GREEN
+
+Added two regression tests before changing production code:
+
+- `test_ingest_telegram_job_label_and_result_hide_raw_handle` proves that a CR/LF-containing handle cannot enter the externally visible job label or completed status/result.
+- `test_normal_success_does_not_discard_prior_inflight_failures` starts three failures, lets an ordinary success finish first, then verifies those pre-existing failures still open the breaker.
+
+RED command and result:
+
+```sh
+HEPHAESTUS_ENGINE=/nonexistent OLLAMA_HOST=http://127.0.0.1:59999 \
+  PYTHONPATH=scripts pytest -q \
+  tests/test_mcp_server.py::test_ingest_telegram_job_label_and_result_hide_raw_handle \
+  tests/test_relevance_judge.py::TestJudgeCircuitBreaker::test_normal_success_does_not_discard_prior_inflight_failures
+# 2 failed
+```
+
+GREEN command and result (same command after the minimal fixes):
+
+```text
+2 passed
+```

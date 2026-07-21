@@ -70,6 +70,30 @@ def test_job_error_is_captured(monkeypatch):
     assert st["status"] == "error" and "сеть упала" in st["error"]
 
 
+def test_ingest_telegram_job_label_and_result_hide_raw_handle(monkeypatch):
+    """Входной handle не попадает в наблюдаемый job label/status даже с CR/LF."""
+    import mcp_server, time
+    raw_handle = "@my_channel\r\nforged: metadata"
+    monkeypatch.setattr(mcp_server, "_do_ingest",
+                        lambda handle, out_path: {"handle": "my_channelforgedmetadata",
+                                                  "posts": 0, "out": out_path, "written": 0})
+
+    started = dispatch("ingest_telegram", {"handle": raw_handle})
+    deadline = time.time() + 5
+    status = dispatch("job_status", {"job_id": started["job_id"]})
+    while status["status"] == "running" and time.time() < deadline:
+        time.sleep(0.02)
+        status = dispatch("job_status", {"job_id": started["job_id"]})
+
+    assert started["label"] == "ingest_telegram"
+    assert status["label"] == "ingest_telegram"
+    assert status["status"] == "done"
+    assert status["result"]["handle"] == "my_channelforgedmetadata"
+    assert raw_handle not in repr({"started": started, "status": status})
+    assert "\r" not in repr({"started": started, "status": status})
+    assert "\n" not in repr({"started": started, "status": status})
+
+
 def test_job_status_unknown_id():
     assert "error" in dispatch("job_status", {"job_id": "job-999999"})
 

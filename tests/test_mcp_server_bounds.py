@@ -12,6 +12,7 @@
 import os
 import sys
 import threading
+import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.join(HERE, "..")
@@ -156,6 +157,85 @@ def test_start_job_removes_record_when_thread_cannot_start(clean_jobs, monkeypat
     result = M._start_job(lambda: None, "admitted-after-failure")
     assert result["status"] == "running"
     assert len(starts) == 1
+
+
+# ──────────────── TASK 3: build execution + single-flight ────────────────
+
+@pytest.fixture
+def clean_build_admission():
+    """Изолируем лимит выполнения сборок и ключи single-flight."""
+    lock = getattr(M, "_BUILD_LOCK", threading.RLock())
+    with lock:
+        jobs = getattr(M, "_BUILD_JOBS", None)
+        saved_builds = dict(jobs) if jobs is not None else None
+        saved_semaphore = getattr(M, "_BUILD_EXECUTION_SEMAPHORE", None)
+        if jobs is not None:
+            jobs.clear()
+    yield
+    with lock:
+        if saved_builds is not None:
+            M._BUILD_JOBS.clear()
+            M._BUILD_JOBS.update(saved_builds)
+        if saved_semaphore is not None:
+            M._BUILD_EXECUTION_SEMAPHORE = saved_semaphore
+
+
+def test_active_build_cap_refuses_excess_execution(clean_jobs, clean_build_admission,
+                                                    monkeypatch):
+    """Заполнив единственный слот сборки, второй build_advisor не создаёт job."""
+    started = threading.Event()
+    release = threading.Event()
+    monkeypatch.setattr(M, "_BUILD_EXECUTION_SEMAPHORE", threading.BoundedSemaphore(1), raising=False)
+
+    def blocked_build(*_args, **_kwargs):
+        started.set()
+        assert release.wait(timeout=1)
+        return {"ok": True}
+
+    monkeypatch.setattr(M, "_do_build", blocked_build)
+    first = M._build_advisor("advisors/first")
+    assert started.wait(timeout=1)
+
+    excess = M._build_advisor("advisors/second")
+    release.set()
+
+    assert "error" in excess and "job_id" not in excess
+    with M._JOBS_LOCK:
+        assert list(M._JOBS) == [first["job_id"]]
+
+
+def test_resolved_advisor_build_coalesces_existing_job_and_cleans_up(
+        clean_jobs, clean_build_admission, monkeypatch, tmp_path):
+    """Относительный и абсолютный путь одного советника разделяют running job, затем ключ снимается."""
+    advisor = tmp_path / "advisors" / "alpha"
+    advisor.mkdir(parents=True)
+    started = threading.Event()
+    release = threading.Event()
+    calls = []
+    monkeypatch.setattr(M, "_root", lambda: str(tmp_path))
+
+    def blocked_build(advisor_dir, *_args, **_kwargs):
+        calls.append(advisor_dir)
+        started.set()
+        assert release.wait(timeout=1)
+        return {"ok": True}
+
+    monkeypatch.setattr(M, "_do_build", blocked_build)
+    first = M._build_advisor("advisors/alpha")
+    assert started.wait(timeout=1)
+    coalesced = M._build_advisor(str(advisor))
+    release.set()
+
+    assert coalesced["job_id"] == first["job_id"]
+    assert coalesced["status"] == "running"
+    assert calls == ["advisors/alpha"]
+
+    deadline = time.time() + 1
+    while M._job_status(first["job_id"])["status"] == "running" and time.time() < deadline:
+        time.sleep(0.01)
+
+    next_job = M._build_advisor(str(advisor))
+    assert next_job["job_id"] != first["job_id"]
 
 
 # ─────────────────── ITEM 1: _PENDING_VERDICTS кап ───────────────────

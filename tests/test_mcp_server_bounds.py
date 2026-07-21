@@ -185,7 +185,8 @@ def test_active_build_cap_refuses_excess_execution(clean_jobs, clean_build_admis
     """Заполнив единственный слот сборки, второй build_advisor не создаёт job."""
     started = threading.Event()
     release = threading.Event()
-    monkeypatch.setattr(M, "_BUILD_EXECUTION_SEMAPHORE", threading.BoundedSemaphore(1), raising=False)
+    semaphore = threading.BoundedSemaphore(1)
+    monkeypatch.setattr(M, "_BUILD_EXECUTION_SEMAPHORE", semaphore, raising=False)
 
     def blocked_build(*_args, **_kwargs):
         started.set()
@@ -198,6 +199,11 @@ def test_active_build_cap_refuses_excess_execution(clean_jobs, clean_build_admis
 
     excess = M._build_advisor("advisors/second")
     release.set()
+
+    # Дождаться on_complete: иначе fixture вернёт старый global semaphore, пока daemon
+    # ещё освобождает тестовый, и pytest увидит ложный double-release в другом тесте.
+    assert semaphore.acquire(timeout=1)
+    semaphore.release()
 
     assert "error" in excess and "job_id" not in excess
     with M._JOBS_LOCK:

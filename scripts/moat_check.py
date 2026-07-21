@@ -173,11 +173,23 @@ def run_battery(advisor_dirs, seed=0, n_ans=12, n_samples=3, top_k=3,
 
 # ───────────────────────── сравнение с базлайном (чистое) ────────────────────
 
-def _battery_tolerance(base_tol, n):
-    """Эффективный допуск = max(base, 1/n + квант округления). При n вопросах один
-    флип судьи весит 1/n: допуск уже этого шага ловит шум, а не деградацию
-    (ревью M6: 5 п.п. при n=12 < 8.3 п.п. одного флипа). Квант 1e-4 = 2×полушага
-    round(rate, 4) на разности двух округлённых долей."""
+def _battery_tolerance(base_tol, n, strict=False):
+    """Эффективный допуск.
+
+    coverage (strict=False): max(base, 1/n + квант). При n вопросах один флип судьи
+    весит 1/n; для «гейт слишком много воздерживается» допуск разумно поднять до
+    разрешения батареи — одиночный флип там шум, а не деградация (ревью M6). Квант
+    1e-4 = 2×полушага round(rate, 4) на разности двух округлённых долей.
+
+    misapply (strict=True): ЖЁСТКИЙ пол = base, БЕЗ 1/n-послабления (F1, адверс-ревью
+    2026-07-21). misapply — crown-jewel рва (протечка камуфляжа в 🔵); её аларм не
+    должен делить рыхлый 1/n-пол с coverage. При n=12 старый 1/n давал 8.3 п.п. →
+    аларм молчал до 2 протечек из 12 (доля протечки ~удваивалась до срабатывания).
+    Шум одиночного флипа гасит НЕ допуск, а медиана-из-3 семплов судьи (отдельный
+    механизм измерения); политика обнаружения эрозии остаётся на базовом пороге.
+    Асимметрия намеренная: перекос в сторону ложной тревоги на РВЕ, а не пропуска."""
+    if strict:
+        return base_tol
     if not n:
         return base_tol
     return max(base_tol, 1.0 / n + 1e-4)
@@ -199,7 +211,8 @@ def compare(baseline, run, tolerances=None):
             continue
         eps = 1e-9                                     # «ровно на границе» = зелёный (float-точность)
         tol_mis = _battery_tolerance(tol["misapply_pp"],
-                                     r.get("n_camouflage") or b.get("n_camouflage"))
+                                     r.get("n_camouflage") or b.get("n_camouflage"),
+                                     strict=True)   # F1: жёсткий пол на эрозию рва
         tol_cov = _battery_tolerance(tol["coverage_pp"],
                                      r.get("n_ans") or b.get("n_ans"))
         d_mis = r["misapply_rate"] - b["misapply_rate"]

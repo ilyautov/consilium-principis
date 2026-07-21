@@ -51,8 +51,9 @@ def test_improvement_is_green():
 
 
 def test_degradation_within_tolerance_green():
-    """+5 п.п. misapply и −5 п.п. coverage — внутри эффективного допуска → зелёный.
-    (при n=12 допуск поднят разрешением батареи до 1/12 ≈ 8.3 п.п., см. M6-тесты ниже)."""
+    """+5 п.п. misapply (ровно жёсткий пол F1) и −5 п.п. coverage (< 8.3 п.п. разрешения
+    при n=12) — оба на/внутри допуска → зелёный. misapply держится на базовом 5 п.п.,
+    coverage поднят разрешением батареи до 1/12 (см. асимметрию в _battery_tolerance)."""
     v = moat_check.compare(_baseline(0.20, 0.90), _run(mis=0.25, cov=0.85))
     assert v["ok"], v["failures"]
 
@@ -91,22 +92,34 @@ def test_missing_baseline_advisor_fails():
 def test_custom_tolerances_override_defaults():
     v = moat_check.compare(_baseline(0.20), _run(mis=0.26), {"misapply_pp": 0.10})
     assert v["ok"]
-    # override не опускает допуск ниже разрешения батареи (M6): 0.01 при n=12
-    # эффективно = 1/12 — деградация должна превышать вес одного флипа
+    # misapply-override действует БУКВАЛЬНО (F1: жёсткий пол, без 1/n-подъёма): при
+    # misapply_pp=0.01 деградация +10 п.п. заведомо краснит (0.10 > 0.01).
     v2 = moat_check.compare(_baseline(0.20), _run(mis=0.30), {"misapply_pp": 0.01})
     assert not v2["ok"]
 
 
 # ───────────────────────── compare: разрешение батареи (M6) ──────────────────
 
-def test_single_flip_at_n12_is_noise_not_degradation():
-    """При n=12 один флип судьи весит 1/12 = 8.3 п.п. — больше базового допуска
-    5 п.п. (ревью M6): допуск поднимается до разрешения батареи, одиночный флип
-    — шум, гейт не красный."""
-    b = _baseline(mis=0.1667, cov=0.9167)      # n_camouflage=12, n_ans=12
-    r = _run(mis=0.25, cov=0.8333)             # ровно +1/12 misapply и −1/12 coverage
+def test_single_flip_coverage_at_n12_is_noise_green():
+    """coverage: при n=12 один флип весит 1/12 = 8.3 п.п. — «гейт слишком много
+    воздерживается» на ОДИН вопрос = шум разрешения батареи (M6), не деградация.
+    misapply держим неизменным, чтобы изолировать coverage-ветку."""
+    b = _baseline(mis=0.0, cov=0.9167)         # n_camouflage=12, n_ans=12
+    r = _run(mis=0.0, cov=0.8333)              # −1/12 coverage, misapply без изменений
     v = moat_check.compare(b, r)
     assert v["ok"], v["failures"]
+
+
+def test_single_flip_misapply_at_n12_fails_F1():
+    """misapply (crown-jewel рва): один флип (+1/12 = 8.3 п.п.) БОЛЬШЕ не шум —
+    жёсткий пол 5 п.п. на эрозию рва (F1, адверс-ревью 2026-07-21). Раньше 1/n-допуск
+    держал это зелёным до 2/12 (доля протечки камуфляжа удваивалась до аларма).
+    coverage держим неизменным, чтобы изолировать misapply-ветку."""
+    b = _baseline(mis=0.1667, cov=0.9167)      # n_camouflage=12
+    r = _run(mis=0.25, cov=0.9167)             # +1/12 misapply, coverage без изменений
+    v = moat_check.compare(b, r)
+    assert not v["ok"]
+    assert any("misapply" in f for f in v["failures"])
 
 
 def test_two_flips_at_n12_exceed_resolution_fail():

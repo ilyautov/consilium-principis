@@ -1294,6 +1294,11 @@ _JOBS = {}
 _JOBS_LOCK = threading.Lock()
 _JOB_SEQ = [0]
 _MAX_JOBS = 256               # кап реестра: без него долгоживущий сервер = утечка памяти (реестр не чистится)
+_MAX_ACTIVE_BUILDS = 2        # CPU/память/модель: тяжёлые сборки не должны стартовать безгранично
+_BUILD_EXECUTION_SEMAPHORE = threading.BoundedSemaphore(_MAX_ACTIVE_BUILDS)
+_BUILD_LOCK = threading.RLock()
+_BUILD_JOBS = {}              # canonical advisor_dir -> running job_id (single-flight)
+_JOB_WAIT_NOTE = "долгая операция в фоне — опрашивай job_status(job_id), не жди в этом вызове"
 
 
 def _evict_jobs_over_cap(reserve=0):
@@ -1307,7 +1312,7 @@ def _evict_jobs_over_cap(reserve=0):
         _JOBS.pop(victim, None)
 
 
-def _start_job(fn, label):
+def _start_job(fn, label, before_start=None, on_complete=None):
     with _JOBS_LOCK:
         _evict_jobs_over_cap(reserve=1)
         if len(_JOBS) >= _MAX_JOBS:
@@ -1315,6 +1320,8 @@ def _start_job(fn, label):
         _JOB_SEQ[0] += 1
         jid = "job-%d" % _JOB_SEQ[0]
         _JOBS[jid] = {"status": "running", "label": label, "result": None, "error": None}
+        if before_start is not None:
+            before_start(jid)
 
     def _run():
         try:
@@ -1328,14 +1335,19 @@ def _start_job(fn, label):
                 job = _JOBS.get(jid)
                 if job is not None:
                     job.update(status="error", error=str(e))
+        finally:
+            if on_complete is not None:
+                on_complete(jid)
     try:
         threading.Thread(target=_run, daemon=True).start()
     except Exception:
         with _JOBS_LOCK:
             _JOBS.pop(jid, None)
+        if on_complete is not None:
+            on_complete(jid)
         raise
     return {"job_id": jid, "status": "running", "label": label,
-            "note": "долгая операция в фоне — опрашивай job_status(job_id), не жди в этом вызове"}
+            "note": _JOB_WAIT_NOTE}
 
 
 def _job_status(job_id):
@@ -1368,8 +1380,40 @@ def _do_ingest(handle, out_path=None):
 
 def _build_advisor(advisor_dir, author=None, run_kernels=True, run_index=True):
     """Советник под ключ (МАНИФЕСТ-ГЕЙТ→corpus→kernels→индекс) — ФОНОВЫЙ ДЖОБ (долго)."""
-    return _start_job(lambda: _do_build(advisor_dir, author, run_kernels, run_index),
-                      "build_advisor:%s" % advisor_dir)
+    advisor_key, _err = _resolve_under_root(advisor_dir)
+
+    with _BUILD_LOCK:
+        existing_id = _BUILD_JOBS.get(advisor_key) if advisor_key else None
+        if existing_id:
+            with _JOBS_LOCK:
+                existing = _JOBS.get(existing_id)
+            if existing and existing["status"] == "running":
+                return {"job_id": existing_id, "status": "running", "label": existing["label"],
+                        "note": _JOB_WAIT_NOTE}
+            _BUILD_JOBS.pop(advisor_key, None)
+
+        if not _BUILD_EXECUTION_SEMAPHORE.acquire(blocking=False):
+            return {"error": "слишком много одновременно выполняющихся сборок; дождись job_status"}
+
+        def _reserved(jid):
+            if advisor_key:
+                _BUILD_JOBS[advisor_key] = jid
+
+        def _completed(jid):
+            with _BUILD_LOCK:
+                if advisor_key and _BUILD_JOBS.get(advisor_key) == jid:
+                    _BUILD_JOBS.pop(advisor_key, None)
+                _BUILD_EXECUTION_SEMAPHORE.release()
+
+        started = _start_job(
+            lambda: _do_build(advisor_dir, author, run_kernels, run_index),
+            "build_advisor:%s" % advisor_dir,
+            before_start=_reserved,
+            on_complete=_completed,
+        )
+        if "job_id" not in started:
+            _BUILD_EXECUTION_SEMAPHORE.release()
+        return started
 
 
 def _seed_council():

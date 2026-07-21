@@ -1379,7 +1379,7 @@ def _seed_council():
 
 def _ingest_telegram(handle, out_path=None):
     """Канал → корпус Принцепса — ФОНОВЫЙ ДЖОБ (сеть)."""
-    return _start_job(lambda: _do_ingest(handle, out_path), "ingest_telegram:%s" % handle)
+    return _start_job(lambda: _do_ingest(handle, out_path), "ingest_telegram")
 
 
 def _setup_full(consent=True):

@@ -687,3 +687,47 @@ class TestJudgeCircuitBreaker:
         assert relevance_judge._consec_fail == 0
         assert relevance_judge.judge("after-recovery", "p") == 3
         assert calls.count("success") == 2
+
+    def test_normal_success_does_not_discard_prior_inflight_failures(self, monkeypatch):
+        """Успех в закрытом breaker не меняет поколение: три старых сбоя всё ещё открывают его."""
+        failures_started = threading.Event()
+        release_failures = threading.Event()
+        calls_lock = threading.Lock()
+        failure_calls = []
+        outcomes = []
+
+        def controlled_generate(prompt, *args, **kwargs):
+            if "prior-failure" in prompt:
+                with calls_lock:
+                    failure_calls.append(1)
+                    if len(failure_calls) == relevance_judge._CB_FAILS:
+                        failures_started.set()
+                assert release_failures.wait(timeout=1)
+                raise RuntimeError("prior failure")
+            if "ordinary-success" in prompt:
+                return "3"
+            raise AssertionError("open breaker must not call generate")
+
+        def run_failure():
+            with pytest.raises(RuntimeError, match="prior failure"):
+                relevance_judge.judge("prior-failure", "p")
+            outcomes.append("raised")
+
+        monkeypatch.setattr(llm_local, "generate", controlled_generate)
+        workers = [threading.Thread(target=run_failure)
+                   for _ in range(relevance_judge._CB_FAILS)]
+        for worker in workers:
+            worker.start()
+        assert failures_started.wait(timeout=1)
+
+        assert relevance_judge.judge("ordinary-success", "p") == 3
+        generation_after_success = relevance_judge._cb_generation
+
+        release_failures.set()
+        for worker in workers:
+            worker.join(timeout=1)
+
+        assert generation_after_success == 0
+        assert outcomes == ["raised"] * relevance_judge._CB_FAILS
+        assert relevance_judge._consec_fail == relevance_judge._CB_FAILS
+        assert relevance_judge.judge("must-be-blocked", "p") == 0

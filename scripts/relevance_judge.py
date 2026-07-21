@@ -178,10 +178,13 @@ def judge(query: str, passage: str, model=None, source=None) -> int:
         raise                                # прежний fail-closed путь: гейт withhold'ит
     with _CB_LOCK:
         if request_generation == _cb_generation:
-            _consec_fail = 0
-            _cb_open_until = 0.0
-            _cb_half_open = False
-            _cb_generation += 1
+            if half_open_probe:
+                _consec_fail = 0
+                _cb_open_until = 0.0
+                _cb_half_open = False
+                _cb_generation += 1
+            else:
+                _consec_fail = 0
     m = re.match(r"^\s*([0-3])\s*$", response.strip())
     if m:                                # строгий одиночный ответ по промпту
         return int(m.group(1))

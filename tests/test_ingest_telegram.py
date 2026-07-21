@@ -2,6 +2,7 @@
 import os, sys, json, tempfile
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "scripts"))
+import ingest_telegram
 from ingest_telegram import parse_telegram_html, posts_to_records, write_corpus
 
 MOCK = """
@@ -41,3 +42,43 @@ def test_write_corpus_roundtrip():
 
 def test_empty_html_yields_nothing():
     assert parse_telegram_html("<html><body>no messages</body></html>") == []
+
+
+def test_ingest_canonicalizes_handle_before_fetch_and_corpus_metadata(monkeypatch):
+    """CR/LF из входного handle не доходит ни до URL-fetch, ни до source в JSONL."""
+    seen = []
+
+    def fake_fetch(handle):
+        seen.append(handle)
+        return MOCK
+
+    monkeypatch.setattr(ingest_telegram, "_fetch_channel_html_canonical", fake_fetch)
+    with tempfile.TemporaryDirectory() as t:
+        out = os.path.join(t, "telegram.jsonl")
+        result = ingest_telegram.ingest("@my_channel\r\nforged: metadata", out)
+        records = [json.loads(line) for line in open(out, encoding="utf-8")]
+
+    canonical = "my_channelforgedmetadata"
+    assert seen == [canonical]
+    assert result["handle"] == canonical
+    assert {record["source"] for record in records} == {f"telegram:{canonical}"}
+    assert all("\r" not in record["source"] and "\n" not in record["source"]
+               for record in records)
+
+
+def test_ingest_canonicalizes_handle_once(monkeypatch):
+    """Один канонический handle переиспользуется и для fetch, и для corpus."""
+    original = ingest_telegram._safe_handle
+    calls = []
+
+    def tracking_safe_handle(handle):
+        calls.append(handle)
+        return original(handle)
+
+    import collect_common
+    monkeypatch.setattr(ingest_telegram, "_safe_handle", tracking_safe_handle)
+    monkeypatch.setattr(collect_common, "fetch", lambda *args, **kwargs: MOCK)
+    with tempfile.TemporaryDirectory() as t:
+        ingest_telegram.ingest("@my_channel", os.path.join(t, "telegram.jsonl"))
+
+    assert calls == ["@my_channel"]

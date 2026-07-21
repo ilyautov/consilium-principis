@@ -59,19 +59,25 @@ def _safe_handle(handle):
     return h[:64]
 
 
+def _fetch_channel_html_canonical(canonical_handle, timeout=20):
+    """Скачать preview уже канонического публичного Telegram handle."""
+    from collect_common import fetch as _cc_fetch
+    return _cc_fetch(f"https://t.me/s/{canonical_handle}", timeout=timeout)
+
+
 def fetch_channel_html(handle, timeout=20):
     """Скачать web-превью публичного канала через collect_common.fetch — тот же SSRF-гард
     (схема/публичный IP/ре-валидация редиректов), что у add_source. Сеть нужна (sandbox может
     блокировать — тогда агент отдаёт HTML через WebFetch в parse_telegram_html напрямую)."""
-    from collect_common import fetch as _cc_fetch
-    return _cc_fetch(f"https://t.me/s/{_safe_handle(handle)}", timeout=timeout)
+    return _fetch_channel_html_canonical(_safe_handle(handle), timeout=timeout)
 
 
 def ingest(handle, out_path=None):
     out_path = out_path or os.path.join("principis_corpus", "telegram.jsonl")
-    posts = parse_telegram_html(fetch_channel_html(handle))
-    n = write_corpus(posts_to_records(posts, handle), out_path)
-    return {"handle": handle.lstrip("@"), "posts": len(posts), "out": out_path, "written": n}
+    canonical_handle = _safe_handle(handle)
+    posts = parse_telegram_html(_fetch_channel_html_canonical(canonical_handle))
+    n = write_corpus(posts_to_records(posts, canonical_handle), out_path)
+    return {"handle": canonical_handle, "posts": len(posts), "out": out_path, "written": n}
 
 
 if __name__ == "__main__":

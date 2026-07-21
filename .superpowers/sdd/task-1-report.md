@@ -34,3 +34,24 @@ The temporary loopback `OLLAMA_HOST` makes the host-judge suite use its intended
 - Reject oversized/non-string retrieve and cite queries before retrieval; cite rejects lists over eight before iterating them and retains the normal empty-cite response fields on invalid input.
 - Validated federation session/task/worker/token/model IDs and role arrays before backend access.
 - Changed the federation expansion budget to bytes and counted all per-replica stored identifiers, including the session ID and question.
+
+## Review follow-up — malformed input
+
+RED (before review fix):
+
+```text
+pytest -q tests/test_federation_mcp.py::test_federation_rejects_lone_utf16_surrogate_before_backend tests/test_federation_mcp.py::test_federation_open_falls_back_for_infinite_default_replicas
+```
+
+Result: `2 failed in 0.16s`: a lone `"\\ud800"` reached `_fed_backend`, and `int(float("inf"))` raised `OverflowError`.
+
+GREEN (after minimal review fix):
+
+```text
+pytest -q tests/test_federation_mcp.py::test_federation_rejects_lone_utf16_surrogate_before_backend tests/test_federation_mcp.py::test_federation_open_falls_back_for_infinite_default_replicas
+```
+
+Result: `2 passed in 0.09s`.
+
+- The common validator rejects UTF-16 surrogate code points before backend calls or UTF-8 encoding can occur.
+- Infinite `replicas_default` now follows the existing malformed-value fallback to `3`.

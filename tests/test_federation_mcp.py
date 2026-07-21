@@ -165,6 +165,28 @@ def test_federation_expanded_budget_counts_replicated_session_identifier(monkeyp
     assert calls == []
 
 
+def test_federation_rejects_lone_utf16_surrogate_before_backend(monkeypatch):
+    """Недопустимый Unicode не доходит до SQLite и не даёт UnicodeEncodeError."""
+    monkeypatch.setattr(m, "_fed_backend",
+                        lambda: (_ for _ in ()).throw(AssertionError("surrogate reached backend")))
+
+    result = m.dispatch("federation_poll", {"session_id": "\ud800"})
+    assert "error" in result
+
+
+def test_federation_open_falls_back_for_infinite_default_replicas(monkeypatch):
+    """JSON 1e999 приводит к float('inf'); default должен безопасно стать 3."""
+    seen = {}
+    monkeypatch.setattr(m, "_fed_backend", lambda: object())
+    monkeypatch.setattr(m, "_fed_open",
+                        lambda backend, session_id, plan, replicas_default:
+                        seen.update(replicas_default=replicas_default) or {"ok": True})
+    item = {"role": "role", "advisor_dir": "advisors/a", "question": "Q"}
+
+    assert m._federation_open("session", [item], replicas_default=float("inf")) == {"ok": True}
+    assert seen["replicas_default"] == 3
+
+
 def test_federation_full_cycle_open_claim_submit_poll_assemble(tmp_path, monkeypatch):
     """Сквозной e2e на ЖИВОМ sqlite-бэкенде: _root → tmp (стейт пишется в tmp/.consilium/),
     _FED_BACKEND сброшен → _fed_backend() сам строит SqliteBackend, как в проде. Верность

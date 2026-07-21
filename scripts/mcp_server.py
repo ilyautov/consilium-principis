@@ -290,10 +290,12 @@ _MAX_CITE_QUERIES = 8
 
 
 def _utf8_byte_len(value):
-    """Размер UTF-8 без создания временного bytes-объекта размером с недоверенный input."""
+    """Размер UTF-8 без временного bytes-объекта; lone surrogate → None."""
     size = 0
     for char in value:
         codepoint = ord(char)
+        if 0xd800 <= codepoint <= 0xdfff:
+            return None
         size += 1 if codepoint <= 0x7f else 2 if codepoint <= 0x7ff else 3 if codepoint <= 0xffff else 4
     return size
 
@@ -302,7 +304,10 @@ def _validate_bounded_string(value, field, max_bytes):
     """Вернуть ошибку для нестрокового/слишком большого UTF-8 поля, иначе None."""
     if not isinstance(value, str):
         return "%s должен быть строкой" % field
-    if _utf8_byte_len(value) > max_bytes:
+    byte_len = _utf8_byte_len(value)
+    if byte_len is None:
+        return "%s содержит недопустимый UTF-16 surrogate" % field
+    if byte_len > max_bytes:
         return "%s превышает лимит %d байт UTF-8" % (field, max_bytes)
     return None
 
@@ -1491,7 +1496,7 @@ def _federation_open(session_id, plan, replicas_default=3):
         return {"error": "plan должен быть непустым списком ≤ %d ролей" % _FED_MAX_PLAN}
     try:
         replicas_default = int(replicas_default)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         replicas_default = 3
     replicas_default = max(1, min(replicas_default, _FED_MAX_REPLICAS))
     # DoS-кап (M2): per-item replicas — тот же вектор, что и replicas_default:

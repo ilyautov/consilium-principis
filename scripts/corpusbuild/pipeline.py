@@ -1,5 +1,6 @@
 """Оркестратор сборки: ingest → clean → chunk по всем источникам → build/corpus.jsonl + lock."""
 import os, json
+from file_atomic import atomic_write_text
 from . import ingest, clean, chunk as chunkmod, buildlock, paths
 
 SUPPORTED = (".txt", ".md", ".pdf", ".epub")
@@ -25,11 +26,9 @@ def build(advisor_dir: str, config=None, built_at: str = "unknown"):
         else:
             tagged = clean.tag_regions(recs, fn, advisor_dir)
         all_chunks.extend(chunkmod.chunk_records(tagged, fn, chunk_cfg))
-    os.makedirs(paths.build_dir(advisor_dir), exist_ok=True)
     out = os.path.join(paths.build_dir(advisor_dir), "corpus.jsonl")  # пишем ВСЕГДА в build/
-    with open(out, "w", encoding="utf-8") as f:
-        for c in all_chunks:
-            f.write(json.dumps(c, ensure_ascii=False) + "\n")
+    corpus = "".join(json.dumps(c, ensure_ascii=False) + "\n" for c in all_chunks)
+    atomic_write_text(out, corpus)
     buildlock.write_lock(advisor_dir, config, all_chunks, built_at)
     _invalidate_semantic_index(advisor_dir)              # корпус уехал → старый .npy устарел
     return all_chunks  # corpus_path() теперь автоматически отдаёт build/corpus.jsonl

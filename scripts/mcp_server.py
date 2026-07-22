@@ -915,64 +915,69 @@ def _add_source(advisor_dir, url=None, text=None, path=None, basename=None,
     bf = back_from or report["signals"]["back_from"]
     effective = ("tier" if report["has_apparatus"] else "raw") if mode == "auto" else mode
 
+    from corpusbuild.pipeline import source_snapshot_lock
     landed_name = basename or hint
-    if effective == "clean":                          # пишем ЧИСТЫЙ файл + прячем сырой backup
-        cleaned = ap.clean(raw, fu, bf)
-        src_dir = os.path.join(d, "sources")
-        slug = cc.slugify(landed_name) or "src"       # имена консистентны с land_to_sources
-        # сырой backup → sources/originals/<slug>.txt: pipeline.build делает плоский listdir по
-        # расширениям, подкаталог 'originals' пропускается → сырьё НЕ ингестится (иначе тир-A мусор),
-        # но реверс может его прочитать. land_to_sources сюда не зовём (он форсит sources/*.txt).
-        orig_dir = os.path.join(src_dir, "originals")
-        os.makedirs(orig_dir, exist_ok=True)
-        number = 1
-        while True:
-            suffix = "" if number == 1 else "-%d" % number
-            raw_name = slug + suffix + ".txt"
-            fn = slug + suffix + ".clean.txt"
-            raw_path = os.path.join(orig_dir, raw_name)
-            clean_path = os.path.join(src_dir, fn)
-            try:
-                raw_file = open(raw_path, "x", encoding="utf-8")
-            except FileExistsError:
-                number += 1
-                continue
-            try:
-                clean_file = open(clean_path, "x", encoding="utf-8")
-            except FileExistsError:
-                raw_file.close()
-                os.unlink(raw_path)
-                number += 1
-                continue
-            break
-        with raw_file:
-            raw_file.write(raw.strip() + "\n")
-        # провенанс сырья — теми же ключами, что land_to_sources пишет в _provenance.jsonl
-        # (clean пишет файлы напрямую, иначе url/license фетча потерялись бы)
-        with open(os.path.join(src_dir, "_provenance.jsonl"), "a", encoding="utf-8") as _f:
-            _f.write(json.dumps({"file": "originals/" + raw_name, "url": prov,
-                                 "fetched": cc.today(), "license": lic, "chars": len(raw)},
-                                ensure_ascii=False) + "\n")
-        # .clean.txt пишем напрямую: land_to_sources→slugify стирает точку, имя ломается
-        with clean_file:
-            clean_file.write(cleaned.strip() + "\n")
-        # source_raw — путь ОТНОСИТЕЛЬНО sources/ (реверс резолвит от sources-дира советника)
-        appa = {"mode": "clean", "source_raw": "originals/" + raw_name}
-    else:
-        src_path = cc.land_to_sources(d, landed_name, raw, url=prov, license_note=lic)
-        fn = os.path.basename(src_path)
-        if effective == "tier":
-            appa = {"mode": "tier", "inline_commentary": report["inline_commentary"] or "bracket",
-                    "front_until": fu, "back_from": bf,
-                    "front_confident": report["signals"]["front_confident"],
-                    "back_confident": report["signals"]["back_confident"]}
+    # One transaction covers every mutation: corpus source, raw backup, provenance and the
+    # manifest RMW. A concurrent build therefore sees either the old complete set or new complete set.
+    with source_snapshot_lock(d):
+        if effective == "clean":                      # пишем ЧИСТЫЙ файл + прячем сырой backup
+            cleaned = ap.clean(raw, fu, bf)
+            src_dir = os.path.join(d, "sources")
+            slug = cc.slugify(landed_name) or "src"   # имена консистентны с land_to_sources
+            # сырой backup → sources/originals/<slug>.txt: pipeline.build делает плоский listdir по
+            # расширениям, подкаталог 'originals' пропускается → сырьё НЕ ингестится (иначе тир-A мусор),
+            # но реверс может его прочитать. land_to_sources сюда не зовём (он форсит sources/*.txt).
+            orig_dir = os.path.join(src_dir, "originals")
+            os.makedirs(orig_dir, exist_ok=True)
+            number = 1
+            while True:
+                suffix = "" if number == 1 else "-%d" % number
+                raw_name = slug + suffix + ".txt"
+                fn = slug + suffix + ".clean.txt"
+                raw_path = os.path.join(orig_dir, raw_name)
+                clean_path = os.path.join(src_dir, fn)
+                try:
+                    raw_file = open(raw_path, "x", encoding="utf-8")
+                except FileExistsError:
+                    number += 1
+                    continue
+                try:
+                    clean_file = open(clean_path, "x", encoding="utf-8")
+                except FileExistsError:
+                    raw_file.close()
+                    os.unlink(raw_path)
+                    number += 1
+                    continue
+                break
+            with raw_file:
+                raw_file.write(raw.strip() + "\n")
+            # провенанс сырья — теми же ключами, что land_to_sources пишет в _provenance.jsonl
+            # (clean пишет файлы напрямую, иначе url/license фетча потерялись бы)
+            with open(os.path.join(src_dir, "_provenance.jsonl"), "a", encoding="utf-8") as _f:
+                _f.write(json.dumps({"file": "originals/" + raw_name, "url": prov,
+                                     "fetched": cc.today(), "license": lic, "chars": len(raw)},
+                                    ensure_ascii=False) + "\n")
+            # .clean.txt пишем напрямую: land_to_sources→slugify стирает точку, имя ломается
+            with clean_file:
+                clean_file.write(cleaned.strip() + "\n")
+            # source_raw — путь ОТНОСИТЕЛЬНО sources/ (реверс резолвит от sources-дира советника)
+            appa = {"mode": "clean", "source_raw": "originals/" + raw_name}
         else:
-            appa = {"mode": "raw"}
+            src_path = cc.land_to_sources(d, landed_name, raw, url=prov, license_note=lic,
+                                          source_lock_held=True)
+            fn = os.path.basename(src_path)
+            if effective == "tier":
+                appa = {"mode": "tier", "inline_commentary": report["inline_commentary"] or "bracket",
+                        "front_until": fu, "back_from": bf,
+                        "front_confident": report["signals"]["front_confident"],
+                        "back_confident": report["signals"]["back_confident"]}
+            else:
+                appa = {"mode": "raw"}
 
-    man_p = os.path.join(d, "sources", "manifest.json")
-    man = _load_json(man_p, {})
-    man[fn] = {"tier": tier, "apparatus": appa}
-    atomic_write_json(man_p, man, ensure_ascii=False, indent=2)
+        man_p = os.path.join(d, "sources", "manifest.json")
+        man = _load_json(man_p, {})
+        man[fn] = {"tier": tier, "apparatus": appa}
+        atomic_write_json(man_p, man, ensure_ascii=False, indent=2)
 
     out = {"ok": True, "advisor_dir": d, "source_file": fn, "tier": tier,
            "mode": effective, "chars": len(raw),

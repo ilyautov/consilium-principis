@@ -270,6 +270,64 @@ def test_windows_junction_fallback_publishes_two_generations_and_retrieves(tmp_p
     assert tier_full.retrieve("counsel", str(advisor))
 
 
+@pytest.mark.parametrize("mode", ["raw", "tier", "clean"])
+def test_add_source_mutation_and_build_observe_one_source_manifest_snapshot(tmp_path, monkeypatch, mode):
+    import mcp_server
+
+    advisor = _advisor(tmp_path)
+    json.dump({"book.txt": {"tier": "P1", "apparatus": {"mode": "raw"}}},
+              open(advisor / "sources" / "manifest.json", "w", encoding="utf-8"))
+    manifest_read = threading.Event()
+    release_manifest = threading.Event()
+    add_result = []
+    add_errors = []
+    build_errors = []
+    build_done = threading.Event()
+    original_load = mcp_server._load_json
+
+    def block_manifest(path, default):
+        if path.endswith("manifest.json"):
+            manifest_read.set()
+            assert release_manifest.wait(timeout=5)
+        return original_load(path, default)
+
+    monkeypatch.setattr(mcp_server, "_load_json", block_manifest)
+    monkeypatch.setattr(mcp_server, "_resolve_under_root", lambda value: (str(advisor), None))
+
+    def add():
+        try:
+            add_result.append(mcp_server._add_source(str(advisor), text="New attributed source. " * 40,
+                                                      basename="new", tier="P1", mode=mode))
+        except BaseException as exc:
+            add_errors.append(exc)
+
+    adder = threading.Thread(target=add)
+    adder.start()
+    assert manifest_read.wait(timeout=5)
+    builder = threading.Thread(target=lambda: _run(
+        lambda: (pipeline.build(str(advisor), built_at="concurrent"), build_done.set()), build_errors))
+    builder.start()
+    try:
+        assert not build_done.wait(timeout=0.2)
+    finally:
+        release_manifest.set()
+    adder.join(timeout=5)
+    builder.join(timeout=5)
+    assert not adder.is_alive() and not builder.is_alive()
+    assert add_errors == [] and build_errors == []
+    assert add_result and add_result[0]["ok"] is True
+
+    source_file = add_result[0]["source_file"]
+    manifest = json.load(open(advisor / "sources" / "manifest.json", encoding="utf-8"))
+    lock = json.load(open(os.path.join(paths.build_dir(str(advisor)), "build.lock.json"), encoding="utf-8"))
+    corpus = [json.loads(line) for line in open(paths.corpus_path(str(advisor)), encoding="utf-8")]
+    corpus_sources = {name for name in lock["sources"]
+                      if os.path.splitext(name)[1].lower() in pipeline.SUPPORTED}
+    assert corpus_sources == set(manifest) == {"book.txt", source_file}
+    assert {chunk["source"] for chunk in corpus} == corpus_sources
+    assert {chunk["tier"] for chunk in corpus if chunk["source"] == source_file} == {"P1"}
+
+
 def _run(operation, errors):
     try:
         operation()

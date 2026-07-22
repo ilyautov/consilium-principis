@@ -10,6 +10,7 @@ safe_expr). Ноль LLM, ноль сети.
 import json
 import os
 import re
+import stat
 import sys
 
 import pytest
@@ -208,6 +209,12 @@ def test_save_decision_map_writes_artifact(board_root):
     assert doc["calculation"]["predicted"]
     assert doc["calculation"]["result"]["p_best"]
     assert doc["calculation"]["seed"] == 2026 and doc["calculation"]["n"] == 200
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX permission bits are unavailable on Windows")
+def test_save_decision_map_artifact_is_private(board_root):
+    result = dispatch("save_decision_map", {"map": _valid_map(), "slug": "private-map", "n": 20})
+    assert stat.S_IMODE((board_root / result["path"]).stat().st_mode) == 0o600
 
 
 def test_save_returns_journal_line_for_43_record(board_root):

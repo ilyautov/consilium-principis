@@ -85,6 +85,13 @@ def _file_lock(destination, private=False):
             os.close(fd)
 
 
+@contextmanager
+def exclusive_file_lock(path, *, private=False):
+    """Hold a cross-process advisory lock for a caller-defined state namespace."""
+    with _file_lock(Path(path), private=private):
+        yield
+
+
 def _atomic_write_text_unlocked(destination, text, *, encoding, private):
     fd, temporary = tempfile.mkstemp(
         prefix=f".{destination.name}.", suffix=".tmp", dir=destination.parent
@@ -126,12 +133,14 @@ def atomic_write_json(
 
 
 def atomic_update_json(
-    path, update, *, default=None, ensure_ascii=False, indent=2, sort_keys=False, private=False
+    path, update, *, default=None, ensure_ascii=False, indent=2, sort_keys=False, private=False,
+    recover_invalid=False,
 ):
     """Lock, read, transform, and atomically replace one JSON document.
 
     ``update`` receives the current decoded object and returns the replacement.  Invalid
-    existing JSON is deliberately not replaced: callers retain the last recoverable state.
+    existing JSON is deliberately not replaced unless ``recover_invalid`` opts in to the
+    historical fallback behavior of a particular caller.
     """
     destination = Path(path)
     with _file_lock(destination, private=private):
@@ -139,6 +148,10 @@ def atomic_update_json(
             with open(destination, encoding="utf-8") as handle:
                 current = json.load(handle)
         except FileNotFoundError:
+            current = default
+        except json.JSONDecodeError:
+            if not recover_invalid:
+                raise
             current = default
         replacement = update(current)
         text = json.dumps(

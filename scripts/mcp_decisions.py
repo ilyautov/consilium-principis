@@ -21,7 +21,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from file_atomic import atomic_update_json, atomic_write_json
+from file_atomic import atomic_update_json, atomic_write_json, exclusive_file_lock
 
 
 # ── Шаренные гарды mcp_server: ленивые делегаты (НЕ копии — единая реализация там) ──
@@ -201,17 +201,18 @@ def _save_decision_map(map, slug=None, seed=_CALC_SEED_DEFAULT, n=None):
         return {"error": str(e)}
     day = time.strftime("%Y-%m-%d")
     base = os.path.join(_DECISIONS_DIR, "%s-%s" % (day, s))
-    p, err = _unique_path_under_root(base, ".json")   # write-side traversal-гард (пояс+подтяжки)
-    if err:
-        return err
     predicted = _decision_predicted(map, res)
-    rel = os.path.relpath(p, os.path.realpath(_root())).replace(os.sep, "/")
-    atomic_write_json(
-        p, {"kind": "decision_map", "saved": day, "map": map,
-            "calculation": {"seed": seed, "n": n_eff,
-                            "predicted": predicted, "result": res}},
-        ensure_ascii=False, indent=2, private=True,
-    )
+    with exclusive_file_lock(os.path.join(_root(), _DECISIONS_DIR, ".allocation"), private=True):
+        p, err = _unique_path_under_root(base, ".json")  # selection and publication are one critical section
+        if err:
+            return err
+        rel = os.path.relpath(p, os.path.realpath(_root())).replace(os.sep, "/")
+        atomic_write_json(
+            p, {"kind": "decision_map", "saved": day, "map": map,
+                "calculation": {"seed": seed, "n": n_eff,
+                                "predicted": predicted, "result": res}},
+            ensure_ascii=False, indent=2, private=True,
+        )
     return {"ok": True, "path": rel, "predicted": predicted,
             "journal_line": "- Прогноз: 📐 %s (карта: %s)" % (predicted, rel),
             "note": ("Карта сохранена (этот тул зовут ТОЛЬКО с согласия юзера). journal_line — "
@@ -333,12 +334,12 @@ def _save_decision_card(map, chosen_option, slug=None, seed=_CALC_SEED_DEFAULT, 
         s = re.sub(r"[^a-z0-9]+", "-", str(map.get("question") or "").lower()).strip("-")[:40] \
             or "decision"
     base = os.path.join(_DECISIONS_DIR, "%s-%s" % (created, s))
-    p, err = _unique_path_under_root(base, ".card.json")    # write-side traversal-гард (§7)
-    if err:
-        return err
-
-    rel = os.path.relpath(p, os.path.realpath(_root())).replace(os.sep, "/")
-    atomic_write_json(p, card, ensure_ascii=False, indent=2, private=True)
+    with exclusive_file_lock(os.path.join(_root(), _DECISIONS_DIR, ".allocation"), private=True):
+        p, err = _unique_path_under_root(base, ".card.json")  # selection and publication are one critical section
+        if err:
+            return err
+        rel = os.path.relpath(p, os.path.realpath(_root())).replace(os.sep, "/")
+        atomic_write_json(p, card, ensure_ascii=False, indent=2, private=True)
     predicted = _decision_predicted(map, res)
     journal_line = ("- Прогноз: 📐 %s (карта: %s) <!-- card: %s -->"
                     % (predicted, map_path or rel, card["id"]))
@@ -427,17 +428,18 @@ def _write_consult(record):
     коллизия→суффикс. → {ok, path} | {error}."""
     day = record.get("created") or time.strftime("%Y-%m-%d")
     base = os.path.join(_CONSULTS_DIR, "%s-%s" % (day, _consult_slug(record.get("question"))))
-    p, err = _resolve_under_root(base + ".consult.json")
-    if err:
-        return err
-    i = 1
-    while os.path.exists(p):
-        i += 1
-        p, err = _resolve_under_root("%s-%d.consult.json" % (base, i))
+    with exclusive_file_lock(os.path.join(_root(), _CONSULTS_DIR, ".allocation"), private=True):
+        p, err = _resolve_under_root(base + ".consult.json")
         if err:
             return err
-    rel = os.path.relpath(p, os.path.realpath(_root())).replace(os.sep, "/")
-    atomic_write_json(p, record, ensure_ascii=False, indent=2, private=True)
+        i = 1
+        while os.path.exists(p):
+            i += 1
+            p, err = _resolve_under_root("%s-%d.consult.json" % (base, i))
+            if err:
+                return err
+        rel = os.path.relpath(p, os.path.realpath(_root())).replace(os.sep, "/")
+        atomic_write_json(p, record, ensure_ascii=False, indent=2, private=True)
     return {"ok": True, "path": rel}
 
 

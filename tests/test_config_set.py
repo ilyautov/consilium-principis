@@ -33,6 +33,16 @@ def test_valid_abstain_threshold_writes(_root_in_tmp):
     assert on_disk["abstain_threshold"] == 0.5
 
 
+def test_config_set_recovers_from_malformed_json(_root_in_tmp):
+    p = _cfg_path(_root_in_tmp)
+    p.write_text("{broken", encoding="utf-8")
+
+    result = dispatch("config_set", {"key": "retrieval_mode", "value": "hybrid"})
+
+    assert result["old"] is None and result["new"] == "hybrid"
+    assert json.loads(p.read_text(encoding="utf-8")) == {"retrieval_mode": "hybrid"}
+
+
 @pytest.mark.skipif(os.name == "nt", reason="POSIX permission bits are unavailable on Windows")
 def test_config_file_is_private(_root_in_tmp):
     dispatch("config_set", {"key": "abstain_threshold", "value": 0.5})

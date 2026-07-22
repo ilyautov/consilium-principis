@@ -235,7 +235,6 @@ def land_to_sources(advisor_dir, basename, text, *, url, license_note, extra_met
     Возвращает путь. sources/ — gitignored (чужие тексты в историю не уходят)."""
     src_dir = os.path.join(advisor_dir, "sources")
     os.makedirs(src_dir, exist_ok=True)
-    path = os.path.join(src_dir, f"{slugify(basename)}.txt")
     header = [
         f"# SOURCE: {url}",
         f"# FETCHED: {today()}",
@@ -245,8 +244,17 @@ def land_to_sources(advisor_dir, basename, text, *, url, license_note, extra_met
         for k, v in extra_meta.items():
             header.append(f"# {k.upper()}: {v}")
     header.append("# " + "-" * 60)
-    with open(path, "w", encoding="utf-8") as f:
-        f.write("\n".join(header) + "\n" + text.strip() + "\n")
+    stem = slugify(basename)
+    number = 1
+    while True:
+        name = f"{stem}.txt" if number == 1 else f"{stem}-{number}.txt"
+        path = os.path.join(src_dir, name)
+        try:
+            with open(path, "x", encoding="utf-8") as f:
+                f.write("\n".join(header) + "\n" + text.strip() + "\n")
+            break
+        except FileExistsError:
+            number += 1
     # сайдкар-манифест провенанса (для аудита; sources/ всё равно gitignored)
     man = os.path.join(src_dir, "_provenance.jsonl")
     with open(man, "a", encoding="utf-8") as f:

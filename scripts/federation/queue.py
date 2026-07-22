@@ -82,18 +82,34 @@ DEFAULT_LEASE_S = 300.0
 
 class SqliteBackend(QueueBackend):
     def __init__(self, db_path):
-        self.db_path = db_path
-        d = os.path.dirname(db_path)
-        if d:
-            os.makedirs(d, exist_ok=True)
+        self.db_path = os.path.abspath(db_path)
+        d = os.path.dirname(self.db_path)
+        os.makedirs(d, mode=0o700, exist_ok=True)
+        self._tighten_parent_mode(d)
         with self._conn() as c:
             c.executescript(_SCHEMA)
+        self._tighten_file_modes()
+
+    @staticmethod
+    def _tighten_parent_mode(path):
+        if os.name == "posix":
+            os.chmod(path, 0o700)
+
+    def _tighten_file_modes(self):
+        if os.name != "posix":
+            return
+        for path in (self.db_path, self.db_path + "-wal", self.db_path + "-shm"):
+            try:
+                os.chmod(path, 0o600)
+            except FileNotFoundError:
+                pass
 
     def _conn(self):
         c = sqlite3.connect(self.db_path, timeout=5.0)
         c.row_factory = sqlite3.Row
         c.execute("PRAGMA journal_mode=WAL")
         c.execute("PRAGMA busy_timeout=5000")
+        self._tighten_file_modes()
         return c
 
     def enqueue(self, task):

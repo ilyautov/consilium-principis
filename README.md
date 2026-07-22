@@ -170,16 +170,19 @@ cd ~/consilium-principis && python3 install.py
 
 Prefer buttons or a terminal? See [`QUICKSTART.md`](QUICKSTART.md): a click-to-install ([`install.command`](install.command) / `.bat`) and the manual path.
 
-**Cowork / Claude Desktop / any MCP host:** connect it as an MCP server and get the whole cycle
-(build, sessions, widgets) via tools, without leaving your agent. See [`CONNECT-MCP.md`](CONNECT-MCP.md)
-(`python3 scripts/board.py mcp-config` fills in the path for you).
+**Claude Desktop or another MCP host:** the server exposes its cycle (build, sessions, widgets) as
+tools. Host compatibility varies; see the tested-status table in
+[`docs/CONNECT-HOSTS.md`](docs/CONNECT-HOSTS.md), then generate the portable configuration from the checkout with
+`python3 scripts/board.py mcp-config --json`.
 
 **All you need:** Python 3.10+. For smart cross-language search, optionally
 [ollama](https://ollama.com) with `bge-m3` (the board will walk you through setting it up). The contour works without it too.
 
 ### Windows
 
-The double-click installer ([`install.bat`](install.bat)) and the mcpb bundle both work out of the box — they launch through the `py` Python Launcher. Two Windows-specific things worth knowing:
+Windows is not yet an end-to-end tested support target. `install.bat` and the mcpb bundle contain a
+Windows launcher path, but please treat it as experimental and report the result through
+[Support](SUPPORT.md). Two Windows-specific things worth knowing:
 
 - **In a terminal, use `py install.py`** (not `python3 install.py`). The python.org installer ships `py.exe` and `python.exe`, but no `python3.exe`; the `python3.exe` you may see under the Microsoft Store is an App Execution Alias stub that just opens the Store instead of running.
 - **Plugin can't find Python?** Set `CONSILIUM_PYTHON=py` in your environment before launching Claude Code. The plugin's server command defaults to `python3` and honors this override. (The Claude Desktop path needs nothing — `board.py mcp-config` writes the exact interpreter for you.)
@@ -198,10 +201,10 @@ from materials you bring yourself.
 
 ## How it's built
 
-Under the hood is corpus search with three modes (from plain Python to semantic) and graceful
-degradation. The protective contour is a separate layer on top: it checks every quote against its
-source and doesn't depend on which search mode is active. So honesty is the same on any machine.
-Details in [`SKILL.md`](SKILL.md) and [`docs/`](docs/superpowers/specs/).
+Search has two support tiers: **SIMPLE** is the standard-library lexical floor; **FULL** adds
+Ollama with `bge-m3` for semantic cross-language search. **Hybrid** retrieval is opt-in, not a
+third support tier. The protective contour is separate: it checks every quote against its source
+regardless of the selected tier. Details in [`SKILL.md`](SKILL.md) and [`docs/`](docs/superpowers/specs/).
 
 ## Technical design
 
@@ -245,7 +248,9 @@ PRs are welcome, but two rules are non-negotiable: **only public-domain texts** 
 material, not even excerpts) and **never weaken the fail-closed contour** (🔵 only via code
 verification). How to set up, run the offline suite, and open a PR is in [`CONTRIBUTING.md`](CONTRIBUTING.md).
 Found a way to bypass the fidelity contour or a data leak? That's a first-class vulnerability,
-report it privately via [`SECURITY.md`](SECURITY.md). Change history is in [`CHANGELOG.md`](CHANGELOG.md).
+report it privately via [`SECURITY.md`](SECURITY.md). Support and project governance are in
+[`SUPPORT.md`](SUPPORT.md) and [`GOVERNANCE.md`](GOVERNANCE.md); change history is in
+[`CHANGELOG.md`](CHANGELOG.md).
 
 ---
 

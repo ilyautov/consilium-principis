@@ -5,9 +5,9 @@
 | Хост | Способ | Что получаешь |
 |---|---|---|
 | **Claude Code** | навык (`python3 install.py`) | хост сам гоняет скрипты; скажи «с чего начать» |
-| **Cowork / Claude Desktop / любой MCP-хост** | MCP-сервер (ниже) | весь цикл как тулы, **не выходя из агента** |
+| **Claude Desktop / другой MCP-хост** | MCP-сервер (ниже) | MCP-интерфейс; совместимость зависит от хоста |
 
-Через MCP доступен **полный жизненный цикл без терминала**: `doctor` (готовность машины),
+MCP-сервер предоставляет интерфейс жизненного цикла: `doctor` (готовность машины),
 `seed_council` (стартовый совет), `build_advisor` (советник под ключ), `ingest_telegram`
 (корпус Принцепса), `setup_full` (FULL-тир), `render_session`/`list_recipes` (виджеты для Cowork),
 контур-тулы (`fidelity_check`/`cite`/`gate_verdict`/`retrieve`, двухфазный судья-гейт цитат),
@@ -16,7 +16,7 @@ decision-calc (`validate_decision_map`/`run_calculation`/`save_decision_map`, т
 общественного достояния (`catalog_list`/`catalog_search`/`catalog_preview`/`catalog_add`), ситуационная
 карта (`capture_situation`/`situation_analyze`/`situation_stress_test`), выходы заседания
 (`decision_record`/`proof_card`/`quote_of_day`/`export_session`), само-документация (`explain_self`)
-плюс тулы линз и жизненного цикла (`build_lens`/`add_source`/`config_*`/`ollama_*`). **Всего 60 тулов.**
+плюс тулы линз и жизненного цикла (`build_lens`/`add_source`/`config_*`/`ollama_*`). Состав MCP-интерфейса развивается; смотри живой список через `tools/list` или `explain_self`. Проверенный статус отдельных хостов — в [`docs/CONNECT-HOSTS.md`](docs/CONNECT-HOSTS.md).
 
 ## Подключение за 3 шага (Claude Desktop / Cowork)
 
@@ -59,8 +59,9 @@ python3 ~/consilium-principis/scripts/board.py mcp-install
 
 **Готовый конфиг-сниппет** (путь подставится сам):
 ```bash
-python3 ~/consilium-principis/scripts/board.py mcp-config        # гайд под все хосты
-python3 ~/consilium-principis/scripts/board.py mcp-config --json # только JSON-сниппет
+cd ~/consilium-principis
+python3 scripts/board.py mcp-config        # гайд под все хосты
+python3 scripts/board.py mcp-config --json # только JSON-сниппет
 ```
 Вид сниппета (см. `mcp.example.json`):
 ```json
@@ -111,3 +112,4 @@ python3 ~/consilium-principis/scripts/board.py mcp-config --json # только 
 - **FULL-тир** (семантика) опционально: `ollama` + `bge-m3`; подними тулом `setup_full`
   (системный `ollama` он не ставит молча, вернёт инструкцию под твою ОС). Без него мягкая
   деградация до SIMPLE; **контур честен на любом тире**.
+- **Hybrid**-ретрив доступен только по opt-in; это не отдельный тир поддержки.

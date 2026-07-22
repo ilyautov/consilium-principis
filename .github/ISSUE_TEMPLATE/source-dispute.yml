@@ -1,0 +1,42 @@
+name: Source or marker dispute
+description: Challenge an advisor attribution, quote, provenance, or marker.
+title: "source: "
+body:
+  - type: markdown
+    attributes:
+      value: Do not upload copyrighted or private corpus material. Security exposures belong in SECURITY.md.
+  - type: input
+    id: advisor_source
+    attributes:
+      label: Advisor and source
+      description: Name the advisor and identify the public or lawful source at issue.
+    validations:
+      required: true
+  - type: textarea
+    id: exact_quote
+    attributes:
+      label: Exact quote or output
+      description: Include only the minimal excerpt needed to identify the claim.
+    validations:
+      required: true
+  - type: input
+    id: claimed_marker
+    attributes:
+      label: Claimed marker
+      description: For example, the displayed 🔵, 🟢, or 🟡 marker.
+    validations:
+      required: true
+  - type: input
+    id: expected_marker
+    attributes:
+      label: Expected marker
+      description: State the marker you believe is correct and why.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproducible command or session
+      description: Provide a command or minimal host session that another maintainer can run.
+    validations:
+      required: true

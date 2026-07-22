@@ -52,26 +52,43 @@ def do_seed(root=None):
 def do_ingest(handle, out_path=None, root=None, resolve_under_root=None):
     """Публичный Telegram-канал → корпус Принцепса. H1-кламп — на host-фронте (с резолвером)."""
     from ingest_telegram import ingest
+    op, error = prepare_ingest_destination(out_path=out_path, root=root,
+                                            resolve_under_root=resolve_under_root)
+    if error:
+        return error
+    return ingest(handle, op)
+
+
+def prepare_ingest_destination(out_path=None, root=None, resolve_under_root=None):
+    """Выбрать безопасный новый файл Telegram-корпуса без перезаписи существующего."""
     root = root or project_root()
     if out_path:
         if resolve_under_root is not None:
             op, err = resolve_under_root(out_path)       # write-side traversal-гард
             if err:
-                return err
+                return None, err
             # H1: запись — ТОЛЬКО файл прямо в principis_corpus/ и ТОЛЬКО новый. Иначе
             # out_path=".env" молча уничтожал секреты, а out_path="scripts/mcp_server.py"
             # перезаписывал код сервера (RCE при рестарте) — гард был шире угрозы.
             corpus_dir = os.path.realpath(os.path.join(root, "principis_corpus"))
             if os.path.dirname(op) != corpus_dir:
-                return {"error": "out_path должен быть новым файлом прямо в principis_corpus/ "
-                                 "(запись в код, конфиги и секреты запрещена)."}
+                return None, {"error": "out_path должен быть новым файлом прямо в principis_corpus/ "
+                                        "(запись в код, конфиги и секреты запрещена)."}
             if os.path.exists(op):
-                return {"error": "файл уже существует — перезапись запрещена: %s" % op}
+                return None, {"error": "файл уже существует — перезапись запрещена: %s" % op}
         else:
             op = out_path                                # CLI: путь от локального юзера
     else:
-        op = os.path.join(root, "principis_corpus", "telegram.jsonl")
-    return ingest(handle, op)
+        corpus_dir = os.path.join(root, "principis_corpus")
+        os.makedirs(corpus_dir, exist_ok=True)
+        number = 1
+        while True:
+            name = "telegram.jsonl" if number == 1 else "telegram-%d.jsonl" % number
+            op = os.path.join(corpus_dir, name)
+            if not os.path.exists(op):
+                break
+            number += 1
+    return op, None
 
 
 def setup_full(consent=True):

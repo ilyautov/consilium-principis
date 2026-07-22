@@ -2,10 +2,15 @@
 .env*
 !.env.example
 *.log
+# ИЗОЛИРОВАННЫЕ РАНТАЙМ-РАБОЧИЕ ДЕРЕВЬЯ И ОТЧЁТЫ
+.superpowers/
+.worktrees/
 # КОПИРАЙТНЫЕ ИСХОДНИКИ И СОБРАННЫЕ КОРПУСА
 reference-library-raw/
 reference-library/
 *-raw/
+advisors/*
+!advisors/README.md
 advisors/*/build/
 advisors/*/sources/
 advisors/*/corpus.jsonl

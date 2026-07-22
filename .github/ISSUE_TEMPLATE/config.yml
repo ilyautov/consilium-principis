@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Support and usage help
+    url: https://github.com/ilyautov/consilium-principis/discussions
+    about: Ask installation and usage questions without exposing private data.
+  - name: Security vulnerability or data exposure
+    url: https://github.com/ilyautov/consilium-principis/security/advisories/new
+    about: Report security issues privately; do not create a public issue.

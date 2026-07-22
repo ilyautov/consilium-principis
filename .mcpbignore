@@ -29,11 +29,25 @@ data/embeddings*.npy
 data/embeddings*.meta.json
 scripts/golden/
 mcp.json
+server.json
+.github/
+tests/
+assets/
+docs/dev/
+docs/demo/
+docs/launch/
+docs/research/
+docs/superpowers/
+package.json
+package-lock.json
 # СЛУЖЕБНОЕ
 .git/
 __pycache__/
 *.pyc
 .venv/
 venv/
+node_modules/
+.pytest_cache/
+dist/
 .DS_Store
 tests/fixtures/

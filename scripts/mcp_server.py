@@ -798,7 +798,7 @@ def _config_set(key, value):
         cfg[key] = value
         return cfg
 
-    cfg = atomic_update_json(p, set_config, default={}, private=True)
+    cfg = atomic_update_json(p, set_config, default={}, private=True, recover_invalid=True)
     old = old_value[0]
     out = {"key": key, "old": old, "new": value, "config": cfg}
     return out

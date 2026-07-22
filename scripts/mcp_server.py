@@ -30,6 +30,7 @@ from situation import Move, node, analyze
 from governance import _verify_corpus
 from calibration import calibrate as _calibrate_fn, parse_decision_log
 from corpusbuild.paths import corpus_path, project_root
+from file_atomic import atomic_write_json
 import lifecycle
 # H2 (Task 5.4): decisions-домен (карта/расчёт, Decision Card, петля исхода, calibrated
 # consult) вынесен в mcp_decisions.py. Имена реэкспортируются фасадом — TOOLS-реестр,
@@ -919,15 +920,33 @@ def _add_source(advisor_dir, url=None, text=None, path=None, basename=None,
         cleaned = ap.clean(raw, fu, bf)
         src_dir = os.path.join(d, "sources")
         slug = cc.slugify(landed_name) or "src"       # имена консистентны с land_to_sources
-        raw_name = slug + ".txt"
-        fn = slug + ".clean.txt"
         # сырой backup → sources/originals/<slug>.txt: pipeline.build делает плоский listdir по
         # расширениям, подкаталог 'originals' пропускается → сырьё НЕ ингестится (иначе тир-A мусор),
         # но реверс может его прочитать. land_to_sources сюда не зовём (он форсит sources/*.txt).
         orig_dir = os.path.join(src_dir, "originals")
         os.makedirs(orig_dir, exist_ok=True)
-        with open(os.path.join(orig_dir, raw_name), "w", encoding="utf-8") as _f:
-            _f.write(raw.strip() + "\n")
+        number = 1
+        while True:
+            suffix = "" if number == 1 else "-%d" % number
+            raw_name = slug + suffix + ".txt"
+            fn = slug + suffix + ".clean.txt"
+            raw_path = os.path.join(orig_dir, raw_name)
+            clean_path = os.path.join(src_dir, fn)
+            try:
+                raw_file = open(raw_path, "x", encoding="utf-8")
+            except FileExistsError:
+                number += 1
+                continue
+            try:
+                clean_file = open(clean_path, "x", encoding="utf-8")
+            except FileExistsError:
+                raw_file.close()
+                os.unlink(raw_path)
+                number += 1
+                continue
+            break
+        with raw_file:
+            raw_file.write(raw.strip() + "\n")
         # провенанс сырья — теми же ключами, что land_to_sources пишет в _provenance.jsonl
         # (clean пишет файлы напрямую, иначе url/license фетча потерялись бы)
         with open(os.path.join(src_dir, "_provenance.jsonl"), "a", encoding="utf-8") as _f:
@@ -935,8 +954,8 @@ def _add_source(advisor_dir, url=None, text=None, path=None, basename=None,
                                  "fetched": cc.today(), "license": lic, "chars": len(raw)},
                                 ensure_ascii=False) + "\n")
         # .clean.txt пишем напрямую: land_to_sources→slugify стирает точку, имя ломается
-        with open(os.path.join(src_dir, fn), "w", encoding="utf-8") as _f:
-            _f.write(cleaned.strip() + "\n")
+        with clean_file:
+            clean_file.write(cleaned.strip() + "\n")
         # source_raw — путь ОТНОСИТЕЛЬНО sources/ (реверс резолвит от sources-дира советника)
         appa = {"mode": "clean", "source_raw": "originals/" + raw_name}
     else:
@@ -953,8 +972,7 @@ def _add_source(advisor_dir, url=None, text=None, path=None, basename=None,
     man_p = os.path.join(d, "sources", "manifest.json")
     man = _load_json(man_p, {})
     man[fn] = {"tier": tier, "apparatus": appa}
-    with open(man_p, "w", encoding="utf-8") as f:
-        json.dump(man, f, ensure_ascii=False, indent=2)
+    atomic_write_json(man_p, man, ensure_ascii=False, indent=2)
 
     out = {"ok": True, "advisor_dir": d, "source_file": fn, "tier": tier,
            "mode": effective, "chars": len(raw),
@@ -1299,6 +1317,11 @@ _BUILD_EXECUTION_SEMAPHORE = threading.BoundedSemaphore(_MAX_ACTIVE_BUILDS)
 _BUILD_LOCK = threading.RLock()
 _BUILD_JOBS = {}              # canonical advisor_dir -> running job_id (single-flight)
 _JOB_WAIT_NOTE = "долгая операция в фоне — опрашивай job_status(job_id), не жди в этом вызове"
+_MAX_NETWORK_JOBS = 2
+_NETWORK_EXECUTION_SEMAPHORE = threading.BoundedSemaphore(_MAX_NETWORK_JOBS)
+_NETWORK_JOBS_LOCK = threading.RLock()
+_NETWORK_JOBS = {}            # canonical network operation -> running job_id
+_NETWORK_JOB_CAPACITY_ERROR = "too many active network jobs; wait for job_status"
 
 
 def _evict_jobs_over_cap(reserve=0):
@@ -1331,10 +1354,11 @@ def _start_job(fn, label, before_start=None, on_complete=None):
                 if job is not None:
                     job.update(status="done", result=r)
         except Exception as e:
+            print(f"consilium: background job {jid!r} failed: {e!r}", file=sys.stderr)
             with _JOBS_LOCK:
                 job = _JOBS.get(jid)
                 if job is not None:
-                    job.update(status="error", error=str(e))
+                    job.update(status="error", error="job failed; see server stderr")
         finally:
             if on_complete is not None:
                 on_complete(jid)
@@ -1353,7 +1377,50 @@ def _start_job(fn, label, before_start=None, on_complete=None):
 def _job_status(job_id):
     with _JOBS_LOCK:
         j = _JOBS.get(job_id)
-        return dict(j) if j else {"error": "нет такого job_id: %s" % job_id}
+        return _public_job_state(j) if j else {"error": "нет такого job_id"}
+
+
+def _public_job_state(job):
+    """Состояние джобы для MCP: локальные пути не являются публичным контрактом."""
+    def _clean(value):
+        if isinstance(value, str):
+            return "[private path]" if os.path.isabs(value) else value
+        if isinstance(value, dict):
+            return {key: _clean(item) for key, item in value.items()}
+        if isinstance(value, list):
+            return [_clean(item) for item in value]
+        return value
+    return _clean(dict(job))
+
+
+def _start_network_job(operation_key, fn, label):
+    """Запустить ограниченную сетевую операцию с single-flight по каноническому ключу."""
+    with _NETWORK_JOBS_LOCK:
+        existing_id = _NETWORK_JOBS.get(operation_key)
+        if existing_id:
+            with _JOBS_LOCK:
+                existing = _JOBS.get(existing_id)
+            if existing and existing["status"] == "running":
+                return {"job_id": existing_id, "status": "running", "label": existing["label"],
+                        "note": _JOB_WAIT_NOTE}
+            _NETWORK_JOBS.pop(operation_key, None)
+
+        if not _NETWORK_EXECUTION_SEMAPHORE.acquire(blocking=False):
+            return {"error": _NETWORK_JOB_CAPACITY_ERROR}
+
+        def _reserved(jid):
+            _NETWORK_JOBS[operation_key] = jid
+
+        def _completed(jid):
+            with _NETWORK_JOBS_LOCK:
+                if _NETWORK_JOBS.get(operation_key) == jid:
+                    _NETWORK_JOBS.pop(operation_key, None)
+                _NETWORK_EXECUTION_SEMAPHORE.release()
+
+        started = _start_job(fn, label, before_start=_reserved, on_complete=_completed)
+        if "job_id" not in started:
+            _NETWORK_EXECUTION_SEMAPHORE.release()
+        return started
 
 
 def _doctor():
@@ -1407,7 +1474,7 @@ def _build_advisor(advisor_dir, author=None, run_kernels=True, run_index=True):
 
         started = _start_job(
             lambda: _do_build(advisor_dir, author, run_kernels, run_index),
-            "build_advisor:%s" % advisor_dir,
+            "build_advisor",
             before_start=_reserved,
             on_complete=_completed,
         )
@@ -1418,12 +1485,17 @@ def _build_advisor(advisor_dir, author=None, run_kernels=True, run_index=True):
 
 def _seed_council():
     """Стартовый совет PD-мудрецов с нуля — ФОНОВЫЙ ДЖОБ (долго + сеть Gutenberg)."""
-    return _start_job(_do_seed, "seed_council")
+    return _start_network_job("seed", _do_seed, "seed_council")
 
 
 def _ingest_telegram(handle, out_path=None):
     """Канал → корпус Принцепса — ФОНОВЫЙ ДЖОБ (сеть)."""
-    return _start_job(lambda: _do_ingest(handle, out_path), "ingest_telegram")
+    destination, error = lifecycle.prepare_ingest_destination(
+        out_path=out_path, root=_root(), resolve_under_root=_resolve_under_root)
+    if error:
+        return error
+    return _start_network_job("ingest:" + destination,
+                              lambda: _do_ingest(handle, destination), "ingest_telegram")
 
 
 def _setup_full(consent=True):
@@ -2605,7 +2677,11 @@ def _response_language_directive(lang):
 
 def _handle_rpc(msg):
     """JSON-RPC запрос → ответ (или None для нотификаций). Реализует initialize/tools.*"""
+    if not isinstance(msg, dict):
+        return _rpc_error(None, -32600, "Invalid Request")
     method, req_id = msg.get("method"), msg.get("id")
+    if msg.get("jsonrpc") != "2.0" or not isinstance(method, str):
+        return _rpc_error(req_id, -32600, "Invalid Request")
     if method == "initialize":
         # Язык ответа фиксируется конфигом (env), известным серверу ещё до первого вопроса.
         instructions = INSTRUCTIONS + _response_language_directive(os.getenv("CONSILIUM_LANG"))
@@ -2622,14 +2698,17 @@ def _handle_rpc(msg):
             {"name": t["name"], "description": t["description"], "inputSchema": t["input_schema"]}
             for t in list_tools()]})
     if method == "tools/call":
-        params = msg.get("params") or {}
+        params = msg.get("params")
+        if (not isinstance(params, dict) or "arguments" not in params
+                or not isinstance(params["arguments"], dict)):
+            return _rpc_error(req_id, -32602, "Invalid params")
         name = params.get("name")
         # Неизвестный тул детектим ЯВНО до вызова — иначе KeyError ВНУТРИ хендлера
         # (напр. неполный session-объект) маскировался бы под «неизвестный тул».
         if name not in TOOLS:
             return _rpc_error(req_id, -32601, f"неизвестный тул: {name!r}")
         try:
-            out = dispatch(name, params.get("arguments") or {})
+            out = dispatch(name, params.get("arguments", {}))
             return _rpc_result(req_id, {
                 "content": [{"type": "text", "text": json.dumps(out, ensure_ascii=False)}]})
         except Exception as e:
@@ -2679,6 +2758,9 @@ def _serve_stdio():
         try:
             msg = json.loads(line)
         except Exception:
+            resp = _rpc_error(None, -32700, "Parse error")
+            sys.stdout.write(json.dumps(resp, ensure_ascii=False) + "\n")
+            sys.stdout.flush()
             continue
         resp = _handle_rpc(msg)
         if resp is not None:

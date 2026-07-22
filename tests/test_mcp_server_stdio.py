@@ -59,15 +59,32 @@ def test_oversized_line_exactly_at_cap_is_processed(monkeypatch):
     assert len(responses) == 1 and responses[0]["id"] == 2 and "result" in responses[0]
 
 
-def test_broken_json_line_is_skipped_and_loop_continues(monkeypatch):
-    """Битая JSON-строка не роняет цикл и не даёт ответа; следующие строки обслуживаются."""
+def test_broken_json_line_returns_parse_error_and_loop_continues(monkeypatch):
+    """Битая JSON-строка даёт JSON-RPC parse error; следующие строки обслуживаются."""
     payload = ("это не json совсем\n"
                "\n"                                        # пустая строка — тоже пропуск
                "{\"jsonrpc\": \"2.0\", \"id\": 5, \n"      # оборванный JSON
                + _req("tools/list", req_id=7) + "\n")
     responses = _run_stdio(monkeypatch, payload)
-    assert len(responses) == 1
-    assert responses[0]["id"] == 7 and "tools" in responses[0]["result"]
+    assert len(responses) == 3
+    assert all(response["error"]["code"] == -32700 for response in responses[:2])
+    assert responses[2]["id"] == 7 and "tools" in responses[2]["result"]
+
+
+def test_stdio_recovers_after_non_object_requests_then_initializes(monkeypatch):
+    """null и массив не роняют поле-доступ и получают Invalid Request."""
+    payload = "null\n[]\n" + _req("initialize", req_id=8) + "\n"
+    responses = _run_stdio(monkeypatch, payload)
+    assert [response["error"]["code"] for response in responses[:2]] == [-32600, -32600]
+    assert responses[2]["result"]["serverInfo"]["name"] == "consilium-principis"
+
+
+def test_tools_call_rejects_non_object_params_and_arguments():
+    """tools/call принимает только JSON-объекты params и arguments."""
+    for params in ([], "bad", 1, {"name": "doctor"}, {"name": "doctor", "arguments": []}):
+        response = M._handle_rpc({"jsonrpc": "2.0", "id": 9,
+                                  "method": "tools/call", "params": params})
+        assert response["error"]["code"] == -32602
 
 
 def test_notification_gets_no_response(monkeypatch):

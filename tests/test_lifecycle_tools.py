@@ -248,6 +248,16 @@ def test_ingest_out_path_existing_file_rejected(tmp_path, monkeypatch):
     assert "error" in out
 
 
+def test_default_ingest_destination_uses_suffix_without_overwriting(tmp_path):
+    """Повторный default ingest выбирает telegram-2.jsonl, а не перезаписывает историю."""
+    import lifecycle
+    corpus = tmp_path / "principis_corpus"
+    corpus.mkdir()
+    (corpus / "telegram.jsonl").write_text("old\n", encoding="utf-8")
+    destination, error = lifecycle.prepare_ingest_destination(root=str(tmp_path))
+    assert error is None and destination == str(corpus / "telegram-2.jsonl")
+
+
 def test_embed_batch_rejects_count_mismatch(monkeypatch):
     pytest.importorskip("numpy")   # H8: tier_full тянет numpy транзитивно → SKIP без numpy
     import tier_full
@@ -331,6 +341,21 @@ def test_add_source_clean_mode_writes_clean_file(tmp_path):
     corpus = [json.loads(l) for l in open(paths.corpus_path(r["advisor_dir"]))]
     assert corpus and all(c["tier"] == "P1" for c in corpus)        # только чистый автор, без A-мусора
     assert not any("Tu Mu" in c["text"] for c in corpus)            # аппарат исчез из корпуса
+
+
+def test_add_source_clean_mode_preserves_colliding_source_pairs(tmp_path):
+    """Два clean-источника с одним basename получают согласованные суффиксы, без перезаписи."""
+    body = "I. LAYING PLANS\nWar is deception.\nAPPENDIX\nx\n"
+    first = dispatch("add_source", {"advisor_dir": "advisors/x-clean-pair", "text": body,
+                                    "basename": "book", "tier": "P1", "mode": "clean",
+                                    "front_until": "I. LAYING PLANS", "back_from": "APPENDIX"})
+    second = dispatch("add_source", {"advisor_dir": "advisors/x-clean-pair", "text": body + "two",
+                                     "basename": "book", "tier": "P1", "mode": "clean",
+                                     "front_until": "I. LAYING PLANS", "back_from": "APPENDIX"})
+    assert [first["source_file"], second["source_file"]] == ["book.clean.txt", "book-2.clean.txt"]
+    sources = os.path.join(first["advisor_dir"], "sources")
+    assert os.path.isfile(os.path.join(sources, "originals", "book.txt"))
+    assert os.path.isfile(os.path.join(sources, "originals", "book-2.txt"))
 
 
 def test_add_source_env_path_rejected(tmp_path, monkeypatch):

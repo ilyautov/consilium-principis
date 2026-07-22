@@ -38,6 +38,65 @@ def clean_jobs():
         M._JOB_SEQ[0] = saved_seq
 
 
+@pytest.fixture
+def clean_network_jobs(monkeypatch):
+    lock = getattr(M, "_NETWORK_JOBS_LOCK", threading.RLock())
+    with lock:
+        jobs = getattr(M, "_NETWORK_JOBS", None)
+        saved = dict(jobs) if jobs is not None else None
+        if jobs is not None:
+            jobs.clear()
+    original = getattr(M, "_NETWORK_EXECUTION_SEMAPHORE", None)
+    yield
+    with lock:
+        if saved is not None:
+            M._NETWORK_JOBS.clear()
+            M._NETWORK_JOBS.update(saved)
+    if original is not None:
+        M._NETWORK_EXECUTION_SEMAPHORE = original
+
+
+def test_duplicate_network_operation_coalesces_to_one_job(clean_jobs, clean_network_jobs, monkeypatch):
+    """Одинаковый канонический ключ не запускает второй сетевой поток."""
+    release = threading.Event()
+    monkeypatch.setattr(M, "_NETWORK_EXECUTION_SEMAPHORE", threading.BoundedSemaphore(1), raising=False)
+    first = M._start_network_job("ingest:/canonical/path", lambda: release.wait(1), "ingest")
+    second = M._start_network_job("ingest:/canonical/path", lambda: None, "ingest")
+    release.set()
+    assert second["job_id"] == first["job_id"]
+
+
+def test_network_job_refuses_full_semaphore_and_releases_after_failure(
+        clean_jobs, clean_network_jobs, monkeypatch):
+    """Лимит не создаёт job, а сбой воркера освобождает слот для следующей операции."""
+    semaphore = threading.BoundedSemaphore(1)
+    monkeypatch.setattr(M, "_NETWORK_EXECUTION_SEMAPHORE", semaphore, raising=False)
+    release = threading.Event()
+    first = M._start_network_job("seed", lambda: release.wait(1), "seed")
+    refused = M._start_network_job("ingest:/elsewhere", lambda: None, "ingest")
+    assert refused == {"error": M._NETWORK_JOB_CAPACITY_ERROR}
+    release.set()
+    assert semaphore.acquire(timeout=1)
+    semaphore.release()
+
+    failed = M._start_network_job("failed", lambda: (_ for _ in ()).throw(RuntimeError("/private/nope")), "x")
+    deadline = time.time() + 1
+    while M._job_status(failed["job_id"])["status"] == "running" and time.time() < deadline:
+        time.sleep(0.01)
+    assert M._job_status(failed["job_id"])["error"] == "job failed; see server stderr"
+    assert semaphore.acquire(timeout=1)
+    semaphore.release()
+
+
+def test_job_status_redacts_absolute_paths_from_results(clean_jobs):
+    """Публичный job_status не раскрывает локальные пути даже из результата воркера."""
+    with M._JOBS_LOCK:
+        M._JOBS["job-private"] = {"status": "done", "label": "x",
+                                  "result": {"out": "/private/data.jsonl"}, "error": None}
+    assert M._job_status("job-private")["result"]["out"] == "[private path]"
+    assert "/private" not in M._job_status("/private/unknown")["error"]
+
+
 def test_jobs_cap_holds_and_keeps_newest(clean_jobs):
     """cap+N вставок терминальных джобов → len ≤ cap, новейший присутствует, старейший вытеснен."""
     cap = M._MAX_JOBS

@@ -67,7 +67,7 @@ def test_job_error_is_captured(monkeypatch):
     while st["status"] == "running" and time.time() < deadline:
         time.sleep(0.02)
         st = dispatch("job_status", {"job_id": jid})
-    assert st["status"] == "error" and "сеть упала" in st["error"]
+    assert st["status"] == "error" and st["error"] == "job failed; see server stderr"
 
 
 def test_ingest_telegram_job_label_and_result_hide_raw_handle(monkeypatch):

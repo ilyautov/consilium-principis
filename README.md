@@ -8,6 +8,10 @@
 
 **You ask one AI, you get one confident answer. Sometimes it's off. And to sound smart, it'll even invent a quote.**
 
+<img src="assets/demo-refusal-en.gif" width="760" alt="Consilium refuses a fabricated quote and confirms a real one word-for-word" />
+
+<sub>Live: a made-up "Aurelius quote" is refused; a real line is confirmed 🔵 word-for-word with its source. The verdict is computed by code on every run, not scripted.</sub>
+
 **A personal board of directors made of great minds, for your decisions.** Several thinkers at one table, each through their own lens: they argue with you and with each other. And unlike "ask an AI to roleplay a sage," they **prove the quote or honestly stay silent**. No fabrication.
 
 Every 🔵 quote is checked by code against the author's genuine text, **word-for-word**. What isn't
@@ -68,11 +72,7 @@ of a great mind."</sub>
 
 <div align="center">
 
-<img src="assets/demo-refusal-en.gif" width="760" alt="Consilium refuses a fabricated quote and confirms a real one word-for-word" />
-
-<sub>A live recording of the fidelity gate: a fabricated "Aurelius quote" is refused, a real line is confirmed 🔵 word-for-word with its source. The 🔵/🟡 verdict is computed by code on every run, not scripted. Public-domain figure (Meditations, public domain).</sub>
-
-<sub>More scenarios (wrong-mouth attribution, Monte Carlo, cross-lingual): **[demo gallery →](docs/demo/gallery.md)**</sub>
+<sub>The refusal + word-for-word verification is in the demo up top. More scenarios — wrong-mouth attribution, Monte Carlo, cross-lingual: **[demo gallery →](docs/demo/gallery.md)**</sub>
 
 </div>
 

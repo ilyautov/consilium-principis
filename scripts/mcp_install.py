@@ -18,6 +18,8 @@ _CONFIG_NAME = "claude_desktop_config.json"
 _SECRET_ARGUMENT = re.compile(
     r"(?:api[_-]?key|token|secret|password|passwd|authorization|credential)", re.IGNORECASE
 )
+_HEADER_OPTIONS = {"-H", "--header"}
+_ENVIRONMENT_OPTIONS = {"-e", "--env"}
 
 
 def config_path(platform=None, home=None, appdata=None):
@@ -110,14 +112,35 @@ def _backup_config(config_file):
 
 
 def _safe_args(args):
-    """Redact values that follow or embed a conventional secret-bearing argument name."""
+    """Redact secret-bearing option, header, and environment values for install records."""
     safe = []
     redact_next = False
+    environment_next = False
     for argument in args:
         text = str(argument)
         if redact_next:
             safe.append("[REDACTED]")
             redact_next = False
+        elif environment_next:
+            name, separator, value = text.partition("=")
+            safe.append(name + "=[REDACTED]" if separator and _SECRET_ARGUMENT.search(name) else text)
+            environment_next = False
+        elif text in _HEADER_OPTIONS:
+            safe.append(text)
+            redact_next = True
+        elif text.startswith("--header="):
+            safe.append("--header=[REDACTED]")
+        elif text.startswith("-H") and len(text) > 2:
+            safe.append("-H[REDACTED]")
+        elif text in _ENVIRONMENT_OPTIONS:
+            safe.append(text)
+            environment_next = True
+        elif text.startswith("--env="):
+            name, separator, value = text[len("--env="):].partition("=")
+            safe.append("--env=" + name + "=[REDACTED]"
+                        if separator and _SECRET_ARGUMENT.search(name) else text)
+        elif _SECRET_ARGUMENT.search(text.split(":", 1)[0]) and ":" in text:
+            safe.append("[REDACTED]")
         elif "=" in text and _SECRET_ARGUMENT.search(text.split("=", 1)[0]):
             safe.append(text.split("=", 1)[0] + "=[REDACTED]")
         else:

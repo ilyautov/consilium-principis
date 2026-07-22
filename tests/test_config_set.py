@@ -7,6 +7,7 @@ M7: abstain_threshold=0 (или ≤0 / ≥1) тихо отключал бы ве
 import os
 import sys
 import json
+import stat
 import pytest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -30,6 +31,31 @@ def test_valid_abstain_threshold_writes(_root_in_tmp):
     assert "error" not in r and r["new"] == 0.5
     on_disk = json.load(open(_cfg_path(_root_in_tmp), encoding="utf-8"))
     assert on_disk["abstain_threshold"] == 0.5
+
+
+def test_config_set_recovers_from_malformed_json(_root_in_tmp):
+    p = _cfg_path(_root_in_tmp)
+    p.write_text("{broken", encoding="utf-8")
+
+    result = dispatch("config_set", {"key": "retrieval_mode", "value": "hybrid"})
+
+    assert result["old"] is None and result["new"] == "hybrid"
+    assert json.loads(p.read_text(encoding="utf-8")) == {"retrieval_mode": "hybrid"}
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX permission bits are unavailable on Windows")
+def test_config_file_is_private(_root_in_tmp):
+    dispatch("config_set", {"key": "abstain_threshold", "value": 0.5})
+    assert stat.S_IMODE(_cfg_path(_root_in_tmp).stat().st_mode) == 0o600
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX permission bits are unavailable on Windows")
+def test_swallow_state_directory_and_log_are_private(_root_in_tmp):
+    result = mcp_server._swallow("test", lambda: (_ for _ in ()).throw(OSError("boom")), None)
+    log = _root_in_tmp / ".consilium" / "swallow.log"
+    assert result is None and log.is_file()
+    assert stat.S_IMODE((_root_in_tmp / ".consilium").stat().st_mode) == 0o700
+    assert stat.S_IMODE(log.stat().st_mode) == 0o600
 
 
 @pytest.mark.parametrize("bad", [0, 1, -0.1, "foo"])

@@ -21,6 +21,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from file_atomic import atomic_update_json, atomic_write_json, exclusive_file_lock
 
 
 # ── Шаренные гарды mcp_server: ленивые делегаты (НЕ копии — единая реализация там) ──
@@ -200,17 +201,18 @@ def _save_decision_map(map, slug=None, seed=_CALC_SEED_DEFAULT, n=None):
         return {"error": str(e)}
     day = time.strftime("%Y-%m-%d")
     base = os.path.join(_DECISIONS_DIR, "%s-%s" % (day, s))
-    p, err = _unique_path_under_root(base, ".json")   # write-side traversal-гард (пояс+подтяжки)
-    if err:
-        return err
     predicted = _decision_predicted(map, res)
-    rel = os.path.relpath(p, os.path.realpath(_root())).replace(os.sep, "/")
-    os.makedirs(os.path.dirname(p), exist_ok=True)
-    with open(p, "w", encoding="utf-8") as f:
-        json.dump({"kind": "decision_map", "saved": day, "map": map,
-                   "calculation": {"seed": seed, "n": n_eff,
-                                   "predicted": predicted, "result": res}},
-                  f, ensure_ascii=False, indent=2)
+    with exclusive_file_lock(os.path.join(_root(), _DECISIONS_DIR, ".allocation"), private=True):
+        p, err = _unique_path_under_root(base, ".json")  # selection and publication are one critical section
+        if err:
+            return err
+        rel = os.path.relpath(p, os.path.realpath(_root())).replace(os.sep, "/")
+        atomic_write_json(
+            p, {"kind": "decision_map", "saved": day, "map": map,
+                "calculation": {"seed": seed, "n": n_eff,
+                                "predicted": predicted, "result": res}},
+            ensure_ascii=False, indent=2, private=True,
+        )
     return {"ok": True, "path": rel, "predicted": predicted,
             "journal_line": "- Прогноз: 📐 %s (карта: %s)" % (predicted, rel),
             "note": ("Карта сохранена (этот тул зовут ТОЛЬКО с согласия юзера). journal_line — "
@@ -332,14 +334,12 @@ def _save_decision_card(map, chosen_option, slug=None, seed=_CALC_SEED_DEFAULT, 
         s = re.sub(r"[^a-z0-9]+", "-", str(map.get("question") or "").lower()).strip("-")[:40] \
             or "decision"
     base = os.path.join(_DECISIONS_DIR, "%s-%s" % (created, s))
-    p, err = _unique_path_under_root(base, ".card.json")    # write-side traversal-гард (§7)
-    if err:
-        return err
-
-    rel = os.path.relpath(p, os.path.realpath(_root())).replace(os.sep, "/")
-    os.makedirs(os.path.dirname(p), exist_ok=True)
-    with open(p, "w", encoding="utf-8") as f:
-        json.dump(card, f, ensure_ascii=False, indent=2)
+    with exclusive_file_lock(os.path.join(_root(), _DECISIONS_DIR, ".allocation"), private=True):
+        p, err = _unique_path_under_root(base, ".card.json")  # selection and publication are one critical section
+        if err:
+            return err
+        rel = os.path.relpath(p, os.path.realpath(_root())).replace(os.sep, "/")
+        atomic_write_json(p, card, ensure_ascii=False, indent=2, private=True)
     predicted = _decision_predicted(map, res)
     journal_line = ("- Прогноз: 📐 %s (карта: %s) <!-- card: %s -->"
                     % (predicted, map_path or rel, card["id"]))
@@ -378,16 +378,11 @@ def _close_decision_card(outcome, card_id=None, path=None):
         return {"error": "Укажи card_id или path закрываемой Card."}
 
     try:
-        with open(target, encoding="utf-8") as f:
-            card = json.load(f)
-    except (OSError, ValueError) as e:
-        return {"error": "Не читается Card: %s" % e}
-    try:
-        closed = dc.close_card(card, outcome)
-    except ValueError as e:
+        closed = atomic_update_json(
+            target, lambda card: dc.close_card(card, outcome), private=True
+        )
+    except (OSError, ValueError, TypeError, AttributeError) as e:
         return {"error": str(e), "hint": _RELAY_AS_QUESTIONS_HINT}
-    with open(target, "w", encoding="utf-8") as f:
-        json.dump(closed, f, ensure_ascii=False, indent=2)
     rel = os.path.relpath(target, os.path.realpath(root)).replace(os.sep, "/")
     return {"ok": True, "path": rel, "card_id": closed.get("id"),
             "note": ("Исход записан числом в Card. Обнови и markdown-запись (глиф ИСХОД ⏳ → "
@@ -433,19 +428,18 @@ def _write_consult(record):
     коллизия→суффикс. → {ok, path} | {error}."""
     day = record.get("created") or time.strftime("%Y-%m-%d")
     base = os.path.join(_CONSULTS_DIR, "%s-%s" % (day, _consult_slug(record.get("question"))))
-    p, err = _resolve_under_root(base + ".consult.json")
-    if err:
-        return err
-    i = 1
-    while os.path.exists(p):
-        i += 1
-        p, err = _resolve_under_root("%s-%d.consult.json" % (base, i))
+    with exclusive_file_lock(os.path.join(_root(), _CONSULTS_DIR, ".allocation"), private=True):
+        p, err = _resolve_under_root(base + ".consult.json")
         if err:
             return err
-    rel = os.path.relpath(p, os.path.realpath(_root())).replace(os.sep, "/")
-    os.makedirs(os.path.dirname(p), exist_ok=True)
-    with open(p, "w", encoding="utf-8") as f:
-        json.dump(record, f, ensure_ascii=False, indent=2)
+        i = 1
+        while os.path.exists(p):
+            i += 1
+            p, err = _resolve_under_root("%s-%d.consult.json" % (base, i))
+            if err:
+                return err
+        rel = os.path.relpath(p, os.path.realpath(_root())).replace(os.sep, "/")
+        atomic_write_json(p, record, ensure_ascii=False, indent=2, private=True)
     return {"ok": True, "path": rel}
 
 
@@ -506,13 +500,17 @@ def _close_consult_tool(consult_id, posterior_call, posterior_confidence,
         return {"error": "Не нашёл консульт с id %s в consults/ — сначала "
                          "calibrated_consult_open." % consult_id}
     try:
-        closed = ccm.close_consult(rec, posterior_call, posterior_confidence,
-                                   posterior_abstain=posterior_abstain,
-                                   followed_council=followed_council, prediction=prediction)
-    except ValueError as e:
+        closed = atomic_update_json(
+            path,
+            lambda current: ccm.close_consult(
+                current, posterior_call, posterior_confidence,
+                posterior_abstain=posterior_abstain,
+                followed_council=followed_council, prediction=prediction,
+            ),
+            private=True,
+        )
+    except (OSError, ValueError, TypeError, AttributeError) as e:
         return {"error": str(e), "hint": _CONSULT_RELAY_HINT}
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(closed, f, ensure_ascii=False, indent=2)
     m = closed["mirror"]
     return {"ok": True, "mirror": m,
             "note": ("Зеркало: сдвиг позиции=%s, Δуверенности=%+.2f, «не знаю» подавлено=%s. "
@@ -531,11 +529,11 @@ def _resolve_consult_tool(consult_id, outcome):
     if rec is None:
         return {"error": "Не нашёл консульт с id %s в consults/." % consult_id}
     try:
-        resolved = ccm.resolve_consult(rec, outcome)
-    except ValueError as e:
+        resolved = atomic_update_json(
+            path, lambda current: ccm.resolve_consult(current, outcome), private=True
+        )
+    except (OSError, ValueError, TypeError, AttributeError) as e:
         return {"error": str(e), "hint": _CONSULT_RELAY_HINT}
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(resolved, f, ensure_ascii=False, indent=2)
     return {"ok": True, "consult_id": consult_id,
             "note": "Исход записан. Сводку оси оверрелайанса смотри calibrated_consult_journal."}
 

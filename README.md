@@ -186,6 +186,7 @@ Windows launcher path, but please treat it as experimental and report the result
 
 - **In a terminal, use `py install.py`** (not `python3 install.py`). The python.org installer ships `py.exe` and `python.exe`, but no `python3.exe`; the `python3.exe` you may see under the Microsoft Store is an App Execution Alias stub that just opens the Store instead of running.
 - **Plugin can't find Python?** Set `CONSILIUM_PYTHON=py` in your environment before launching Claude Code. The plugin's server command defaults to `python3` and honors this override. (The Claude Desktop path needs nothing — `board.py mcp-config` writes the exact interpreter for you.)
+- **MCP configuration:** run `py -3 scripts/board.py mcp-config --json` (or `py -3 scripts/board.py mcp-install` for Claude Desktop). If `py` is absent, use `python` only after confirming it is Python 3.10+; do not use the Store `python3` alias. See [`CONNECT-MCP.md`](CONNECT-MCP.md) for the exact fallback.
 
 ## Your board, your call
 

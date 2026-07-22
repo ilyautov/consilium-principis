@@ -6,10 +6,10 @@ on:
       - "v*"
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  release:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -21,6 +21,19 @@ jobs:
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.12"
+      - name: Install hash-locked test dependencies
+        run: python -m pip install --require-hashes -r requirements/ci.txt
+      - name: Firewall guard (secrets and forbidden tracked files)
+        run: sh scripts/firewall_check.sh
+      - name: Repository and plugin consistency
+        run: python -m pytest tests/test_plugin_manifests.py -q
+      - name: Compile tracked Python scripts
+        run: git ls-files '*.py' | xargs -r python -m py_compile
+      - name: Run offline test suite
+        env:
+          HEPHAESTUS_ENGINE: /nonexistent
+          OLLAMA_HOST: http://127.0.0.1:59999
+        run: python -m pytest tests/ -q
       - name: Install locked MCPB packager
         run: npm ci
       - name: Validate MCPB manifest
@@ -30,6 +43,42 @@ jobs:
           mkdir -p dist
           npx mcpb pack . dist/consilium-principis.mcpb
           unzip -Z1 dist/consilium-principis.mcpb | python3 scripts/ci_bundle_guard.py -
+      - name: Smoke-test packed MCP server
+        run: |
+          python3 - dist/consilium-principis.mcpb <<'PY'
+          import json
+          import subprocess
+          import sys
+          import tempfile
+          import zipfile
+          from pathlib import Path
+
+          artifact = Path(sys.argv[1])
+          with tempfile.TemporaryDirectory(prefix="consilium-mcpb-") as directory:
+              root = Path(directory)
+              with zipfile.ZipFile(artifact) as archive:
+                  archive.extractall(root)
+              process = subprocess.Popen(
+                  [sys.executable, str(root / "scripts" / "mcp_server.py")],
+                  stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+              )
+              requests = [
+                  {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}},
+                  {"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}},
+              ]
+              stdout, stderr = process.communicate(
+                  "\n".join(json.dumps(request) for request in requests) + "\n", timeout=30
+              )
+              if process.returncode:
+                  raise SystemExit(f"packed MCP server failed: {stderr}")
+              responses = [json.loads(line) for line in stdout.splitlines() if line.strip()]
+              if len(responses) != 2 or responses[0].get("id") != 1 or responses[1].get("id") != 2:
+                  raise SystemExit(f"unexpected MCP responses: {stdout}")
+              if responses[0].get("result", {}).get("serverInfo", {}).get("name") != "consilium-principis":
+                  raise SystemExit("packed MCP initialize response is invalid")
+              if not isinstance(responses[1].get("result", {}).get("tools"), list):
+                  raise SystemExit("packed MCP tools/list response is invalid")
+          PY
       - name: Build hash-complete registry manifest
         run: |
           python3 - "$GITHUB_REF_NAME" <<'PY'
@@ -51,6 +100,26 @@ jobs:
             --tag "$GITHUB_REF_NAME" \
             --artifact dist/consilium-principis.mcpb \
             --registry-manifest dist/server.json
+      - name: Upload validated release assets
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-assets
+          path: |
+            dist/consilium-principis.mcpb
+            dist/server.json
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download validated release assets
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: release-assets
+          path: dist
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}

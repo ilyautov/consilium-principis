@@ -1,5 +1,6 @@
 """Оркестратор сборки: публикует corpus/lock как одну читательскую генерацию."""
-import os, json, shutil, tempfile, uuid
+import contextlib
+import os, json, shutil, subprocess, tempfile, time, uuid
 from file_atomic import atomic_write_text
 from . import ingest, clean, chunk as chunkmod, buildlock, paths
 
@@ -14,10 +15,42 @@ def _generations_dir(advisor_dir: str) -> str:
     return os.path.join(advisor_dir, ".corpus-generations")
 
 
+@contextlib.contextmanager
+def publisher_lock(advisor_dir: str):
+    """Cross-process exclusive lock covering staging and the pointer publication."""
+    root = _generations_dir(advisor_dir)
+    os.makedirs(root, exist_ok=True)
+    path = os.path.join(root, ".publisher.lock")
+    with open(path, "a+b") as handle:
+        handle.write(b"0")
+        handle.flush()
+        if os.name == "nt":
+            import msvcrt
+            while True:
+                try:
+                    handle.seek(0)
+                    msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)
+                    break
+                except OSError:
+                    time.sleep(0.05)
+            try:
+                yield
+            finally:
+                handle.seek(0)
+                msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
 def active_generation_dir(advisor_dir: str):
     """The completed directory selected by the single backward-compatible build pointer."""
     build = paths.build_dir(advisor_dir)
-    if not os.path.islink(build):
+    if not os.path.isdir(build):
         return None
     target = os.path.realpath(build)
     return target if os.path.isfile(os.path.join(target, ".generation.json")) else None
@@ -46,6 +79,24 @@ def discard_staging(stage: str) -> None:
     shutil.rmtree(stage, ignore_errors=True)
 
 
+def _make_directory_pointer(target: str, pointer: str, *, platform_name=None) -> None:
+    """Create a directory pointer, falling back to a Windows junction without symlink rights."""
+    platform_name = platform_name or os.name
+    try:
+        relative_target = os.path.relpath(target, os.path.dirname(pointer))
+        if platform_name == "nt":
+            os.symlink(relative_target, pointer, target_is_directory=True)
+        else:
+            os.symlink(relative_target, pointer)
+    except (OSError, NotImplementedError):
+        if platform_name != "nt":
+            raise
+        # Junctions support normal ``build/corpus.jsonl`` paths and don't require the
+        # SeCreateSymbolicLinkPrivilege granted to symlink creation on many Windows hosts.
+        subprocess.run(["cmd", "/c", "mklink", "/J", pointer, target],
+                       check=True, capture_output=True, text=True)
+
+
 def publish_generation(advisor_dir: str, stage: str, expected_token) -> str:
     """Switch the one ``build`` pointer only after every staged artifact succeeded."""
     if _active_token(advisor_dir) != expected_token:
@@ -59,7 +110,7 @@ def publish_generation(advisor_dir: str, stage: str, expected_token) -> str:
     pointer = os.path.join(advisor_dir, ".build-pointer-" + uuid.uuid4().hex)
     legacy = None
     try:
-        os.symlink(os.path.relpath(final, advisor_dir), pointer)
+        _make_directory_pointer(final, pointer)
         if os.path.isdir(build) and not os.path.islink(build):
             legacy = os.path.join(root, "legacy-" + uuid.uuid4().hex)
             os.replace(build, legacy)
@@ -95,22 +146,23 @@ def build(advisor_dir: str, config=None, built_at: str = "unknown"):
             tagged = clean.tag_regions(recs, fn, advisor_dir)
         all_chunks.extend(chunkmod.chunk_records(tagged, fn, chunk_cfg))
     corpus = "".join(json.dumps(c, ensure_ascii=False) + "\n" for c in all_chunks)
-    stage, token = stage_generation(advisor_dir)
-    try:
-        atomic_write_text(os.path.join(stage, "corpus.jsonl"), corpus)
-        buildlock.write_lock(advisor_dir, config, all_chunks, built_at,
-                             output_path=os.path.join(stage, "build.lock.json"),
-                             register_head=False)
-        for name in ("embeddings.npy", "embeddings.meta.json"):
-            stale = os.path.join(stage, name)
-            if os.path.isfile(stale):
-                os.remove(stale)
-        publish_generation(advisor_dir, stage, token)
-    except BaseException:
-        discard_staging(stage)
-        raise
-    from governance import register_head
-    register_head(advisor_dir, buildlock._gov_head(all_chunks), n=len(all_chunks))
+    with publisher_lock(advisor_dir):
+        stage, token = stage_generation(advisor_dir)
+        try:
+            atomic_write_text(os.path.join(stage, "corpus.jsonl"), corpus)
+            buildlock.write_lock(advisor_dir, config, all_chunks, built_at,
+                                 output_path=os.path.join(stage, "build.lock.json"),
+                                 register_head=False)
+            for name in ("embeddings.npy", "embeddings.meta.json"):
+                stale = os.path.join(stage, name)
+                if os.path.isfile(stale):
+                    os.remove(stale)
+            publish_generation(advisor_dir, stage, token)
+            from governance import register_head
+            register_head(advisor_dir, buildlock._gov_head(all_chunks), n=len(all_chunks))
+        except BaseException:
+            discard_staging(stage)
+            raise
     _invalidate_semantic_index(advisor_dir)
     return all_chunks  # corpus_path() теперь автоматически отдаёт build/corpus.jsonl
 

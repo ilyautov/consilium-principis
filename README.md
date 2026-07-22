@@ -209,6 +209,36 @@ The full technical manual (what this is, architecture, tool/rule reference, how 
 in [`docs/MANUAL.md`](docs/MANUAL.md). It's generated from code (`scripts/gen_selfdoc.py` →
 `scripts/build_manual.py`); at runtime the same information is available via the MCP tool `explain_self`.
 
+## FAQ
+
+**What is Consilium Principis?**
+Consilium Principis is an open-source AI advisory board — a skill for Claude Code and an MCP server —
+that convenes a panel of AI personas of real thinkers (Sun Tzu, Marcus Aurelius, Machiavelli,
+Epictetus, and any you add) to reason through a decision. Its distinguishing feature is a fidelity
+contour: every verbatim quote is verified against the author's genuine text, or the advisor abstains.
+
+**How does it verify quotes?**
+Each 🔵 quote is checked by code against the author's public-domain corpus, word-for-word. If a claim
+isn't found in the source text, the advisor does not present it as a quote — it stays silent
+(fail-closed) rather than inventing one. You re-verify it, not take it on faith.
+
+**How is this different from asking an AI to roleplay a sage?**
+A roleplay chatbot will happily fabricate a plausible-sounding quote. Consilium either proves the
+quote against the real text or declines to attribute it. Disagreement between advisors is a feature,
+not a bug: each speaks through a different lens.
+
+**Does it need an API key or extra payment?**
+No. It runs on the AI agent you already have (Claude Code). The verification contour needs no network;
+full offline operation is available only if you add local models.
+
+**Which thinkers are included, and can I add my own?**
+Public-domain figures (the Stoics, Sun Tzu, Machiavelli) are assembled from their own texts with one
+phrase. You can add any advisor yourself from public-domain or your own legal materials, which stay on
+your machine — the repository ships only the machinery, never copyrighted sources.
+
+**Is it free and open-source?**
+Yes. It is MIT-licensed and open-source. Install with `/plugin marketplace add ilyautov/consilium-principis`.
+
 ## Contributing and security
 
 PRs are welcome, but two rules are non-negotiable: **only public-domain texts** (no copyrighted

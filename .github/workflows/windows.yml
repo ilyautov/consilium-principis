@@ -25,9 +25,11 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install test runner
-        run: python -m pip install --disable-pip-version-check pytest==8.3.4
+        run: python -m pip install --disable-pip-version-check pytest==8.3.4 numpy==2.2.3
       - name: Run installer and stdio tests offline
         run: python -m pytest tests/test_mcp_install.py tests/test_install.py tests/test_mcp_server_stdio.py -q
+      - name: Exercise generation publication through the NTFS junction fallback
+        run: python -m pytest tests/test_generation_publication.py::test_windows_junction_fallback_publishes_two_generations_and_retrieves -q
       - name: Smoke-test the Windows launcher
         shell: cmd
         run: install.bat --print

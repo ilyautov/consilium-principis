@@ -230,11 +230,8 @@ def slugify(s):
     return re.sub(r"[\s_-]+", "-", s).strip("-")[:60] or "source"
 
 
-def land_to_sources(advisor_dir, basename, text, *, url, license_note, extra_meta=None):
-    """Пишет текст в advisors/{name}/sources/{basename}.txt с provenance-заголовком.
-    Возвращает путь. sources/ — gitignored (чужие тексты в историю не уходят)."""
-    src_dir = os.path.join(advisor_dir, "sources")
-    os.makedirs(src_dir, exist_ok=True)
+def _land_to_sources_unlocked(advisor_dir, basename, text, *, url, license_note, extra_meta=None):
+    """Write one source and provenance sidecar while the caller owns the source lock."""
     header = [
         f"# SOURCE: {url}",
         f"# FETCHED: {today()}",
@@ -244,6 +241,8 @@ def land_to_sources(advisor_dir, basename, text, *, url, license_note, extra_met
         for k, v in extra_meta.items():
             header.append(f"# {k.upper()}: {v}")
     header.append("# " + "-" * 60)
+    src_dir = os.path.join(advisor_dir, "sources")
+    os.makedirs(src_dir, exist_ok=True)
     stem = slugify(basename)
     number = 1
     while True:
@@ -264,6 +263,18 @@ def land_to_sources(advisor_dir, basename, text, *, url, license_note, extra_met
             rec.update(extra_meta)
         f.write(json.dumps(rec, ensure_ascii=False) + "\n")
     return path
+
+
+def land_to_sources(advisor_dir, basename, text, *, url, license_note, extra_meta=None,
+                    source_lock_held=False):
+    """Write a source and provenance record, optionally under an already-held source lock."""
+    if source_lock_held:
+        return _land_to_sources_unlocked(advisor_dir, basename, text, url=url,
+                                         license_note=license_note, extra_meta=extra_meta)
+    from corpusbuild.pipeline import source_snapshot_lock
+    with source_snapshot_lock(advisor_dir):
+        return _land_to_sources_unlocked(advisor_dir, basename, text, url=url,
+                                         license_note=license_note, extra_meta=extra_meta)
 
 
 def require_advisor_dir(advisor_dir):

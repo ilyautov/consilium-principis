@@ -152,6 +152,30 @@ def test_successful_install_writes_secret_free_record(tmp_path):
     assert "very-secret" not in text
 
 
+def test_install_record_redacts_header_and_environment_secret_forms(tmp_path):
+    cfgf = tmp_path / "Claude" / "claude_desktop_config.json"
+    cfgf.parent.mkdir(parents=True)
+    record = tmp_path / ".consilium" / "last_mcp_install.json"
+    secrets = ("header-secret", "env-secret", "token-secret")
+
+    result = install(
+        str(cfgf),
+        command="py",
+        args=[
+            "s.py", "--verbose", "-H", "Authorization: Bearer header-secret",
+            "--env=API_KEY=env-secret", "--token", "token-secret",
+        ],
+        record_path=str(record),
+        platform="linux",
+    )
+
+    assert result["ok"] is True
+    text = record.read_text(encoding="utf-8")
+    assert all(secret not in text for secret in secrets)
+    saved = json.loads(text)
+    assert saved["args"][:2] == ["s.py", "--verbose"]
+
+
 def test_failed_multi_target_install_does_not_replace_prior_record(tmp_path, monkeypatch):
     first = tmp_path / "classic" / "claude_desktop_config.json"
     second = tmp_path / "store" / "claude_desktop_config.json"

@@ -179,7 +179,7 @@ def cmd_mcp_config(args):
 def cmd_mcp_install(args):
     """Подключить как MCP-сервер скриптом: мердж в claude_desktop_config.json (соседей не трогает),
     с бэкапом. --dry-run — показать без записи; --config <файл> — свой путь."""
-    from mcp_install import install, config_path
+    from mcp_install import install
     cfg = None
     if "--config" in args:
         i = args.index("--config")
@@ -192,11 +192,24 @@ def cmd_mcp_install(args):
         print(f"DRY-RUN (записи нет). Стало бы в {r['path']}:\n\n{r['preview']}")
         print("\nПрименить: убери --dry-run.")
     elif not r["changed"]:
-        print(f"✓ {r['note']} — {r['path']}")
+        paths = r.get("paths") or [r["path"]]
+        if len(paths) == 1:
+            print(f"✓ {r['note']} — {paths[0]}")
+        else:
+            print(f"✓ {r['note']}:")
+            for path in paths:
+                print(f"  {path}")
     else:
-        print(f"✓ подключено → {r['path']}")
-        if r.get("backup"):
-            print(f"  бэкап: {r['backup']}")
+        paths = r.get("paths") or [r["path"]]
+        if len(paths) == 1:
+            print(f"✓ подключено → {paths[0]}")
+        else:
+            print("✓ подключено:")
+            for path in paths:
+                print(f"  {path}")
+        backups = r.get("backups") or ([r["backup"]] if r.get("backup") else [])
+        for backup in backups:
+            print(f"  бэкап: {backup}")
         print(f"  {r['restart']}")
     return 0
 

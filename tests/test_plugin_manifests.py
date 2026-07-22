@@ -1,7 +1,11 @@
 import json
 import re
-import tomllib
 from pathlib import Path
+
+try:
+    import tomllib  # stdlib только с Python 3.11+
+except ModuleNotFoundError:  # 3.10 (заявленный минимум) — фолбэк на regex ниже
+    tomllib = None
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -11,8 +15,15 @@ def _load_json(rel):
 
 
 def _pyproject_version():
-    data = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    return data["project"]["version"]
+    text = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    if tomllib is not None:
+        return tomllib.loads(text)["project"]["version"]
+    # Python 3.10 без tomllib: вытащить version из таблицы [project] точечно.
+    proj = re.search(r"(?ms)^\[project\]\s*(.*?)(?=^\[|\Z)", text)
+    assert proj, "[project] не найден в pyproject.toml"
+    m = re.search(r'(?m)^\s*version\s*=\s*"([^"]+)"', proj.group(1))
+    assert m, "version не найден в таблице [project]"
+    return m.group(1)
 
 
 def _serverinfo_version():

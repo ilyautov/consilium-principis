@@ -208,6 +208,68 @@ def test_snapshot_fingerprint_remains_valid_after_pointer_moves(tmp_path):
     assert tier_full._fingerprint_matches(meta, str(advisor), corpus_file=corpus_file)
 
 
+def test_ingest_waits_for_build_source_snapshot_and_cannot_split_lock_from_corpus(tmp_path, monkeypatch):
+    import collect_common
+
+    advisor = _advisor(tmp_path)
+    started = threading.Event()
+    release = threading.Event()
+    build_errors = []
+    ingest_done = threading.Event()
+    original_extract = pipeline.ingest.extract_source
+
+    def blocked_extract(path):
+        started.set()
+        assert release.wait(timeout=5)
+        return original_extract(path)
+
+    monkeypatch.setattr(pipeline.ingest, "extract_source", blocked_extract)
+    builder = threading.Thread(target=lambda: _run(
+        lambda: pipeline.build(str(advisor), built_at="snapshot"), build_errors))
+    builder.start()
+    assert started.wait(timeout=5)
+
+    def land_source():
+        collect_common.land_to_sources(str(advisor), "added", "Added while build runs.",
+                                      url="https://example.test/added", license_note="test")
+        ingest_done.set()
+
+    ingester = threading.Thread(target=land_source)
+    ingester.start()
+    try:
+        assert not ingest_done.wait(timeout=0.2)
+    finally:
+        release.set()
+    builder.join(timeout=5)
+    ingester.join(timeout=5)
+    assert not builder.is_alive() and not ingester.is_alive()
+    assert build_errors == []
+
+    lock = json.load(open(os.path.join(paths.build_dir(str(advisor)), "build.lock.json"), encoding="utf-8"))
+    corpus = [json.loads(line) for line in open(paths.corpus_path(str(advisor)), encoding="utf-8")]
+    assert set(lock["sources"]) == {"book.txt"}
+    assert {chunk["source"] for chunk in corpus} == {"book.txt"}
+    assert (advisor / "sources" / "added.txt").is_file()
+
+
+@pytest.mark.skipif(os.name != "nt", reason="requires a real NTFS junction")
+def test_windows_junction_fallback_publishes_two_generations_and_retrieves(tmp_path, monkeypatch):
+    advisor = _advisor(tmp_path)
+    monkeypatch.setattr(pipeline.os, "symlink",
+                        lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("no symlink privilege")))
+    monkeypatch.setattr(tier_full, "embed_batch", _fake_embed)
+
+    pipeline.build(str(advisor), built_at="first")
+    (advisor / "sources" / "book.txt").write_text("Second generation counsel. " * 80,
+                                                     encoding="utf-8")
+    pipeline.build(str(advisor), built_at="second")
+
+    assert os.path.isdir(paths.build_dir(str(advisor)))
+    assert not os.path.islink(paths.build_dir(str(advisor)))
+    assert "Second generation" in open(paths.corpus_path(str(advisor)), encoding="utf-8").read()
+    assert tier_full.retrieve("counsel", str(advisor))
+
+
 def _run(operation, errors):
     try:
         operation()

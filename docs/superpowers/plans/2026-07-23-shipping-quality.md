@@ -174,7 +174,8 @@ git commit -m "fix: harden MCP runtime state handling"
 ### Task 3: Make installer and Windows support crash-safe
 
 **Files:**
-- Modify: `scripts/mcp_install.py`, `scripts/board.py`, `install.bat`, `install.sh`, `install.command`, `.github/workflows/ci.yml`
+- Modify: `scripts/mcp_install.py`, `scripts/board.py`, `install.bat`, `install.sh`, `install.command`
+- Create: `.github/workflows/windows.yml`
 - Test: `tests/test_mcp_install.py`, `tests/test_install.py`, `tests/test_mcp_server_stdio.py`
 
 **Consumes:** Task 1 `atomic_write_json`.
@@ -211,7 +212,7 @@ Use `file_atomic.atomic_write_json` after the existing backup. On Windows includ
 
 - [ ] **Step 4: Implement safe launchers and CI smoke coverage.**
 
-Make `install.bat` choose `py -3` then `python` only after `-c "import sys; assert sys.version_info >= (3, 10)"` succeeds; honour `CONSILIUM_NO_PAUSE=1`. Make POSIX launchers provide the same clear Python 3.10+ check. Add a `windows-latest` job running pytest with offline environment plus `install.bat --print`; use pinned action SHAs supplied by Task 4.
+Make `install.bat` choose `py -3` then `python` only after `-c "import sys; assert sys.version_info >= (3, 10)"` succeeds; honour `CONSILIUM_NO_PAUSE=1`. Make POSIX launchers provide the same clear Python 3.10+ check. Create `windows.yml` with a `windows-latest` job running pytest with offline environment plus `install.bat --print`; use full action SHAs. Task 4 remains the sole owner of the existing `ci.yml`.
 
 - [ ] **Step 5: Run GREEN and commit.**
 
@@ -222,7 +223,7 @@ Expected: PASS.
 Commit:
 
 ```bash
-git add scripts/mcp_install.py scripts/board.py install.bat install.sh install.command .github/workflows/ci.yml tests/
+git add scripts/mcp_install.py scripts/board.py install.bat install.sh install.command .github/workflows/windows.yml tests/
 git commit -m "fix: harden MCP installation across platforms"
 ```
 

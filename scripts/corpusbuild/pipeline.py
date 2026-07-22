@@ -16,11 +16,9 @@ def _generations_dir(advisor_dir: str) -> str:
 
 
 @contextlib.contextmanager
-def publisher_lock(advisor_dir: str):
-    """Cross-process exclusive lock covering staging and the pointer publication."""
-    root = _generations_dir(advisor_dir)
-    os.makedirs(root, exist_ok=True)
-    path = os.path.join(root, ".publisher.lock")
+def _exclusive_file_lock(path: str):
+    """Cross-process exclusive advisory lock for one advisor-local coordination file."""
+    os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "a+b") as handle:
         handle.write(b"0")
         handle.flush()
@@ -45,6 +43,20 @@ def publisher_lock(advisor_dir: str):
                 yield
             finally:
                 fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
+@contextlib.contextmanager
+def publisher_lock(advisor_dir: str):
+    """Cross-process exclusive lock covering staging and the pointer publication."""
+    with _exclusive_file_lock(os.path.join(_generations_dir(advisor_dir), ".publisher.lock")):
+        yield
+
+
+@contextlib.contextmanager
+def source_snapshot_lock(advisor_dir: str):
+    """Serialize source ingestion against a build's enumerate/extract/hash snapshot."""
+    with _exclusive_file_lock(os.path.join(_generations_dir(advisor_dir), ".sources.lock")):
+        yield
 
 
 def active_generation_dir(advisor_dir: str):
@@ -135,34 +147,35 @@ def build(advisor_dir: str, config=None, built_at: str = "unknown"):
     config = config or {}
     chunk_cfg = config.get("chunk", {})
     src_dir = os.path.join(advisor_dir, "sources")
-    all_chunks = []
-    for fn in sorted(os.listdir(src_dir)):
-        if os.path.splitext(fn)[1].lower() not in SUPPORTED:
-            continue
-        recs = ingest.extract_source(os.path.join(src_dir, fn))
-        if _is_tier_mode(fn, advisor_dir):           # apparatus tier → секции+инлайн одним проходом
-            tagged = clean.apparatus_tier(recs, fn, advisor_dir)
-        else:
-            tagged = clean.tag_regions(recs, fn, advisor_dir)
-        all_chunks.extend(chunkmod.chunk_records(tagged, fn, chunk_cfg))
-    corpus = "".join(json.dumps(c, ensure_ascii=False) + "\n" for c in all_chunks)
-    with publisher_lock(advisor_dir):
-        stage, token = stage_generation(advisor_dir)
-        try:
-            atomic_write_text(os.path.join(stage, "corpus.jsonl"), corpus)
-            buildlock.write_lock(advisor_dir, config, all_chunks, built_at,
-                                 output_path=os.path.join(stage, "build.lock.json"),
-                                 register_head=False)
-            for name in ("embeddings.npy", "embeddings.meta.json"):
-                stale = os.path.join(stage, name)
-                if os.path.isfile(stale):
-                    os.remove(stale)
-            publish_generation(advisor_dir, stage, token)
-            from governance import register_head
-            register_head(advisor_dir, buildlock._gov_head(all_chunks), n=len(all_chunks))
-        except BaseException:
-            discard_staging(stage)
-            raise
+    with source_snapshot_lock(advisor_dir):
+        all_chunks = []
+        for fn in sorted(os.listdir(src_dir)):
+            if os.path.splitext(fn)[1].lower() not in SUPPORTED:
+                continue
+            recs = ingest.extract_source(os.path.join(src_dir, fn))
+            if _is_tier_mode(fn, advisor_dir):       # apparatus tier → sections+inline in one pass
+                tagged = clean.apparatus_tier(recs, fn, advisor_dir)
+            else:
+                tagged = clean.tag_regions(recs, fn, advisor_dir)
+            all_chunks.extend(chunkmod.chunk_records(tagged, fn, chunk_cfg))
+        corpus = "".join(json.dumps(c, ensure_ascii=False) + "\n" for c in all_chunks)
+        with publisher_lock(advisor_dir):
+            stage, token = stage_generation(advisor_dir)
+            try:
+                atomic_write_text(os.path.join(stage, "corpus.jsonl"), corpus)
+                buildlock.write_lock(advisor_dir, config, all_chunks, built_at,
+                                     output_path=os.path.join(stage, "build.lock.json"),
+                                     register_head=False)
+                for name in ("embeddings.npy", "embeddings.meta.json"):
+                    stale = os.path.join(stage, name)
+                    if os.path.isfile(stale):
+                        os.remove(stale)
+                publish_generation(advisor_dir, stage, token)
+                from governance import register_head
+                register_head(advisor_dir, buildlock._gov_head(all_chunks), n=len(all_chunks))
+            except BaseException:
+                discard_staging(stage)
+                raise
     _invalidate_semantic_index(advisor_dir)
     return all_chunks  # corpus_path() теперь автоматически отдаёт build/corpus.jsonl
 

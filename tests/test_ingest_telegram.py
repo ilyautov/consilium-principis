@@ -40,6 +40,30 @@ def test_write_corpus_roundtrip():
         assert lines[0]["tier"] == "P1" and lines[0]["source"] == "telegram:ch"
 
 
+def test_write_corpus_collision_preserves_existing_file_and_uses_suffix(tmp_path):
+    """The final writer reserves a new filename instead of truncating a raced destination."""
+    out = tmp_path / "telegram.jsonl"
+    out.write_text('{"old": true}\n', encoding="utf-8")
+    recs = posts_to_records(parse_telegram_html(MOCK), "ch")
+    assert write_corpus(recs, str(out)) == 2
+    assert out.read_text(encoding="utf-8") == '{"old": true}\n'
+    assert (tmp_path / "telegram-2.jsonl").exists()
+
+
+def test_standalone_default_ingest_preserves_existing_telegram_corpus(tmp_path, monkeypatch):
+    """CLI/default ingest never silently overwrites telegram.jsonl already on disk."""
+    corpus = tmp_path / "principis_corpus"
+    corpus.mkdir()
+    original = corpus / "telegram.jsonl"
+    original.write_text('{"old": true}\n', encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(ingest_telegram, "_fetch_channel_html_canonical", lambda _handle: MOCK)
+    result = ingest_telegram.ingest("@my_channel")
+    assert original.read_text(encoding="utf-8") == '{"old": true}\n'
+    assert result["out"] == os.path.join("principis_corpus", "telegram-2.jsonl")
+    assert (corpus / "telegram-2.jsonl").exists()
+
+
 def test_empty_html_yields_nothing():
     assert parse_telegram_html("<html><body>no messages</body></html>") == []
 

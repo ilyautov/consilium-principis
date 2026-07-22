@@ -145,3 +145,15 @@ def test_land_to_sources_writes_provenance_header_and_manifest(tmp_path):
     assert rec["file"] == "my-source-name.txt" and rec["url"] == "https://example.org/x"
     assert rec["license"] == "public-domain" and rec["chars"] == len("  body text  ")
     assert rec["type"] == "essay"
+
+
+def test_land_to_sources_reserves_suffix_without_overwriting(tmp_path):
+    """Повторное имя сохраняет оба источника и провенанс с итоговым именем."""
+    adv = tmp_path / "advisor"
+    first = cc.land_to_sources(str(adv), "Book", "first", url="u1", license_note="PD")
+    second = cc.land_to_sources(str(adv), "Book", "second", url="u2", license_note="PD")
+    assert [os.path.basename(first), os.path.basename(second)] == ["book.txt", "book-2.txt"]
+    assert open(first, encoding="utf-8").read().endswith("first\n")
+    assert open(second, encoding="utf-8").read().endswith("second\n")
+    rows = [json.loads(line) for line in open(adv / "sources" / "_provenance.jsonl", encoding="utf-8")]
+    assert [row["file"] for row in rows] == ["book.txt", "book-2.txt"]

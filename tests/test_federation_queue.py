@@ -21,6 +21,8 @@ def test_queuebackend_is_abstract():
 
 
 import tempfile
+import stat
+import pytest
 
 
 def _mk(tmp_path):
@@ -42,6 +44,31 @@ def test_enqueue_then_claim_returns_task(tmp_path):
 def test_claim_empty_queue_returns_none(tmp_path):
     q = _mk(tmp_path)
     assert q.claim("w1") is None
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX mode contract")
+def test_sqlite_private_state_uses_owner_only_mode_bits(tmp_path):
+    """Локальная очередь не раскрывает каталог, DB или WAL/SHM другим пользователям."""
+    state = tmp_path / "private" / "q.sqlite3"
+    q = SqliteBackend(str(state))
+    with q._conn():
+        pass
+    assert stat.S_IMODE(os.stat(state.parent).st_mode) == 0o700
+    for path in (state, state.with_name(state.name + "-wal"), state.with_name(state.name + "-shm")):
+        if path.exists():
+            assert stat.S_IMODE(os.stat(path).st_mode) == 0o600
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX mode contract")
+def test_sqlite_filename_only_path_tightens_its_absolute_parent(tmp_path, monkeypatch):
+    """Bare DB path must protect cwd as its actual parent, not skip parent hardening."""
+    os.chmod(tmp_path, 0o755)
+    monkeypatch.chdir(tmp_path)
+    q = SqliteBackend("queue.sqlite3")
+    with q._conn():
+        pass
+    assert stat.S_IMODE(os.stat(tmp_path).st_mode) == 0o700
+    assert stat.S_IMODE(os.stat(tmp_path / "queue.sqlite3").st_mode) == 0o600
 
 
 def test_claim_filters_by_role(tmp_path):

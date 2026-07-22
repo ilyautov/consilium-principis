@@ -6,7 +6,10 @@
 """
 import json
 import os
+import stat
 import sys
+
+import pytest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.join(HERE, "..")
@@ -46,6 +49,16 @@ def test_card_written_under_decisions(tmp_path, monkeypatch):
     assert r["path"].startswith("decisions/") and r["path"].endswith(".card.json")
     assert os.path.isfile(os.path.join(str(tmp_path), r["path"]))
     assert r["card_id"].startswith("dc_")
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX permission bits are unavailable on Windows")
+def test_card_artifact_and_decisions_directory_are_private(tmp_path, monkeypatch):
+    monkeypatch.setattr(mcp_server, "_root", lambda: str(tmp_path))
+    saved = dispatch("save_decision_card", {"map": _valid_map(), "chosen_option": "ship_public",
+                                             "review_horizon_days": 90, "slug": "private-card"})
+    artifact = tmp_path / saved["path"]
+    assert stat.S_IMODE(artifact.stat().st_mode) == 0o600
+    assert stat.S_IMODE((tmp_path / "decisions").stat().st_mode) == 0o700
 
 
 def test_card_path_traversal_refused(tmp_path, monkeypatch):

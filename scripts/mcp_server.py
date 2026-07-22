@@ -30,7 +30,8 @@ from situation import Move, node, analyze
 from governance import _verify_corpus
 from calibration import calibrate as _calibrate_fn, parse_decision_log
 from corpusbuild.paths import corpus_path, project_root
-from file_atomic import atomic_write_json
+from file_atomic import (atomic_update_json, atomic_write_json, ensure_private_directory,
+                         ensure_private_file)
 import lifecycle
 # H2 (Task 5.4): decisions-домен (карта/расчёт, Decision Card, петля исхода, calibrated
 # consult) вынесен в mcp_decisions.py. Имена реэкспортируются фасадом — TOOLS-реестр,
@@ -101,9 +102,10 @@ def _swallow(what, fn, default):
     except Exception as e:
         try:
             p = os.path.join(_root(), ".consilium", "swallow.log")
-            os.makedirs(os.path.dirname(p), exist_ok=True)
+            ensure_private_directory(os.path.dirname(p))
             with open(p, "a", encoding="utf-8") as f:
                 f.write("%s %s: %r\n" % (time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), what, e))
+            ensure_private_file(p)
         except Exception:
             pass
         return default
@@ -787,11 +789,17 @@ def _config_set(key, value):
         return {"key": key, "rejected": value,
                 "error": "hybrid_alpha должен быть числом в диапазоне [0, 1] включительно."}
     p = _config_path()
-    cfg = _load_json(p, {})
-    old = cfg.get(key)
-    cfg[key] = value
-    with open(p, "w", encoding="utf-8") as f:
-        json.dump(cfg, f, ensure_ascii=False, indent=2)
+    old_value = []
+
+    def set_config(current):
+        cfg = current if isinstance(current, dict) else {}
+        old_value.append(cfg.get(key))
+        cfg = dict(cfg)
+        cfg[key] = value
+        return cfg
+
+    cfg = atomic_update_json(p, set_config, default={}, private=True, recover_invalid=True)
+    old = old_value[0]
     out = {"key": key, "old": old, "new": value, "config": cfg}
     return out
 

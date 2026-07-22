@@ -87,6 +87,20 @@ def test_windows_host_guide_describes_the_generated_interpreter_path():
     assert re.search(r"точный путь к\s+запущенному интерпретатору", hosts)
 
 
+def test_windows_mcp_guides_use_py_launcher_not_python3():
+    hosts = (ROOT / "docs/CONNECT-HOSTS.md").read_text(encoding="utf-8")
+    connect = (ROOT / "CONNECT-MCP.md").read_text(encoding="utf-8")
+    english = (ROOT / "README.md").read_text(encoding="utf-8")
+    russian = (ROOT / "README.ru.md").read_text(encoding="utf-8")
+
+    assert "py -3 scripts/board.py mcp-config --json" in hosts
+    assert "py -3 scripts/board.py mcp-install" in hosts
+    assert "py -3 ~/consilium-principis/scripts/board.py mcp-install" in connect
+    assert "py -3 scripts/board.py mcp-config --json" in connect
+    assert "py -3 scripts/board.py mcp-config --json" in english
+    assert "py -3 scripts/board.py mcp-config --json" in russian
+
+
 def test_en_ru_entry_points_keep_mechanical_facts_aligned():
     english = (ROOT / "README.md").read_text(encoding="utf-8")
     russian = (ROOT / "README.ru.md").read_text(encoding="utf-8")

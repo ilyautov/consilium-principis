@@ -146,6 +146,7 @@ Windows пока не проверен как полностью поддерж�
 
 - **В терминале запускай `py install.py`** (не `python3 install.py`). Инсталлятор с python.org кладёт `py.exe` и `python.exe`, но `python3.exe` не создаёт; а `python3.exe`, который может маячить из Microsoft Store, — это заглушка (App Execution Alias), которая вместо запуска просто открывает магазин.
 - **Плагин не находит Python?** Поставь `CONSILIUM_PYTHON=py` в окружении перед запуском Claude Code. Команда сервера плагина по умолчанию `python3` и уважает этот оверрайд. (Путь Claude Desktop не требует ничего — `board.py mcp-config` подставит точный интерпретатор сам.)
+- **MCP-конфиг:** запускай `py -3 scripts/board.py mcp-config --json` (или `py -3 scripts/board.py mcp-install` для Claude Desktop). Если `py` нет, используй `python` только после проверки Python 3.10+; Store-alias `python3` не используй. Точный fallback — в [`CONNECT-MCP.md`](CONNECT-MCP.md).
 
 ## Твой совет, твой выбор
 

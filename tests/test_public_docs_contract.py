@@ -72,6 +72,42 @@ def test_connect_docs_do_not_claim_untested_cowork_bridge():
     assert "один конфиг включает тулы" not in connect_docs
 
 
+def test_host_matrix_makes_no_supported_claim_without_host_smoke():
+    hosts = (ROOT / "docs/CONNECT-HOSTS.md").read_text(encoding="utf-8")
+
+    assert "Claude Code и Claude Desktop проверены" not in hosts
+    assert "✅ да" not in hosts
+    assert "экспериментальн" in hosts
+
+
+def test_windows_host_guide_describes_the_generated_interpreter_path():
+    hosts = (ROOT / "docs/CONNECT-HOSTS.md").read_text(encoding="utf-8")
+
+    assert "явного фикса/детекта нет" not in hosts
+    assert re.search(r"точный путь к\s+запущенному интерпретатору", hosts)
+
+
+def test_en_ru_entry_points_keep_mechanical_facts_aligned():
+    english = (ROOT / "README.md").read_text(encoding="utf-8")
+    russian = (ROOT / "README.ru.md").read_text(encoding="utf-8")
+    registry = (ROOT / "server.json").read_text(encoding="utf-8")
+
+    en_version = re.search(r"early access \(v([^)]*)\)", english).group(1)
+    ru_version = re.search(r"ранний доступ \(v([^)]*)\)", russian).group(1)
+    release_version = re.search(r"releases/download/v([0-9][^/\"]*)/", registry).group(1)
+    assert (en_version, ru_version, release_version) == (en_version,) * 3
+
+    for command in ("python3 install.py", "py install.py", "python3 scripts/board.py mcp-config --json"):
+        assert command in english
+        assert command in russian
+
+    assert "experimental" in english
+    assert "эксперименталь" in russian
+    tool_count = re.compile(r"\b\d+\s+(?:(?:MCP )?tools?|тул(?:ов|а)?)\b", re.I)
+    assert not tool_count.search(english)
+    assert not tool_count.search(russian)
+
+
 def test_build_manual_check_is_reproducible():
     result = subprocess.run(
         [sys.executable, str(ROOT / "scripts" / "build_manual.py"), "--check"],

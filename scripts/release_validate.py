@@ -18,6 +18,7 @@ from ci_bundle_guard import offending
 ROOT = Path(__file__).resolve().parents[1]
 REPOSITORY = "https://github.com/ilyautov/consilium-principis"
 ARTIFACT_NAME = "consilium-principis.mcpb"
+REGISTRY_NAME = "io.github.ilyautov/consilium-principis"
 SHA256_RE = re.compile(r"[0-9a-f]{64}\Z")
 TAG_RE = re.compile(r"v(\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?)\Z")
 
@@ -97,10 +98,17 @@ def validate(tag, artifact_path, registry_path):
         return errors
 
     registry = load_json(registry_path, errors, "registry manifest")
+    if registry.get("name") != REGISTRY_NAME:
+        errors.append("registry name must equal canonical server name")
     packages = registry.get("packages")
     package = packages[0] if isinstance(packages, list) and len(packages) == 1 and isinstance(packages[0], dict) else {}
     if not package:
         errors.append("registry manifest must contain exactly one package")
+    elif package.get("registryType") != "mcpb":
+        errors.append("registry package type must be mcpb")
+
+    if package and package.get("transport", {}).get("type") != "stdio":
+        errors.append("registry package transport must be stdio")
 
     registry_version = registry.get("version")
     if tag_version and registry_version != tag_version:

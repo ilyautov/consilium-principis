@@ -119,8 +119,13 @@ def _fs_write_sandbox(_fs_sandbox_baseline):
         return
     cur = _tracked_changes()
     last = _fs_state["last"]
+    if cur is None:
+        # git недоступен в этот момент (транзиентный сбой на раннере) — НЕ затираем
+        # baseline в None, иначе следующий тест словит last.splitlines() на None и
+        # песочница молча умрёт до конца сессии. Пропускаем проверку, baseline цел.
+        return
     _fs_state["last"] = cur
-    if cur is None or cur == last:
+    if last is None or cur == last:
         return
     new = sorted(set(cur.splitlines()) - set(last.splitlines()))
     gone = sorted(set(last.splitlines()) - set(cur.splitlines()))

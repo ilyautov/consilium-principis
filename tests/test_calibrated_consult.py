@@ -6,6 +6,7 @@
 """
 import os
 import re
+import stat
 import sys
 
 import pytest
@@ -298,6 +299,17 @@ def test_open_tool_writes_record_and_returns_id(tmp_path, monkeypatch):
     assert len(files) == 1
     rec = json.load(open(files[0], encoding="utf-8"))
     assert rec["prior"]["call"] == "ждать" and rec["posterior"] is None
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX permission bits are unavailable on Windows")
+def test_consult_artifact_and_directory_are_private(tmp_path, monkeypatch):
+    _point_root(monkeypatch, tmp_path)
+    res = srv.dispatch("calibrated_consult_open",
+                       {"question": "Шипнуть сейчас?", "prior_call": "ждать",
+                        "prior_confidence": 0.6})
+    artifact = tmp_path / res["path"]
+    assert stat.S_IMODE(artifact.stat().st_mode) == 0o600
+    assert stat.S_IMODE((tmp_path / "consults").stat().st_mode) == 0o700
 
 
 def test_open_tool_fail_closed_on_bad_confidence(tmp_path, monkeypatch):

@@ -3,8 +3,8 @@
     "tool_count": 61,
     "rule_count": 19,
     "recipe_count": 16,
-    "script_count": 69,
-    "test_count": 160,
+    "script_count": 71,
+    "test_count": 163,
     "glossary_count": 113
   },
   "tools": [
@@ -1924,6 +1924,11 @@
       "doc": "Экстрактор ситуации (борроу #1 из MiroFish) = «захват контекста» для ситуационной карты."
     },
     {
+      "path": "scripts/file_atomic.py",
+      "subsystem": "other",
+      "doc": "Small, neutral helpers for atomically publishing text files."
+    },
+    {
       "path": "scripts/gen_golden.py",
       "subsystem": "other",
       "doc": "Э0: генератор eval-golden из корпуса (provenance target_tier=P1)."
@@ -1996,7 +2001,7 @@
     {
       "path": "scripts/mcp_install.py",
       "subsystem": "install",
-      "doc": "Подключить Consilium как локальный stdio-MCP в claude_desktop_config.json — СКРИПТОМ, не руками."
+      "doc": "Safely connect Consilium to Claude Desktop's local MCP configuration."
     },
     {
       "path": "scripts/mcp_server.py",
@@ -2057,6 +2062,11 @@
       "path": "scripts/recipes.py",
       "subsystem": "other",
       "doc": "Меню рецептов — discoverable «что умеет твой совет» для нетехнического юзера."
+    },
+    {
+      "path": "scripts/release_validate.py",
+      "subsystem": "other",
+      "doc": "Validate that an MCPB artifact and its external registry manifest agree."
     },
     {
       "path": "scripts/relevance_gate.py",
@@ -2451,6 +2461,10 @@
       "covers": "fidelity tiers"
     },
     {
+      "path": "tests/test_file_atomic.py",
+      "covers": "file atomic"
+    },
+    {
       "path": "tests/test_firewall_check.py",
       "covers": "firewall check"
     },
@@ -2697,6 +2711,14 @@
     {
       "path": "tests/test_refusal_demo.py",
       "covers": "refusal demo"
+    },
+    {
+      "path": "tests/test_release_validate.py",
+      "covers": "release validate"
+    },
+    {
+      "path": "tests/test_release_workflow.py",
+      "covers": "release workflow"
     },
     {
       "path": "tests/test_relevance_gate.py",

@@ -59,6 +59,18 @@ def test_sqlite_private_state_uses_owner_only_mode_bits(tmp_path):
             assert stat.S_IMODE(os.stat(path).st_mode) == 0o600
 
 
+@pytest.mark.skipif(os.name != "posix", reason="POSIX mode contract")
+def test_sqlite_filename_only_path_tightens_its_absolute_parent(tmp_path, monkeypatch):
+    """Bare DB path must protect cwd as its actual parent, not skip parent hardening."""
+    os.chmod(tmp_path, 0o755)
+    monkeypatch.chdir(tmp_path)
+    q = SqliteBackend("queue.sqlite3")
+    with q._conn():
+        pass
+    assert stat.S_IMODE(os.stat(tmp_path).st_mode) == 0o700
+    assert stat.S_IMODE(os.stat(tmp_path / "queue.sqlite3").st_mode) == 0o600
+
+
 def test_claim_filters_by_role(tmp_path):
     from federation.queue import RoleTask
     q = _mk(tmp_path)

@@ -88,6 +88,18 @@ def test_network_job_refuses_full_semaphore_and_releases_after_failure(
     semaphore.release()
 
 
+def test_network_job_releases_the_semaphore_it_acquired(clean_jobs, clean_network_jobs, monkeypatch):
+    """Completion releases the original admission slot even if the module setting changes."""
+    admitted = threading.BoundedSemaphore(1)
+    release = threading.Event()
+    monkeypatch.setattr(M, "_NETWORK_EXECUTION_SEMAPHORE", admitted, raising=False)
+    M._start_network_job("seed", lambda: release.wait(1), "seed")
+    monkeypatch.setattr(M, "_NETWORK_EXECUTION_SEMAPHORE", threading.BoundedSemaphore(1), raising=False)
+    release.set()
+    assert admitted.acquire(timeout=1)
+    admitted.release()
+
+
 def test_job_status_redacts_absolute_paths_from_results(clean_jobs):
     """Публичный job_status не раскрывает локальные пути даже из результата воркера."""
     with M._JOBS_LOCK:

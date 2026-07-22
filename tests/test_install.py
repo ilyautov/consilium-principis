@@ -7,6 +7,7 @@ M5a: если board_init (ядро установки) упал (returncode!=0),
 """
 import os
 import sys
+from pathlib import Path
 import pytest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -71,3 +72,20 @@ def test_successful_board_init_prints_gotovo(monkeypatch, tmp_path, capsys):
     _install_with_board_init_rc(monkeypatch, tmp_path, rc=0)  # не должно бросать
     out = capsys.readouterr()
     assert "Готово" in out.out
+
+
+def test_windows_launcher_selects_python_310_and_honours_no_pause():
+    batch = (Path(REPO) / "install.bat").read_text(encoding="utf-8")
+    check = 'import sys; assert sys.version_info >= (3, 10)'
+    assert f'py -3 -c "{check}"' in batch
+    assert f'python -c "{check}"' in batch
+    assert 'if not "%CONSILIUM_NO_PAUSE%"=="1" pause' in batch
+    assert "python.org" in batch
+
+
+def test_posix_launchers_validate_python_310_before_running_installer():
+    check = "import sys; assert sys.version_info >= (3, 10)"
+    for launcher in ("install.sh", "install.command"):
+        text = (Path(REPO) / launcher).read_text(encoding="utf-8")
+        assert check in text
+        assert "Python 3.10+" in text

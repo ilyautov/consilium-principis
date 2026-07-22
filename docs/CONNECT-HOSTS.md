@@ -16,8 +16,9 @@ if method == "initialize":
 ```
 
 Это описывает протокол, но не является обещанием совместимости каждого MCP-хоста: они по-разному
-обрабатывают `instructions`, конфиг и разрешения. Claude Code и Claude Desktop проверены; остальные
-разделы ниже — отправные точки, пока не появится подтверждённый запуск.
+обрабатывают `instructions`, конфиг и разрешения. CI проверяет сам сервер и его stdio-протокол, но
+пока не запускает настоящий Claude Code или Claude Desktop. Поэтому все host-specific рецепты ниже
+экспериментальны: это отправные точки для проверки на своей машине, а не заявление о поддержке.
 
 Общая ссылка на подробности протокола, безопасность, зависимости (Python 3.10+, SIMPLE/FULL
 тир) лежит в [`CONNECT-MCP.md`](../CONNECT-MCP.md). Здесь разбор по хостам, конкретно.
@@ -26,9 +27,9 @@ if method == "initialize":
 
 | Хост | Скилл (plugin/manual) | MCP-сервер | Проверено вживую |
 |---|---|---|---|
-| Claude Code | plugin (`/plugin marketplace add`), золотой путь | да | ✅ да (плагин смержен, см. `docs/superpowers/plans/2026-07-08-plugin-marketplace.md`) |
-| Claude Code | manual (`claude mcp add`) | да | ✅ да |
-| Claude Desktop | нет своего скилл-формата, MCP-сервер даёт весь функционал | да | ✅ да (описано и проверялось в `CONNECT-MCP.md`) |
+| Claude Code | plugin (`/plugin marketplace add`) | да | ⚠ экспериментально: нет host-specific CI smoke |
+| Claude Code | manual (`claude mcp add`) | да | ⚠ экспериментально: нет host-specific CI smoke |
+| Claude Desktop | нет своего скилл-формата, MCP-сервер даёт весь функционал | да | ⚠ экспериментально: нет host-specific CI smoke |
 | Cursor | нет | да (по документации Cursor) | ⚠ не проверено на этом хосте, подтвердите |
 | Codex / OpenAI-style CLI | нет | ⚠ зависит от версии CLI, см. раздел ниже | ⚠ не проверено |
 | Gemini CLI | нет | ⚠ через расширения/MCP-конфиг, см. раздел ниже | ⚠ не проверено |
@@ -126,8 +127,9 @@ python3 ~/consilium-principis/scripts/board.py mcp-install
 **Обязателен полный рестарт Claude Desktop** после правки конфига или кода сервера:
 у локальных stdio-серверов нет hot-reload.
 
-Проверен (`✅`) путь Claude Desktop. Cowork не smoke-tested отдельно: не выводи из Desktop-конфига
-автоматическую поддержку Cowork и сообщи о подтверждённом запуске через [SUPPORT.md](../SUPPORT.md).
+Путь Claude Desktop экспериментальный: CI проверяет конфиг-мердж и stdio MCP-сервера, но не сам
+Desktop. Cowork тоже не smoke-tested отдельно: не выводи из Desktop-конфига автоматическую
+поддержку Cowork и сообщи о подтверждённом запуске через [SUPPORT.md](../SUPPORT.md).
 
 ---
 
@@ -260,22 +262,16 @@ python3 scripts/board.py mcp-config --json  # только JSON-сниппет
 
 ---
 
-## Известное ограничение: `python3` на Windows
+## Windows: используй сгенерированный конфиг
 
-Во всех конфигах выше `command` захардкожен как `python3` (или `sys.executable`, что на
-большинстве *nix-систем эквивалентно). На Windows команда `python3` часто **не существует**
-в PATH: обычно там `python` или `py -3`. Это известный незакрытый пункт (см. заметку по
-проекту: «Остаток publish-time: python3 на Windows» после мержа плагин-маркетплейса),
-**на момент написания этого файла Windows не тестировался и явного фикса/детекта нет.**
+На Windows `python3` часто отсутствует в `PATH`, поэтому не копируй вручную примеры выше с этим
+именем команды. `python3 scripts/board.py mcp-config --json` подставляет **точный путь к
+запущенному интерпретатору** (`sys.executable`); `mcp-install` делает то же при мердже Claude
+Desktop-конфига. MCPB-бандл отдельно использует Windows Python Launcher `py -3`.
 
-Если вы на Windows и `python3` не находится:
-- замените `"command": "python3"` на `"command": "python"` (или `"py"` с `"args": ["-3",
-  "scripts/mcp_server.py", ...]`) в конфиге вашего хоста вручную;
-- либо создайте алиас/симлинк `python3` на ваш интерпретатор Python 3.10+.
-
-⚠ Это временный обходной путь, не проверенный автором на реальной Windows-машине:
-если наткнётесь на проблему, дайте знать, чтобы закрыть тикет по-настоящему (детект ОС в
-`scripts/board.py:cmd_mcp_config`, а не документационная заплатка).
+Windows CI проверяет launcher, выбор конфигов и stdio `initialize`/`tools/list`, но не настоящий
+запуск конкретного хоста. Поэтому этот путь экспериментальный: проверь сгенерированный конфиг в
+своём хосте и сообщи о результате через [SUPPORT.md](../SUPPORT.md).
 
 ---
 

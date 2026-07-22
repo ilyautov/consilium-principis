@@ -25,7 +25,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install test runner
-        run: python -m pip install --disable-pip-version-check pytest==8.3.4
+        run: python -m pip install --disable-pip-version-check --require-hashes -r requirements/ci-no-numpy.txt
       - name: Run installer and stdio tests offline
         run: python -m pytest tests/test_mcp_install.py tests/test_install.py tests/test_mcp_server_stdio.py -q
       - name: Smoke-test the Windows launcher

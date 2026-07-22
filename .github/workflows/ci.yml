@@ -25,9 +25,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install deps
-        run: |
-          python -m pip install --upgrade pip
-          pip install pytest==8.3.4 numpy==2.2.1   # пины: воспроизводимый CI, без дрейфа транзитивов
+        run: python -m pip install --require-hashes -r requirements/ci.txt
       - name: Firewall guard (секреты / запрещённые к трекингу файлы)
         # В CI приватного advisors/ нет (gitignored), поэтому гард в основном проверяет
         # паттерны секретов и «никогда-не-трекать» файлов — это всё равно ценно (ловит
@@ -54,9 +52,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install deps (pytest ТОЛЬКО, без numpy)
-        run: |
-          python -m pip install --upgrade pip
-          pip install pytest==8.3.4   # пин; numpy НЕ ставим (нога проверяет stdlib-ядро)
+        run: python -m pip install --require-hashes -r requirements/ci-no-numpy.txt
       - name: Run tests (ожидаем SKIP numpy-тестов, НЕ collection-error)
         run: python -m pytest tests/ -q
 
@@ -74,8 +70,6 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install deps
-        run: |
-          python -m pip install --upgrade pip
-          pip install pytest==8.3.4 numpy==2.2.1
+        run: python -m pip install --require-hashes -r requirements/ci.txt
       - name: Run tests (SIMPLE-тир, без ollama/движка)
         run: python -m pytest tests/ -q

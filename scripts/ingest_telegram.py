@@ -42,12 +42,30 @@ def posts_to_records(posts, handle):
     return [{"source": f"telegram:{h}", "tier": "P1", "text": p} for p in posts]
 
 
-def write_corpus(records, out_path):
+def _write_corpus_exclusive(records, out_path):
+    """Создать новый corpus-файл без TOCTOU между проверкой имени и записью."""
     os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
-    with open(out_path, "w", encoding="utf-8") as f:
-        for r in records:
-            f.write(json.dumps(r, ensure_ascii=False) + "\n")
-    return len(records)
+    directory, filename = os.path.split(out_path)
+    stem, extension = os.path.splitext(filename)
+    match = re.match(r"^(.*)-(\d+)$", stem)
+    base = match.group(1) if match else stem
+    number = int(match.group(2)) if match else 1
+    while True:
+        candidate_name = (filename if number == 1 else "%s-%d%s" % (base, number, extension))
+        candidate = os.path.join(directory, candidate_name)
+        try:
+            with open(candidate, "x", encoding="utf-8") as f:
+                for r in records:
+                    f.write(json.dumps(r, ensure_ascii=False) + "\n")
+            return len(records), candidate
+        except FileExistsError:
+            number += 1
+
+
+def write_corpus(records, out_path):
+    """Записать corpus в новый файл, выбирая числовой суффикс при коллизии."""
+    written, _path = _write_corpus_exclusive(records, out_path)
+    return written
 
 
 def _safe_handle(handle):
@@ -76,8 +94,8 @@ def ingest(handle, out_path=None):
     out_path = out_path or os.path.join("principis_corpus", "telegram.jsonl")
     canonical_handle = _safe_handle(handle)
     posts = parse_telegram_html(_fetch_channel_html_canonical(canonical_handle))
-    n = write_corpus(posts_to_records(posts, canonical_handle), out_path)
-    return {"handle": canonical_handle, "posts": len(posts), "out": out_path, "written": n}
+    n, final_path = _write_corpus_exclusive(posts_to_records(posts, canonical_handle), out_path)
+    return {"handle": canonical_handle, "posts": len(posts), "out": final_path, "written": n}
 
 
 if __name__ == "__main__":

@@ -1405,7 +1405,8 @@ def _start_network_job(operation_key, fn, label):
                         "note": _JOB_WAIT_NOTE}
             _NETWORK_JOBS.pop(operation_key, None)
 
-        if not _NETWORK_EXECUTION_SEMAPHORE.acquire(blocking=False):
+        execution_semaphore = _NETWORK_EXECUTION_SEMAPHORE
+        if not execution_semaphore.acquire(blocking=False):
             return {"error": _NETWORK_JOB_CAPACITY_ERROR}
 
         def _reserved(jid):
@@ -1415,11 +1416,11 @@ def _start_network_job(operation_key, fn, label):
             with _NETWORK_JOBS_LOCK:
                 if _NETWORK_JOBS.get(operation_key) == jid:
                     _NETWORK_JOBS.pop(operation_key, None)
-                _NETWORK_EXECUTION_SEMAPHORE.release()
+                execution_semaphore.release()
 
         started = _start_job(fn, label, before_start=_reserved, on_complete=_completed)
         if "job_id" not in started:
-            _NETWORK_EXECUTION_SEMAPHORE.release()
+            execution_semaphore.release()
         return started
 
 

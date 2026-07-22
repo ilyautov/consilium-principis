@@ -82,11 +82,10 @@ DEFAULT_LEASE_S = 300.0
 
 class SqliteBackend(QueueBackend):
     def __init__(self, db_path):
-        self.db_path = db_path
-        d = os.path.dirname(db_path)
-        if d:
-            os.makedirs(d, mode=0o700, exist_ok=True)
-            self._tighten_parent_mode(d)
+        self.db_path = os.path.abspath(db_path)
+        d = os.path.dirname(self.db_path)
+        os.makedirs(d, mode=0o700, exist_ok=True)
+        self._tighten_parent_mode(d)
         with self._conn() as c:
             c.executescript(_SCHEMA)
         self._tighten_file_modes()

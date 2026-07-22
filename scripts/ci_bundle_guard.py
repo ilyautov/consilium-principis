@@ -6,14 +6,15 @@ import sys, fnmatch
 FORBIDDEN = [
     ".env*", "*.log", "mcp.json", "board_config.json", "gov_heads.local.json",
     "principis.md", "relationship.md",
+    ".superpowers/*", ".worktrees/*",
     "reference-library-raw/*", "reference-library/*", "*-raw/*",
     "principis_corpus/*", "council/*", "decisions/*", "consults/*", ".consilium/*",
+    "advisors/*",
     "advisors/*/build/*", "advisors/*/sources/*", "advisors/*/corpus.jsonl", "advisors/*/corpus.lock.json",
     "lenses/*/build/*", "lenses/*/sources/*",
     "data/embeddings*.npy", "data/embeddings*.meta.json", "scripts/golden/*",
 ]
-ALLOW = ["advisors/machiavelli/corpus.jsonl", "advisors/marcus-aurelius/corpus.jsonl",
-         "advisors/sun-tzu/corpus.jsonl",
+ALLOW = ["advisors/README.md",
          # публичные env-шаблоны — НЕ секреты (исключение из ".env*")
          ".env.example", ".env.sample", ".env.template"]
 

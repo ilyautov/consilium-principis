@@ -47,6 +47,7 @@ __pycache__/
 *.pyc
 .venv/
 venv/
+node_modules/
 
 # Личный MCP-конфиг (абсолютный путь машины); пример — mcp.example.json (в репо)
 mcp.json

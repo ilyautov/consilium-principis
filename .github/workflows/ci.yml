@@ -20,8 +20,8 @@ jobs:
       HEPHAESTUS_ENGINE: /nonexistent      # внешний движок отсутствует (как у внешнего юзера)
       OLLAMA_HOST: http://127.0.0.1:59999  # ollama недоступен → лексический пол
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install deps
@@ -33,6 +33,10 @@ jobs:
         # паттерны секретов и «никогда-не-трекать» файлов — это всё равно ценно (ловит
         # утёкший ключ / .env / приватный якорь в трекаемых файлах ДО прогона тестов).
         run: sh scripts/firewall_check.sh
+      - name: Repository and skill consistency
+        run: python -m pytest tests/test_plugin_manifests.py -q
+      - name: Compile tracked Python scripts
+        run: git ls-files '*.py' | xargs -r python -m py_compile
       - name: Run tests (SIMPLE-тир, без ollama/движка)
         run: python -m pytest tests/ -q
 
@@ -45,8 +49,8 @@ jobs:
       HEPHAESTUS_ENGINE: /nonexistent
       OLLAMA_HOST: http://127.0.0.1:59999
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.12"
       - name: Install deps (pytest ТОЛЬКО, без numpy)
@@ -65,8 +69,8 @@ jobs:
       HEPHAESTUS_ENGINE: /nonexistent
       OLLAMA_HOST: http://127.0.0.1:59999
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.12"
       - name: Install deps

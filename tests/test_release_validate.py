@@ -37,19 +37,28 @@ def make_bundle(tmp_path, entries):
     return artifact
 
 
-def write_registry(tmp_path, *, version=VERSION, sha256_value=None, url=RELEASE_URL):
+def write_registry(
+    tmp_path,
+    *,
+    version=VERSION,
+    sha256_value=None,
+    url=RELEASE_URL,
+    name="io.github.ilyautov/consilium-principis",
+    registry_type="mcpb",
+    transport_type="stdio",
+):
     registry = tmp_path / "server.json"
     registry.write_text(
         json.dumps(
             {
-                "name": "io.github.ilyautov/consilium-principis",
+                "name": name,
                 "version": version,
                 "packages": [
                     {
-                        "registryType": "mcpb",
+                        "registryType": registry_type,
                         "identifier": url,
                         "fileSha256": sha256_value,
-                        "transport": {"type": "stdio"},
+                        "transport": {"type": transport_type},
                     }
                 ],
             }
@@ -183,3 +192,39 @@ def test_validator_rejects_wrong_release_url(tmp_path):
 
     assert result.returncode != 0
     assert "registry package identifier must equal release URL" in result.stderr
+
+
+def test_validator_rejects_wrong_registry_name(tmp_path):
+    artifact = make_bundle(tmp_path, entries=complete_entries())
+    registry = write_registry(
+        tmp_path, sha256_value=sha256(artifact), name="io.github.example/wrong"
+    )
+
+    result = run_validator(TAG, artifact, registry)
+
+    assert result.returncode != 0
+    assert "registry name must equal canonical server name" in result.stderr
+
+
+def test_validator_rejects_non_mcpb_package(tmp_path):
+    artifact = make_bundle(tmp_path, entries=complete_entries())
+    registry = write_registry(
+        tmp_path, sha256_value=sha256(artifact), registry_type="npm"
+    )
+
+    result = run_validator(TAG, artifact, registry)
+
+    assert result.returncode != 0
+    assert "registry package type must be mcpb" in result.stderr
+
+
+def test_validator_rejects_non_stdio_transport(tmp_path):
+    artifact = make_bundle(tmp_path, entries=complete_entries())
+    registry = write_registry(
+        tmp_path, sha256_value=sha256(artifact), transport_type="http"
+    )
+
+    result = run_validator(TAG, artifact, registry)
+
+    assert result.returncode != 0
+    assert "registry package transport must be stdio" in result.stderr

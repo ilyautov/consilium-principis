@@ -94,6 +94,7 @@ python3 scripts/eval.py advisors/<имя>                       # 🔵 verified 
 - **Включить FULL-тир:** `python3 scripts/board.py setup-full` (подскажет про ollama, сам стянет `bge-m3`).
 - **Подключить как MCP-сервер:** статус конкретного хоста в [`docs/CONNECT-HOSTS.md`](docs/CONNECT-HOSTS.md),
   подробности в [`CONNECT-MCP.md`](CONNECT-MCP.md). Из корня чекаута сначала сгенерируй конфиг:
-  `python3 scripts/board.py mcp-config --json`.
+  `python3 scripts/board.py mcp-config --json` (**Windows:** `py -3 scripts/board.py mcp-config --json`; если
+  `py` нет, проверь Python 3.10+ и используй `python`, не Store-alias `python3`).
 - **Контур всегда с тобой:** 🔵 слова автора (P1/P2) · 🟢 дословный комментарий (S1, с атрибуцией) ·
   🟡 перенос · 📐 расчёт (твоя модель, не цитата) · отказ вне корпуса. На любом тире поиска.

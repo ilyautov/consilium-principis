@@ -110,13 +110,13 @@ def _export_pdf(md_path):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--pdf", action="store_true", help="также экспортировать PDF через pandoc (если есть)")
-    ap.add_argument("--check", action="store_true", help="проверить, что MANUAL.md не отстал от источников")
+    ap.add_argument("--check", action="store_true", help="verify that MANUAL.md matches its sources")
     a = ap.parse_args()
     if a.check:
         if check():
-            print("MANUAL.md актуален")
+            print("MANUAL.md is current")
             return
-        print("MANUAL.md отстал — запусти scripts/build_manual.py", file=sys.stderr)
+        print("MANUAL.md is stale — run scripts/build_manual.py", file=sys.stderr)
         sys.exit(1)
     out = build(pdf=a.pdf)
     print("мануал собран → %s" % os.path.relpath(out, ROOT))

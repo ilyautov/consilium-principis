@@ -126,9 +126,8 @@ python3 ~/consilium-principis/scripts/board.py mcp-install
 **Обязателен полный рестарт Claude Desktop** после правки конфига или кода сервера:
 у локальных stdio-серверов нет hot-reload.
 
-Замечание из `CONNECT-MCP.md`: Claude Desktop спавнит локальные stdio-серверы у себя и
-бриджит их в песочницу Cowork, один и тот же конфиг включает тулы и в Desktop, и в Cowork.
-Проверено (`✅`): этот путь уже описан и обкатан в существующей документации.
+Проверен (`✅`) путь Claude Desktop. Cowork не smoke-tested отдельно: не выводи из Desktop-конфига
+автоматическую поддержку Cowork и сообщи о подтверждённом запуске через [SUPPORT.md](../SUPPORT.md).
 
 ---
 

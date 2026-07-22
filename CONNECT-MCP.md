@@ -76,14 +76,14 @@ python3 scripts/board.py mcp-config --json # только JSON-сниппет
   ```bash
   claude mcp add consilium-principis -- python3 ~/consilium-principis/scripts/mcp_server.py
   ```
-- **Claude Desktop и Cowork, один конфиг** (файл, не UI; UI в Desktop про `.mcpb`-бандлы и
-  удалённые HTTP-коннекторы). macOS:
+- **Claude Desktop, конфиг в файле** (не UI; UI в Desktop про `.mcpb`-бандлы и удалённые
+  HTTP-коннекторы). macOS:
   ```
   ~/Library/Application Support/Claude/claude_desktop_config.json
   ```
   Добавь ключ внутрь существующего `mcpServers` (рядом с другими серверами, не заменяя блок).
-  Claude Desktop спавнит локальные stdio-серверы у себя и **бриджит их в песочницу Cowork**:
-  один конфиг включает тулы и в Desktop, и в Cowork (`mcp__consilium-principis__doctor` и т.д.).
+  Это документированный путь для Claude Desktop. Интеграция с Cowork отдельно не smoke-tested;
+  не считай этот конфиг подтверждением поддержки Cowork.
 - **Рестарт после правок.** Hot-reload у stdio нет: изменил конфиг ИЛИ код, полностью выйди из
   Claude Desktop и открой заново.
 - **cwd при спавне не определён, уже учтено.** Сервер резолвит пути от `__file__` (корня репо),

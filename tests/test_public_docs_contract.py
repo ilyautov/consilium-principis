@@ -62,6 +62,16 @@ def test_public_docs_do_not_describe_search_as_three_modes():
     assert not re.search(r"(?:three|три)\s+(?:search\s+)?(?:modes|режим[а-я]*)", public_docs_text(), re.I)
 
 
+def test_connect_docs_do_not_claim_untested_cowork_bridge():
+    connect_docs = "\n".join(
+        (ROOT / document).read_text(encoding="utf-8")
+        for document in ("CONNECT-MCP.md", "docs/CONNECT-HOSTS.md")
+    )
+    assert "бриджит их в песочницу Cowork" not in connect_docs
+    assert "в Desktop, и в Cowork" not in connect_docs
+    assert "один конфиг включает тулы" not in connect_docs
+
+
 def test_build_manual_check_is_reproducible():
     result = subprocess.run(
         [sys.executable, str(ROOT / "scripts" / "build_manual.py"), "--check"],

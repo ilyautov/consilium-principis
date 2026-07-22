@@ -1,0 +1,27 @@
+name: Bug report
+description: Report a reproducible problem in Consilium Principis.
+title: "bug: "
+body:
+  - type: markdown
+    attributes:
+      value: Do not include private corpora, transcripts, credentials, or security vulnerabilities.
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Python version, Consilium revision, and MCP host if applicable.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction
+      description: Give the smallest command or host session that demonstrates the problem.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected and actual result
+    validations:
+      required: true

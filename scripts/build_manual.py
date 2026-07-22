@@ -83,6 +83,20 @@ def build(root=None, out_path=None, pdf=False):
     return out_path
 
 
+def check(root=None, out_path=None):
+    """Return whether the committed manual matches the current index and narrative."""
+    root = root or ROOT
+    out_path = out_path or os.path.join(root, "docs", "MANUAL.md")
+    idx = json.load(open(os.path.join(root, "docs", "selfdoc", "index.json"), encoding="utf-8"))
+    expected = assemble(idx, _load_narrative(root))
+    try:
+        with open(out_path, encoding="utf-8") as f:
+            actual = f.read()
+    except FileNotFoundError:
+        return False
+    return actual == expected
+
+
 def _export_pdf(md_path):
     if not shutil.which("pandoc"):
         print("PDF пропущен: pandoc не найден в PATH. Установи pandoc для экспорта (MD уже собран).")
@@ -96,7 +110,14 @@ def _export_pdf(md_path):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--pdf", action="store_true", help="также экспортировать PDF через pandoc (если есть)")
+    ap.add_argument("--check", action="store_true", help="verify that MANUAL.md matches its sources")
     a = ap.parse_args()
+    if a.check:
+        if check():
+            print("MANUAL.md is current")
+            return
+        print("MANUAL.md is stale — run scripts/build_manual.py", file=sys.stderr)
+        sys.exit(1)
     out = build(pdf=a.pdf)
     print("мануал собран → %s" % os.path.relpath(out, ROOT))
 

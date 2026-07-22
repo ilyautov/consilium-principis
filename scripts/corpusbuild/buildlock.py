@@ -23,7 +23,8 @@ def _hash_file(path: str) -> str:
     return f"sha256:{h}"
 
 
-def write_lock(advisor_dir: str, config: dict, chunks, built_at: str) -> dict:
+def write_lock(advisor_dir: str, config: dict, chunks, built_at: str, *, output_path=None,
+               register_head=True) -> dict:
     src_dir = os.path.join(advisor_dir, "sources")
     sources = {}
     if os.path.isdir(src_dir):
@@ -39,10 +40,12 @@ def write_lock(advisor_dir: str, config: dict, chunks, built_at: str) -> dict:
     from .apparatus import TIERING_VERSION
     lock = {"built_at": built_at, "tiering_version": TIERING_VERSION, "config": config,
             "sources": sources, "counts": counts, "gov_head": _gov_head(chunks)}
-    atomic_write_json(paths.lock_path(advisor_dir), lock, ensure_ascii=False, indent=2)
+    atomic_write_json(output_path or paths.lock_path(advisor_dir), lock,
+                      ensure_ascii=False, indent=2)
     # Якорь ВНЕ подменяемой папки: легитимная сборка регистрирует голову в gov_heads.json
     # (корень доски) — verify_advisor ловит подмену советника ЦЕЛИКОМ (самосогласованный
     # двойник несёт свои lock'и, но якорь унести не может). Советник вне корня → no-op.
-    from governance import register_head
-    register_head(advisor_dir, lock["gov_head"], n=len(chunks))
+    if register_head:
+        from governance import register_head
+        register_head(advisor_dir, lock["gov_head"], n=len(chunks))
     return lock

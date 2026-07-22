@@ -90,7 +90,7 @@ def available() -> bool:
 
 
 # ------------------------------------------------------------------- chunking
-def _read_corpus_chunks(advisor_dir: str):
+def _read_corpus_chunks(advisor_dir: str, corpus_file=None):
     """Читает advisors/<name>/corpus.jsonl и режет на осмысленные пассажи.
 
     Наш корпус может хранить весь отрывок одной строкой (одна большая `text`) — для
@@ -100,7 +100,7 @@ def _read_corpus_chunks(advisor_dir: str):
     Дефолт chunk_chars=500 — согласован с калибровкой abstain_threshold (semantic 0.50)
     в board_config.json на реальном корпусе. Меньший чанк требует пере-калибровки порога."""
     chunk_chars = int(os.getenv("TIER_CHUNK_CHARS", "500"))
-    path = corpus_path(advisor_dir)
+    path = corpus_file or corpus_path(advisor_dir)
     if not os.path.isfile(path):
         raise FileNotFoundError(f"нет корпуса: {path}")
 
@@ -134,12 +134,22 @@ def _read_corpus_chunks(advisor_dir: str):
     return passages
 
 
-def _paths(advisor_dir: str):
+def _legacy_paths(advisor_dir: str):
     name = os.path.basename(advisor_dir.rstrip("/")) or "advisor"
     os.makedirs(DATA_DIR, exist_ok=True)
     emb = os.path.join(DATA_DIR, f"embeddings_{name}.npy")
     meta = os.path.join(DATA_DIR, f"embeddings_{name}.meta.json")
     return emb, meta
+
+
+def _paths(advisor_dir: str):
+    """Paths inside one active snapshot; data/ remains the pre-generation fallback."""
+    from corpusbuild import pipeline
+    generation = pipeline.active_generation_dir(advisor_dir)
+    if generation:
+        return (os.path.join(generation, "embeddings.npy"),
+                os.path.join(generation, "embeddings.meta.json"))
+    return _legacy_paths(advisor_dir)
 
 
 # -------------------------------------------------------------- fingerprint (staleness)
@@ -172,30 +182,38 @@ def _fingerprint_matches(meta: dict, advisor_dir: str) -> bool:
 
 
 # --------------------------------------------------------------- build_index
-def build_index(advisor_dir: str) -> None:
-    """Строит семантический индекс для advisors/<name>/corpus.jsonl вшитым embed_batch
-    (батч bge-m3 через ollama). Сохраняет нормированную матрицу в data/embeddings_<name>.npy
-    и пассажи (text/source) в .meta.json."""
-    passages = _read_corpus_chunks(advisor_dir)
-    emb_path, meta_path = _paths(advisor_dir)
-
-    # вшитый эмбеддинг-примитив: батчи через ollama /api/embed (вектора нормируем ниже).
+def _write_index(passages, emb_path: str, meta_path: str, fingerprint: dict) -> None:
+    """Write only into a private staging directory (or legacy data/ fallback)."""
     batch = int(os.getenv("EMBED_BATCH", "64"))
     vecs = []
     for i in range(0, len(passages), batch):
         chunk_texts = [p["text"] for p in passages[i:i + batch]]
         vecs.extend(embed_batch(chunk_texts))
-    M = np.asarray(vecs, dtype=np.float32)
-    # на всякий случай нормируем (embed_batch уже отдаёт |v|=1, но не зависим от этого).
-    M = M / (np.linalg.norm(M, axis=1, keepdims=True) + 1e-9)
+    matrix = np.asarray(vecs, dtype=np.float32)
+    matrix = matrix / (np.linalg.norm(matrix, axis=1, keepdims=True) + 1e-9)
+    with open(emb_path, "wb") as handle:
+        np.save(handle, matrix)
+    with open(meta_path, "w", encoding="utf-8") as handle:
+        json.dump({"fingerprint": fingerprint, "model": EMBED_MODEL, "passages": passages},
+                  handle, ensure_ascii=False)
 
-    np.save(emb_path, M)
-    json.dump(
-        {"fingerprint": _index_fingerprint(advisor_dir),
-         "model": EMBED_MODEL, "passages": passages},   # model оставлен для отображения/бэк-компат
-        open(meta_path, "w", encoding="utf-8"),
-        ensure_ascii=False,
-    )
+
+def build_index(advisor_dir: str) -> None:
+    """Строит семантический индекс для advisors/<name>/corpus.jsonl вшитым embed_batch
+    (батч bge-m3 через ollama). Сохраняет нормированную матрицу в data/embeddings_<name>.npy
+    и пассажи (text/source) в .meta.json."""
+    from corpusbuild import pipeline
+    stage, token = pipeline.stage_generation(advisor_dir)
+    try:
+        passages = _read_corpus_chunks(advisor_dir,
+                                       corpus_file=os.path.join(stage, "corpus.jsonl"))
+        _write_index(passages, os.path.join(stage, "embeddings.npy"),
+                     os.path.join(stage, "embeddings.meta.json"),
+                     _index_fingerprint(advisor_dir))
+        pipeline.publish_generation(advisor_dir, stage, token)
+    except BaseException:
+        pipeline.discard_staging(stage)
+        raise
 
 
 # ------------------------------------------------------------------ retrieve
@@ -215,6 +233,9 @@ def retrieve(question: str, advisor_dir: str, top_k: int = 3, rerank: bool = Fal
     emb_path, meta_path = _paths(advisor_dir)
     if not (os.path.isfile(emb_path) and os.path.isfile(meta_path)):
         build_index(advisor_dir)
+        # build_index publishes a new immutable generation; retain no paths from the
+        # previous snapshot.
+        emb_path, meta_path = _paths(advisor_dir)
 
     meta = json.load(open(meta_path, encoding="utf-8"))
     # Fail-closed staleness (спека 2026-07-18 §1.3, Вариант B): устаревший индекс НЕ используем.

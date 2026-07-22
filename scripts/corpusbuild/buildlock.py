@@ -1,9 +1,10 @@
 """build.lock.json — воспроизводимость: хеши источников + config + счётчики тиров + gov_head.
 built_at передаётся аргументом (в скриптах нет argless-времени для детерминизма)."""
-import os, sys, json, hashlib
+import os, sys, hashlib
 from collections import Counter
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # corpusbuild/ → scripts/
+from file_atomic import atomic_write_json
 from . import paths
 
 
@@ -38,9 +39,7 @@ def write_lock(advisor_dir: str, config: dict, chunks, built_at: str) -> dict:
     from .apparatus import TIERING_VERSION
     lock = {"built_at": built_at, "tiering_version": TIERING_VERSION, "config": config,
             "sources": sources, "counts": counts, "gov_head": _gov_head(chunks)}
-    os.makedirs(paths.build_dir(advisor_dir), exist_ok=True)
-    with open(paths.lock_path(advisor_dir), "w", encoding="utf-8") as f:
-        json.dump(lock, f, ensure_ascii=False, indent=2)
+    atomic_write_json(paths.lock_path(advisor_dir), lock, ensure_ascii=False, indent=2)
     # Якорь ВНЕ подменяемой папки: легитимная сборка регистрирует голову в gov_heads.json
     # (корень доски) — verify_advisor ловит подмену советника ЦЕЛИКОМ (самосогласованный
     # двойник несёт свои lock'и, но якорь унести не может). Советник вне корня → no-op.

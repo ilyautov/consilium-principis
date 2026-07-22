@@ -44,6 +44,17 @@ decision-calc (`validate_decision_map`/`run_calculation`/`save_decision_map`, т
 ```bash
 python3 ~/consilium-principis/scripts/board.py mcp-install
 ```
+
+На Windows используй вместо этой строки:
+
+```powershell
+py -3 ~/consilium-principis/scripts/board.py mcp-install
+```
+
+Если `py` отсутствует, сначала проверь, что `python` — настоящий Python 3.10+
+(`python -c "import sys; assert sys.version_info >= (3, 10)"`), затем замени `py -3` на `python`.
+Не используй Store-alias `python3`.
+
 Скрипт сам впишет сервер в конфиг Claude Desktop, **сохранив соседние серверы**, сделает бэкап и
 подставит пути. Хочешь сперва увидеть, что изменится, добавь в конец `--dry-run`.
 Затем **полностью перезапусти Claude Desktop** (у локальных серверов нет горячей перезагрузки).
@@ -62,6 +73,10 @@ python3 ~/consilium-principis/scripts/board.py mcp-install
 cd ~/consilium-principis
 python3 scripts/board.py mcp-config        # гайд под все хосты
 python3 scripts/board.py mcp-config --json # только JSON-сниппет
+```
+На Windows:
+```powershell
+py -3 scripts/board.py mcp-config --json
 ```
 Вид сниппета (см. `mcp.example.json`):
 ```json
@@ -93,6 +108,8 @@ python3 scripts/board.py mcp-config --json # только JSON-сниппет
   машины). В репозиторий едет только `mcp.example.json`.
 - Хочешь проверить здоровье явно, зови тул **`doctor`** (Python, тир, самотест рва: P1-фрагмент → 🔵,
   фейк → None); стартовый совет вручную через **`seed_council`**.
+- **Windows:** для ручного `mcp-install` и генератора используй `py -3` по инструкции выше; полный
+  разбор и fallback лежат в [`docs/CONNECT-HOSTS.md`](docs/CONNECT-HOSTS.md#Windows-используй-сгенерированный-конфиг).
 
 </details>
 

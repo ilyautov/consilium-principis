@@ -269,6 +269,17 @@ python3 scripts/board.py mcp-config --json  # только JSON-сниппет
 запущенному интерпретатору** (`sys.executable`); `mcp-install` делает то же при мердже Claude
 Desktop-конфига. MCPB-бандл отдельно использует Windows Python Launcher `py -3`.
 
+На Windows запускай генератор и авто-мердж так:
+
+```powershell
+py -3 scripts/board.py mcp-config --json
+py -3 scripts/board.py mcp-install
+```
+
+Если `py` не установлен, используй `python` только после проверки, что это реальный Python 3.10+
+(`python -c "import sys; assert sys.version_info >= (3, 10)"`), и замени им `py -3`. Не используй
+Store-alias `python3`: он может открыть магазин вместо запуска скрипта.
+
 Windows CI проверяет launcher, выбор конфигов и stdio `initialize`/`tools/list`, но не настоящий
 запуск конкретного хоста. Поэтому этот путь экспериментальный: проверь сгенерированный конфиг в
 своём хосте и сообщи о результате через [SUPPORT.md](../SUPPORT.md).

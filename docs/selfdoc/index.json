@@ -4,7 +4,7 @@
     "rule_count": 19,
     "recipe_count": 16,
     "script_count": 71,
-    "test_count": 163,
+    "test_count": 165,
     "glossary_count": 113
   },
   "tools": [
@@ -1926,7 +1926,7 @@
     {
       "path": "scripts/file_atomic.py",
       "subsystem": "other",
-      "doc": "Small, neutral helpers for atomically publishing text files."
+      "doc": "Small, neutral helpers for locked, atomically published state files."
     },
     {
       "path": "scripts/gen_golden.py",
@@ -2481,6 +2481,10 @@
       "covers": "gen selfdoc"
     },
     {
+      "path": "tests/test_generation_publication.py",
+      "covers": "generation publication"
+    },
+    {
       "path": "tests/test_golden_meta.py",
       "covers": "golden meta"
     },
@@ -2671,6 +2675,10 @@
     {
       "path": "tests/test_principis.py",
       "covers": "principis"
+    },
+    {
+      "path": "tests/test_private_state_collisions.py",
+      "covers": "private state collisions"
     },
     {
       "path": "tests/test_proof_card.py",

@@ -138,3 +138,78 @@ def test_reader_uses_old_complete_generation_while_new_index_is_staged(tmp_path,
     # Open readers retain a valid old generation after the pointer moves.
     assert os.path.isfile(os.path.join(old_generation, "corpus.jsonl"))
     assert os.path.isfile(os.path.join(old_generation, "embeddings.npy"))
+
+
+def test_competing_index_and_corpus_publishers_both_commit_in_order(tmp_path, monkeypatch):
+    advisor = _advisor(tmp_path)
+    pipeline.build(str(advisor), built_at="old")
+    started = threading.Event()
+    release = threading.Event()
+    errors = []
+
+    def slow_embed(texts):
+        started.set()
+        assert release.wait(timeout=5)
+        return _fake_embed(texts)
+
+    monkeypatch.setattr(tier_full, "embed_batch", slow_embed)
+    indexer = threading.Thread(target=lambda: _run(lambda: tier_full.build_index(str(advisor)), errors))
+    indexer.start()
+    assert started.wait(timeout=5)
+    (advisor / "sources" / "book.txt").write_text("New counsel. " * 80, encoding="utf-8")
+    builder = threading.Thread(target=lambda: _run(
+        lambda: pipeline.build(str(advisor), built_at="new"), errors))
+    builder.start()
+
+    release.set()
+    indexer.join(timeout=5)
+    builder.join(timeout=5)
+    assert not indexer.is_alive() and not builder.is_alive()
+    assert errors == []
+    lock = json.load(open(os.path.join(paths.build_dir(str(advisor)), "build.lock.json"), encoding="utf-8"))
+    assert lock["built_at"] == "new"
+    assert "New counsel" in open(paths.corpus_path(str(advisor)), encoding="utf-8").read()
+
+
+def test_windows_pointer_falls_back_to_non_privileged_junction(tmp_path, monkeypatch):
+    target = tmp_path / "generation"
+    pointer = tmp_path / "build-pointer"
+    target.mkdir()
+    calls = []
+
+    monkeypatch.setattr(pipeline.os, "symlink", lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("privilege")))
+    monkeypatch.setattr(pipeline.subprocess, "run",
+                        lambda args, **kwargs: calls.append((args, kwargs)))
+
+    pipeline._make_directory_pointer(str(target), str(pointer), platform_name="nt")
+
+    assert calls == [(["cmd", "/c", "mklink", "/J", str(pointer), str(target)],
+                      {"check": True, "capture_output": True, "text": True})]
+
+
+def test_completed_directory_pointer_is_recognised_without_symlink_metadata(tmp_path):
+    advisor = tmp_path / "advisor"
+    build = advisor / "build"
+    build.mkdir(parents=True)
+    (build / ".generation.json").write_text('{"completed": true}\n', encoding="utf-8")
+
+    assert pipeline.active_generation_dir(str(advisor)) == os.path.realpath(build)
+
+
+def test_snapshot_fingerprint_remains_valid_after_pointer_moves(tmp_path):
+    advisor = _advisor(tmp_path)
+    pipeline.build(str(advisor), built_at="old")
+    tier_full.build_index(str(advisor))
+    corpus_file, _emb, meta_file = tier_full._reader_snapshot(str(advisor))
+    meta = json.load(open(meta_file, encoding="utf-8"))
+    (advisor / "sources" / "book.txt").write_text("New counsel. " * 80, encoding="utf-8")
+    pipeline.build(str(advisor), built_at="new")
+
+    assert tier_full._fingerprint_matches(meta, str(advisor), corpus_file=corpus_file)
+
+
+def _run(operation, errors):
+    try:
+        operation()
+    except BaseException as exc:  # test reports publication failures from worker threads
+        errors.append(exc)

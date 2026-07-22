@@ -26,6 +26,7 @@ import os
 import re
 import sys
 import json
+import hashlib
 import urllib.request
 
 import numpy as np
@@ -160,25 +161,33 @@ def _effective_chunk_chars() -> int:
     return int(os.getenv("TIER_CHUNK_CHARS", "500"))
 
 
-def _index_fingerprint(advisor_dir: str) -> dict:
+def _corpus_digest(path: str):
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for block in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def _index_fingerprint(advisor_dir: str, corpus_file=None) -> dict:
     """Отпечаток, связывающий индекс с {корпус, модель, чанкинг, формат}. Зеркало staleness
     load_calibration: рассинхрон ЛЮБОГО поля = индекс устарел (fail-closed). corpus_sha256 —
     ЕДИНЫЙ хэшер (engine.corpus_sha256, не форкать)."""
     return {
-        "corpus_sha256": corpus_sha256(advisor_dir),
+        "corpus_sha256": _corpus_digest(corpus_file) if corpus_file else corpus_sha256(advisor_dir),
         "embed_model": EMBED_MODEL,
         "chunk_chars": _effective_chunk_chars(),
         "index_version": INDEX_VERSION,
     }
 
 
-def _fingerprint_matches(meta: dict, advisor_dir: str) -> bool:
+def _fingerprint_matches(meta: dict, advisor_dir: str, corpus_file=None) -> bool:
     """True только при полном совпадении сохранённого fingerprint с текущим. Легаси-мета без
     поля 'fingerprint' → False (fail-closed, как калибровка без corpus_sha256)."""
     stored = (meta or {}).get("fingerprint")
     if not isinstance(stored, dict):
         return False
-    return stored == _index_fingerprint(advisor_dir)
+    return stored == _index_fingerprint(advisor_dir, corpus_file=corpus_file)
 
 
 # --------------------------------------------------------------- build_index
@@ -198,22 +207,37 @@ def _write_index(passages, emb_path: str, meta_path: str, fingerprint: dict) -> 
                   handle, ensure_ascii=False)
 
 
+def _reader_snapshot(advisor_dir: str):
+    """Resolve corpus and index paths once so a pointer switch cannot mix generations."""
+    from corpusbuild import pipeline
+    generation = pipeline.active_generation_dir(advisor_dir)
+    if generation:
+        return (os.path.join(generation, "corpus.jsonl"),
+                os.path.join(generation, "embeddings.npy"),
+                os.path.join(generation, "embeddings.meta.json"))
+    # Keep the historical _paths seam for legacy integrations and tests.
+    emb_path, meta_path = _paths(advisor_dir)
+    legacy_corpus = corpus_path(advisor_dir)
+    return (legacy_corpus if os.path.isfile(legacy_corpus) else None), emb_path, meta_path
+
+
 def build_index(advisor_dir: str) -> None:
     """Строит семантический индекс для advisors/<name>/corpus.jsonl вшитым embed_batch
     (батч bge-m3 через ollama). Сохраняет нормированную матрицу в data/embeddings_<name>.npy
     и пассажи (text/source) в .meta.json."""
     from corpusbuild import pipeline
-    stage, token = pipeline.stage_generation(advisor_dir)
-    try:
-        passages = _read_corpus_chunks(advisor_dir,
-                                       corpus_file=os.path.join(stage, "corpus.jsonl"))
-        _write_index(passages, os.path.join(stage, "embeddings.npy"),
-                     os.path.join(stage, "embeddings.meta.json"),
-                     _index_fingerprint(advisor_dir))
-        pipeline.publish_generation(advisor_dir, stage, token)
-    except BaseException:
-        pipeline.discard_staging(stage)
-        raise
+    with pipeline.publisher_lock(advisor_dir):
+        stage, token = pipeline.stage_generation(advisor_dir)
+        corpus_file = os.path.join(stage, "corpus.jsonl")
+        try:
+            passages = _read_corpus_chunks(advisor_dir, corpus_file=corpus_file)
+            _write_index(passages, os.path.join(stage, "embeddings.npy"),
+                         os.path.join(stage, "embeddings.meta.json"),
+                         _index_fingerprint(advisor_dir, corpus_file=corpus_file))
+            pipeline.publish_generation(advisor_dir, stage, token)
+        except BaseException:
+            pipeline.discard_staging(stage)
+            raise
 
 
 # ------------------------------------------------------------------ retrieve
@@ -230,18 +254,18 @@ def retrieve(question: str, advisor_dir: str, top_k: int = 3, rerank: bool = Fal
 
     Мирроринг косинусной логики SemanticRetriever.query Гефеста (Mn @ qv), но поверх
     нашего корпуса. rerank=True → реюз reranker_model.CrossEncoderReranker."""
-    emb_path, meta_path = _paths(advisor_dir)
+    corpus_file, emb_path, meta_path = _reader_snapshot(advisor_dir)
     if not (os.path.isfile(emb_path) and os.path.isfile(meta_path)):
         build_index(advisor_dir)
         # build_index publishes a new immutable generation; retain no paths from the
         # previous snapshot.
-        emb_path, meta_path = _paths(advisor_dir)
+        corpus_file, emb_path, meta_path = _reader_snapshot(advisor_dir)
 
     meta = json.load(open(meta_path, encoding="utf-8"))
     # Fail-closed staleness (спека 2026-07-18 §1.3, Вариант B): устаревший индекс НЕ используем.
     # Не авто-rebuild в hot-path — поднимаем StaleIndexError; safe_retrieve деградирует на lexical
     # (наблюдаемо), явная пересборка живёт в pipeline/doctor. Легаси-мета без fingerprint → stale.
-    if not _fingerprint_matches(meta, advisor_dir):
+    if not _fingerprint_matches(meta, advisor_dir, corpus_file=corpus_file):
         raise StaleIndexError(
             f"семантический индекс '{os.path.basename(advisor_dir.rstrip('/'))}' устарел: "
             "fingerprint (corpus_sha256/embed_model/chunk_chars/index_version) не совпал с текущим "

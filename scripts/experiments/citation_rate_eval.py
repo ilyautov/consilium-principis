@@ -6,7 +6,7 @@
 без сети/ollama). Это НЕ доказательство рва третьей стороной — это проверка внутренней
 консистентности гейта (он не пропускает невериф. как 🔵/🟢) + baseline-контраст с голым LLM.
 Статистика (bootstrap-CI) переиспользована из antisycophancy_probe (DRY).
-Спека: docs/superpowers/specs/2026-07-11-citation-rate-eval-design.md
+Спека: внутренний дизайн-док (citation rate eval).
 """
 import os
 import sys

@@ -1966,7 +1966,7 @@
     {
       "path": "scripts/lens_builder.py",
       "subsystem": "other",
-      "doc": "Интерактивный билдер линз (направление «линзы > личности», docs/dev/2026-06-30-lenses-over-"
+      "doc": "Интерактивный билдер линз (направление «линзы > личности», внутренний дизайн-док). Линза = advisor-каталог; строится тем же corpusbuild.pipeline. Три конфигурации"
     },
     {
       "path": "scripts/lenses.py",

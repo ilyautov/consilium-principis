@@ -65,7 +65,7 @@ def get_figure(data, fid):
 def rights_clear(fig):
     """True только если СЕЯНАЯ фигура несёт полностью очищенные права (fail-closed).
 
-    Ров легальности (docs/dev/legal-posture-2026-07): публично сеем ТОЛЬКО давно-умерших на
+    Ров легальности: публично сеем ТОЛЬКО давно-умерших на
     public-domain текстах. rights-блок обязан нести:
       - death_year (int) — тексты в PD (жизнь+70, ГК РФ ст.1281/1282);
       - text_status == "public_domain";

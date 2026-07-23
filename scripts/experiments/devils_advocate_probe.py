@@ -8,7 +8,7 @@
 Рантайм НЕ импортирует этот модуль. Он читает живые INSTRUCTIONS read-only,
 гоняет батарею решений-сценариев baseline vs devils_advocate через
 инъектируемый call=, судит по 3 осям.
-Спека: docs/superpowers/specs/2026-07-12-council-rituals-design.md (пункт B)
+Спека: внутренний дизайн-док (council rituals, пункт B).
 """
 import os
 import sys

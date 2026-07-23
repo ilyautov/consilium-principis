@@ -1,6 +1,6 @@
 """Гарды языкового выключателя CONSILIUM_LANG. Форс-блок фиксирует язык ответа поверх
 автоподстройки en_bottom, НЕ ослабляя безопасность (клауза Правила 0). Спека:
-docs/superpowers/specs/2026-07-18-language-config-design.md."""
+внутренний дизайн-док (language config)."""
 import os
 import sys
 

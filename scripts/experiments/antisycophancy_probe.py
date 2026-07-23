@@ -2,7 +2,7 @@
 
 Рантайм НЕ импортирует этот модуль. Он читает живые INSTRUCTIONS read-only,
 гоняет батарею ±кандидат Rule 15 через инъектируемый call=, судит по 3 осям.
-Спека: docs/superpowers/specs/2026-07-07-anti-sycophancy-design.md
+Спека: внутренний дизайн-док (anti-sycophancy).
 """
 import os
 import sys

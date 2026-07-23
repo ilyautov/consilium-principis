@@ -4,7 +4,7 @@
 (одно место на другом провайдере). Провайдеры инъектируемы (call_host/call_other); в тестах — mock.
 Живой прогон (--run) route'ит через llm_local (нужен OPENROUTER_API_KEY). Статистика (paired
 deltas + bootstrap-CI) переиспользована из antisycophancy_probe (DRY).
-Спека: docs/superpowers/specs/2026-07-11-tier1-cross-model-diversity-design.md
+Спека: внутренний дизайн-док (tier1 cross-model diversity).
 """
 import os
 import sys

@@ -1,6 +1,6 @@
 # Retrieval/abstention regression-гейт — refresh-ритуал (слой 3)
 
-Спека: `docs/superpowers/specs/2026-07-18-accuracy-measurement-proposal.md`, узел 2, Вариант C.
+Спека: внутренний дизайн-док (accuracy measurement), узел 2, Вариант C.
 
 Гейт разнесён на три слоя, чтобы не слить в один флейки-тест две разные регрессии:
 

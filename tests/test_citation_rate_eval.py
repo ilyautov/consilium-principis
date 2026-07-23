@@ -2,7 +2,7 @@
 
 Гейт (_fidelity_check) — единственный источник правды, переиспользован как есть, не мокается.
 Фикстура-корпус построена по паттерну tests/test_fidelity_tiers.py (build/corpus.jsonl, tier).
-Спека: docs/superpowers/specs/2026-07-11-citation-rate-eval-design.md
+Спека: внутренний дизайн-док (citation rate eval).
 """
 import os
 import sys

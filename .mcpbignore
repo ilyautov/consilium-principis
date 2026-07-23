@@ -33,6 +33,12 @@ POSITIONING-*.md
 data/embeddings*.npy
 data/embeddings*.meta.json
 scripts/golden/
+# DEV/RESEARCH-СКРИПТЫ И ФИКСТУРЫ (в рантайме не импортятся — только раздувают бандл)
+scripts/experiments/
+scripts/demo/
+scripts/moat_battery/
+requirements/
+article-*.md
 mcp.json
 server.json
 .github/

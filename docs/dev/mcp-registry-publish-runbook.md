@@ -23,8 +23,9 @@ The registry is in preview; check the current
 - Pushing a release tag is the normal release path.
 - Manual dispatch requires an existing immutable `vX.Y.Z` Git tag. It checks out and
   verifies that exact tag, then reconciles its GitHub release: a missing release is
-  created, while an existing release's two assets must compare byte-for-byte with the
-  newly built assets.
+  created, while an existing release's two immutable assets are downloaded and checked
+  with the release validator. MCPB packaging includes ZIP timestamps, so rebuilding the
+  same source later is not a byte-for-byte reproducibility check.
 - Manual dispatch never overwrites release assets or moves a tag. Treat the failed
   `v0.1.1` release run as historical evidence, not as a release to overwrite.
 

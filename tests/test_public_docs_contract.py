@@ -61,7 +61,8 @@ NUMERIC_TOOL_COUNT = re.compile(
     r"(?:\b\d+(?:[.,]\d+)?\s*[-–—]?\s*(?:MCP[\s-]*)?"
     r"(?:tools?|тул(?:ов|а|ы)?)\b|\b(?:MCP[\s-]*)?"
     r"(?:tools?|тул(?:ов|а|ы)?)\s*(?:count\s*)?"
-    r"(?:(?::|\()|\bis\b|[-–—])?\s*\d+\b)",
+    r"(?:(?::|\()|\bis\b|[-–—=])?\s*\d+\b|"
+    r"\bколичество\s+(?:MCP[\s-]*)?тул(?:ов|а|ы)?\s*=\s*\d+\b)",
     re.I,
 )
 
@@ -90,6 +91,8 @@ def test_connect_docs_do_not_hard_code_tool_count():
         "tools 72",
         "tools — 72",
         "MCP tool count is 72",
+        "tools = 72",
+        "количество MCP-тулов = 72",
     ),
 )
 def test_numeric_tool_count_pattern_rejects_count_first_and_label_first_forms(expression):
@@ -231,16 +234,19 @@ def test_host_status_matrix_keeps_the_same_hosts_and_warning_level_in_both_langu
         return status
 
     def matrix(path):
+        in_host_table = False
         rows = []
         for line in (ROOT / path).read_text(encoding="utf-8").splitlines():
             cells = [cell.strip() for cell in line.split("|")]
-            if len(cells) == 6 and cells[0] == cells[-1] == "" and cells[1] != "---":
-                name = normalized_names.get(cells[1], cells[1])
-                if name in {
-                    "Claude Code", "Claude Desktop", "Cursor", "Codex / OpenAI-style CLI",
-                    "Gemini CLI", "Universal MCP host",
-                }:
-                    rows.append((name, status_class(cells[4])))
+            if len(cells) != 6 or not (cells[0] == cells[-1] == ""):
+                if in_host_table:
+                    break
+                continue
+            if cells[1] in {"Host", "Хост"}:
+                in_host_table = True
+                continue
+            if in_host_table and cells[1] != "---":
+                rows.append((normalized_names.get(cells[1], cells[1]), status_class(cells[4])))
         return rows
 
     expected = [
@@ -252,7 +258,11 @@ def test_host_status_matrix_keeps_the_same_hosts_and_warning_level_in_both_langu
         ("Gemini CLI", "unverified"),
         ("Universal MCP host", "host-dependent"),
     ]
-    assert matrix("docs/CONNECT-HOSTS.en.md") == matrix("docs/CONNECT-HOSTS.md") == expected
+    english = matrix("docs/CONNECT-HOSTS.en.md")
+    russian = matrix("docs/CONNECT-HOSTS.md")
+    assert set(english) == set(russian) == set(expected)
+    assert [name for name, _ in english] == [name for name, _ in russian] == [name for name, _ in expected]
+    assert english == russian == expected
 
 
 def test_build_manual_check_is_reproducible():

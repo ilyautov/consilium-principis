@@ -77,11 +77,19 @@ For the complete source, manifest, and validation recipe, see
 - Convene a board: “convene a board about [question]”.
 - Calculate a decision: “let’s calculate which is better, X or Y”. The board builds a decision map
   and runs deterministic Monte Carlo over your inputs.
-- Add an advisor or lens: ask in natural language, or use `board.py build-advisor`.
+- Add an advisor or lens: ask in natural language, or use `board.py build-advisor`. Guard against an
+  echo chamber with `python3 scripts/diversity_check.py advisors/<a> advisors/<b> ...`.
 - Enable FULL retrieval: `python3 scripts/board.py setup-full`.
 - Connect an MCP host: start with `python3 scripts/board.py mcp-config --json`. On Windows use
   `py -3 scripts/board.py mcp-config --json`; if `py` is unavailable, confirm that `python` is
   Python 3.10+ before using it. Do not use the Store `python3` alias.
+
+The board replies in your language automatically; force it with `CONSILIUM_LANG=ru` or
+`CONSILIUM_LANG=en` in the environment.
+
+The fidelity contour travels with every answer, at any retrieval tier: 🔵 the author's words (P1/P2)
+· 🟢 verbatim commentary (S1, attributed) · 🟡 an inference · 📐 a calculation (your model, not a
+quote) · abstention outside the corpus.
 
 Detailed MCP instructions are in [`CONNECT-MCP.en.md`](CONNECT-MCP.en.md); the status of each host
 is in [`docs/CONNECT-HOSTS.en.md`](docs/CONNECT-HOSTS.en.md).

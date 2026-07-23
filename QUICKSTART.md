@@ -100,5 +100,7 @@ python3 scripts/eval.py advisors/<имя>                       # 🔵 verified 
   подробности в [`CONNECT-MCP.md`](CONNECT-MCP.md). Из корня чекаута сначала сгенерируй конфиг:
   `python3 scripts/board.py mcp-config --json` (**Windows:** `py -3 scripts/board.py mcp-config --json`; если
   `py` нет, проверь Python 3.10+ и используй `python`, не Store-alias `python3`).
+- **Язык ответа:** совет отвечает на твоём языке автоматически; принудительно — `CONSILIUM_LANG=ru`
+  или `CONSILIUM_LANG=en` в окружении.
 - **Контур всегда с тобой:** 🔵 слова автора (P1/P2) · 🟢 дословный комментарий (S1, с атрибуцией) ·
   🟡 перенос · 📐 расчёт (твоя модель, не цитата) · отказ вне корпуса. На любом тире поиска.

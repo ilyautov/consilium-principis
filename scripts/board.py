@@ -6,6 +6,7 @@
   ingest-telegram <@h>   — выкачать публичный канал в корпус-Принцепса (твои слова = P1)
   validate-manifest <d>  — проверить тир-манифест советника (маркеры реально в тексте? ров цел?)
   build-advisor <d>      — собрать советника в один шаг: манифест-гейт → corpus → kernels → индекс
+  scaffold-persona <d>   — записать стартовый persona.md советнику (заполнить lenses/domains руками)
   seed-council           — собрать стартовый совет PD-мудрецов с нуля (Аврелий + Эпиктет)
   doctor                 — health-check: Python, скилл установлен, тир, самотест рва
   setup-full             — поднять FULL-тир: инструкция по ollama + авто-pull модели bge-m3
@@ -59,6 +60,27 @@ def cmd_principis(args):
         f.write(scaffold_principis(answers))
     print(f"✓ principis.md собран (подача={answers.get('interface_mode', 'rigor')}). "
           f"Вектор держим живым — совет допросит на первом заседании.")
+    return 0
+
+
+def cmd_scaffold_persona(args):
+    """Записать стартовый persona.md советнику (F2: рецепт не круговой). Тот же шаблон, что и seed.
+    Не затирает без --force. Имя фигуры: --name «...» (иначе берётся из имени папки-слага)."""
+    from scaffold import scaffold_persona
+    paths = [a for a in args if not a.startswith("--")]
+    if not paths:
+        print("дай advisors/{имя}  [--name «Имя фигуры»]")
+        return 1
+    adv = paths[0]
+    name = args[args.index("--name") + 1] if "--name" in args else os.path.basename(adv.rstrip("/"))
+    out = os.path.join(adv, "persona.md")
+    if os.path.isfile(out) and "--force" not in args:
+        print("persona.md уже есть — добавь --force чтобы перезаписать (или правь руками)")
+        return 1
+    os.makedirs(adv, exist_ok=True)
+    with open(out, "w", encoding="utf-8") as f:
+        f.write(scaffold_persona(name))
+    print(f"✓ {out} создан — заполни lenses/domains и секции (без них diversity_check не судит).")
     return 0
 
 
@@ -256,6 +278,7 @@ def cmd_render_session(args):
 
 CMDS = {"status": cmd_status, "principis": cmd_principis, "ingest-telegram": cmd_ingest_telegram,
         "validate-manifest": cmd_validate_manifest, "build-advisor": cmd_build_advisor,
+        "scaffold-persona": cmd_scaffold_persona,
         "doctor": cmd_doctor, "seed-council": cmd_seed_council, "setup-full": cmd_setup_full,
         "recipes": cmd_recipes, "render-session": cmd_render_session,
         "mcp-config": cmd_mcp_config, "mcp-install": cmd_mcp_install}

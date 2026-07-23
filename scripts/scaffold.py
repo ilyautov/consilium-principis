@@ -52,6 +52,35 @@ def scaffold_principis(answers):
     )
 
 
+def scaffold_persona(name, lenses=None, domains=None):
+    """Минимальный ВАЛИДНЫЙ persona.md для нового советника — единый шаблон (F2).
+
+    Читается тем же parse_frontmatter_list/load_advisor, что и настоящие persona.md.
+    lenses/domains по умолчанию ПУСТЫ: seed не знает их за юзера, а пустые списки заставляют
+    diversity_check вернуть честный insufficient_data с подсказкой заполнить, вместо ложного
+    score. Формат списков — `key: [a, b]` (в скобках), как ждёт parse_frontmatter_list.
+    Заполнение lenses/domains — шаг юзера (рецепт advisors/README)."""
+    def _fmt(xs):
+        return "[" + ", ".join(x for x in (xs or []) if x) + "]"
+    nm = (name or "—").strip() or "—"
+    return (
+        f"---\nname: {nm}\nlenses: {_fmt(lenses)}\ndomains: {_fmt(domains)}\n---\n"
+        f"\n# {nm}\n"
+        f"\n<!-- Стартовый persona.md (записан seed). Заполни поля — и советник заработает в полную силу. -->\n"
+        f"\n## Метаданные разнообразия (обязательно)\n"
+        f"Впиши во фронтматер выше:\n"
+        f"  · lenses  — линзы/методы, через которые фигура думает (напр.: [инверсия, memento-mori])\n"
+        f"  · domains — области, где её совет весомее (напр.: [стратегия, этика])\n"
+        f"Без них diversity_check судить состав не может (эхо-камера vs разнообразие).\n"
+        f"\n## Как эта фигура спорит\n"
+        f"_(1–2 абзаца о манере рассуждения — оставлено для заполнения)_\n"
+        f"\n## Чего не делает (never_do / never_quote)\n"
+        f"_(чего фигура точно НЕ говорила/не советовала — защита от фейк-цитат)_\n"
+        f"\n## Заземление\n"
+        f"Источник корпуса и тиры — в `sources/manifest.json` (выверены при seed).\n"
+    )
+
+
 def next_step(pf):
     """Приоритетная следующая сборка по preflight. {action, why, say} — что/зачем (why: техн. лог)
     и `say`: то же человеческим языком для не-технического юзера (хост показывает ЕГО, не why)."""

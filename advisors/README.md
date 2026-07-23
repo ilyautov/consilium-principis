@@ -28,11 +28,12 @@ python3 scripts/collect_pd.py advisors/<slug> --url <gutenberg-url>
 python3 scripts/board.py validate-manifest advisors/<slug>
 # 3) собрать целиком: манифест-гейт → corpus → kernels → семантический индекс (graceful без ollama)
 python3 scripts/board.py build-advisor advisors/<slug>
-# 4) написать advisors/<slug>/persona.md (структуру повторяй с уже собранного советника)
+# 4) стартовый persona.md (шаблон) — потом заполни lenses/domains и секции руками
+python3 scripts/board.py scaffold-persona advisors/<slug> --name "Имя фигуры"
 # 5) golden-набор в scripts/golden/<slug>.{retrieval,abstention}.jsonl и проверка
 python3 scripts/eval.py advisors/<slug>
 ```
 
-Структуру `persona.md` (конституция / как спорит / never_do+never_quote / quote_bank 🔵 / challenge)
-повторяй с любого уже собранного советника. Проверить отдельную цитату:
+`scaffold-persona` (шаг 4) кладёт готовый скелет `persona.md` (имя + пустые lenses/domains + секции
+конституция / как спорит / never_do+never_quote / заземление) — заполни его под фигуру. Проверить отдельную цитату:
 `from engine.fidelity import best_match` → `best_match("<цитата>", "advisors/<slug>")` → `('P1', источник)` = годна на 🔵.

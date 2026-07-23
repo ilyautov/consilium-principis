@@ -5,6 +5,14 @@ versions — [SemVer](https://semver.org/). Dates in ISO (YYYY-MM-DD).
 
 ## [Unreleased]
 
+### Fixed
+- `seed-council` now writes a starter `persona.md` for each seeded advisor, so `diversity_check`
+  recognizes a fresh board instead of erroring on missing metadata.
+
+### Added
+- `board.py scaffold-persona <dir>` — write a starter `persona.md` template for a hand-built
+  advisor, resolving the previously circular recipe reference.
+
 ## [0.1.2] — 2026-07-23
 
 ### Fixed
@@ -114,4 +122,4 @@ offline on pure stdlib.
 [Unreleased]: https://github.com/ilyautov/consilium-principis/compare/v0.1.2...HEAD
 [0.1.2]: https://github.com/ilyautov/consilium-principis/releases/tag/v0.1.2
 [0.1.1]: https://github.com/ilyautov/consilium-principis/releases/tag/v0.1.1
-[0.1.0]: https://github.com/ilyautov/consilium-principis/releases/tag/v0.1.0
+[0.1.0]: https://github.com/ilyautov/consilium-principis/tree/v0.1.0

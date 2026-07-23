@@ -5,11 +5,12 @@
 один приоритетный шаг по состоянию доски (preflight). Вектор НЕ фиксируем — пробел держим
 живым (совет допрашивает), это из спора про вектор-как-зеркало.
 """
-import os, sys, tempfile
+import os, re, sys, tempfile
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "scripts"))
-from scaffold import scaffold_principis, next_step
+from scaffold import scaffold_principis, next_step, scaffold_persona
 from principis import load_principis
+from diversity_check import parse_frontmatter_list, load_advisor
 
 
 def test_scaffold_roundtrips_through_loader():
@@ -61,6 +62,55 @@ def test_context_expansion_defaults_to_ask():
 def test_context_expansion_explicit_and_invalid():
     assert "context_expansion: deny" in scaffold_principis({"who": "X", "context_expansion": "deny"})
     assert "context_expansion: ask" in scaffold_principis({"who": "X", "context_expansion": "хм"})
+
+
+def test_scaffold_persona_sets_name_and_empty_metadata_lists():
+    # F2: канонический шаблон persona.md. Минимум = имя + ПУСТЫЕ lenses/domains
+    # (seed не знает их за юзера; пустые списки → diversity даёт честный insufficient_data).
+    md = scaffold_persona("Марк Аврелий")
+    assert re.search(r"^name:\s*Марк Аврелий\s*$", md, re.M)
+    assert parse_frontmatter_list(md, "lenses") == []
+    assert parse_frontmatter_list(md, "domains") == []
+
+
+def test_scaffold_persona_accepts_provided_metadata():
+    md = scaffold_persona("Сунь-Цзы", lenses=["deception", "terrain"], domains=["strategy"])
+    assert parse_frontmatter_list(md, "lenses") == ["deception", "terrain"]
+    assert parse_frontmatter_list(md, "domains") == ["strategy"]
+
+
+def test_scaffold_persona_round_trips_through_diversity_loader():
+    # Шаблон должен читаться тем же load_advisor, что и настоящие persona.md.
+    with tempfile.TemporaryDirectory() as t:
+        d = os.path.join(t, "advisors", "sage")
+        os.makedirs(d)
+        open(os.path.join(d, "persona.md"), "w", encoding="utf-8").write(scaffold_persona("Мудрец"))
+        a = load_advisor(d)
+    assert a is not None and a["name"] == "Мудрец"
+    assert a["lenses"] == set() and a["domains"] == set()
+
+
+def test_board_scaffold_persona_writes_file():
+    # F2 ручной путь: CLI-команда даёт стартовый persona.md, чтобы рецепт не был круговым.
+    import board
+    with tempfile.TemporaryDirectory() as t:
+        adv = os.path.join(t, "advisors", "solon")
+        os.makedirs(adv)
+        rc = board.cmd_scaffold_persona([adv, "--name", "Солон"])
+        assert rc == 0
+        pm = os.path.join(adv, "persona.md")
+        assert os.path.isfile(pm) and "Солон" in open(pm, encoding="utf-8").read()
+
+
+def test_board_scaffold_persona_refuses_clobber_without_force():
+    import board
+    with tempfile.TemporaryDirectory() as t:
+        adv = os.path.join(t, "advisors", "solon")
+        os.makedirs(adv)
+        pm = os.path.join(adv, "persona.md")
+        open(pm, "w", encoding="utf-8").write("РУЧНОЕ")
+        assert board.cmd_scaffold_persona([adv]) == 1        # отказ без --force
+        assert open(pm, encoding="utf-8").read() == "РУЧНОЕ"  # не затёрто
 
 
 def test_next_step_principis_first_when_missing():

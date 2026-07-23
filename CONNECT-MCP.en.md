@@ -7,7 +7,9 @@
 Use Consilium either as a Claude Code skill or as an MCP server. The server exposes the board
 lifecycle, fidelity checks, source-backed retrieval, decision calculations, and self-documentation.
 The available MCP interface changes over time; inspect it with `tools/list` or `explain_self`.
-Host-specific support remains experimental unless the host matrix says otherwise.
+Host-specific support remains experimental unless the host matrix says otherwise. Cowork has not
+received a separate smoke test, so these instructions are not a support claim for Cowork; validate
+the connection locally and report a confirmed run through [`SUPPORT.md`](SUPPORT.md).
 
 | Host | Connection | Result |
 |---|---|---|
@@ -20,8 +22,9 @@ See [`docs/CONNECT-HOSTS.en.md`](docs/CONNECT-HOSTS.en.md) for the tested-status
 
 ### 0. Put the files on the same machine
 
-The project folder must be on the machine that runs Claude Desktop or the MCP host, so personal
-corpora stay local. Either download and unpack the project ZIP into `~/consilium-principis`, or run:
+The project folder must be on the machine where a local MCP host starts the server, so personal
+corpora stay local. Cowork's launch path and permission model have not been verified. Either
+download and unpack the project ZIP into `~/consilium-principis`, or run:
 
 ```bash
 git clone https://github.com/ilyautov/consilium-principis ~/consilium-principis
@@ -96,11 +99,11 @@ Git; only [`mcp.example.json`](mcp.example.json) belongs in the repository.
 
 ## Security boundary
 
-The MCP server runs natively as a child process on your machine, outside a host sandbox, with your
-user's filesystem and network permissions. That is necessary for local corpus construction and
-public-domain retrieval. Keep the safety boundary in server code: only fetch lawful public-domain
-material and write sources under `advisors/*/sources/` and `principis_corpus/` as the project rules
-require.
+In hosts that launch a local stdio MCP server, the process receives your user's filesystem and
+network permissions. Cowork's launch and sandbox behavior have not been verified, so do not infer
+its access boundaries without a local test. Keep the safety boundary in server code: only fetch
+lawful public-domain material and write sources under `advisors/*/sources/` and
+`principis_corpus/` as the project rules require.
 
 ## Dependencies
 

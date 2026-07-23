@@ -1916,7 +1916,7 @@
     {
       "path": "scripts/eval.py",
       "subsystem": "eval",
-      "doc": "eval.py — харнесс точности и безопасности совета (перенос логики Гефеста под fidelity)."
+      "doc": "eval.py — харнесс точности и безопасности совета (перенос логики прежнего RAG-движка под fidelity)."
     },
     {
       "path": "scripts/extractor.py",

@@ -166,7 +166,7 @@ def test_main_no_args_prints_help_and_exits_zero(capsys):
 
 
 def test_smoke_run_as_script_prints_help_and_exits_zero():
-    env = dict(os.environ, HEPHAESTUS_ENGINE="/nonexistent", OLLAMA_HOST="http://127.0.0.1:59999")
+    env = dict(os.environ, OLLAMA_HOST="http://127.0.0.1:59999")
     proc = subprocess.run(
         [sys.executable, os.path.join(ROOT, "scripts", "experiments", "citation_rate_eval.py")],
         capture_output=True, text=True, env=env, cwd=ROOT,

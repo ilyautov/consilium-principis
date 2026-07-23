@@ -19,7 +19,7 @@ fail-closed). Тесты проверяют РОВНО этот инвариан
 
 Герметично: только tmp-корпус + engine.fidelity/relevance_gate напрямую,
 без сети и без движка. Запуск (как в задаче):
-  HEPHAESTUS_ENGINE=/nonexistent OLLAMA_HOST=http://127.0.0.1:59999 \
+  OLLAMA_HOST=http://127.0.0.1:59999 \
     python3 -m pytest tests/test_gate_simple_tier_inert.py -q
 """
 import os

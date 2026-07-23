@@ -3,6 +3,8 @@
 # Quick start
 
 > Release: [v0.1.2](https://github.com/ilyautov/consilium-principis/releases/download/v0.1.2/consilium-principis.mcpb)
+> — the `.mcpb` is a single-file extension for **Claude Desktop** (Settings → Extensions → install from
+> file); for Claude Code the paths below are enough, no bundle needed.
 
 Consilium gives your AI assistant a personal board of thinkers grounded in their texts. These are
 AI representations, not the people themselves. The fidelity contour verifies a 🔵 quote against the
@@ -30,7 +32,7 @@ be seeded in one step; build modern advisors only from material you are entitled
 4. Say “where do I start?”, “what can you do?”, or “convene a board about [question]”.
 
 Other hosts are not verified merely because they can read a config. Check the experimental host
-matrix in [`docs/CONNECT-HOSTS.en.md`](docs/CONNECT-HOSTS.en.md) and generate a config locally:
+matrix in [`docs/CONNECT-HOSTS.en.md`](https://github.com/ilyautov/consilium-principis/blob/master/docs/CONNECT-HOSTS.en.md) and generate a config locally:
 
 ```bash
 python3 scripts/board.py mcp-config --json
@@ -70,7 +72,14 @@ python3 scripts/eval.py advisors/<name>
 ```
 
 For the complete source, manifest, and validation recipe, see
-[`docs/onboarding-recipe.md`](docs/onboarding-recipe.md) and [`advisors/README.md`](advisors/README.md).
+[`advisors/README.md`](advisors/README.md) and [`docs/onboarding-recipe.md`](https://github.com/ilyautov/consilium-principis/blob/master/docs/onboarding-recipe.md).
+
+## Update / uninstall
+
+- **Update:** run the install again (`python3 install.py` or the Path 2 installer) — the machinery is
+  overwritten while **your board (`advisors/`, `golden/`) is preserved** (merge, not wipe).
+- **Uninstall:** delete the skill folder — `rm -rf ~/.claude/skills/consilium-principis` (Windows:
+  remove `%USERPROFILE%\.claude\skills\consilium-principis`). The skill writes nothing outside it.
 
 ## Next steps
 
@@ -92,4 +101,4 @@ The fidelity contour travels with every answer, at any retrieval tier: 🔵 the 
 quote) · abstention outside the corpus.
 
 Detailed MCP instructions are in [`CONNECT-MCP.en.md`](CONNECT-MCP.en.md); the status of each host
-is in [`docs/CONNECT-HOSTS.en.md`](docs/CONNECT-HOSTS.en.md).
+is in [`docs/CONNECT-HOSTS.en.md`](https://github.com/ilyautov/consilium-principis/blob/master/docs/CONNECT-HOSTS.en.md).

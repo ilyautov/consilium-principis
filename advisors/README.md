@@ -34,6 +34,7 @@ python3 scripts/board.py scaffold-persona advisors/<slug> --name "Имя фиг�
 python3 scripts/eval.py advisors/<slug>
 ```
 
-`scaffold-persona` (шаг 4) кладёт готовый скелет `persona.md` (имя + пустые lenses/domains + секции
-конституция / как спорит / never_do+never_quote / заземление) — заполни его под фигуру. Проверить отдельную цитату:
+`scaffold-persona` (шаг 4) кладёт готовый скелет `persona.md` (frontmatter name/aliases/domains/lenses/
+consent_status/role_framing + секции Конституция / Как спорит / Чего не делает+never_quote / Quote bank 🔵 /
+Где challenge) — заполни его под фигуру. Проверить отдельную цитату:
 `from engine.fidelity import best_match` → `best_match("<цитата>", "advisors/<slug>")` → `('P1', источник)` = годна на 🔵.

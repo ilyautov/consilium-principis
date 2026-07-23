@@ -5,13 +5,30 @@ versions — [SemVer](https://semver.org/). Dates in ISO (YYYY-MM-DD).
 
 ## [Unreleased]
 
-### Fixed
-- `seed-council` now writes a starter `persona.md` for each seeded advisor, so `diversity_check`
-  recognizes a fresh board instead of erroring on missing metadata.
-
 ### Added
 - `board.py scaffold-persona <dir>` — write a starter `persona.md` template for a hand-built
   advisor, resolving the previously circular recipe reference.
+- English glossary and trigger terms in the skill `description`, so English-language hosts surface
+  the skill.
+- Update/uninstall instructions and a note on the `.mcpb` bundle in the quick-start and README.
+
+### Fixed
+- `seed-council` now writes a starter `persona.md` for each seeded advisor, so `diversity_check`
+  recognizes a fresh board instead of erroring on missing metadata.
+- Python 3.13 compatibility.
+- Cold-start onboarding bugs: the FULL-tier numpy gate, an advisor build path, and a dead `.env`
+  variable.
+- The skill name is now consistently `consilium-principis`.
+- `seed-council` fails soft (no traceback) when a source cannot be fetched offline.
+- Broken documentation links left by the history cleanup; shipped docs now use absolute links so
+  they resolve inside the installed skill.
+
+### Changed
+- The FULL retrieval tier is self-contained (ollama + bge-m3): the dead rerank path, all references
+  to the former external engine, and the vestigial `HEPHAESTUS_ENGINE` variable (no code read it)
+  are gone. `OLLAMA_HOST` is the offline-test lever.
+- The `persona.md` scaffold now matches the canonical structure the recipe documents.
+- The `.mcpb` bundle no longer includes dev/research scripts.
 
 ## [0.1.2] — 2026-07-23
 

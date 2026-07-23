@@ -136,10 +136,13 @@ python3 scripts/collect_pd.py advisors/<slug> --url <gutenberg-url> --name <sour
    python3 scripts/build_advisor.py advisors/<slug> --name "<Имя>" --max-quotes 40
    ```
    → `corpus.jsonl` + `quote_candidates.md` (кандидаты ШУМНЫЕ — включают вступление редактора; бери дословно только из ТЕЛА).
-3. **Написать `advisors/<slug>/persona.md`** — структуру повторяй с уже собранного советника (или см. `advisors/README.md`):
-   - frontmatter: `name, aliases, domains, lenses, consent_status, fidelity, role_framing`
+3. **Написать `advisors/<slug>/persona.md`** — не с нуля: `scaffold-persona` кладёт готовый скелет, заполни его:
+   ```bash
+   python3 scripts/board.py scaffold-persona advisors/<slug> --name "<Имя>"
+   ```
+   - frontmatter: `name, aliases, domains, lenses, consent_status, role_framing` (диверсити судит по `lenses`/`domains` — заполни обязательно).
    - `role_framing` — **3-е лицо** (снижает sycophancy): советник держит свою линзу и скорее оспорит, чем поддакнет.
-   - `## Конституция` (от 1-го лица, ядро голоса) · `## Как спорит` · `## Чего не делает (never_do)` + `never_quote` (явно перечисли известные ФЕЙК-цитаты этой фигуры) · `## Quote bank` (🔵) · `## Где challenge-ит` (под задачу пользователя).
+   - секции: `## Конституция` (от 1-го лица, ядро голоса) · `## Как спорит` · `## Чего не делает (never_do)` + `never_quote` (явно перечисли известные ФЕЙК-цитаты этой фигуры) · `## Quote bank` (🔵) · `## Где challenge-ит` (под задачу пользователя).
 4. **ПРОВЕРИТЬ КАЖДУЮ цитату банка контуром** (это и есть ров — не пропускай):
    ```bash
    python3 -c "import sys; sys.path.insert(0,'scripts'); from engine.fidelity import best_match; print(best_match('<точная цитата>', 'advisors/<slug>'))"

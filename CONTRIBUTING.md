@@ -48,7 +48,7 @@ PR примут быстро. Прочитайте два красных пра�
 движка и без ключей (так его видит внешний пользователь и CI). Запуск ровно так:
 
 ```bash
-HEPHAESTUS_ENGINE=/nonexistent OLLAMA_HOST=http://127.0.0.1:59999 python3 -m pytest tests/ -q
+OLLAMA_HOST=http://127.0.0.1:59999 python3 -m pytest tests/ -q
 ```
 
 Или короче: `make test`. Тест, который ходит в сеть без DI-инъекции фейка, в CI не пройдёт.

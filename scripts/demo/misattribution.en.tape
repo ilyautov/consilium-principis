@@ -10,7 +10,7 @@ Set Padding 30
 Set Theme "Catppuccin Mocha"
 Set TypingSpeed 45ms
 Hide
-Type "export HEPHAESTUS_ENGINE=/nonexistent OLLAMA_HOST=http://127.0.0.1:59999" Enter
+Type "export OLLAMA_HOST=http://127.0.0.1:59999" Enter
 Type "consilium() { python3 scripts/demo/misattribution_demo.py --no-prompt --en; }" Enter
 Type "clear" Enter
 Show

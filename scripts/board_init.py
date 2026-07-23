@@ -2,7 +2,7 @@
 """
 board_init.py — авто-настройка скилла при старте: выбор tier ретрива на советника.
 
-Две версии (решение Ильи): SIMPLE (без инфры) и FULL (семантический стек, как Гефест).
+Две версии (решение Ильи): SIMPLE (без инфры) и FULL (семантический стек: ollama + bge-m3).
 Скилл сам выбирает при старте по двум сигналам:
   - размер корпуса советника (этот скрипт считает);
   - доступность семантического бэкенда (агент проверяет ollama_health и передаёт флагом).
@@ -60,7 +60,7 @@ def main():
     ap.add_argument("--semantic-available", default="false")
     ap.add_argument("--threshold", type=int, default=150000)  # токенов
     # 0.50 — калибровано на корпусе советника (eval.py: вне-корпуса max 0.402, в-корпусе min 0.532;
-    # чистый зазор → 0% галлюцинаций И 0% ложных отказов). Гефестовы 0.62 давали 50% over-abstention.
+    # чистый зазор → 0% галлюцинаций И 0% ложных отказов). Прежний порог 0.62 давал 50% over-abstention.
     # PROVISIONAL: N=12 на одном советнике (marcus-aurelius), привязано к chunk-size (TIER_CHUNK_CHARS);
     # пересчитать на большом корпусе. Safety-биас вверх: галлюцинация опаснее ложного отказа.
     ap.add_argument("--abstain-threshold", type=float, default=0.50)
@@ -103,7 +103,7 @@ def main():
     with open(out, "w", encoding="utf-8") as f:
         json.dump(config, f, ensure_ascii=False, indent=2)
     print(f"\nКонфиг записан: {out}")
-    print("Скилл будет грузить ретрив по tier каждого советника (адаптер backends, как Гефест).")
+    print("Скилл будет грузить ретрив по tier каждого советника (адаптер backends).")
 
 if __name__ == "__main__":
     main()

@@ -48,7 +48,7 @@ Use English Conventional Commits, e.g. `docs: clarify privacy boundary` or
 engine, and no keys (that is how an outside user and CI see it). Run it exactly like this:
 
 ```bash
-HEPHAESTUS_ENGINE=/nonexistent OLLAMA_HOST=http://127.0.0.1:59999 python3 -m pytest tests/ -q
+OLLAMA_HOST=http://127.0.0.1:59999 python3 -m pytest tests/ -q
 ```
 
 Or shorter: `make test`. A test that hits the network without a DI-injected fake will not pass CI.

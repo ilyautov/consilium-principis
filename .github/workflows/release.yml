@@ -46,7 +46,6 @@ jobs:
         run: git ls-files '*.py' | xargs -r python -m py_compile
       - name: Run offline test suite
         env:
-          HEPHAESTUS_ENGINE: /nonexistent
           OLLAMA_HOST: http://127.0.0.1:59999
         run: python -m pytest tests/ -q
       - name: Install locked MCPB packager

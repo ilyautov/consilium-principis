@@ -9,6 +9,7 @@
   • тяжёлый регенерируемый lenses/*/build/ НЕ едет (copyright/размер).
 """
 import os
+import re
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -18,6 +19,24 @@ sys.path.insert(0, os.path.join(REPO, "scripts"))
 
 import install  # noqa: E402
 from engine.fidelity import best_match  # noqa: E402
+
+
+def test_shipped_md_has_no_relative_docs_links():
+    # docs/ НЕ шипуется (RUNTIME его исключает), поэтому относительная ссылка `](docs/...` МЁРТВА
+    # внутри установленного скилла (~/.claude/skills/...). Link-guard репо этого не ловит — он
+    # сканирует repo-tree, где docs/ есть. Гард: шипуемый markdown ссылается на docs/ только
+    # абсолютным URL (`](https://.../docs/...)` не матчится этим regex).
+    shipped_md = [f for f in install.RUNTIME if f.endswith(".md")] + ["advisors/README.md"]
+    offenders = []
+    for rel in shipped_md:
+        p = os.path.join(install.HERE, rel)
+        if not os.path.isfile(p):
+            continue
+        text = open(p, encoding="utf-8").read()
+        for m in re.finditer(r"\]\(docs/[^)]+\)", text):
+            offenders.append(f"{rel}: {m.group(0)}")
+    assert not offenders, ("относительные docs/-ссылки в шипуемых файлах (мертвы в installed "
+                           "skill): " + "; ".join(offenders))
 
 
 def test_runtime_ships_lenses_and_gov_heads():

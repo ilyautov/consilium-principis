@@ -3,6 +3,8 @@
 # Быстрый старт
 
 > Релиз: [v0.1.2](https://github.com/ilyautov/consilium-principis/releases/download/v0.1.2/consilium-principis.mcpb)
+> — `.mcpb` это однофайловое расширение для **Claude Desktop** (Settings → Extensions → установить из файла);
+> для Claude Code достаточно путей ниже, бандл не нужен.
 
 > Consilium даёт твоему ИИ-ассистенту **совет из персон реальных мыслителей**, грунтованных в
 > их же текстах: советники обращаются к тебе, спорят между собой, дают синтез и шаг к действию.
@@ -40,7 +42,7 @@
    - **«созови совет по [вопрос]»** откроет заседание.
 
 > Cowork и другие неописанные в таблице хосты не считаются проверенными: смотри
-> [`docs/CONNECT-HOSTS.md`](docs/CONNECT-HOSTS.md) и сначала проверь сгенерированный конфиг на
+> [`docs/CONNECT-HOSTS.md`](https://github.com/ilyautov/consilium-principis/blob/master/docs/CONNECT-HOSTS.md) и сначала проверь сгенерированный конфиг на
 > своей машине. FULL-тир требует локальный Ollama и `bge-m3`.
 
 ---
@@ -80,7 +82,16 @@ python3 scripts/board.py build-advisor   advisors/<имя>     # собрать 
 python3 scripts/eval.py advisors/<имя>                       # 🔵 verified X/X, честные отказы
 ```
 Полный рецепт сборки советника (откуда брать источники, как писать `persona.md`, проверка каждой
-цитаты контуром) лежит в [`docs/onboarding-recipe.md`](docs/onboarding-recipe.md) и [`advisors/README.md`](advisors/README.md).
+цитаты контуром) лежит в [`advisors/README.md`](advisors/README.md) и [`docs/onboarding-recipe.md`](https://github.com/ilyautov/consilium-principis/blob/master/docs/onboarding-recipe.md).
+
+---
+
+## Обновить / удалить
+
+- **Обновить:** повтори установку (`python3 install.py` или установщик Пути 2) — машинерия
+  перезапишется, **твоя доска (`advisors/`, `golden/`) сохранится** (слияние, не снос).
+- **Удалить:** снеси папку скилла — `rm -rf ~/.claude/skills/consilium-principis` (Windows:
+  удали каталог `%USERPROFILE%\.claude\skills\consilium-principis`). Ничего вне неё скилл не пишет.
 
 ---
 
@@ -96,7 +107,7 @@ python3 scripts/eval.py advisors/<имя>                       # 🔵 verified 
   «как ТЫ его читаешь») и собирает сам; руками через `board.py build-advisor`, против эхо-камеры
   `python3 scripts/diversity_check.py`.
 - **Включить FULL-тир:** `python3 scripts/board.py setup-full` (подскажет про ollama, сам стянет `bge-m3`).
-- **Подключить как MCP-сервер:** статус конкретного хоста в [`docs/CONNECT-HOSTS.md`](docs/CONNECT-HOSTS.md),
+- **Подключить как MCP-сервер:** статус конкретного хоста в [`docs/CONNECT-HOSTS.md`](https://github.com/ilyautov/consilium-principis/blob/master/docs/CONNECT-HOSTS.md),
   подробности в [`CONNECT-MCP.md`](CONNECT-MCP.md). Из корня чекаута сначала сгенерируй конфиг:
   `python3 scripts/board.py mcp-config --json` (**Windows:** `py -3 scripts/board.py mcp-config --json`; если
   `py` нет, проверь Python 3.10+ и используй `python`, не Store-alias `python3`).

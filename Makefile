@@ -4,7 +4,7 @@
 
 # Оффлайн-сьют (без ollama/движка — CI-инвариант)
 test:
-	HEPHAESTUS_ENGINE=/nonexistent OLLAMA_HOST=http://127.0.0.1:59999 python3 -m pytest tests/ -q
+	OLLAMA_HOST=http://127.0.0.1:59999 python3 -m pytest tests/ -q
 
 # §3.3: pre-release ритуал рва — фиксированная батарея против docs/dev/moat-baseline.json.
 # Требует: ollama (bge-m3 для ретрива) + судья (OPENROUTER_API_KEY в env/./.env, дефолт

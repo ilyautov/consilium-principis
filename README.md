@@ -170,6 +170,16 @@ cd ~/consilium-principis && python3 install.py
 
 Prefer buttons or a terminal? See [`QUICKSTART.en.md`](QUICKSTART.en.md): a click-to-install ([`install.command`](install.command) / `.bat`) and the manual path.
 
+### Or the Claude Desktop bundle
+
+The [release](https://github.com/ilyautov/consilium-principis/releases/latest) ships a single-file
+`.mcpb` bundle — a Claude Desktop extension. Download it, then in Claude Desktop open **Settings →
+Extensions → install from file**. Claude Code users don't need it; the paths above are enough. Wiring
+details for other MCP hosts are in [`CONNECT-MCP.en.md`](CONNECT-MCP.en.md).
+
+To **update**, re-run the install (it merges, preserving your `advisors/` board); to **uninstall**,
+delete `~/.claude/skills/consilium-principis`.
+
 **Claude Desktop or another MCP host:** the server exposes its cycle (build, sessions, widgets) as
 tools. Host compatibility varies; see the tested-status table in
 [`docs/CONNECT-HOSTS.en.md`](docs/CONNECT-HOSTS.en.md), then generate the portable configuration from the checkout with

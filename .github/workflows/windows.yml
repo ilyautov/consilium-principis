@@ -15,7 +15,6 @@ jobs:
     runs-on: windows-latest
     env:
       CONSILIUM_NO_PAUSE: "1"
-      HEPHAESTUS_ENGINE: C:\\nonexistent\\hephaestus
       OLLAMA_HOST: http://127.0.0.1:59999
     steps:
       - name: Check out repository

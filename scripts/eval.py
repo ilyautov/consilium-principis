@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-eval.py — харнесс точности и безопасности совета (перенос логики Гефеста под fidelity).
+eval.py — харнесс точности и безопасности совета (перенос логики прежнего RAG-движка под fidelity).
 
-Метрики (по образцу Гефеста: retrieval / extraction / abstention раздельно):
+Метрики (retrieval / extraction / abstention раздельно):
 
   [РАБОТАЕТ] FIDELITY — exact-match гейт цитат. Делится на ДВЕ оси (Correctness ≠ Faithfulness,
              arXiv 2412.18004):

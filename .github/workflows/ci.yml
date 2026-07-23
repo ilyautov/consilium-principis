@@ -18,7 +18,6 @@ jobs:
       matrix:
         python-version: ["3.10", "3.11", "3.12", "3.13"]
     env:
-      HEPHAESTUS_ENGINE: /nonexistent      # внешний движок отсутствует (как у внешнего юзера)
       OLLAMA_HOST: http://127.0.0.1:59999  # ollama недоступен → лексический пол
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -45,7 +44,6 @@ jobs:
     # через pytest.importorskip, а НЕ уронить сбор ImportError'ом. Зелёный тут = ядро реально stdlib.
     runs-on: ubuntu-latest
     env:
-      HEPHAESTUS_ENGINE: /nonexistent
       OLLAMA_HOST: http://127.0.0.1:59999
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -60,10 +58,8 @@ jobs:
   pytest-macos:
     # macOS-нога: тот же офлайн-инвариант на Python 3.12 (кросс-платформенность ядра —
     # пути от __file__, детач ollama, сокет-песочница conftest работают и на darwin).
-    # TODO windows-latest leg — held pending green verification
     runs-on: macos-latest
     env:
-      HEPHAESTUS_ENGINE: /nonexistent
       OLLAMA_HOST: http://127.0.0.1:59999
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

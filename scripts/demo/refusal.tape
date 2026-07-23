@@ -18,7 +18,7 @@ Set TypingSpeed 45ms
 Set PlaybackSpeed 1.0
 
 Hide
-Type "export HEPHAESTUS_ENGINE=/nonexistent OLLAMA_HOST=http://127.0.0.1:59999" Enter
+Type "export OLLAMA_HOST=http://127.0.0.1:59999" Enter
 Type "consilium() { python3 scripts/demo/refusal_demo.py --no-prompt; }" Enter
 Type "clear" Enter
 Show

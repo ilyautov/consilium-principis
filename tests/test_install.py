@@ -79,6 +79,8 @@ def test_windows_launcher_selects_python_310_and_honours_no_pause():
     check = 'import sys; assert sys.version_info >= (3, 10)'
     assert f'py -3 -c "{check}"' in batch
     assert f'python -c "{check}"' in batch
+    assert 'chcp 65001 >nul' in batch
+    assert 'set "PYTHONUTF8=1"' in batch
     assert 'if not "%CONSILIUM_NO_PAUSE%"=="1" pause' in batch
     assert "python.org" in batch
 

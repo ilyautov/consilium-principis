@@ -109,8 +109,16 @@ def test_add_source_blocks_path_traversal(tmp_path):
     assert "error" in r and ("traversal" in r["error"].lower() or "вне корня" in r["error"])
 
 
-def test_ssrf_check_passes_public_blocks_private():
+def test_ssrf_check_passes_public_blocks_private(monkeypatch):
     import collect_common as cc
+    monkeypatch.setattr(
+        cc.socket,
+        "getaddrinfo",
+        lambda host, port, **_kwargs: [
+            (None, None, None, None, (("127.0.0.1" if host == "127.0.0.1"
+                                        else "93.184.216.34"), port))
+        ],
+    )
     assert cc.ssrf_check("https://www.gutenberg.org/cache/epub/1/pg1.txt") is None  # публичный → ок
     assert "SSRF" not in (cc.ssrf_check("ftp://x/y") or "")    # схема режется отдельно
     assert cc.ssrf_check("http://127.0.0.1/") and "127.0.0.1" in cc.ssrf_check("http://127.0.0.1/")

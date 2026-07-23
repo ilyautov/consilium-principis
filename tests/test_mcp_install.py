@@ -11,11 +11,12 @@ from mcp_install import config_path, merge_entry, install, server_command, NAME
 
 
 def test_config_path_per_os():
-    assert config_path("darwin", home="/h").endswith(
+    normalized = lambda path: path.replace("\\", "/")
+    assert normalized(config_path("darwin", home="/h")).endswith(
         "/h/Library/Application Support/Claude/claude_desktop_config.json")
-    assert config_path("win32", home="/h", appdata="/AD").endswith(
+    assert normalized(config_path("win32", home="/h", appdata="/AD")).endswith(
         "/AD/Claude/claude_desktop_config.json")
-    assert config_path("linux", home="/h").endswith("/h/.config/Claude/claude_desktop_config.json")
+    assert normalized(config_path("linux", home="/h")).endswith("/h/.config/Claude/claude_desktop_config.json")
 
 
 def test_merge_preserves_other_servers():
@@ -250,8 +251,9 @@ def test_windows_paths_include_classic_and_store_configs(tmp_path):
         localappdata=str(tmp_path / "LocalAppData"),
         glob_fn=lambda _: [str(tmp_path / "LocalAppData/Packages/Claude_123/LocalCache/Roaming/Claude/claude_desktop_config.json")],
     )
-    assert paths[0].endswith("AppData/Claude/claude_desktop_config.json")
-    assert any("Packages/Claude_123" in path for path in paths)
+    normalized = [path.replace("\\", "/") for path in paths]
+    assert normalized[0].endswith("AppData/Claude/claude_desktop_config.json")
+    assert any("Packages/Claude_123" in path for path in normalized)
 
 
 def test_config_paths_deduplicates_windows_discovery(tmp_path):

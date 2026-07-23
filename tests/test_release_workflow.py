@@ -8,7 +8,8 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_release_uploads_the_hash_validated_registry_manifest():
     workflow = (ROOT / ".github/workflows/release.yml").read_text(encoding="utf-8")
 
-    assert 'gh release create "$GITHUB_REF_NAME" dist/consilium-principis.mcpb dist/server.json --generate-notes' in workflow
+    assert ('gh release create "$GITHUB_REF_NAME" dist/consilium-principis.mcpb dist/server.json '
+            '--repo "$GITHUB_REPOSITORY" --generate-notes') in workflow
 
 
 def test_release_verifies_runtime_before_publishing():

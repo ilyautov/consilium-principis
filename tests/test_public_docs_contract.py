@@ -4,6 +4,8 @@ import re
 import subprocess
 import sys
 
+import pytest
+
 
 ROOT = Path(__file__).resolve().parent.parent
 PUBLIC_DOCS = (
@@ -55,6 +57,14 @@ PAIR_COMMANDS = {
     ),
 }
 
+NUMERIC_TOOL_COUNT = re.compile(
+    r"(?:\b\d+(?:[.,]\d+)?\s*[-–—]?\s*(?:MCP[\s-]*)?"
+    r"(?:tools?|тул(?:ов|а|ы)?)\b|\b(?:MCP[\s-]*)?"
+    r"(?:tools?|тул(?:ов|а|ы)?)\s*(?:count\s*)?"
+    r"(?:(?::|\()|\bis\b|[-–—])?\s*\d+\b)",
+    re.I,
+)
+
 
 def public_docs_text():
     return "\n".join((ROOT / document).read_text(encoding="utf-8") for document in PUBLIC_DOCS)
@@ -67,24 +77,23 @@ def test_public_docs_do_not_claim_untested_windows_support():
 
 
 def test_connect_docs_do_not_hard_code_tool_count():
-    tool_count = re.compile(
-        r"(?:\b\d+(?:[.,]\d+)?\s*[-–—]?\s*(?:MCP[\s-]*)?"
-        r"(?:tools?|тул(?:ов|а|ы)?)\b|\b(?:MCP[\s-]*)?"
-        r"(?:tools?|тул(?:ов|а|ы)?)\s*(?:count\s*)?[:(]\s*\d+\b)",
-        re.I,
-    )
-    assert not tool_count.search(public_docs_text())
+    assert not NUMERIC_TOOL_COUNT.search(public_docs_text())
 
 
-def test_numeric_tool_count_pattern_rejects_count_first_and_label_first_forms():
-    tool_count = re.compile(
-        r"(?:\b\d+(?:[.,]\d+)?\s*[-–—]?\s*(?:MCP[\s-]*)?"
-        r"(?:tools?|тул(?:ов|а|ы)?)\b|\b(?:MCP[\s-]*)?"
-        r"(?:tools?|тул(?:ов|а|ы)?)\s*(?:count\s*)?[:(]\s*\d+\b)",
-        re.I,
-    )
-    for expression in ("72 tools", "MCP tools: 72", "72 MCP-tool", "тулов: 72"):
-        assert tool_count.search(expression), expression
+@pytest.mark.parametrize(
+    "expression",
+    (
+        "72 tools",
+        "MCP tools: 72",
+        "72 MCP-tool",
+        "тулов: 72",
+        "tools 72",
+        "tools — 72",
+        "MCP tool count is 72",
+    ),
+)
+def test_numeric_tool_count_pattern_rejects_count_first_and_label_first_forms(expression):
+    assert NUMERIC_TOOL_COUNT.search(expression), expression
 
 
 def test_public_markdown_links_resolve_locally():
@@ -188,6 +197,18 @@ def test_document_language_pairs_keep_release_versions_and_links_aligned():
         assert release_url in russian
 
 
+def test_document_language_pairs_link_to_each_other():
+    link = re.compile(r"(?<!!)\[[^]]+\]\(([^)]+)\)")
+
+    for english_path, russian_path in LANGUAGE_PAIRS:
+        english = (ROOT / english_path).read_text(encoding="utf-8")
+        russian = (ROOT / russian_path).read_text(encoding="utf-8")
+        english_target = str(Path(russian_path).relative_to(Path(english_path).parent))
+        russian_target = str(Path(english_path).relative_to(Path(russian_path).parent))
+        assert english_target in link.findall(english)
+        assert russian_target in link.findall(russian)
+
+
 def test_document_language_pairs_keep_install_commands_aligned():
     for pair, commands in PAIR_COMMANDS.items():
         for document in pair:
@@ -197,15 +218,41 @@ def test_document_language_pairs_keep_install_commands_aligned():
 
 
 def test_host_status_matrix_keeps_the_same_hosts_and_warning_level_in_both_languages():
+    normalized_names = {"Универсальный MCP-хост": "Universal MCP host"}
+
+    def status_class(status):
+        status = status.casefold()
+        if "experimental" in status or "эксперимент" in status:
+            return "experimental"
+        if "unverified" in status or "не проверено" in status:
+            return "unverified"
+        if "host-dependent" in status or "зависит от хоста" in status:
+            return "host-dependent"
+        return status
+
     def matrix(path):
         rows = []
         for line in (ROOT / path).read_text(encoding="utf-8").splitlines():
             cells = [cell.strip() for cell in line.split("|")]
-            if len(cells) == 6 and cells[0] == cells[-1] == "" and cells[4].startswith("⚠"):
-                rows.append(cells[4].split()[0])
+            if len(cells) == 6 and cells[0] == cells[-1] == "" and cells[1] != "---":
+                name = normalized_names.get(cells[1], cells[1])
+                if name in {
+                    "Claude Code", "Claude Desktop", "Cursor", "Codex / OpenAI-style CLI",
+                    "Gemini CLI", "Universal MCP host",
+                }:
+                    rows.append((name, status_class(cells[4])))
         return rows
 
-    assert matrix("docs/CONNECT-HOSTS.en.md") == matrix("docs/CONNECT-HOSTS.md") == ["⚠"] * 7
+    expected = [
+        ("Claude Code", "experimental"),
+        ("Claude Code", "experimental"),
+        ("Claude Desktop", "experimental"),
+        ("Cursor", "unverified"),
+        ("Codex / OpenAI-style CLI", "unverified"),
+        ("Gemini CLI", "unverified"),
+        ("Universal MCP host", "host-dependent"),
+    ]
+    assert matrix("docs/CONNECT-HOSTS.en.md") == matrix("docs/CONNECT-HOSTS.md") == expected
 
 
 def test_build_manual_check_is_reproducible():

@@ -167,3 +167,22 @@ def test_example_mcp_json_neutral_no_machine_path():
     assert "/opt/" not in raw
     m = json.loads(raw)  # валидный JSON
     assert "consilium-principis" in m["mcpServers"]
+
+
+def _skill_name(rel):
+    """name из YAML-фронтматтера SKILL.md (первый блок между --- ... ---)."""
+    text = (ROOT / rel).read_text(encoding="utf-8")
+    fm = re.search(r"(?ms)\A---\s*\n(.*?)\n---", text)
+    assert fm, f"{rel}: нет YAML-фронтматтера"
+    nm = re.search(r"(?m)^name:\s*(\S+)", fm.group(1))
+    assert nm, f"{rel}: нет поля name во фронтматтере"
+    return nm.group(1)
+
+
+def test_skill_names_match_plugin():
+    # #10: имя скилла в обоих SKILL.md должно совпадать с plugin.json и директорией установки
+    # (~/.claude/skills/consilium-principis/) — иначе host ставит одно, а декларируется другое.
+    expected = _load_json(".claude-plugin/plugin.json")["name"]
+    assert expected == "consilium-principis"
+    for rel in ("SKILL.md", "skills/consilium-principis/SKILL.md"):
+        assert _skill_name(rel) == expected, f"{rel}: name != {expected} (дрейф имени скилла)"

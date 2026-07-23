@@ -176,6 +176,22 @@ def test_register_head_skips_advisor_outside_root(tmp_path):
     assert not os.path.exists(registry_path(root))
 
 
+def test_register_head_skips_advisor_on_another_windows_drive(tmp_path, monkeypatch):
+    # ntpath.relpath raises ValueError for C:→D:, which must retain the same external no-op.
+    import governance
+    root = str(tmp_path / "board")
+    advisor = str(tmp_path / "advisor")
+    os.makedirs(root)
+    os.makedirs(advisor)
+    monkeypatch.setattr(
+        governance.os.path,
+        "relpath",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(ValueError("different drives")),
+    )
+
+    assert governance.register_head(advisor, "deadbeef", root=root) is None
+
+
 def test_freeze_registers_anchor_one_shot(tmp_path):
     # Владельческий one-shot: freeze пишет corpus.lock.json И регистрирует якорь в gov_heads.json.
     from governance import freeze, anchored_head_for, verify_advisor

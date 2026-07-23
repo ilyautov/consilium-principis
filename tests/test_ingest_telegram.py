@@ -1,5 +1,6 @@
 """Ингест Telegram → корпус Принцепса. Парсер тестируется на моке (сеть не нужна)."""
 import os, sys, json, tempfile
+import pytest
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "scripts"))
 import ingest_telegram
@@ -62,6 +63,77 @@ def test_standalone_default_ingest_preserves_existing_telegram_corpus(tmp_path, 
     assert original.read_text(encoding="utf-8") == '{"old": true}\n'
     assert result["out"] == os.path.join("principis_corpus", "telegram-2.jsonl")
     assert (corpus / "telegram-2.jsonl").exists()
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX permission bits are unavailable on Windows")
+def test_default_ingest_preserves_and_tightens_existing_telegram_corpus(tmp_path, monkeypatch):
+    """The default collision flow does not overwrite private history and locks both files down."""
+    corpus = tmp_path / "principis_corpus"
+    corpus.mkdir()
+    original = corpus / "telegram.jsonl"
+    original.write_text('{"old": true}\n', encoding="utf-8")
+    os.chmod(corpus, 0o755)
+    os.chmod(original, 0o644)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(ingest_telegram, "_fetch_channel_html_canonical", lambda _handle: MOCK)
+
+    result = ingest_telegram.ingest("@my_channel")
+    created = corpus / "telegram-2.jsonl"
+
+    assert original.read_text(encoding="utf-8") == '{"old": true}\n'
+    assert result["out"] == os.path.join("principis_corpus", "telegram-2.jsonl")
+    assert (corpus.stat().st_mode & 0o777) == 0o700
+    assert (original.stat().st_mode & 0o777) == 0o600
+    assert (created.stat().st_mode & 0o777) == 0o600
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX permission bits are unavailable on Windows")
+def test_bare_explicit_output_does_not_change_the_working_directory_mode(tmp_path, monkeypatch):
+    """A caller-owned CWD is not a Telegram corpus directory and must not be tightened."""
+    os.chmod(tmp_path, 0o755)
+    monkeypatch.chdir(tmp_path)
+
+    write_corpus(posts_to_records(parse_telegram_html(MOCK), "ch"), "telegram.jsonl")
+
+    assert (tmp_path.stat().st_mode & 0o777) == 0o755
+    assert (tmp_path / "telegram.jsonl").stat().st_mode & 0o777 == 0o600
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX permission bits are unavailable on Windows")
+def test_bare_explicit_output_opens_private_exclusive_fd_before_writing(tmp_path, monkeypatch):
+    """The corpus file is born owner-only instead of relying on a post-write chmod."""
+    observed = []
+    real_open = ingest_telegram.os.open
+
+    def observing_open(path, flags, mode=0o777, *args, **kwargs):
+        if os.fspath(path).endswith("telegram.jsonl"):
+            observed.append({"flags": flags, "mode": mode})
+        return real_open(path, flags, mode, *args, **kwargs)
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(ingest_telegram.os, "open", observing_open)
+    write_corpus(posts_to_records(parse_telegram_html(MOCK), "ch"), "telegram.jsonl")
+
+    created = next(call for call in observed if call["flags"] & os.O_CREAT)
+    assert created["mode"] == 0o600
+    assert created["flags"] & os.O_EXCL
+    if hasattr(os, "O_NOFOLLOW"):
+        assert created["flags"] & os.O_NOFOLLOW
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX permission bits are unavailable on Windows")
+def test_collision_with_telegram_symlink_does_not_chmod_its_target(tmp_path):
+    """Suffix reservation treats a symlink as occupied without following it for chmod."""
+    target = tmp_path / "outside-telegram.jsonl"
+    target.write_text('{"outside": true}\n', encoding="utf-8")
+    os.chmod(target, 0o644)
+    output = tmp_path / "telegram.jsonl"
+    os.symlink(target, output)
+
+    assert write_corpus(posts_to_records(parse_telegram_html(MOCK), "ch"), str(output)) == 2
+
+    assert target.stat().st_mode & 0o777 == 0o644
+    assert (tmp_path / "telegram-2.jsonl").stat().st_mode & 0o777 == 0o600
 
 
 def test_empty_html_yields_nothing():

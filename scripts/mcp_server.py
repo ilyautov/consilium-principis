@@ -936,7 +936,8 @@ def _add_source(advisor_dir, url=None, text=None, path=None, basename=None,
             # расширениям, подкаталог 'originals' пропускается → сырьё НЕ ингестится (иначе тир-A мусор),
             # но реверс может его прочитать. land_to_sources сюда не зовём (он форсит sources/*.txt).
             orig_dir = os.path.join(src_dir, "originals")
-            os.makedirs(orig_dir, exist_ok=True)
+            ensure_private_directory(src_dir)
+            ensure_private_directory(orig_dir)
             number = 1
             while True:
                 suffix = "" if number == 1 else "-%d" % number
@@ -947,11 +948,13 @@ def _add_source(advisor_dir, url=None, text=None, path=None, basename=None,
                 try:
                     raw_file = open(raw_path, "x", encoding="utf-8")
                 except FileExistsError:
+                    ensure_private_file(raw_path)
                     number += 1
                     continue
                 try:
                     clean_file = open(clean_path, "x", encoding="utf-8")
                 except FileExistsError:
+                    ensure_private_file(clean_path)
                     raw_file.close()
                     os.unlink(raw_path)
                     number += 1
@@ -959,15 +962,18 @@ def _add_source(advisor_dir, url=None, text=None, path=None, basename=None,
                 break
             with raw_file:
                 raw_file.write(raw.strip() + "\n")
+            ensure_private_file(raw_path)
             # провенанс сырья — теми же ключами, что land_to_sources пишет в _provenance.jsonl
             # (clean пишет файлы напрямую, иначе url/license фетча потерялись бы)
             with open(os.path.join(src_dir, "_provenance.jsonl"), "a", encoding="utf-8") as _f:
                 _f.write(json.dumps({"file": "originals/" + raw_name, "url": prov,
                                      "fetched": cc.today(), "license": lic, "chars": len(raw)},
                                     ensure_ascii=False) + "\n")
+            ensure_private_file(os.path.join(src_dir, "_provenance.jsonl"))
             # .clean.txt пишем напрямую: land_to_sources→slugify стирает точку, имя ломается
             with clean_file:
                 clean_file.write(cleaned.strip() + "\n")
+            ensure_private_file(clean_path)
             # source_raw — путь ОТНОСИТЕЛЬНО sources/ (реверс резолвит от sources-дира советника)
             appa = {"mode": "clean", "source_raw": "originals/" + raw_name}
         else:
@@ -985,7 +991,7 @@ def _add_source(advisor_dir, url=None, text=None, path=None, basename=None,
         man_p = os.path.join(d, "sources", "manifest.json")
         man = _load_json(man_p, {})
         man[fn] = {"tier": tier, "apparatus": appa}
-        atomic_write_json(man_p, man, ensure_ascii=False, indent=2)
+        atomic_write_json(man_p, man, ensure_ascii=False, indent=2, private=True)
 
     out = {"ok": True, "advisor_dir": d, "source_file": fn, "tier": tier,
            "mode": effective, "chars": len(raw),

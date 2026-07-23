@@ -81,7 +81,7 @@ def _fake_tier_full(rows):
     m = types.ModuleType("tier_full")
     m.available = lambda: True
     m.build_index = lambda adv: None
-    m.retrieve = lambda q, adv, top_k=3, rerank=False: rows[:top_k]
+    m.retrieve = lambda q, adv, top_k=3: rows[:top_k]
     return m
 
 

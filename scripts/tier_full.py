@@ -1,22 +1,17 @@
 # -*- coding: utf-8 -*-
 """
-tier_full.py — ТОНКИЙ адаптер движка «Гефест» (rag-sds) под «личный совет директоров».
+tier_full.py — семантический FULL-тир (ollama + bge-m3) под «личный совет директоров».
 
 Контракт (его ждёт scripts/eval.py — НЕ менять сигнатуры):
     available() -> bool
     build_index(advisor_dir: str) -> None
-    retrieve(question, advisor_dir, top_k=3, rerank=False) -> list[dict]
+    retrieve(question, advisor_dir, top_k=3) -> list[dict]
         каждый dict: {"text": str, "score": float, "source": str}
 
-ПРИНЦИП: логику Гефеста НЕ переписываем — переиспользуем его модули как зависимость:
-  • build_semantic_index.embed_batch — батчевый bge-m3 эмбеддинг через /api/embed
-    (тот же эндпоинт, та же нормировка |v|=1, что и в индексаторе Гефеста). Используется
-    и для индексации корпуса, и для эмбеддинга вопроса при retrieve.
-  • reranker_model.CrossEncoderReranker — кросс-энкодер bge-reranker-v2-m3 (rerank=True).
-Косинусная математика retrieve мирроринг SemanticRetriever.query Гефеста (Mn @ qv по
-нормированным векторам), но без его hardwired-загрузки corpus_full.json/substances/plants —
-у нас другой корпус (advisors/<name>/corpus.jsonl), поэтому переиспользуем эмбеддинг-примитив,
-а не класс целиком (см. «несовпадения API» в отчёте).
+САМОДОСТАТОЧНОСТЬ: внешнего движка НЕ требует. Эмбеддинг-примитив (embed_batch) вшит —
+батчевый bge-m3 через ollama /api/embed (нормировка |v|=1), и для индексации корпуса, и
+для эмбеддинга вопроса при retrieve. Косинусная математика retrieve (Mn @ qv по
+нормированным векторам) поверх нашего корпуса (advisors/<name>/corpus.jsonl).
 
 ГДЕ ЛЕЖАТ ЭМБЕДДИНГИ: <project>/data/embeddings_<advisor>.npy (+ data/embeddings_<advisor>.meta.json).
 Имя матчит существующий паттерн .gitignore `data/embeddings*.npy` → не коммитятся.
@@ -41,13 +36,6 @@ EMBED_MODEL = os.getenv("EMBED_MODEL", "bge-m3")
 # бампни, если сменилась математика/формат матрицы — старые .npy инвалидируются fingerprint'ом
 # даже при неизменных корпусе/модели/чанкинге. Владелец константы = автор формата индекса.
 INDEX_VERSION = 1
-
-# Опциональный кросс-энкодер (rerank=True) живёт во внешнем движке Гефеста. FULL-тир его НЕ
-# требует — только ollama+bge-m3 (см. embed_batch ниже). sys.path к движку подключается ЛЕНИВО
-# в rerank-ветке, поэтому `import tier_full` никогда не зависит от наличия чужого репо.
-# Дефолта-пути НЕТ (не шипуем персональный /Users/... в public): не задан HEPHAESTUS_ENGINE →
-# rerank недоступен, честная деградация (косинусный retrieve работает и без него).
-ENGINE_DIR = os.getenv("HEPHAESTUS_ENGINE", "")
 
 
 def embed_batch(texts):
@@ -248,12 +236,9 @@ def _embed_query(question: str) -> np.ndarray:
     return qv / (np.linalg.norm(qv) + 1e-9)
 
 
-def retrieve(question: str, advisor_dir: str, top_k: int = 3, rerank: bool = False):
+def retrieve(question: str, advisor_dir: str, top_k: int = 3):
     """Возвращает top_k пассажей: [{"text","score","source"}].
-    score = косинус bge-m3 (или скор кросс-энкодера при rerank=True).
-
-    Мирроринг косинусной логики SemanticRetriever.query Гефеста (Mn @ qv), но поверх
-    нашего корпуса. rerank=True → реюз reranker_model.CrossEncoderReranker."""
+    score = косинус bge-m3 поверх нашего корпуса (Mn @ qv по нормированным векторам)."""
     corpus_file, emb_path, meta_path = _reader_snapshot(advisor_dir)
     if not (os.path.isfile(emb_path) and os.path.isfile(meta_path)):
         build_index(advisor_dir)
@@ -278,34 +263,11 @@ def retrieve(question: str, advisor_dir: str, top_k: int = 3, rerank: bool = Fal
     qv = _embed_query(question)
     sims = M @ qv  # косинус (M и qv нормированы)
 
-    if not rerank:
-        idx = sims.argsort()[::-1][:top_k]
-        return [
-            {"text": passages[i]["text"], "score": float(sims[i]),
-             "source": passages[i]["source"], "tier": passages[i].get("tier")}
-            for i in idx
-        ]
-
-    # rerank=True: пул top-N по косинусу -> кросс-энкодер bge-reranker-v2-m3 (движок Гефеста).
-    # Опциональная зависимость: подключаем sys.path к движку ЛЕНИВО, только здесь.
-    if not ENGINE_DIR:
-        raise RuntimeError(
-            "rerank=True требует внешний движок Гефеста: задай HEPHAESTUS_ENGINE=/path/to/rag-sds/engine. "
-            "Без него используй rerank=False (косинусный retrieve работает на FULL-тире без реранкера).")
-    if ENGINE_DIR not in sys.path:
-        sys.path.insert(0, ENGINE_DIR)
-    from reranker_model import CrossEncoderReranker  # ленивый импорт: тянет torch/transformers
-    rerank_n = int(os.getenv("RERANK_N", "20"))
-    pool = sims.argsort()[::-1][:rerank_n]
-    # tier едет в кандидате: реранкер отдаёт исходный dict обратно (text_key="text"), так что
-    # поле переживает кросс-энкодер без отдельного маппинга по тексту.
-    cands = [{"text": passages[i]["text"], "source": passages[i]["source"],
-              "tier": passages[i].get("tier")} for i in pool]
-    rk = CrossEncoderReranker()
-    ranked = rk.rerank(question, cands, top_k=top_k, text_key="text")
+    idx = sims.argsort()[::-1][:top_k]
     return [
-        {"text": c["text"], "score": float(s), "source": c["source"], "tier": c.get("tier")}
-        for c, s in ranked
+        {"text": passages[i]["text"], "score": float(sims[i]),
+         "source": passages[i]["source"], "tier": passages[i].get("tier")}
+        for i in idx
     ]
 
 

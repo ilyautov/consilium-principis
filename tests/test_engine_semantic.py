@@ -7,7 +7,7 @@ def _fake_tier_full():
     m = types.ModuleType("tier_full")
     m.available = lambda: True
     m.build_index = lambda adv: None
-    m.retrieve = lambda q, adv, top_k=3, rerank=False: [
+    m.retrieve = lambda q, adv, top_k=3: [
         {"text": "retire into thyself", "score": 0.61, "source": "long.txt"}][:top_k]
     return m
 

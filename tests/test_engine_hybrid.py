@@ -8,7 +8,7 @@ def _fake_tf():
     m.available = lambda: True
     m.build_index = lambda adv: None
     # семантика ставит «compendious» выше, но якорь запроса дословно в «retire» пассаже
-    m.retrieve = lambda q, adv, top_k=3, rerank=False: [
+    m.retrieve = lambda q, adv, top_k=3: [
         {"text": "the most compendious way is according to nature", "score": 0.58, "source": "s"},
         {"text": "retire into thyself and be at rest", "score": 0.55, "source": "s"},
     ][:top_k]

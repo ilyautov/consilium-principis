@@ -17,10 +17,8 @@ AST кодирует сам инвариант («верх модуля, без 
 import ast
 import os
 
-# Осознанные исключения (файл → сколько in-function insert'ов разрешено). tier_full.py:
-# ленивый хук ВНЕШНЕГО движка Гефеста (HEPHAESTUS_ENGINE из env, НЕ scripts/) — подключается
-# только в rerank-ветке, чтобы `import tier_full` не зависел от наличия чужого репо.
-_ALLOWED_LAZY = {"tier_full.py": 1}
+# Осознанных исключений нет: все sys.path.insert — прямые безусловные statements наверху модуля.
+_ALLOWED_LAZY = {}
 
 
 def _is_syspath_insert(node):

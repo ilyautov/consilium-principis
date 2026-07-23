@@ -5,7 +5,7 @@
     "recipe_count": 16,
     "script_count": 71,
     "test_count": 165,
-    "glossary_count": 113
+    "glossary_count": 112
   },
   "tools": [
     {
@@ -2136,7 +2136,7 @@
     {
       "path": "scripts/tier_full.py",
       "subsystem": "tier",
-      "doc": "tier_full.py — ТОНКИЙ адаптер движка «Гефест» (rag-sds) под «личный совет директоров»."
+      "doc": "tier_full.py — семантический FULL-тир (ollama + bge-m3) под «личный совет директоров»."
     }
   ],
   "tests": [
@@ -2936,7 +2936,7 @@
     },
     {
       "term": "TIER FULL",
-      "definition": "семантический тир: bge-m3 (ollama) + abstention на калиброванной шкале (порог 0.50). `SemanticEngine` (обёртка `tier_full`). Требует ТОЛЬКО ollama+bge-m3 (embed вшит в `tier_full.embed_batch`); внешний движок нужен лишь для опционального rerank. Тир выбирается ПО РАЗМЕРУ корпуса (порог 150k токенов, Via Negativa: мал → SIMPLE даже если семантика есть), НА СОВЕТНИКА."
+      "definition": "семантический тир: bge-m3 (ollama) + abstention на калиброванной шкале (порог 0.50). `SemanticEngine` (обёртка `tier_full`). Требует ТОЛЬКО ollama+bge-m3 (embed вшит в `tier_full.embed_batch`), самодостаточен. Тир выбирается ПО РАЗМЕРУ корпуса (порог 150k токенов, Via Negativa: мал → SIMPLE даже если семантика есть), НА СОВЕТНИКА."
     },
     {
       "term": "Engine (контракт)",
@@ -2949,10 +2949,6 @@
     {
       "term": "ollama",
       "definition": "локальный раннер моделей. В проекте — ТОЛЬКО для эмбеддингов (примитив поиска) и локального independent-судьи, НЕ для рассуждения совета (ризонинг арендуется у хоста). `OLLAMA_HOST` НЕ гонять через ssrf_check (заблокирует localhost)."
-    },
-    {
-      "term": "Hephaestus / внешний движок",
-      "definition": "соседний RAG-движок (`HEPHAESTUS_ENGINE`, дефолт `~/personal/pilots/rag-sds/engine/`). tier-FULL от него РАЗВЯЗАН (2026-06-30); остался зависимостью только для опционального `rerank=True` (bge-reranker-v2-m3), `sys.path` вставляется лениво."
     },
     {
       "term": "translate-query (не corpus)",

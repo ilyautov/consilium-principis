@@ -16,9 +16,8 @@ Claude Code). Поэтому всё поведенческое для MCP жив
 SIMPLE) и `SemanticEngine` (обёртка `tier_full`, bge-m3 через ollama — тир
 FULL), плюс `RemoteEngine`. `resolve_engine` авто-детектит тир по размеру
 корпуса советника; `safe_retrieve` даёт деградацию в рантайме. Тир FULL
-исторически зависел от внешнего движка Гефеста (`HEPHAESTUS_ENGINE`), но
-эмбеддинг-примитив с 2026-06-30 вшит прямо в `tier_full.embed_batch` —
-Гефест остался опциональной зависимостью только для reranking.
+самодостаточен: эмбеддинг-примитив вшит прямо в `tier_full.embed_batch`
+(bge-m3 через ollama), внешнего движка не требует.
 
 **3. Сборка корпусов.** Пакет `scripts/corpusbuild/` (сборщики `collect_pd.py`
 / `collect_web.py` / `collect_transcript.py`, чанкинг с тиром, build-lock,

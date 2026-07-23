@@ -109,9 +109,8 @@ Claude Code). Поэтому всё поведенческое для MCP жив
 SIMPLE) и `SemanticEngine` (обёртка `tier_full`, bge-m3 через ollama — тир
 FULL), плюс `RemoteEngine`. `resolve_engine` авто-детектит тир по размеру
 корпуса советника; `safe_retrieve` даёт деградацию в рантайме. Тир FULL
-исторически зависел от внешнего движка Гефеста (`HEPHAESTUS_ENGINE`), но
-эмбеддинг-примитив с 2026-06-30 вшит прямо в `tier_full.embed_batch` —
-Гефест остался опциональной зависимостью только для reranking.
+самодостаточен: эмбеддинг-примитив вшит прямо в `tier_full.embed_batch`
+(bge-m3 через ollama), внешнего движка не требует.
 
 **3. Сборка корпусов.** Пакет `scripts/corpusbuild/` (сборщики `collect_pd.py`
 / `collect_web.py` / `collect_transcript.py`, чанкинг с тиром, build-lock,
@@ -351,7 +350,7 @@ python scripts/gen_selfdoc.py
 - **proof-card** — Сделаю карточку одной цитаты с источником и бейджем «сверено с первоисточником» — «show your work».
 - **decision-record** — Соберу структурированный протокол: позиции советников с допущениями по тирам, диссент, решение и статус, триггеры пересмотра.
 
-### Глоссарий (113)
+### Глоссарий (112)
 
 - **Consilium-Principis** — название проекта и бренд-титул. Латинское *consilium principis* — «совещательный орган при принцепсе» (был у Марка Аврелия). Имя называет коллегию (много линз), а не одного советника — согласовано с рвом (плюрализм против эхо-камеры). Технический id скилла / команды — `personal-board` / `/board` (ренейм частичный).
 - **Consilium** — «совет»: построенный и вылизанный слой советников (персонажи + корпуса + заседание-форум).
@@ -386,11 +385,10 @@ python scripts/gen_selfdoc.py
 - **moat_battery** — `scripts/moat_battery/`: фиксированные тестовые наборы — `<slug>.camouflage.jsonl` (камуфляж) и `poisoned.jsonl` (14 твин-пар инъекций).
 - **tier / тир** — уровень провенанса текста, задаётся регионом в манифесте: **P1/P2** = слова автора (→🔵), **S1/S2** = комментарий/перевод/соавтор (→🟢), **A/B** = аппарат/экстраполяция (→🟡, никогда не 🔵). Тир на регион через манифест; `tier_for_line` секвенциально.
 - **TIER SIMPLE** — дефолтный тир ретрива, нулевая инфра: full-context + лексический ретрив (char-ngram под морфологию) + exact-match гейт цитат + abstention. `LexicalEngine` (stdlib, 0-install пол). Контур цел и здесь — verbatim не требует ollama.
-- **TIER FULL** — семантический тир: bge-m3 (ollama) + abstention на калиброванной шкале (порог 0.50). `SemanticEngine` (обёртка `tier_full`). Требует ТОЛЬКО ollama+bge-m3 (embed вшит в `tier_full.embed_batch`); внешний движок нужен лишь для опционального rerank. Тир выбирается ПО РАЗМЕРУ корпуса (порог 150k токенов, Via Negativa: мал → SIMPLE даже если семантика есть), НА СОВЕТНИКА.
+- **TIER FULL** — семантический тир: bge-m3 (ollama) + abstention на калиброванной шкале (порог 0.50). `SemanticEngine` (обёртка `tier_full`). Требует ТОЛЬКО ollama+bge-m3 (embed вшит в `tier_full.embed_batch`), самодостаточен. Тир выбирается ПО РАЗМЕРУ корпуса (порог 150k токенов, Via Negativa: мал → SIMPLE даже если семантика есть), НА СОВЕТНИКА.
 - **Engine (контракт)** — `scripts/engine/`: ABC с backend-независимыми `abstain_check` и `fidelity_check`; бэкенды (`LexicalEngine`, `SemanticEngine`, `RemoteEngine`) переопределяют только `retrieve`/`build_index`/`abstain_threshold`. `resolve_engine` авто-детектит тир, `safe_retrieve` даёт runtime-деградацию.
 - **bge-m3** — многоязычная эмбеддинг-модель (через ollama) для семантического ретрива. Робастна к кросс-языку (RU-запрос → EN-корпус). Кэш эмбеддингов — `data/embeddings_*.npy` (gitignored).
 - **ollama** — локальный раннер моделей. В проекте — ТОЛЬКО для эмбеддингов (примитив поиска) и локального independent-судьи, НЕ для рассуждения совета (ризонинг арендуется у хоста). `OLLAMA_HOST` НЕ гонять через ssrf_check (заблокирует localhost).
-- **Hephaestus / внешний движок** — соседний RAG-движок (`HEPHAESTUS_ENGINE`, дефолт `~/personal/pilots/rag-sds/engine/`). tier-FULL от него РАЗВЯЗАН (2026-06-30); остался зависимостью только для опционального `rerank=True` (bge-reranker-v2-m3), `sys.path` вставляется лениво.
 - **translate-query (не corpus)** — кросс-язычный ретрив переводит ЗАПРОС в язык корпуса; корпус держит в оригинале ВСЕГДА (перевод корпуса убил бы ров — 🔵 указывал бы на машинный перевод). Асимметрия load-bearing: корпус = источник истины, запрос = одноразовый ключ поиска.
 - **hybrid / RRF** — гибридный ретрив (semantic ∪ lexical через Reciprocal Rank Fusion). Оказался СТРОГО ХУЖЕ чистой семантики на кросс-язычном (лексический шум топит сигнал) → переведён в opt-in, дефолт `retrieval_mode=auto`.
 - **abstain_threshold** — порог abstention (дефолт 0.50), валиден на реальном корпусе Аврелия при `TIER_CHUNK_CHARS=500`. Порог связан с chunk-size. Per-backend в `board_config` (`{semantic:0.5, lexical:0.04}`).

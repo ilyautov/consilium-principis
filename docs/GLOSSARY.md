@@ -182,9 +182,9 @@ ollama.
 
 **TIER FULL** — семантический тир: bge-m3 (ollama) + abstention на калиброванной
 шкале (порог 0.50). `SemanticEngine` (обёртка `tier_full`). Требует ТОЛЬКО
-ollama+bge-m3 (embed вшит в `tier_full.embed_batch`); внешний движок нужен лишь
-для опционального rerank. Тир выбирается ПО РАЗМЕРУ корпуса (порог 150k токенов,
-Via Negativa: мал → SIMPLE даже если семантика есть), НА СОВЕТНИКА.
+ollama+bge-m3 (embed вшит в `tier_full.embed_batch`), самодостаточен. Тир
+выбирается ПО РАЗМЕРУ корпуса (порог 150k токенов, Via Negativa: мал → SIMPLE
+даже если семантика есть), НА СОВЕТНИКА.
 
 **Engine (контракт)** — `scripts/engine/`: ABC с backend-независимыми
 `abstain_check` и `fidelity_check`; бэкенды (`LexicalEngine`, `SemanticEngine`,
@@ -199,11 +199,6 @@ Via Negativa: мал → SIMPLE даже если семантика есть), 
 поиска) и локального independent-судьи, НЕ для рассуждения совета (ризонинг
 арендуется у хоста). `OLLAMA_HOST` НЕ гонять через ssrf_check (заблокирует
 localhost).
-
-**Hephaestus / внешний движок** — соседний RAG-движок (`HEPHAESTUS_ENGINE`, дефолт
-`~/personal/pilots/rag-sds/engine/`). tier-FULL от него РАЗВЯЗАН (2026-06-30);
-остался зависимостью только для опционального `rerank=True` (bge-reranker-v2-m3),
-`sys.path` вставляется лениво.
 
 **translate-query (не corpus)** — кросс-язычный ретрив переводит ЗАПРОС в язык
 корпуса; корпус держит в оригинале ВСЕГДА (перевод корпуса убил бы ров — 🔵

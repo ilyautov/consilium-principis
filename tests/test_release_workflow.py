@@ -48,8 +48,16 @@ def test_release_rerun_validates_immutable_existing_assets_without_repacking_the
     assert checkout in publish
     assert "ref: ${{ inputs.tag || github.ref_name }}" in publish
     assert 'git rev-parse "refs/tags/$RELEASE_TAG^{commit}"' in publish
+    assert 'head_commit="$(git rev-parse HEAD)"' in publish
+    assert 'test "$tag_commit" = "$head_commit"' in publish
     assert publish.index(checkout) < publish.index('git rev-parse "refs/tags/$RELEASE_TAG^{commit}"')
     assert publish.index('git rev-parse "refs/tags/$RELEASE_TAG^{commit}"') < publish.index(
+        'head_commit="$(git rev-parse HEAD)"'
+    )
+    assert publish.index('head_commit="$(git rev-parse HEAD)"') < publish.index(
+        'test "$tag_commit" = "$head_commit"'
+    )
+    assert publish.index('test "$tag_commit" = "$head_commit"') < publish.index(
         "uses: actions/download-artifact@"
     )
     assert 'gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \\' in existing_release

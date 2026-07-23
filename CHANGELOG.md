@@ -13,6 +13,8 @@ versions — [SemVer](https://semver.org/). Dates in ISO (YYYY-MM-DD).
 - Update/uninstall instructions and a note on the `.mcpb` bundle in the quick-start and README.
 - English `docs/onboarding-recipe.en.md` with a language switcher on both versions.
 - `explain_self` now works in the installed skill: `docs/selfdoc` ships with the runtime.
+- English-language CLI (`CONSILIUM_LANG=en`): the recipe menu (`board.py recipes`), recipe
+  matching, and the installer output are now bilingual; English queries match recipes.
 
 ### Fixed
 - `seed-council` now writes a starter `persona.md` for each seeded advisor, so `diversity_check`

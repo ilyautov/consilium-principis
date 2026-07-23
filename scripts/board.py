@@ -251,13 +251,14 @@ def _surface(args, default):
 def cmd_recipes(args):
     import recipes as R
     rs = R.load_recipes()
+    lang = R.lang_from_env()                 # #4: EN-меню при CONSILIUM_LANG=en (дефолт ru)
     surface = _surface(args, "text")
     if surface == "widget":
-        print(R.render_widget(rs))          # для mcp__visualize__show_widget (Cowork)
+        print(R.render_widget(rs, lang=lang))   # для mcp__visualize__show_widget (Cowork)
     elif surface == "html":
-        print(R.render_html(rs))            # самодостаточный фолбэк
+        print(R.render_html(rs, lang=lang))     # самодостаточный фолбэк
     else:
-        print(R.render_menu(rs))            # текст (универсально)
+        print(R.render_menu(rs, lang=lang))     # текст (универсально)
     return 0
 
 

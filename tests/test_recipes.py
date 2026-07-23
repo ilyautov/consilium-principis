@@ -51,6 +51,42 @@ def test_render_widget_clickable_all_recipes():
     assert rs[0]["triggers"][0] in w
 
 
+def test_every_recipe_has_en_parity():
+    # #4 EN-паритет CLI: меню-поля должны иметь английские варианты (иначе англ-юзер упирается).
+    for r in load_recipes():
+        for k in ("title_en", "short_en", "does_en", "triggers_en"):
+            assert r.get(k), f"{r['id']} без {k}"
+        assert isinstance(r["triggers_en"], list) and r["triggers_en"]
+
+
+def test_match_finds_recipe_from_english_query():
+    # match_recipe детерминированный (пересечение слов) — англ-запрос должен матчить по triggers_en.
+    r = match_recipe("where do i start building my council", load_recipes())
+    assert r is not None and r["id"] == "start"
+    r2 = match_recipe("play devil's advocate and tear my plan apart", load_recipes())
+    assert r2 is not None and r2["id"] == "red-team"
+
+
+def test_render_menu_en_uses_english():
+    menu = render_menu(load_recipes(), lang="en")
+    assert "where do i start" in menu.lower()
+    assert "council" in menu.lower()
+    assert "Что умеет" not in menu               # без русского chrome в en-меню
+
+
+def test_render_html_en_sets_lang_and_english():
+    h = render_html(load_recipes(), lang="en")
+    assert "<html lang=en>" in h
+    assert "where do i start" in h.lower()
+    assert h.count('class="card"') == len(load_recipes())
+
+
+def test_render_menu_ru_default_unchanged():
+    # дефолт остаётся русским (не менять поведение молча)
+    menu = render_menu(load_recipes())
+    assert "с чего начать" in menu.lower()
+
+
 def test_match_finds_premortem():
     r = match_recipe("что может пойти не так с моим запуском", load_recipes())
     assert r is not None and r["id"] == "premortem"
@@ -70,7 +106,7 @@ def test_calibrate_recipe_present():
     ids = [r["id"] for r in rs]
     assert "calibrate" in ids
     r = next(r for r in rs if r["id"] == "calibrate")
-    assert set(r.keys()) == {"id", "title", "short", "triggers", "does", "reads"}
+    assert set(r.keys()) >= {"id", "title", "short", "triggers", "does", "reads"}
     assert r["triggers"] and isinstance(r["triggers"], list)
 
 
@@ -81,7 +117,7 @@ def test_moat_fit_recipes_present():
     for rid in ("exec-brief", "red-team"):
         assert rid in ids, f"{rid} рецепт пропал"
         r = next(r for r in rs if r["id"] == rid)
-        assert set(r.keys()) == {"id", "title", "short", "triggers", "does", "reads"}
+        assert set(r.keys()) >= {"id", "title", "short", "triggers", "does", "reads"}
         assert r["triggers"] and isinstance(r["triggers"], list)
 
 
@@ -97,7 +133,7 @@ def test_moat_fit_share_recipes_present():
     for rid in ("share-session", "quote-of-day", "proof-card"):
         assert rid in ids, f"{rid} рецепт пропал"
         r = next(r for r in rs if r["id"] == rid)
-        assert set(r.keys()) == {"id", "title", "short", "triggers", "does", "reads"}
+        assert set(r.keys()) >= {"id", "title", "short", "triggers", "does", "reads"}
         assert r["triggers"] and isinstance(r["triggers"], list)
 
 

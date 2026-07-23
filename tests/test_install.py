@@ -17,6 +17,21 @@ sys.path.insert(0, REPO)
 import install  # noqa: E402
 
 
+def test_install_messages_en_ru_parity():
+    # #4 EN-паритет: оба словаря вывода должны нести ОДИН набор ключей (иначе KeyError на en).
+    assert set(install._MSG["en"]) == set(install._MSG["ru"])
+    assert install._messages("en")["done"] != install._messages("ru")["done"]
+
+
+def test_install_lang_resolves_from_env(monkeypatch):
+    monkeypatch.setenv("CONSILIUM_LANG", "en")
+    assert install._lang() == "en"
+    monkeypatch.setenv("CONSILIUM_LANG", "ru")
+    assert install._lang() == "ru"
+    monkeypatch.delenv("CONSILIUM_LANG", raising=False)
+    assert install._lang() == "ru"                 # дефолт — русский, поведение не меняем
+
+
 # ── M5b: council/ не шипуется ────────────────────────────────────────────────
 def test_council_not_in_runtime():
     assert "council" not in install.RUNTIME, "приватный council/ не должен копироваться в установку"

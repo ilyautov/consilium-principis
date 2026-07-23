@@ -8,8 +8,43 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_release_uploads_the_hash_validated_registry_manifest():
     workflow = (ROOT / ".github/workflows/release.yml").read_text(encoding="utf-8")
 
-    assert ('gh release create "$GITHUB_REF_NAME" dist/consilium-principis.mcpb dist/server.json '
+    assert ('gh release create "$RELEASE_TAG" dist/consilium-principis.mcpb dist/server.json '
             '--repo "$GITHUB_REPOSITORY" --generate-notes') in workflow
+
+
+def test_release_requires_an_explicit_manual_tag_and_checks_out_that_tag():
+    workflow = (ROOT / ".github/workflows/release.yml").read_text(encoding="utf-8")
+
+    assert "workflow_dispatch:\n    inputs:\n      tag:" in workflow
+    assert "description: Existing vX.Y.Z tag to build and publish/reconcile" in workflow
+    assert "required: true" in workflow
+    assert "type: string" in workflow
+    assert "RELEASE_TAG: ${{ inputs.tag || github.ref_name }}" in workflow
+    assert "ref: ${{ inputs.tag || github.ref_name }}" in workflow
+
+
+def test_release_checks_out_and_verifies_the_requested_tag_commit():
+    workflow = (ROOT / ".github/workflows/release.yml").read_text(encoding="utf-8")
+
+    assert 'git rev-parse "refs/tags/$RELEASE_TAG^{commit}"' in workflow
+    assert "git rev-parse HEAD" in workflow
+
+
+def test_release_uses_its_resolved_tag_for_registry_and_validation():
+    workflow = (ROOT / ".github/workflows/release.yml").read_text(encoding="utf-8")
+
+    assert 'python3 - "$RELEASE_TAG"' in workflow
+    assert '--tag "$RELEASE_TAG"' in workflow
+
+
+def test_release_rerun_compares_existing_assets_without_overwriting_them():
+    workflow = (ROOT / ".github/workflows/release.yml").read_text(encoding="utf-8")
+
+    assert 'if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then' in workflow
+    assert 'gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \\' in workflow
+    assert 'cmp --silent dist/consilium-principis.mcpb "$release_dir/consilium-principis.mcpb"' in workflow
+    assert 'cmp --silent dist/server.json "$release_dir/server.json"' in workflow
+    assert "--clobber" not in workflow
 
 
 def test_release_verifies_runtime_before_publishing():

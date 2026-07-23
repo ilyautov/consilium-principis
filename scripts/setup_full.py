@@ -33,7 +33,11 @@ def _norm_platform(p):
 
 
 def probe():
-    """{ollama_running, bge_m3_present} — без падений (нет сети → оба False)."""
+    """{ollama_running, bge_m3_present, numpy_present} — без падений (нет сети → всё False).
+
+    numpy отдельным полем: FULL-тир (tier_full.py) считает эмбеддинги через numpy, и без него
+    молча откатывается в SIMPLE даже при живом ollama+bge-m3 (это и был тихий провал онбординга).
+    """
     running, model = False, False
     try:
         with urllib.request.urlopen(OLLAMA_URL + "/api/tags", timeout=3) as r:
@@ -43,20 +47,37 @@ def probe():
             model = any(EMBED_MODEL in n for n in names)
     except Exception:
         pass
-    return {"ollama_running": running, "bge_m3_present": model}
+    try:
+        import numpy  # noqa: F401
+        numpy_ok = True
+    except Exception:
+        numpy_ok = False
+    return {"ollama_running": running, "bge_m3_present": model, "numpy_present": numpy_ok}
 
 
 def plan(state, platform):
-    """Состояние + платформа → упорядоченные шаги. Системный софт — auto=False (инструкция)."""
+    """Состояние + платформа → упорядоченные шаги. Системный софт — auto=False (инструкция).
+
+    numpy — auto=True: это Python-пакет в текущий venv, безопасно и идемпотентно (в отличие от
+    системного ollama). Показываем его как шаг ВСЕГДА, когда его нет, иначе FULL «доступен» врёт.
+    """
+    steps = []
     if not state["ollama_running"]:
-        return [
-            {"step": "ollama", "auto": False, "detail": INSTALL_HINTS.get(platform, INSTALL_HINTS["linux"])},
-            {"step": "bge-m3", "auto": False, "detail": "после старта ollama: `ollama pull bge-m3`"},
-        ]
-    if not state["bge_m3_present"]:
-        return [{"step": "bge-m3", "auto": True, "cmd": ["ollama", "pull", "bge-m3"],
-                 "detail": "скачать модель эмбеддингов (~1.2GB) в установленный ollama"}]
-    return [{"step": "ready", "auto": False, "detail": "ollama + bge-m3 на месте → FULL-тир доступен"}]
+        steps.append({"step": "ollama", "auto": False,
+                      "detail": INSTALL_HINTS.get(platform, INSTALL_HINTS["linux"])})
+        steps.append({"step": "bge-m3", "auto": False,
+                      "detail": "после старта ollama: `ollama pull bge-m3`"})
+    elif not state["bge_m3_present"]:
+        steps.append({"step": "bge-m3", "auto": True, "cmd": ["ollama", "pull", "bge-m3"],
+                      "detail": "скачать модель эмбеддингов (~1.2GB) в установленный ollama"})
+    if not state.get("numpy_present"):
+        steps.append({"step": "numpy", "auto": True,
+                      "cmd": [sys.executable, "-m", "pip", "install", "numpy"],
+                      "detail": "FULL-тир считает эмбеддинги через numpy — поставить в текущий Python"})
+    if not steps:
+        steps.append({"step": "ready", "auto": False,
+                      "detail": "ollama + bge-m3 + numpy на месте → FULL-тир доступен"})
+    return steps
 
 
 def run_setup(consent=True):
@@ -83,4 +104,5 @@ if __name__ == "__main__":
         tag = "✓ сделано" if r.get("ran") else ("→ " + r["detail"])
         print(f"  [{r['step']}] {tag}")
     f = out["final"]
-    print(f"FULL-тир: {'✓ доступен' if (f['ollama_running'] and f['bge_m3_present']) else '✗ ещё нет (см. шаги выше)'}")
+    full_ok = f["ollama_running"] and f["bge_m3_present"] and f.get("numpy_present")
+    print(f"FULL-тир: {'✓ доступен' if full_ok else '✗ ещё нет (см. шаги выше)'}")

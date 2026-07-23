@@ -12,8 +12,16 @@ from setup_full import plan, probe
 
 
 def test_plan_ready_when_all_present():
-    steps = plan({"ollama_running": True, "bge_m3_present": True}, "darwin")
+    steps = plan({"ollama_running": True, "bge_m3_present": True, "numpy_present": True}, "darwin")
     assert len(steps) == 1 and steps[0]["step"] == "ready"
+
+
+def test_plan_numpy_step_when_missing():
+    # FULL-тир требует numpy; без него ollama+bge-m3 недостаточно — иначе «доступен» врёт.
+    steps = plan({"ollama_running": True, "bge_m3_present": True, "numpy_present": False}, "darwin")
+    np_step = [s for s in steps if s["step"] == "numpy"][0]
+    assert np_step["auto"] is True and np_step["cmd"][-1] == "numpy"
+    assert not any(s["step"] == "ready" for s in steps)
 
 
 def test_plan_auto_pull_when_ollama_up_no_model():
@@ -36,5 +44,5 @@ def test_plan_platform_specific_hint():
 
 def test_probe_returns_shape():
     p = probe()
-    assert set(p) == {"ollama_running", "bge_m3_present"}
-    assert isinstance(p["ollama_running"], bool) and isinstance(p["bge_m3_present"], bool)
+    assert set(p) == {"ollama_running", "bge_m3_present", "numpy_present"}
+    assert all(isinstance(p[k], bool) for k in ("ollama_running", "bge_m3_present", "numpy_present"))

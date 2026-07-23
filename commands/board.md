@@ -20,7 +20,7 @@ description: Личный совет директоров (Consilium) — сбо
 
 - **`add ИМЯ`** — собрать нового советника (слой 0, билдер профиля).
   Для PD-фигуры используй каталог (`catalog_search`/`catalog_add` или `python3 scripts/board.py
-  seed-council`); путь сборки — `build-advisor` через `scripts/lifecycle.py`. Для современной
+  seed-council`); путь сборки — `python3 scripts/board.py build-advisor`. Для современной
   фигуры источники даёт САМ пользователь из своих легальных материалов (см. SKILL.md «Онбординг»).
 
 - **`ask ИМЯ: ВОПРОС`** — диалог с ОДНИМ советником.

@@ -66,8 +66,21 @@ def check_tier():
         sem = SemanticEngine.available()
     except Exception:
         sem = False
+    if sem:
+        return {"name": "tier", "ok": True, "detail": "FULL (semantic, bge-m3)"}
+    # FULL не активен — уточнить причину. numpy молча роняет FULL даже при живом ollama+bge-m3:
+    # без него семантик-ретрив недостижим, а юзер думает, что настроил всё.
+    try:
+        import numpy  # noqa: F401
+        numpy_ok = True
+    except Exception:
+        numpy_ok = False
+    if not numpy_ok:
+        return {"name": "tier", "ok": True, "advisory": True,
+                "detail": "SIMPLE; ВНИМАНИЕ: нет numpy → FULL недоступен даже с ollama. "
+                          "Поставь: python3 scripts/setup_full.py (или pip install numpy)"}
     return {"name": "tier", "ok": True,  # SIMPLE — норма, контур цел
-            "detail": "FULL (semantic, bge-m3)" if sem else "SIMPLE (лексика; контур цел без ollama)"}
+            "detail": "SIMPLE (лексика; контур цел без ollama)"}
 
 
 def check_judge():

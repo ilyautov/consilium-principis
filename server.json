@@ -3,7 +3,7 @@
   "name": "io.github.ilyautov/consilium-principis",
   "title": "Consilium Principis",
   "description": "A personal board of directors made of AI personas of real thinkers, grounded in public-domain texts, with a fidelity contour: quotes checked word-for-word by code, fail-closed abstention when there are no grounds.",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "repository": {
     "url": "https://github.com/ilyautov/consilium-principis",
     "source": "github"
@@ -11,7 +11,7 @@
   "packages": [
     {
       "registryType": "mcpb",
-      "identifier": "https://github.com/ilyautov/consilium-principis/releases/download/v0.1.1/consilium-principis.mcpb",
+      "identifier": "https://github.com/ilyautov/consilium-principis/releases/download/v0.1.2/consilium-principis.mcpb",
       "fileSha256": "REPLACE-WITH-sha256-AT-RELEASE-TIME",
       "transport": {
         "type": "stdio"

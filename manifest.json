@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "consilium-principis",
   "display_name": "Consilium Principis",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Личный совет директоров из AI-персон реальных мыслителей, заземлённый в public-domain текстах, с контуром верности (дословные 🔵-цитаты, fail-closed воздержание).",
   "author": {
     "name": "Ilya Autov",

@@ -1,7 +1,7 @@
 {
   "name": "consilium-principis",
   "description": "A personal board of directors made of AI personas of real thinkers, grounded in public-domain texts, with a fidelity contour: quotes checked word-for-word by code, fail-closed abstention when there are no grounds.",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "author": {
     "name": "Ilya Autov",
     "email": "ilyautov@gmail.com"

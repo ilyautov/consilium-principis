@@ -166,7 +166,12 @@ def _registry_path_for_key(key, root=None):
 def _advisor_key(advisor_dir, root):
     """Ключ реестра = путь советника ОТНОСИТЕЛЬНО корня доски (forward-slash, кросс-платформенно).
     Советник вне корня (tmp/внешний каталог) → None: якорить нечем, реестр не трогаем."""
-    rel = os.path.relpath(os.path.realpath(advisor_dir), os.path.realpath(root))
+    try:
+        rel = os.path.relpath(os.path.realpath(advisor_dir), os.path.realpath(root))
+    except ValueError:
+        # Windows cannot compute a relative path across drive letters. Such an
+        # advisor is outside this board root, so it has no registry key.
+        return None
     if rel == ".." or rel.startswith(".." + os.sep) or os.path.isabs(rel):
         return None
     return rel.replace(os.sep, "/")

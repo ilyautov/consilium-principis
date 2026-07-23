@@ -39,15 +39,26 @@ def test_release_uses_its_resolved_tag_for_registry_and_validation():
 
 def test_release_rerun_validates_immutable_existing_assets_without_repacking_them():
     workflow = (ROOT / ".github/workflows/release.yml").read_text(encoding="utf-8")
+    publish = workflow.split("\n  publish:\n", 1)[1]
+    existing_release = publish.split(
+        'if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then', 1
+    )[1].split("          else", 1)[0]
 
-    assert 'if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then' in workflow
-    assert 'gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \\' in workflow
-    assert workflow.count("uses: actions/checkout@") == 2
-    assert "python3 scripts/release_validate.py \\" in workflow
-    assert '--artifact "$release_dir/consilium-principis.mcpb"' in workflow
-    assert '--registry-manifest "$release_dir/server.json"' in workflow
-    assert "cmp --silent" not in workflow
-    assert "--clobber" not in workflow
+    checkout = "uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1"
+    assert checkout in publish
+    assert "ref: ${{ inputs.tag || github.ref_name }}" in publish
+    assert 'git rev-parse "refs/tags/$RELEASE_TAG^{commit}"' in publish
+    assert publish.index(checkout) < publish.index('git rev-parse "refs/tags/$RELEASE_TAG^{commit}"')
+    assert publish.index('git rev-parse "refs/tags/$RELEASE_TAG^{commit}"') < publish.index(
+        "uses: actions/download-artifact@"
+    )
+    assert 'gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \\' in existing_release
+    assert "python3 scripts/release_validate.py \\" in existing_release
+    assert '--artifact "$release_dir/consilium-principis.mcpb"' in existing_release
+    assert '--registry-manifest "$release_dir/server.json"' in existing_release
+    assert "cmp --silent" not in existing_release
+    assert "--clobber" not in existing_release
+    assert "gh release create" not in existing_release
 
 
 def test_release_verifies_runtime_before_publishing():

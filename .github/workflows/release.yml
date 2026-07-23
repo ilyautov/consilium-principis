@@ -135,6 +135,11 @@ jobs:
         with:
           ref: ${{ inputs.tag || github.ref_name }}
           persist-credentials: false
+      - name: Verify checked-out release validator tag
+        run: |
+          tag_commit="$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")"
+          head_commit="$(git rev-parse HEAD)"
+          test "$tag_commit" = "$head_commit"
       - name: Download validated release assets
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:

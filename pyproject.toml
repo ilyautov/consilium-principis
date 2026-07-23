@@ -7,7 +7,7 @@
 
 [project]
 name = "consilium-principis"
-version = "0.1.1"
+version = "0.1.2"
 description = "Личный совет директоров из AI-персон реальных мыслителей, заземлённый в public-domain текстах, с защитным контуром верности (дословные цитаты, fail-closed воздержание)."
 readme = "README.md"
 requires-python = ">=3.10"

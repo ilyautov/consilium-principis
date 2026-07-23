@@ -2,7 +2,7 @@
 
 # Quick start
 
-> Release: [v0.1.1](https://github.com/ilyautov/consilium-principis/releases/download/v0.1.1/consilium-principis.mcpb)
+> Release: [v0.1.2](https://github.com/ilyautov/consilium-principis/releases/download/v0.1.2/consilium-principis.mcpb)
 
 Consilium gives your AI assistant a personal board of thinkers grounded in their texts. These are
 AI representations, not the people themselves. The fidelity contour verifies a 🔵 quote against the

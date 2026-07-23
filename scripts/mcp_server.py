@@ -2708,7 +2708,7 @@ def _handle_rpc(msg):
         return _rpc_result(req_id, {
             "protocolVersion": "2024-11-05",
             "capabilities": {"tools": {}},
-            "serverInfo": {"name": "consilium-principis", "version": "0.1.1"},
+            "serverInfo": {"name": "consilium-principis", "version": "0.1.2"},
             "instructions": instructions,
         })
     if method in ("notifications/initialized", "initialized"):

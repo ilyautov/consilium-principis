@@ -2,7 +2,7 @@
 
 # Connect Consilium as an MCP server
 
-> Release: [v0.1.1](https://github.com/ilyautov/consilium-principis/releases/download/v0.1.1/consilium-principis.mcpb)
+> Release: [v0.1.2](https://github.com/ilyautov/consilium-principis/releases/download/v0.1.2/consilium-principis.mcpb)
 
 Use Consilium either as a Claude Code skill or as an MCP server. The server exposes the board
 lifecycle, fidelity checks, source-backed retrieval, decision calculations, and self-documentation.

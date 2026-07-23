@@ -42,6 +42,30 @@ def test_load_source_rejects_consilium_runtime_log(tmp_path, monkeypatch):
         mcp_server._load_source_text(path=".consilium/swallow.log")
 
 
+@pytest.mark.skipif(os.name == "nt", reason="POSIX permission bits are unavailable on Windows")
+@pytest.mark.parametrize("mode", ["raw", "tier", "clean"])
+def test_add_source_modes_make_personal_landing_private(tmp_path, monkeypatch, mode):
+    """Every add_source landing variant protects sources, provenance, and manifest metadata."""
+    import mcp_server
+    advisor = tmp_path / "advisors" / "private-advisor"
+    advisor.mkdir(parents=True)
+    monkeypatch.setattr(mcp_server, "_root", lambda: str(tmp_path))
+
+    result = mcp_server._add_source(str(advisor), text="Author body.", basename="Private source",
+                                    tier="P1", mode=mode)
+
+    assert result["ok"] is True
+    sources = advisor / "sources"
+    assert (sources.stat().st_mode & 0o777) == 0o700
+    assert (sources / result["source_file"]).stat().st_mode & 0o777 == 0o600
+    assert (sources / "_provenance.jsonl").stat().st_mode & 0o777 == 0o600
+    assert (sources / "manifest.json").stat().st_mode & 0o777 == 0o600
+    if mode == "clean":
+        originals = sources / "originals"
+        assert (originals.stat().st_mode & 0o777) == 0o700
+        assert (originals / "private-source.txt").stat().st_mode & 0o777 == 0o600
+
+
 def test_long_tool_returns_job_and_completes(monkeypatch):
     # долгие тулы рвали таймаут MCP → теперь фоновый джоб: job_id сразу, job_status опрашивается
     import mcp_server, time

@@ -14,6 +14,7 @@ collect_common.py — общая база для сборщиков корпус
 import os, re, sys, json, datetime
 import socket, ipaddress, ssl, http.client
 from urllib.parse import urlparse, urljoin
+from file_atomic import ensure_private_directory, ensure_private_file
 
 UA = "Mozilla/5.0 (Consilium-Principis corpus collector; personal use)"
 
@@ -242,7 +243,7 @@ def _land_to_sources_unlocked(advisor_dir, basename, text, *, url, license_note,
             header.append(f"# {k.upper()}: {v}")
     header.append("# " + "-" * 60)
     src_dir = os.path.join(advisor_dir, "sources")
-    os.makedirs(src_dir, exist_ok=True)
+    ensure_private_directory(src_dir)
     stem = slugify(basename)
     number = 1
     while True:
@@ -251,6 +252,7 @@ def _land_to_sources_unlocked(advisor_dir, basename, text, *, url, license_note,
         try:
             with open(path, "x", encoding="utf-8") as f:
                 f.write("\n".join(header) + "\n" + text.strip() + "\n")
+            ensure_private_file(path)
             break
         except FileExistsError:
             number += 1
@@ -262,6 +264,7 @@ def _land_to_sources_unlocked(advisor_dir, basename, text, *, url, license_note,
         if extra_meta:
             rec.update(extra_meta)
         f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+    ensure_private_file(man)
     return path
 
 

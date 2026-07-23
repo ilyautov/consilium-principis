@@ -157,3 +157,21 @@ def test_land_to_sources_reserves_suffix_without_overwriting(tmp_path):
     assert open(second, encoding="utf-8").read().endswith("second\n")
     rows = [json.loads(line) for line in open(adv / "sources" / "_provenance.jsonl", encoding="utf-8")]
     assert [row["file"] for row in rows] == ["book.txt", "book-2.txt"]
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX permission bits are unavailable on Windows")
+def test_land_to_sources_makes_source_directory_files_and_existing_sidecar_private(tmp_path):
+    """Personal source landing tightens its directory and provenance even when they predate it."""
+    adv = tmp_path / "advisor"
+    sources = adv / "sources"
+    sources.mkdir(parents=True)
+    sidecar = sources / "_provenance.jsonl"
+    sidecar.write_text('{"old": true}\n', encoding="utf-8")
+    os.chmod(sources, 0o755)
+    os.chmod(sidecar, 0o644)
+
+    landed = cc.land_to_sources(str(adv), "Book", "body", url="u", license_note="PD")
+
+    assert (sources.stat().st_mode & 0o777) == 0o700
+    assert (os.stat(landed).st_mode & 0o777) == 0o600
+    assert (sidecar.stat().st_mode & 0o777) == 0o600

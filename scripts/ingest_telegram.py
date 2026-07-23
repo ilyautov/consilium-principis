@@ -19,6 +19,7 @@ import json
 import html as _html
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from file_atomic import ensure_private_directory, ensure_private_file
 
 MSG_RE = re.compile(r'<div class="tgme_widget_message_text[^"]*"[^>]*>(.*?)</div>', re.S)
 
@@ -44,8 +45,10 @@ def posts_to_records(posts, handle):
 
 def _write_corpus_exclusive(records, out_path):
     """Создать новый corpus-файл без TOCTOU между проверкой имени и записью."""
-    os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
     directory, filename = os.path.split(out_path)
+    if directory:
+        ensure_private_directory(directory)
+    directory = directory or "."
     stem, extension = os.path.splitext(filename)
     match = re.match(r"^(.*)-(\d+)$", stem)
     base = match.group(1) if match else stem
@@ -57,8 +60,10 @@ def _write_corpus_exclusive(records, out_path):
             with open(candidate, "x", encoding="utf-8") as f:
                 for r in records:
                     f.write(json.dumps(r, ensure_ascii=False) + "\n")
+            ensure_private_file(candidate)
             return len(records), candidate
         except FileExistsError:
+            ensure_private_file(candidate)
             number += 1
 
 

@@ -168,11 +168,11 @@ git clone https://github.com/ilyautov/consilium-principis ~/consilium-principis
 cd ~/consilium-principis && python3 install.py
 ```
 
-Prefer buttons or a terminal? See [`QUICKSTART.md`](QUICKSTART.md): a click-to-install ([`install.command`](install.command) / `.bat`) and the manual path.
+Prefer buttons or a terminal? See [`QUICKSTART.en.md`](QUICKSTART.en.md): a click-to-install ([`install.command`](install.command) / `.bat`) and the manual path.
 
 **Claude Desktop or another MCP host:** the server exposes its cycle (build, sessions, widgets) as
 tools. Host compatibility varies; see the tested-status table in
-[`docs/CONNECT-HOSTS.md`](docs/CONNECT-HOSTS.md), then generate the portable configuration from the checkout with
+[`docs/CONNECT-HOSTS.en.md`](docs/CONNECT-HOSTS.en.md), then generate the portable configuration from the checkout with
 `python3 scripts/board.py mcp-config --json`.
 
 **All you need:** Python 3.10+. For smart cross-language search, optionally
@@ -186,7 +186,7 @@ Windows launcher path, but please treat it as experimental and report the result
 
 - **In a terminal, use `py install.py`** (not `python3 install.py`). The python.org installer ships `py.exe` and `python.exe`, but no `python3.exe`; the `python3.exe` you may see under the Microsoft Store is an App Execution Alias stub that just opens the Store instead of running.
 - **Plugin can't find Python?** Set `CONSILIUM_PYTHON=py` in your environment before launching Claude Code. The plugin's server command defaults to `python3` and honors this override. (The Claude Desktop path needs nothing — `board.py mcp-config` writes the exact interpreter for you.)
-- **MCP configuration:** run `py -3 scripts/board.py mcp-config --json` (or `py -3 scripts/board.py mcp-install` for Claude Desktop). If `py` is absent, use `python` only after confirming it is Python 3.10+; do not use the Store `python3` alias. See [`CONNECT-MCP.md`](CONNECT-MCP.md) for the exact fallback.
+- **MCP configuration:** run `py -3 scripts/board.py mcp-config --json` (or `py -3 scripts/board.py mcp-install` for Claude Desktop). If `py` is absent, use `python` only after confirming it is Python 3.10+; do not use the Store `python3` alias. See [`CONNECT-MCP.en.md`](CONNECT-MCP.en.md) for the exact fallback.
 
 ## Your board, your call
 
@@ -256,5 +256,5 @@ report it privately via [`SECURITY.md`](SECURITY.md). Support and project govern
 ---
 
 <div align="center">
-<sub>Consilium Principis · early access (v0.1.0) · <a href="LICENSE">MIT</a> · <a href="CONTRIBUTING.md">Contributing</a> · <a href="SECURITY.md">Security</a></sub>
+<sub>Consilium Principis · early access (v0.1.0) · <a href="https://github.com/ilyautov/consilium-principis/releases/download/v0.1.0/consilium-principis.mcpb">release artifact</a> · <a href="LICENSE">MIT</a> · <a href="CONTRIBUTING.md">Contributing</a> · <a href="SECURITY.md">Security</a></sub>
 </div>

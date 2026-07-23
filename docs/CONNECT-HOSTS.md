@@ -6,8 +6,7 @@
 
 Ключевой факт архитектуры: логика советников, контура верности, гейта цитат и 📐 карты
 решения живёт в **MCP-сервере**, то есть в `scripts/mcp_server.py`. Он отдаёт полный
-`INSTRUCTIONS` (см. `INSTRUCTIONS = """…"""` в `scripts/mcp_server.py`, ~строка 1954) прямо в
-ответе на стандартный MCP-хендшейк `initialize` (`scripts/mcp_server.py`, ~строка 2197):
+`INSTRUCTIONS` из обработчика стандартного MCP-хендшейка `initialize`:
 
 ```python
 if method == "initialize":

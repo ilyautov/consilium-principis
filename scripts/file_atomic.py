@@ -3,6 +3,7 @@ from contextlib import contextmanager
 import json
 import os
 from pathlib import Path
+import stat
 import tempfile
 
 
@@ -35,8 +36,29 @@ def ensure_private_directory(path):
 
 
 def ensure_private_file(path):
-    """Restrict an already-created private state file where POSIX supports modes."""
-    _best_effort_chmod(path, _PRIVATE_FILE_MODE)
+    """Restrict a regular private file without following a final-path symlink.
+
+    Source landing can encounter a pre-existing user file while reserving a suffix.  Opening it
+    by descriptor with ``O_NOFOLLOW`` and using ``fchmod`` means a symlink cannot redirect this
+    tightening operation outside the personal-state directory.
+    """
+    if os.name == "nt":
+        return
+    nofollow = getattr(os, "O_NOFOLLOW", None)
+    if nofollow is None:                              # fail closed when the platform lacks it
+        return
+    flags = os.O_RDONLY | os.O_NONBLOCK | nofollow
+    try:
+        fd = os.open(os.fspath(path), flags)
+    except OSError:
+        return
+    try:
+        if stat.S_ISREG(os.fstat(fd).st_mode):
+            os.fchmod(fd, _PRIVATE_FILE_MODE)
+    except OSError:
+        pass
+    finally:
+        os.close(fd)
 
 
 def _ensure_parent(destination, private):

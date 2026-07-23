@@ -45,6 +45,21 @@ def check_response_language():
             "detail": f"{mode} (CONSILIUM_LANG)"}
 
 
+def check_mcp_install():
+    """Verify a configured stdio MCP runtime without making non-MCP installs unhealthy."""
+    try:
+        from mcp_install import check_install
+        result = check_install()
+    except Exception as exc:
+        return {"name": "mcp-install", "ok": False,
+                "detail": f"MCP install check failed unexpectedly: {exc}",
+                "recovery": "Run scripts/board.py mcp-install again."}
+    if result["detail"] == "No MCP install record found":
+        return {"name": "mcp-install", "ok": True, "advisory": True,
+                "detail": "not configured (run scripts/board.py mcp-install to connect Claude Desktop)"}
+    return result
+
+
 def check_tier():
     try:
         from engine.semantic import SemanticEngine
@@ -372,7 +387,7 @@ def summarize(checks):
 def run_doctor(root="."):
     """Полный health-check. Контур тестируем на первом советнике с корпусом."""
     from corpusbuild.paths import corpus_path
-    checks = [check_python(), check_skill_installed(), check_response_language(),
+    checks = [check_python(), check_skill_installed(), check_response_language(), check_mcp_install(),
               check_tier(), check_judge(), check_ollama_endpoint(),
               check_calibration(root), check_gov_anchors(root), check_corpus_tiering(root),
               check_corpus_tier_fields(root), check_semantic_index(root)]

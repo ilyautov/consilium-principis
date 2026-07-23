@@ -6,6 +6,11 @@ description: >
   совет», «спроси Аврелия», «собери совет директоров», «что выгоднее — X или Y», «добавь
   советника/линзу», «премортем», «board», «council». Движок и правила — в MCP-сервере этого
   плагина; навык подсказывает, когда созвать и как довести до первого заседания.
+  In English: a personal board of AI personas of real thinkers (Sun Tzu, Marcus Aurelius,
+  Epictetus, Machiavelli, plus your own legal figures) with a fail-closed fidelity contour.
+  Answers follow the language of the question. Trigger with: "convene the board", "ask
+  Aurelius", "council of advisors", "what's better — X or Y", "add an advisor/lens",
+  "premortem", "board", "council".
 ---
 
 # Consilium-Principis — консьерж совета

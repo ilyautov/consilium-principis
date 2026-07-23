@@ -11,6 +11,14 @@ description: >
   пользователем), diversity-check против эхо-камеры, мост к действию, петля исхода. Используй
   когда: «созови совет», «спроси Аврелия», «собери совет директоров», «совет по решению»,
   «что выгоднее — X или Y», «добавь советника/линзу», «board», «council», «посоветуй как [фигура]».
+  In English: a personal board of directors of AI personas grounded in public-domain thinkers
+  (Sun Tzu, Marcus Aurelius, Epictetus, Machiavelli out of the box; modern figures from the
+  user's own legal materials), with a fail-closed fidelity contour — verbatim-vs-extrapolation
+  markers, citations only from a verified corpus via a two-phase judge gate, disagreement as a
+  feature, diversity-check against echo chambers, a bridge to action, an outcome loop. Answers
+  follow the language of the question. Trigger with: "convene the board", "ask Aurelius",
+  "council of advisors", "board of directors", "premortem", "what's better — X or Y",
+  "add an advisor/lens", "advise me like [figure]", "board", "council".
 ---
 
 # Consilium-Principis — личный совет директоров (personal-board)

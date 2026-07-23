@@ -2,7 +2,7 @@
 
 # Connect to MCP hosts
 
-> Release: [v0.1.0](https://github.com/ilyautov/consilium-principis/releases/download/v0.1.0/consilium-principis.mcpb)
+> Release: [v0.1.1](https://github.com/ilyautov/consilium-principis/releases/download/v0.1.1/consilium-principis.mcpb)
 
 The advisor logic, fidelity contour, quote gate, and decision map live in
 `scripts/mcp_server.py`. It returns server instructions during the standard MCP `initialize`

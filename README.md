@@ -256,5 +256,5 @@ report it privately via [`SECURITY.md`](SECURITY.md). Support and project govern
 ---
 
 <div align="center">
-<sub>Consilium Principis · early access (v0.1.0) · <a href="https://github.com/ilyautov/consilium-principis/releases/download/v0.1.0/consilium-principis.mcpb">release artifact</a> · <a href="LICENSE">MIT</a> · <a href="CONTRIBUTING.md">Contributing</a> · <a href="SECURITY.md">Security</a></sub>
+<sub>Consilium Principis · early access (v0.1.1) · <a href="https://github.com/ilyautov/consilium-principis/releases/download/v0.1.1/consilium-principis.mcpb">release artifact</a> · <a href="LICENSE">MIT</a> · <a href="CONTRIBUTING.md">Contributing</a> · <a href="SECURITY.md">Security</a></sub>
 </div>

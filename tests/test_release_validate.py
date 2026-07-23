@@ -9,7 +9,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 VALIDATOR = ROOT / "scripts" / "release_validate.py"
-VERSION = "0.1.0"
+# The validator checks this synthetic bundle against the repository's release metadata.
+# Keep its matching fixture on the current manifest version so a normal SemVer bump does
+# not turn a valid release test into a false failure.
+VERSION = json.loads((ROOT / "manifest.json").read_text(encoding="utf-8"))["version"]
 TAG = f"v{VERSION}"
 RELEASE_URL = (
     "https://github.com/ilyautov/consilium-principis/releases/download/"

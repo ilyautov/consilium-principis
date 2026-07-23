@@ -5,6 +5,20 @@
 
 ## [Unreleased]
 
+## [0.1.1] — 2026-07-23
+
+### Added
+- Надёжный release-контур: hash-locked CI-зависимости, валидация registry-манифеста, упаковка и
+  smoke-test MCPB, а также гард от попадания приватных и локальных артефактов в поставку.
+- Английские канонические quick-start и MCP-гайды с контрактами паритета для русских переводов.
+
+### Fixed
+- Атомарные публикации корпуса и защищённые конкурентные обновления приватного состояния.
+- Установщик MCP: неизменяемый пользовательский runtime, rollback частичной установки и проверка
+  реального stdio-handshake через `doctor`.
+- Права доступа к личным источникам и Telegram-выгрузкам; Cowork честно обозначен как непроверенный
+  путь интеграции.
+
 ### Added
 - **calibrated-consult** — opt-in режим измерения оверрелайанса: фиксирует позицию ДО совета, зеркало ПОСЛЕ, калибровка по исходу (MCP-интерфейс, Правило 17).
 - **CONSILIUM_LANG** — форс-язык ответов совета.
@@ -78,5 +92,6 @@
   CI гоняет на Python 3.10/3.11/3.12.
 - Личные данные (доска, заседания, реестры, `.env`) в `.gitignore` и не входят в поставку.
 
-[Unreleased]: https://github.com/ilyautov/consilium-principis/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/ilyautov/consilium-principis/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/ilyautov/consilium-principis/releases/tag/v0.1.1
 [0.1.0]: https://github.com/ilyautov/consilium-principis/releases/tag/v0.1.0

@@ -2,7 +2,7 @@
 
 # Быстрый старт
 
-> Релиз: [v0.1.0](https://github.com/ilyautov/consilium-principis/releases/download/v0.1.0/consilium-principis.mcpb)
+> Релиз: [v0.1.1](https://github.com/ilyautov/consilium-principis/releases/download/v0.1.1/consilium-principis.mcpb)
 
 > Consilium даёт твоему ИИ-ассистенту **совет из персон реальных мыслителей**, грунтованных в
 > их же текстах: советники обращаются к тебе, спорят между собой, дают синтез и шаг к действию.

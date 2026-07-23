@@ -1,6 +1,8 @@
 @echo off
 setlocal
 REM Windows launcher: use a real Python 3.10+ interpreter; never install software automatically.
+chcp 65001 >nul
+set "PYTHONUTF8=1"
 cd /d "%~dp0"
 set "CONSILIUM_PYTHON="
 set "CONSILIUM_EXIT=1"

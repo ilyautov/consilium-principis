@@ -141,6 +141,10 @@ def cmd_seed_council(args):
         else:
             print(f"  ✗ {r['name']}: упал на {r.get('stage')} — {r.get('detail') or r.get('problems')}")
     print(f"→ Собрано {ok}/{len(results)}. Дальше: /board council: <твой вопрос>")
+    if ok == 0 and results and all(r.get("stage") == "fetch" for r in results if not r["ok"]):
+        print("  ⚠ Ни один источник не скачался — похоже, нет доступа к Project Gutenberg "
+              "(оффлайн / файрвол / блокировка). Проверь сеть и повтори, либо добавь фигуру "
+              "вручную: python3 scripts/board.py build-advisor.", file=sys.stderr)
     return 0 if ok else 1
 
 

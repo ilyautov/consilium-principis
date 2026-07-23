@@ -2,7 +2,7 @@
 #
 # ЭТО НЕ PyPI-пакет. Скилл ставится копированием в ~/.claude/skills/ через `python3 install.py`
 # (или как MCP-сервер, см. CONNECT-MCP.md), а НЕ через `pip install`. Здесь [project] служит
-# единым источником версии/метаданных, а [tool.*] — конфигом pytest/ruff. [build-system] намеренно
+# единым источником версии/метаданных, а [tool.pytest.ini_options] — конфигом pytest. [build-system] намеренно
 # отсутствует: собирать wheel из этого репозитория не нужно.
 
 [project]
@@ -24,6 +24,7 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 

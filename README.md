@@ -205,7 +205,7 @@ from materials you bring yourself.
 Search has two support tiers: **SIMPLE** is the standard-library lexical floor; **FULL** adds
 Ollama with `bge-m3` for semantic cross-language search. **Hybrid** retrieval is opt-in, not a
 third support tier. The protective contour is separate: it checks every quote against its source
-regardless of the selected tier. Details in [`SKILL.md`](SKILL.md) and [`docs/`](docs/superpowers/specs/).
+regardless of the selected tier. Details in [`SKILL.md`](SKILL.md) *(in Russian)* and the generated [`docs/MANUAL.md`](docs/MANUAL.md) *(in Russian)*.
 
 ## Technical design
 
@@ -247,7 +247,7 @@ Yes. It is MIT-licensed and open-source. Install with `/plugin marketplace add i
 
 PRs are welcome, but two rules are non-negotiable: **only public-domain texts** (no copyrighted
 material, not even excerpts) and **never weaken the fail-closed contour** (🔵 only via code
-verification). How to set up, run the offline suite, and open a PR is in [`CONTRIBUTING.md`](CONTRIBUTING.md).
+verification). How to set up, run the offline suite, and open a PR is in [`CONTRIBUTING.en.md`](CONTRIBUTING.en.md).
 Found a way to bypass the fidelity contour or a data leak? That's a first-class vulnerability,
 report it privately via [`SECURITY.md`](SECURITY.md). Support and project governance are in
 [`SUPPORT.md`](SUPPORT.md) and [`GOVERNANCE.md`](GOVERNANCE.md); change history is in

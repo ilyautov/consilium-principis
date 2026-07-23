@@ -97,6 +97,26 @@ existing `mcpServers` object; do not replace its neighboring entries. The server
 paths from its own file location, not the host's working directory. A local `mcp.json` is ignored by
 Git; only [`mcp.example.json`](mcp.example.json) belongs in the repository.
 
+## Alternative: the `.mcpb` bundle (Claude Desktop extension)
+
+Besides the script above, each release ships an **`.mcpb` bundle** — a single-file extension for
+Claude Desktop (Extensions menu), handy if you'd rather not edit config by hand.
+
+**Install:**
+1. Download `consilium-principis.mcpb` from the [latest release](https://github.com/ilyautov/consilium-principis/releases/latest).
+2. Claude Desktop → **Settings → Extensions** → **Install from file…** (or drag the `.mcpb` into the Extensions window).
+3. Confirm and **fully restart** Claude Desktop (a stdio server has no hot reload).
+
+**Update:** download the newer `.mcpb` and install it the same way — Desktop replaces the old one; then restart.
+The `explain_self` tool reports the current version.
+
+**Remove:** Settings → Extensions → Consilium Principis → **Remove/Uninstall**, then restart Desktop.
+
+> **Honest caveat:** the bundle does NOT ship its own Python — its `manifest.json` launches the system
+> `python3` (`py -3` on Windows), so you need Python 3.10+ installed (see "Dependencies" below); without
+> it the extension installs but the server won't start. The bundle carries only the machinery — assemble
+> your advisors and corpora locally after install (`seed_council` for the public-domain sages).
+
 ## Security boundary
 
 In hosts that launch a local stdio MCP server, the process receives your user's filesystem and

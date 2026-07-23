@@ -77,9 +77,14 @@ jobs:
                   [sys.executable, str(root / "scripts" / "mcp_server.py")],
                   stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
               )
+              # Смок глубже tools/list: реально ВЫЗЫВАЕМ stateless-тул (explain_self — без корпуса,
+              # сети и обязательных аргументов), чтобы упакованный бандл проверялся end-to-end,
+              # а не только на способность перечислить тулы.
               requests = [
                   {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}},
                   {"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}},
+                  {"jsonrpc": "2.0", "id": 3, "method": "tools/call",
+                   "params": {"name": "explain_self", "arguments": {}}},
               ]
               stdout, stderr = process.communicate(
                   "\n".join(json.dumps(request) for request in requests) + "\n", timeout=30
@@ -87,12 +92,15 @@ jobs:
               if process.returncode:
                   raise SystemExit(f"packed MCP server failed: {stderr}")
               responses = [json.loads(line) for line in stdout.splitlines() if line.strip()]
-              if len(responses) != 2 or responses[0].get("id") != 1 or responses[1].get("id") != 2:
+              if len(responses) != 3 or [r.get("id") for r in responses] != [1, 2, 3]:
                   raise SystemExit(f"unexpected MCP responses: {stdout}")
               if responses[0].get("result", {}).get("serverInfo", {}).get("name") != "consilium-principis":
                   raise SystemExit("packed MCP initialize response is invalid")
               if not isinstance(responses[1].get("result", {}).get("tools"), list):
                   raise SystemExit("packed MCP tools/list response is invalid")
+              call = responses[2]
+              if "error" in call or not isinstance(call.get("result", {}).get("content"), list):
+                  raise SystemExit(f"packed MCP tools/call (explain_self) failed: {stdout}")
           PY
       - name: Build hash-complete registry manifest
         run: |

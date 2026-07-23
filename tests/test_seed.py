@@ -56,6 +56,17 @@ def test_seed_one_handles_fetch_failure():
         assert res["ok"] is False and res["stage"] == "fetch"
 
 
+def test_real_fetch_soft_fails_when_collect_errors(monkeypatch):
+    # #7: collect_pd падает (оффлайн / файрвол / блок Gutenberg) → _real_fetch отдаёт None,
+    # а НЕ сырой CalledProcessError-traceback на первом шаге онбординга (seed_one сделает мягко).
+    import seed
+    def boom(*a, **k):
+        raise seed.subprocess.CalledProcessError(1, "collect_pd")
+    monkeypatch.setattr(seed.subprocess, "run", boom)
+    with tempfile.TemporaryDirectory() as t:
+        assert seed._real_fetch(t, "http://x", "s.txt") is None
+
+
 def test_seed_council_continues_past_failures():
     specs = [
         {"name": "good", "display": "G", "url": "http://x", "source_file": "s.txt",

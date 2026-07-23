@@ -87,8 +87,14 @@ def seed_council(specs, root, fetch_fn, build_fn):
 def _real_fetch(adv_dir, url, source_file):
     name = source_file.rsplit(".", 1)[0]
     script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "collect_pd.py")
-    subprocess.run([sys.executable, script, adv_dir, "--url", url, "--name", name,
-                    "--license", "public-domain"], check=True)
+    try:
+        subprocess.run([sys.executable, script, adv_dir, "--url", url, "--name", name,
+                        "--license", "public-domain"], check=True)
+    except subprocess.CalledProcessError:
+        # collect_pd не скачал (оффлайн / файрвол / блок Gutenberg / битый URL). Мягкий сигнал
+        # наверх: seed_one превратит None в {ok: False, stage: "fetch"}, а cmd_seed_council
+        # напечатает понятную строку — вместо сырого traceback на ПЕРВОМ шаге онбординга.
+        return None
     sd = os.path.join(adv_dir, "sources")
     # collect_pd слугифицирует имя — находим .txt, соответствующий запросу
     cand = os.path.join(sd, source_file)

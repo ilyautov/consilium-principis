@@ -69,5 +69,19 @@ POSITIONING-*.md
 # GTM/launch-кухня (порядок залпа, тексты постов, submit-каналы) — рабочие заметки владельца,
 # тон бьёт по рву если увидят в public. Держим локально, из git-истории исключены.
 docs/launch/
+# Внутренние планы реализации (brainstorming/writing-plans) — процессные артефакты, не для public.
+docs/superpowers/
+# docs/dev по умолчанию ВНУТРЕННИЙ (moat-анализ, GTM, монетизация, конкуренты, юр-мемо, research,
+# аудиты — раскрывают конкурентам слабости рва). Публично — ТОЛЬКО операционные файлы, что нужны
+# коду/тестам/контрибьютору, поимённо ниже. Новый анализ по умолчанию НЕ утечёт.
+docs/dev/*
+!docs/dev/moat-baseline.json
+!docs/dev/moat-baseline-provenance.md
+!docs/dev/retrieval-baseline.json
+!docs/dev/retrieval-regression-refresh.md
+!docs/dev/calibration-provenance.md
+!docs/dev/internal-tools.md
+!docs/dev/federation-dogfood-checklist.md
+!docs/dev/mcp-registry-publish-runbook.md
 .worktrees/
 .superpowers/

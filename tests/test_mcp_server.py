@@ -66,6 +66,31 @@ def test_add_source_modes_make_personal_landing_private(tmp_path, monkeypatch, m
         assert (originals / "private-source.txt").stat().st_mode & 0o777 == 0o600
 
 
+@pytest.mark.skipif(os.name == "nt", reason="POSIX permission bits are unavailable on Windows")
+@pytest.mark.parametrize(
+    ("mode", "existing_relative"),
+    [("raw", "private-source.txt"), ("tier", "private-source.txt"),
+     ("clean", "private-source.clean.txt")],
+)
+def test_add_source_modes_tighten_collided_regular_source_files(tmp_path, monkeypatch, mode,
+                                                                 existing_relative):
+    """A collision leaves personal source content intact but removes inherited group/world access."""
+    import mcp_server
+    advisor = tmp_path / "advisors" / "private-advisor"
+    existing = advisor / "sources" / existing_relative
+    existing.parent.mkdir(parents=True)
+    existing.write_text("existing private source\n", encoding="utf-8")
+    os.chmod(existing, 0o644)
+    monkeypatch.setattr(mcp_server, "_root", lambda: str(tmp_path))
+
+    result = mcp_server._add_source(str(advisor), text="Author body.", basename="Private source",
+                                    tier="P1", mode=mode)
+
+    assert result["ok"] is True
+    assert existing.read_text(encoding="utf-8") == "existing private source\n"
+    assert existing.stat().st_mode & 0o777 == 0o600
+
+
 def test_long_tool_returns_job_and_completes(monkeypatch):
     # долгие тулы рвали таймаут MCP → теперь фоновый джоб: job_id сразу, job_status опрашивается
     import mcp_server, time

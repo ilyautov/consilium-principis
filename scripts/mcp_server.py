@@ -948,11 +948,13 @@ def _add_source(advisor_dir, url=None, text=None, path=None, basename=None,
                 try:
                     raw_file = open(raw_path, "x", encoding="utf-8")
                 except FileExistsError:
+                    ensure_private_file(raw_path)
                     number += 1
                     continue
                 try:
                     clean_file = open(clean_path, "x", encoding="utf-8")
                 except FileExistsError:
+                    ensure_private_file(clean_path)
                     raw_file.close()
                     os.unlink(raw_path)
                     number += 1

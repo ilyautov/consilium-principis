@@ -57,7 +57,9 @@ def _write_corpus_exclusive(records, out_path):
         candidate_name = (filename if number == 1 else "%s-%d%s" % (base, number, extension))
         candidate = os.path.join(directory, candidate_name)
         try:
-            with open(candidate, "x", encoding="utf-8") as f:
+            flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
+            fd = os.open(candidate, flags, 0o600)
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
                 for r in records:
                     f.write(json.dumps(r, ensure_ascii=False) + "\n")
             ensure_private_file(candidate)

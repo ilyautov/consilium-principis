@@ -175,3 +175,20 @@ def test_land_to_sources_makes_source_directory_files_and_existing_sidecar_priva
     assert (sources.stat().st_mode & 0o777) == 0o700
     assert (os.stat(landed).st_mode & 0o777) == 0o600
     assert (sidecar.stat().st_mode & 0o777) == 0o600
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX permission bits are unavailable on Windows")
+def test_land_to_sources_never_chmods_a_collided_symlink_target(tmp_path):
+    """A collision with a symlink selects a suffix without changing the symlink target's access."""
+    adv = tmp_path / "advisor"
+    sources = adv / "sources"
+    sources.mkdir(parents=True)
+    target = tmp_path / "outside-source.txt"
+    target.write_text("outside\n", encoding="utf-8")
+    os.chmod(target, 0o644)
+    os.symlink(target, sources / "book.txt")
+
+    landed = cc.land_to_sources(str(adv), "Book", "body", url="u", license_note="PD")
+
+    assert os.path.basename(landed) == "book-2.txt"
+    assert target.stat().st_mode & 0o777 == 0o644

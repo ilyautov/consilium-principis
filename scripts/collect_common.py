@@ -255,6 +255,7 @@ def _land_to_sources_unlocked(advisor_dir, basename, text, *, url, license_note,
             ensure_private_file(path)
             break
         except FileExistsError:
+            ensure_private_file(path)
             number += 1
     # сайдкар-манифест провенанса (для аудита; sources/ всё равно gitignored)
     man = os.path.join(src_dir, "_provenance.jsonl")

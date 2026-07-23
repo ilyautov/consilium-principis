@@ -45,7 +45,7 @@ def test_ci_uses_hash_locked_dependency_sets():
 
     assert "--require-hashes -r requirements/ci.txt" in ci
     assert "--require-hashes -r requirements/ci-no-numpy.txt" in ci
-    assert "--require-hashes -r requirements/ci-no-numpy.txt" in windows
+    assert "--require-hashes -r requirements/ci.txt" in windows
     assert "--hash=sha256:" in normal
     assert "--hash=sha256:" not in no_numpy
     assert "--hash=sha256:" in base

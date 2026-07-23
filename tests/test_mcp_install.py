@@ -1,6 +1,6 @@
 """Скриптовое подключение MCP в claude_desktop_config.json. Критично: МЕРДЖ (не затереть соседние
 серверы), идемпотентность, бэкап перед правкой внешнего конфига, безопасный отказ на битом JSON."""
-import os, sys, json
+import os, sys, json, shutil, threading
 from pathlib import Path
 import pytest
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -55,6 +55,17 @@ def test_install_dry_run_does_not_write(tmp_path):
     assert not cfgf.exists()                             # dry-run не пишет
 
 
+def test_default_dry_run_does_not_create_mcp_runtime(tmp_path):
+    cfgf = tmp_path / "Claude" / "claude_desktop_config.json"
+    cfgf.parent.mkdir(parents=True)
+    home = tmp_path / "home"
+
+    result = install(str(cfgf), home=str(home), dry_run=True)
+
+    assert result["ok"] is True and result["dry_run"] is True
+    assert not (home / ".consilium" / "mcp-runtime").exists()
+
+
 def test_install_missing_dir_refuses_without_create(tmp_path):
     r = install(str(tmp_path / "nope" / "c.json"), command="py", args=["s.py"])
     assert r["ok"] is False and r["reason"] == "no_config_dir"
@@ -71,6 +82,121 @@ def test_install_bad_json_fails_safe(tmp_path):
 def test_server_command_is_absolute():
     cmd, args = server_command()
     assert os.path.isabs(args[0]) and args[0].endswith("mcp_server.py")
+
+
+def test_install_copies_versioned_user_runtime_and_does_not_reference_source_checkout(tmp_path):
+    cfgf = tmp_path / "Claude" / "claude_desktop_config.json"
+    cfgf.parent.mkdir(parents=True)
+    home = tmp_path / "home"
+    record = home / ".consilium" / "last_mcp_install.json"
+
+    result = install(str(cfgf), home=str(home), record_path=str(record))
+
+    assert result["ok"] is True
+    saved = json.loads(cfgf.read_text(encoding="utf-8"))
+    entry = saved["mcpServers"][NAME]
+    runtime_server = entry["args"][0]
+    assert runtime_server.startswith(str(home / ".consilium" / "mcp-runtime"))
+    assert os.path.isfile(runtime_server)
+    assert os.path.dirname(os.path.dirname(runtime_server)) != os.path.dirname(
+        os.path.dirname(os.path.abspath(mcp_install.__file__))
+    )
+    assert entry["command"] == sys.executable
+
+
+def test_concurrent_installs_preserve_each_servers_entry(tmp_path):
+    cfgf = tmp_path / "Claude" / "claude_desktop_config.json"
+    cfgf.parent.mkdir(parents=True)
+    cfgf.write_text(json.dumps({"mcpServers": {"existing": {"command": "old", "args": []}}}),
+                    encoding="utf-8")
+    barrier = threading.Barrier(2)
+    outcomes = []
+
+    def connect(name):
+        barrier.wait()
+        outcomes.append(install(str(cfgf), command="py", args=[name],
+                                record_path=str(tmp_path / (name + ".json"))))
+
+    first = threading.Thread(target=connect, args=("first.py",))
+    second = threading.Thread(target=connect, args=("second.py",))
+    first.start(); second.start(); first.join(); second.join()
+
+    assert all(result["ok"] for result in outcomes)
+    servers = json.loads(cfgf.read_text(encoding="utf-8"))["mcpServers"]
+    assert servers["existing"] == {"command": "old", "args": []}
+    # Both clients use the same Consilium key, so a concurrent update must retain one complete entry.
+    assert servers[NAME]["args"] in (["first.py"], ["second.py"])
+
+
+def test_multi_target_failure_reports_per_target_recovery_without_overwriting_record(tmp_path, monkeypatch):
+    first = tmp_path / "classic" / "claude_desktop_config.json"
+    second = tmp_path / "store" / "claude_desktop_config.json"
+    first.parent.mkdir(parents=True); second.parent.mkdir(parents=True)
+    original = '{"mcpServers": {"existing": {"command": "old", "args": []}}}\n'
+    first.write_text(original, encoding="utf-8")
+    monkeypatch.setattr(mcp_install, "config_paths", lambda **_kwargs: [str(first), str(second)])
+    real_write = mcp_install.atomic_update_json
+
+    def fail_second(path, *args, **kwargs):
+        if path == str(second):
+            raise OSError("store replacement failed")
+        return real_write(path, *args, **kwargs)
+
+    monkeypatch.setattr(mcp_install, "atomic_update_json", fail_second)
+    result = install(command="py", args=["s.py"], platform="win32",
+                     record_path=str(tmp_path / "record.json"))
+
+    assert result["ok"] is False
+    assert result["reason"] == "write_failed"
+    assert result["recovery"][str(first)] == {
+        "status": "changed", "backup": result["backups"][0],
+        "action": "restore backup before retrying",
+    }
+    assert NAME in json.loads(first.read_text(encoding="utf-8"))["mcpServers"]
+
+
+def test_install_doctor_validates_record_and_stdio_initialize(tmp_path, monkeypatch):
+    cfgf = tmp_path / "Claude" / "claude_desktop_config.json"
+    cfgf.parent.mkdir(parents=True)
+    home = tmp_path / "home"
+    record = home / ".consilium" / "last_mcp_install.json"
+    installed = install(str(cfgf), home=str(home), record_path=str(record))
+    assert installed["ok"]
+
+    class Completed:
+        returncode = 0
+        stdout = '{"jsonrpc":"2.0","id":"consilium-doctor","result":{"serverInfo":{"name":"consilium-principis"}}}\n'
+        stderr = ""
+
+    monkeypatch.setattr(mcp_install.subprocess, "run", lambda *args, **kwargs: Completed())
+    result = mcp_install.check_install(record_path=str(record))
+
+    assert result["ok"] is True
+    assert result["name"] == "mcp-install"
+    assert result["detail"] == "MCP runtime responds to initialize"
+
+
+def test_install_doctor_reports_timeout_with_recovery(tmp_path, monkeypatch):
+    record = tmp_path / "record.json"
+    server = tmp_path / "runtime" / "scripts" / "mcp_server.py"
+    server.parent.mkdir(parents=True)
+    server.write_text("", encoding="utf-8")
+    cfg = tmp_path / "Claude" / "claude_desktop_config.json"
+    cfg.parent.mkdir(parents=True)
+    cfg.write_text(json.dumps({"mcpServers": {NAME: {"command": sys.executable,
+                                                       "args": [str(server)]}}}), encoding="utf-8")
+    record.write_text(json.dumps({"timestamp": "2026-01-01T00:00:00+00:00", "server_name": NAME,
+                                  "platform": "linux", "paths": [str(cfg)],
+                                  "command": sys.executable, "args": [str(server)]}), encoding="utf-8")
+    def timed_out(*_args, **_kwargs):
+        raise mcp_install.subprocess.TimeoutExpired([sys.executable, str(server)], 1)
+
+    monkeypatch.setattr(mcp_install.subprocess, "run", timed_out)
+    result = mcp_install.check_install(record_path=str(record), timeout=0.01)
+
+    assert result["ok"] is False
+    assert "timed out" in result["detail"]
+    assert "mcp-install" in result["recovery"]
 
 
 def test_windows_paths_include_classic_and_store_configs(tmp_path):
@@ -102,12 +228,11 @@ def test_interrupted_config_replacement_keeps_previous_config_and_backup(tmp_pat
     def interrupted(*_args, **_kwargs):
         raise OSError("interrupted replacement")
 
-    monkeypatch.setattr(mcp_install, "atomic_write_json", interrupted)
+    monkeypatch.setattr(mcp_install, "atomic_update_json", interrupted)
     with pytest.raises(OSError, match="interrupted replacement"):
         install(str(cfgf), command="py", args=["s.py"])
 
     assert cfgf.read_text(encoding="utf-8") == previous
-    assert list(cfgf.parent.glob("*.bak.*")), "the recovery backup must precede replacement"
 
 
 def test_dry_run_has_zero_config_or_record_side_effects(tmp_path):

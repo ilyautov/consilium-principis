@@ -37,13 +37,16 @@ def test_release_uses_its_resolved_tag_for_registry_and_validation():
     assert '--tag "$RELEASE_TAG"' in workflow
 
 
-def test_release_rerun_compares_existing_assets_without_overwriting_them():
+def test_release_rerun_validates_immutable_existing_assets_without_repacking_them():
     workflow = (ROOT / ".github/workflows/release.yml").read_text(encoding="utf-8")
 
     assert 'if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then' in workflow
     assert 'gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \\' in workflow
-    assert 'cmp --silent dist/consilium-principis.mcpb "$release_dir/consilium-principis.mcpb"' in workflow
-    assert 'cmp --silent dist/server.json "$release_dir/server.json"' in workflow
+    assert workflow.count("uses: actions/checkout@") == 2
+    assert "python3 scripts/release_validate.py \\" in workflow
+    assert '--artifact "$release_dir/consilium-principis.mcpb"' in workflow
+    assert '--registry-manifest "$release_dir/server.json"' in workflow
+    assert "cmp --silent" not in workflow
     assert "--clobber" not in workflow
 
 

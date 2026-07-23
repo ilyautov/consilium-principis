@@ -130,6 +130,11 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Check out release validator source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.tag || github.ref_name }}
+          persist-credentials: false
       - name: Download validated release assets
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
@@ -143,8 +148,10 @@ jobs:
             release_dir=$(mktemp -d)
             gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
               --pattern consilium-principis.mcpb --pattern server.json --dir "$release_dir"
-            cmp --silent dist/consilium-principis.mcpb "$release_dir/consilium-principis.mcpb"
-            cmp --silent dist/server.json "$release_dir/server.json"
+            python3 scripts/release_validate.py \
+              --tag "$RELEASE_TAG" \
+              --artifact "$release_dir/consilium-principis.mcpb" \
+              --registry-manifest "$release_dir/server.json"
           else
             gh release create "$RELEASE_TAG" dist/consilium-principis.mcpb dist/server.json --repo "$GITHUB_REPOSITORY" --generate-notes
           fi

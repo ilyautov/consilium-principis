@@ -18,6 +18,16 @@ The registry is in preview; check the current
   copies it to `dist/server.json`, computes the artifact SHA-256 there, and validates
   that exact file before it is uploaded.
 
+## Triggering and rerunning releases
+
+- Pushing a release tag is the normal release path.
+- Manual dispatch requires an existing immutable `vX.Y.Z` Git tag. It checks out and
+  verifies that exact tag, then reconciles its GitHub release: a missing release is
+  created, while an existing release's two assets must compare byte-for-byte with the
+  newly built assets.
+- Manual dispatch never overwrites release assets or moves a tag. Treat the failed
+  `v0.1.1` release run as historical evidence, not as a release to overwrite.
+
 ## Before creating a tag
 
 1. Update every version source and the release URL in source `server.json` to the
@@ -25,8 +35,9 @@ The registry is in preview; check the current
 2. Run the normal test and packaging checks. The release workflow additionally uses
    the lockfile through `npm ci`, validates `manifest.json`, packs the MCPB, runs the
    denylist guard, validates the generated registry manifest, and creates the release.
-3. Create and push the version tag through the approved release process. Do not use a
-   global MCPB installation or manually calculate/edit the release checksum.
+3. Create and push the version tag through the approved release process. This tag push
+   is the normal release trigger. Do not use a global MCPB installation or manually
+   calculate/edit the release checksum.
 
 ## Obtain the validated external registry manifest
 

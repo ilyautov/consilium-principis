@@ -4,9 +4,18 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing vX.Y.Z tag to build and publish/reconcile
+        required: true
+        type: string
 
 permissions:
   contents: read
+
+env:
+  RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
 
 jobs:
   build:
@@ -15,6 +24,12 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
+          ref: ${{ inputs.tag || github.ref_name }}
+      - name: Verify checked-out release tag
+        run: |
+          tag_commit="$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")"
+          head_commit="$(git rev-parse HEAD)"
+          test "$tag_commit" = "$head_commit"
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "22"
@@ -81,7 +96,7 @@ jobs:
           PY
       - name: Build hash-complete registry manifest
         run: |
-          python3 - "$GITHUB_REF_NAME" <<'PY'
+          python3 - "$RELEASE_TAG" <<'PY'
           import hashlib
           import json
           import sys
@@ -97,7 +112,7 @@ jobs:
       - name: Validate complete release
         run: |
           python3 scripts/release_validate.py \
-            --tag "$GITHUB_REF_NAME" \
+            --tag "$RELEASE_TAG" \
             --artifact dist/consilium-principis.mcpb \
             --registry-manifest dist/server.json
       - name: Upload validated release assets
@@ -120,7 +135,16 @@ jobs:
         with:
           name: release-assets
           path: dist
-      - name: Create GitHub release
+      - name: Create or verify GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" dist/consilium-principis.mcpb dist/server.json --repo "$GITHUB_REPOSITORY" --generate-notes
+        run: |
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            release_dir=$(mktemp -d)
+            gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+              --pattern consilium-principis.mcpb --pattern server.json --dir "$release_dir"
+            cmp --silent dist/consilium-principis.mcpb "$release_dir/consilium-principis.mcpb"
+            cmp --silent dist/server.json "$release_dir/server.json"
+          else
+            gh release create "$RELEASE_TAG" dist/consilium-principis.mcpb dist/server.json --repo "$GITHUB_REPOSITORY" --generate-notes
+          fi

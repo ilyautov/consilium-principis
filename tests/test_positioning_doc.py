@@ -1,14 +1,26 @@
-"""Гард: внутренняя записка позиционирования существует и НЕ протекает в публичный README."""
+"""Гард docs-сплита: внутренняя записка позиционирования (конкурентная стратегия) НЕ трекается в
+публичном репо. Раньше гард требовал её НАЛИЧИЯ в docs/dev/; после сплита 2026-07-23 (внешний ревью:
+стратегия/moat-анализ/GTM не должны ехать в public) инвариант перевёрнут — она живёт локально и
+gitignored, а тест стережёт, чтобы она не вернулась в трекинг."""
 import os
+import subprocess
+
+import pytest
+
 HERE = os.path.dirname(os.path.abspath(__file__))
-DOC = os.path.join(HERE, "..", "docs", "dev", "positioning-vs-competitors.md")
+ROOT = os.path.join(HERE, "..")
+REL = "docs/dev/positioning-vs-competitors.md"
 
 
-def test_positioning_doc_exists_internal():
-    assert os.path.exists(DOC), "записка отсутствует"
-    t = open(DOC, encoding="utf-8").read().lower()
-    assert "provenance" in t or "провенанс" in t or "verified board" in t
-    # честная рамка: структурное разногласие не заявлено как доказанное на LLM
-    assert "null" in t or "ноль" in t or "не доказан" in t or "unproven" in t
-    # внутренняя, не README
-    assert "readme" in t  # должен явно оговаривать «не в README»
+def test_positioning_doc_stays_out_of_public_repo():
+    try:
+        r = subprocess.run(["git", "ls-files", REL], cwd=ROOT,
+                           capture_output=True, text=True, timeout=30)
+    except Exception:
+        pytest.skip("git недоступен")
+    if r.returncode != 0:
+        pytest.skip("не git-воркри")
+    assert not r.stdout.strip(), (
+        f"{REL} снова трекается — внутренняя позиционная стратегия утекает в public-репо "
+        f"(должна быть gitignored, см. docs-сплит)"
+    )

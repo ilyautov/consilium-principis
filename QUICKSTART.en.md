@@ -72,7 +72,7 @@ python3 scripts/eval.py advisors/<name>
 ```
 
 For the complete source, manifest, and validation recipe, see
-[`advisors/README.md`](advisors/README.md) and [`docs/onboarding-recipe.md`](https://github.com/ilyautov/consilium-principis/blob/master/docs/onboarding-recipe.md).
+[`advisors/README.md`](advisors/README.md) and [`docs/onboarding-recipe.en.md`](https://github.com/ilyautov/consilium-principis/blob/master/docs/onboarding-recipe.en.md).
 
 ## Update / uninstall
 

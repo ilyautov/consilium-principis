@@ -136,6 +136,16 @@ cd ~/consilium-principis && python3 install.py
 
 Любишь кнопки или терминал, тебе в [`QUICKSTART.md`](QUICKSTART.md): клик-установщик ([`install.command`](install.command) / `.bat`) и ручной путь.
 
+### Или бандл Claude Desktop
+
+[Релиз](https://github.com/ilyautov/consilium-principis/releases/latest) отдаёт однофайловый
+`.mcpb`-бандл — расширение для Claude Desktop. Скачай его и в Claude Desktop открой **Settings →
+Extensions → установить из файла**. Пользователям Claude Code он не нужен — путей выше достаточно.
+Детали подключения для других MCP-хостов — в [`CONNECT-MCP.md`](CONNECT-MCP.md).
+
+Чтобы **обновить**, повтори установку (мерж, твоя доска `advisors/` сохраняется); чтобы **удалить**,
+снеси `~/.claude/skills/consilium-principis`.
+
 **Claude Desktop или другой MCP-хост:** сервер отдаёт цикл (сборка, заседания, виджеты) тулами. Совместимость хостов различается: сначала посмотри таблицу проверенного статуса в [`docs/CONNECT-HOSTS.md`](docs/CONNECT-HOSTS.md), затем из корня чекаута сгенерируй конфиг командой `python3 scripts/board.py mcp-config --json`.
 
 **Нужно только:** Python 3.10+. Для умного кросс-язычного поиска опционально [ollama](https://ollama.com) с `bge-m3` (совет сам подскажет, как поднять). Контур работает и без него.

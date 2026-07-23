@@ -203,13 +203,25 @@ def test_document_language_pairs_keep_release_versions_and_links_aligned():
 def test_document_language_pairs_link_to_each_other():
     link = re.compile(r"(?<!!)\[[^]]+\]\(([^)]+)\)")
 
+    def _references(text, target):
+        # Версии-пары ссылаются друг на друга. Принимаем И относительную ссылку (`QUICKSTART.en.md`),
+        # И абсолютный URL с тем же именем файла (`.../blob/master/QUICKSTART.en.md`): шипуемый
+        # QUICKSTART.md обязан вести на не-шипуемую пару абсолютом, иначе в установленном скилле
+        # ссылка мертва (см. test_shipped_md_relative_links_resolve_in_installed_tree).
+        base = Path(target).name
+        for t in link.findall(text):
+            path = t.split("#", 1)[0].rstrip("/")
+            if path == target or path.rsplit("/", 1)[-1] == base:
+                return True
+        return False
+
     for english_path, russian_path in LANGUAGE_PAIRS:
         english = (ROOT / english_path).read_text(encoding="utf-8")
         russian = (ROOT / russian_path).read_text(encoding="utf-8")
         english_target = str(Path(russian_path).relative_to(Path(english_path).parent))
         russian_target = str(Path(english_path).relative_to(Path(russian_path).parent))
-        assert english_target in link.findall(english)
-        assert russian_target in link.findall(russian)
+        assert _references(english, english_target), f"{english_path} не ссылается на пару"
+        assert _references(russian, russian_target), f"{russian_path} не ссылается на пару"
 
 
 def test_document_language_pairs_keep_install_commands_aligned():

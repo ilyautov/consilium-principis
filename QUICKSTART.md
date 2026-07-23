@@ -1,4 +1,4 @@
-[English](QUICKSTART.en.md) · **Русский**
+[English](https://github.com/ilyautov/consilium-principis/blob/master/QUICKSTART.en.md) · **Русский**
 
 # Быстрый старт
 
@@ -54,8 +54,8 @@
 
 1. Получи папку скилла (clone или zip), зайди в неё.
 2. Запусти установщик:
-   - **macOS:** двойной клик [`install.command`](install.command) (первый раз: правый клик → «Открыть»);
-   - **Windows:** двойной клик [`install.bat`](install.bat);
+   - **macOS:** двойной клик [`install.command`](https://github.com/ilyautov/consilium-principis/blob/master/install.command) (первый раз: правый клик → «Открыть»);
+   - **Windows:** двойной клик [`install.bat`](https://github.com/ilyautov/consilium-principis/blob/master/install.bat);
    - **терминал:** `python3 install.py` (**Windows:** `py install.py` — см. нюанс ниже)
 3. Установщик скопирует скилл в `~/.claude/skills/`, определит тир и **сам прогонит самопроверку**.
    Перезапусти Claude Code и скажи **«с чего начать»**.
@@ -108,7 +108,7 @@ python3 scripts/eval.py advisors/<имя>                       # 🔵 verified 
   `python3 scripts/diversity_check.py`.
 - **Включить FULL-тир:** `python3 scripts/board.py setup-full` (подскажет про ollama, сам стянет `bge-m3`).
 - **Подключить как MCP-сервер:** статус конкретного хоста в [`docs/CONNECT-HOSTS.md`](https://github.com/ilyautov/consilium-principis/blob/master/docs/CONNECT-HOSTS.md),
-  подробности в [`CONNECT-MCP.md`](CONNECT-MCP.md). Из корня чекаута сначала сгенерируй конфиг:
+  подробности в [`CONNECT-MCP.md`](https://github.com/ilyautov/consilium-principis/blob/master/CONNECT-MCP.md). Из корня чекаута сначала сгенерируй конфиг:
   `python3 scripts/board.py mcp-config --json` (**Windows:** `py -3 scripts/board.py mcp-config --json`; если
   `py` нет, проверь Python 3.10+ и используй `python`, не Store-alias `python3`).
 - **Язык ответа:** совет отвечает на твоём языке автоматически; принудительно — `CONSILIUM_LANG=ru`

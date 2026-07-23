@@ -21,11 +21,14 @@ import install  # noqa: E402
 from engine.fidelity import best_match  # noqa: E402
 
 
-def test_shipped_md_has_no_relative_docs_links():
-    # docs/ НЕ шипуется (RUNTIME его исключает), поэтому относительная ссылка `](docs/...` МЁРТВА
-    # внутри установленного скилла (~/.claude/skills/...). Link-guard репо этого не ловит — он
-    # сканирует repo-tree, где docs/ есть. Гард: шипуемый markdown ссылается на docs/ только
-    # абсолютным URL (`](https://.../docs/...)` не матчится этим regex).
+def test_shipped_md_relative_links_resolve_in_installed_tree():
+    # Любая ОТНОСИТЕЛЬНАЯ markdown-ссылка в шипуемом .md должна вести на то, что ТОЖЕ шипуется
+    # (RUNTIME + advisors/README) — иначе она МЁРТВА в установленном скилле (~/.claude/skills/...):
+    # там нет ни docs/, ни install.command/.bat, ни QUICKSTART.en.md, ни CONNECT-MCP.md.
+    # Link-guard репо этого не ловит (сканирует repo-tree, где всё на месте). Абсолютные URL и
+    # #якоря — ок; на не-шипуемое ссылайся абсолютным URL. Ранняя версия ловила только `](docs/`,
+    # пропуская 4 ссылки другой формы (регресс раунда 4).
+    shipped_top = set(install.RUNTIME) | {"advisors"}
     shipped_md = [f for f in install.RUNTIME if f.endswith(".md")] + ["advisors/README.md"]
     offenders = []
     for rel in shipped_md:
@@ -33,10 +36,15 @@ def test_shipped_md_has_no_relative_docs_links():
         if not os.path.isfile(p):
             continue
         text = open(p, encoding="utf-8").read()
-        for m in re.finditer(r"\]\(docs/[^)]+\)", text):
-            offenders.append(f"{rel}: {m.group(0)}")
-    assert not offenders, ("относительные docs/-ссылки в шипуемых файлах (мертвы в installed "
-                           "skill): " + "; ".join(offenders))
+        for m in re.finditer(r"\]\(([^)]+)\)", text):
+            target = m.group(1).strip()
+            if target.startswith(("http://", "https://", "#", "mailto:")):
+                continue
+            first = target.split("#", 1)[0].split("/", 1)[0]
+            if first and first not in shipped_top:
+                offenders.append(f"{rel}: ]({target})")
+    assert not offenders, ("относительные ссылки на НЕ-шипуемое в шипуемых файлах (мертвы в "
+                           "installed skill — используй абсолютный URL): " + "; ".join(offenders))
 
 
 def test_runtime_ships_lenses_and_gov_heads():

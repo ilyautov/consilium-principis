@@ -104,6 +104,27 @@ def test_install_copies_versioned_user_runtime_and_does_not_reference_source_che
     assert entry["command"] == sys.executable
 
 
+def test_rerun_moves_config_to_a_new_content_versioned_runtime(tmp_path, monkeypatch):
+    cfgf = tmp_path / "Claude" / "claude_desktop_config.json"
+    cfgf.parent.mkdir(parents=True)
+    home = tmp_path / "home"
+    record = home / ".consilium" / "last_mcp_install.json"
+    identities = iter(("v1-old-content", "v1-new-content"))
+    monkeypatch.setattr(mcp_install, "_runtime_identity", lambda: next(identities))
+
+    first = install(str(cfgf), home=str(home), record_path=str(record))
+    first_server = json.loads(cfgf.read_text(encoding="utf-8"))["mcpServers"][NAME]["args"][0]
+    Path(first_server).write_text("stale runtime", encoding="utf-8")
+
+    second = install(str(cfgf), home=str(home), record_path=str(record))
+    second_server = json.loads(cfgf.read_text(encoding="utf-8"))["mcpServers"][NAME]["args"][0]
+
+    assert first["ok"] and second["ok"] and second["changed"]
+    assert first_server != second_server
+    assert "stale runtime" not in Path(second_server).read_text(encoding="utf-8")
+    assert Path(first_server).read_text(encoding="utf-8") == "stale runtime"
+
+
 def test_concurrent_installs_preserve_each_servers_entry(tmp_path):
     cfgf = tmp_path / "Claude" / "claude_desktop_config.json"
     cfgf.parent.mkdir(parents=True)
@@ -149,10 +170,34 @@ def test_multi_target_failure_reports_per_target_recovery_without_overwriting_re
     assert result["ok"] is False
     assert result["reason"] == "write_failed"
     assert result["recovery"][str(first)] == {
-        "status": "changed", "backup": result["backups"][0],
-        "action": "restore backup before retrying",
+        "pre_state": "existing", "status": "rolled_back", "backup": result["backups"][0],
+        "action": "restored backup",
     }
-    assert NAME in json.loads(first.read_text(encoding="utf-8"))["mcpServers"]
+    assert first.read_text(encoding="utf-8") == original
+
+
+def test_multi_target_failure_removes_entry_created_in_absent_first_config(tmp_path, monkeypatch):
+    first = tmp_path / "classic" / "claude_desktop_config.json"
+    second = tmp_path / "store" / "claude_desktop_config.json"
+    first.parent.mkdir(parents=True); second.parent.mkdir(parents=True)
+    monkeypatch.setattr(mcp_install, "config_paths", lambda **_kwargs: [str(first), str(second)])
+    real_update = mcp_install.atomic_update_json
+
+    def fail_second(path, *args, **kwargs):
+        if path == str(second):
+            raise OSError("store replacement failed")
+        return real_update(path, *args, **kwargs)
+
+    monkeypatch.setattr(mcp_install, "atomic_update_json", fail_second)
+    result = install(command="py", args=["s.py"], platform="win32",
+                     record_path=str(tmp_path / "record.json"))
+
+    assert result["ok"] is False
+    assert result["recovery"][str(first)] == {
+        "pre_state": "absent", "status": "rolled_back_entry", "backup": None,
+        "action": "removed the newly created MCP entry",
+    }
+    assert NAME not in json.loads(first.read_text(encoding="utf-8")).get("mcpServers", {})
 
 
 def test_install_doctor_validates_record_and_stdio_initialize(tmp_path, monkeypatch):

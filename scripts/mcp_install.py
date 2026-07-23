@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 import glob
+import hashlib
 import json
 import os
 import re
@@ -12,7 +13,8 @@ import subprocess
 import sys
 import tempfile
 
-from file_atomic import atomic_update_json, atomic_write_json, ensure_private_directory, exclusive_file_lock
+from file_atomic import (atomic_update_json, atomic_write_json, atomic_write_text,
+                         ensure_private_directory, exclusive_file_lock)
 
 NAME = "consilium-principis"
 _CONFIG_NAME = "claude_desktop_config.json"
@@ -80,9 +82,35 @@ def install_record_path(home=None):
     return os.path.join(home, ".consilium", "last_mcp_install.json")
 
 
-def runtime_path(home=None, version=_RUNTIME_VERSION):
+def _runtime_identity():
+    """Return a content-addressed runtime version for the payload copied to user storage."""
+    digest = hashlib.sha256()
+    source = _source_root()
+    ignored_dirs = {"__pycache__", "golden", "build"}
+    for item in _RUNTIME_ITEMS:
+        origin = os.path.join(source, item)
+        if os.path.isfile(origin):
+            files = [origin]
+        elif os.path.isdir(origin):
+            files = []
+            for directory, directories, filenames in os.walk(origin):
+                directories[:] = sorted(d for d in directories if d not in ignored_dirs)
+                files.extend(os.path.join(directory, filename) for filename in sorted(filenames)
+                             if not filename.endswith((".pyc", ".pyo")))
+        else:
+            continue
+        for path in files:
+            digest.update(os.path.relpath(path, source).replace(os.sep, "/").encode("utf-8"))
+            with open(path, "rb") as handle:
+                for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                    digest.update(chunk)
+    return "%s-%s" % (_RUNTIME_VERSION, digest.hexdigest()[:16])
+
+
+def runtime_path(home=None, version=None):
     """Return the versioned, user-owned MCP runtime location."""
     home = home or os.path.expanduser("~")
+    version = version or _runtime_identity()
     return os.path.join(home, ".consilium", "mcp-runtime", version)
 
 
@@ -219,14 +247,17 @@ def _result(ok, targets, changed, backups, **extra):
 
 def _merge_target(target, command, args, do_backup):
     """Lock read/merge/backup/write as one operation for a single config file."""
-    state = {"changed": False, "backup": None}
+    state = {"changed": False, "backup": None, "pre_state": None, "entry": None}
 
     def update(existing):
         if not isinstance(existing, dict):
             raise ValueError("configuration root must be a JSON object")
         replacement, changed = merge_entry(existing, command, args)
+        state["pre_state"] = "existing" if os.path.isfile(target) else "absent"
         if changed and do_backup:
             state["backup"] = _backup_config(target)
+        if changed:
+            state["entry"] = {"command": command, "args": list(args)}
         state["changed"] = changed
         return replacement
 
@@ -241,15 +272,52 @@ def _merge_target(target, command, args, do_backup):
     return {"ok": True, **state}
 
 
+def _rollback_target(target, state):
+    """Best-effort recovery for a prior target after another target fails."""
+    pre_state, backup = state["pre_state"], state["backup"]
+    if backup:
+        try:
+            with open(backup, encoding="utf-8") as handle:
+                atomic_write_text(target, handle.read())
+            return {"pre_state": pre_state, "status": "rolled_back", "backup": backup,
+                    "action": "restored backup"}
+        except OSError as exc:
+            return {"pre_state": pre_state, "status": "rollback_failed", "backup": backup,
+                    "action": "restore backup manually", "error": str(exc)}
+
+    removed = {"value": False, "conflict": False}
+
+    def remove_entry(current):
+        if not isinstance(current, dict):
+            removed["conflict"] = True
+            return current
+        servers = dict(current.get("mcpServers") or {})
+        if servers.get(NAME) != state["entry"]:
+            removed["conflict"] = True
+            return current
+        servers.pop(NAME)
+        replacement = dict(current)
+        if servers:
+            replacement["mcpServers"] = servers
+        else:
+            replacement.pop("mcpServers", None)
+        removed["value"] = True
+        return replacement
+
+    try:
+        atomic_update_json(target, remove_entry, default={}, ensure_ascii=False, indent=2)
+    except OSError as exc:
+        return {"pre_state": pre_state, "status": "rollback_failed", "backup": None,
+                "action": "remove the newly created MCP entry manually", "error": str(exc)}
+    if removed["value"]:
+        return {"pre_state": pre_state, "status": "rolled_back_entry", "backup": None,
+                "action": "removed the newly created MCP entry"}
+    return {"pre_state": pre_state, "status": "rollback_conflict", "backup": None,
+            "action": "remove the consilium-principis entry before retrying"}
+
+
 def _recovery_state(changed_targets):
-    return {
-        target: {
-            "status": "changed",
-            "backup": backup,
-            "action": "restore backup before retrying",
-        }
-        for target, backup in changed_targets
-    }
+    return {target: _rollback_target(target, state) for target, state in reversed(changed_targets)}
 
 
 def install(config_file=None, command=None, args=None, do_backup=True, create_dir=False,
@@ -315,7 +383,7 @@ def install(config_file=None, command=None, args=None, do_backup=True, create_di
             changed_any = True
             if outcome["backup"]:
                 backups.append(outcome["backup"])
-            changed_targets.append((target, outcome["backup"]))
+            changed_targets.append((target, outcome))
 
     record = {
         "timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds"),

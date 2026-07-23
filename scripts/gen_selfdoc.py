@@ -126,6 +126,8 @@ def extract_scripts(root=None):
 def extract_tests(root=None):
     d = os.path.join(_default_root(root), "tests")
     out = []
+    if not os.path.isdir(d):
+        return out  # tests/ не шипуется в установленный скилл — graceful, не FileNotFoundError
     for name in sorted(os.listdir(d)):
         if not (name.startswith("test_") and name.endswith(".py")):
             continue

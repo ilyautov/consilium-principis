@@ -2,6 +2,12 @@ import os, sys, json
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 import gen_selfdoc as g
 
+def test_extract_tests_graceful_without_tests_dir(tmp_path):
+    # В установленном скилле tests/ не шипуется. explain_self советует запустить gen_selfdoc при
+    # пустом индексе — extract_tests не должен падать FileNotFoundError, а вернуть [] (graceful).
+    assert g.extract_tests(root=str(tmp_path)) == []
+
+
 def test_extract_tools_has_status_and_refs():
     tools = g.extract_tools()
     names = {t["name"] for t in tools}

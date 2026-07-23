@@ -44,7 +44,8 @@ python3 scripts/board.py mcp-config --json
 2. Run the installer:
    - macOS: double-click [`install.command`](install.command) (first time: right-click → Open);
    - Windows: double-click [`install.bat`](install.bat);
-   - terminal: `python3 install.py`; on Windows: `py install.py`.
+   - Linux/macOS terminal: `./install.sh` (a wrapper around `install.py`; it never installs Python itself);
+   - any terminal: `python3 install.py`; on Windows: `py install.py`.
 3. The installer copies the skill to `~/.claude/skills/`, detects the retrieval tier, and runs a
    self-check. Restart Claude Code and say “where do I start?”.
 
@@ -78,7 +79,8 @@ For the complete source, manifest, and validation recipe, see
 
 - **Update:** run the install again (`python3 install.py` or the Path 2 installer) — the machinery is
   overwritten while **your board (`advisors/`, `golden/`) is preserved** (merge, not wipe).
-- **Uninstall:** delete the skill folder — `rm -rf ~/.claude/skills/consilium-principis` (Windows:
+- **Uninstall:** installed as a plugin — `/plugin uninstall consilium-principis` in Claude Code.
+  Installed via script — delete the folder `rm -rf ~/.claude/skills/consilium-principis` (Windows:
   remove `%USERPROFILE%\.claude\skills\consilium-principis`). The skill writes nothing outside it.
 
 ## Next steps

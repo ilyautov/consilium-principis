@@ -37,7 +37,9 @@ SKILLS_HOME = Path.home() / ".claude" / "skills"
 # catalog/ — указатели PD-фигур (pd_figures.json) для catalog_add/search/preview: без него
 # эти тулы на установленном скилле бьют по несуществующему файлу.
 RUNTIME = ["SKILL.md", "QUICKSTART.md", "recipes.json", "scripts", "assets",
-           "lenses", "gov_heads.json", "catalog"]
+           "lenses", "gov_heads.json", "catalog", "docs/selfdoc"]
+# docs/selfdoc — единственное исключение из «docs/ не шипуется»: explain_self читает
+# docs/selfdoc/index.json + narrative/, без них тул отдаёт 0 секций в установленном скилле.
 # golden = per-advisor user-data; build = тяжёлые регенерируемые артефакты (эмбеддинги/индексы линз —
 # шипуем только PD-исходник corpus.jsonl + manifest, не производное).
 IGNORE = shutil.ignore_patterns("__pycache__", "*.pyc", "golden", "build")

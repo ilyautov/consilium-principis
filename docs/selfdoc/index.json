@@ -728,7 +728,7 @@
     },
     {
       "name": "federation_open",
-      "description": "Координатор совета-федерации: разложить план ролей в очередь по N реплик (многомозговый совет — исполнители играют роли на СВОИХ моделях). plan = [{role, advisor_dir, question, replicas?}]. Стейт локально в .consilium/. Personal/attended (см. docs/FEDERATION.md).",
+      "description": "Координатор совета-федерации: разложить план ролей в очередь по N реплик (многомозговый совет — исполнители играют роли на СВОИХ моделях). plan = [{role, advisor_dir, question, replicas?}]. Стейт локально в .consilium/. Personal/attended (опциональный многомозговый режим).",
       "input_schema": {
         "type": "object",
         "properties": {
@@ -1540,7 +1540,7 @@
     {
       "n": 15,
       "title": "Федерация",
-      "text": "Федерация (многомозговый совет, ОПЦИЯ — personal/attended, docs/FEDERATION.md). Координатор:\nfederation_open(session_id, plan) кладёт реплики ролей → federation_poll(session_id) до готовности →\nfederation_assemble(session_id) собирает (СЕРВЕР сверяет верность цитат централизованно, дивергенция\nсохранена, идентичность моделей видна, пустая роль → host_single_brain). Исполнитель (твоя ОТДЕЛЬНАЯ\nзапущенная сессия): federation_claim(worker_id, roles) → сыграй advisor_dir на СВОЕЙ модели, цитаты\nчерез cite → federation_submit(worker_model=своя модель) → повтор; federation_heartbeat пока играешь.\nМаркеры 🔵 НЕ ставит воркер — их вычисляет сервер. federation_open/submit ПИШУТ стейт — коротко\nпроговори, что делаешь (Rule 0); federation_poll/assemble read-only — тихо (Rule 1)."
+      "text": "Федерация (многомозговый совет, ОПЦИЯ — personal/attended). Координатор:\nfederation_open(session_id, plan) кладёт реплики ролей → federation_poll(session_id) до готовности →\nfederation_assemble(session_id) собирает (СЕРВЕР сверяет верность цитат централизованно, дивергенция\nсохранена, идентичность моделей видна, пустая роль → host_single_brain). Исполнитель (твоя ОТДЕЛЬНАЯ\nзапущенная сессия): federation_claim(worker_id, roles) → сыграй advisor_dir на СВОЕЙ модели, цитаты\nчерез cite → federation_submit(worker_model=своя модель) → повтор; federation_heartbeat пока играешь.\nМаркеры 🔵 НЕ ставит воркер — их вычисляет сервер. federation_open/submit ПИШУТ стейт — коротко\nпроговори, что делаешь (Rule 0); federation_poll/assemble read-only — тихо (Rule 1)."
     },
     {
       "n": 16,

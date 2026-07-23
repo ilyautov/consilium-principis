@@ -2222,7 +2222,7 @@ TOOLS = {
         "description": "Координатор совета-федерации: разложить план ролей в очередь по N реплик "
                        "(многомозговый совет — исполнители играют роли на СВОИХ моделях). plan = "
                        "[{role, advisor_dir, question, replicas?}]. Стейт локально в .consilium/. "
-                       "Personal/attended (см. docs/FEDERATION.md).",
+                       "Personal/attended (опциональный многомозговый режим).",
         "input_schema": {"type": "object",
                          "properties": {"session_id": {"type": "string"},
                                         "plan": {"type": "array"},
@@ -2606,7 +2606,7 @@ Consilium-Principis — личный совет AI-персон реальных
    (invalidate/weaken/inject_counter) и даёт robustness + fragile_under — насколько линия устойчива и
    где ломается. Возмущается мир, НЕ уста советников (лейблы совета — по глобальному инварианту).
 
-15. Федерация (многомозговый совет, ОПЦИЯ — personal/attended, docs/FEDERATION.md). Координатор:
+15. Федерация (многомозговый совет, ОПЦИЯ — personal/attended). Координатор:
 federation_open(session_id, plan) кладёт реплики ролей → federation_poll(session_id) до готовности →
 federation_assemble(session_id) собирает (СЕРВЕР сверяет верность цитат централизованно, дивергенция
 сохранена, идентичность моделей видна, пустая роль → host_single_brain). Исполнитель (твоя ОТДЕЛЬНАЯ

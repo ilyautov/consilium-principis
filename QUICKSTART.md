@@ -56,7 +56,8 @@
 2. Запусти установщик:
    - **macOS:** двойной клик [`install.command`](https://github.com/ilyautov/consilium-principis/blob/master/install.command) (первый раз: правый клик → «Открыть»);
    - **Windows:** двойной клик [`install.bat`](https://github.com/ilyautov/consilium-principis/blob/master/install.bat);
-   - **терминал:** `python3 install.py` (**Windows:** `py install.py` — см. нюанс ниже)
+   - **Linux/macOS терминал:** `./install.sh` (обёртка над `install.py`, Python сам не ставит);
+   - **любой терминал:** `python3 install.py` (**Windows:** `py install.py` — см. нюанс ниже)
 3. Установщик скопирует скилл в `~/.claude/skills/`, определит тир и **сам прогонит самопроверку**.
    Перезапусти Claude Code и скажи **«с чего начать»**.
 
@@ -90,8 +91,9 @@ python3 scripts/eval.py advisors/<имя>                       # 🔵 verified 
 
 - **Обновить:** повтори установку (`python3 install.py` или установщик Пути 2) — машинерия
   перезапишется, **твоя доска (`advisors/`, `golden/`) сохранится** (слияние, не снос).
-- **Удалить:** снеси папку скилла — `rm -rf ~/.claude/skills/consilium-principis` (Windows:
-  удали каталог `%USERPROFILE%\.claude\skills\consilium-principis`). Ничего вне неё скилл не пишет.
+- **Удалить:** ставил плагином — `/plugin uninstall consilium-principis` в Claude Code. Ставил
+  скриптом — снеси папку `rm -rf ~/.claude/skills/consilium-principis` (Windows: удали каталог
+  `%USERPROFILE%\.claude\skills\consilium-principis`). Ничего вне неё скилл не пишет.
 
 ---
 

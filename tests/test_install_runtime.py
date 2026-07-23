@@ -52,12 +52,31 @@ def test_runtime_ships_lenses_and_gov_heads():
     assert "gov_heads.json" in install.RUNTIME
 
 
+def test_runtime_ships_selfdoc_so_explain_self_works(tmp_path):
+    # explain_self (реклама в SKILL.md) читает docs/selfdoc/index.json + narrative/. Если docs/
+    # selfdoc не шипуется, в установленном скилле тул отдаёт 0 секций и советует запустить
+    # gen_selfdoc.py — а тот падает без tests/. Гард: selfdoc едет и тул работает после install.
+    assert "docs/selfdoc" in install.RUNTIME
+    dest = tmp_path / "installed"
+    install.copy_runtime(install.HERE, dest)
+    assert (dest / "docs" / "selfdoc" / "index.json").is_file()
+    sys.path.insert(0, os.path.join(REPO, "scripts"))
+    import selfdoc_query
+    out = selfdoc_query.explain("overview", root=str(dest))
+    assert out["sections"] and out["sections"][0]["body"].strip(), "explain_self пуст в installed skill"
+    assert "gen_selfdoc" not in str(out.get("suggestions", [])), "тул советует упавший recovery"
+
+
 def test_runtime_does_not_ship_dead_nested_skill():
     # install-skill/SKILL.md переехал в docs/onboarding-recipe.md (2026-07-21) — как
     # под-скилл он приземлялся глубже, чем ищет Claude Code (~/.claude/skills/*/SKILL.md).
-    # Гард: ни старый путь, ни онбординг-док не попадают в RUNTIME (docs/ не шипуется).
+    # Гард: старый путь не шипуется; из docs/ едет ТОЛЬКО docs/selfdoc (для explain_self),
+    # не весь docs/ и не онбординг-рецепт.
     assert "install-skill" not in install.RUNTIME
     assert "docs" not in install.RUNTIME
+    docs_items = [x for x in install.RUNTIME if x.startswith("docs")]
+    assert docs_items == ["docs/selfdoc"], f"из docs/ должен ехать только selfdoc, а не {docs_items}"
+    assert "docs/onboarding-recipe.md" not in install.RUNTIME
 
 
 def test_copy_runtime_ships_working_strategist_lens(tmp_path):

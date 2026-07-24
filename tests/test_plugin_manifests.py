@@ -108,6 +108,9 @@ def test_registry_server_json_valid():
         r"io\.github\.[a-z0-9-]+/[a-z0-9-]+", reg["name"]
     ), "namespace должен быть io.github.<user>/<server> (GitHub-OAuth пруф)"
     assert reg["repository"]["source"] == "github"
+    # MCP Registry отклоняет description > 100 символов (422 на publish) — держим предел здесь,
+    # чтобы релиз не спотыкался о лимит уже после тега.
+    assert len(reg["description"]) <= 100, "server.json description обязан быть ≤100 символов (лимит MCP Registry)"
     pkgs = reg["packages"]
     assert len(pkgs) == 1
     pkg = pkgs[0]

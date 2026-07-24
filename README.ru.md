@@ -209,5 +209,5 @@ PR приветствуются, но два правила нерушимы: **
 ---
 
 <div align="center">
-<sub>Consilium Principis · ранний доступ (v0.1.2) · <a href="https://github.com/ilyautov/consilium-principis/releases/download/v0.1.2/consilium-principis.mcpb">релизный пакет</a> · <a href="LICENSE">MIT</a> · <a href="CONTRIBUTING.md">Contributing</a> · <a href="SECURITY.md">Security</a></sub>
+<sub>Consilium Principis · ранний доступ (v0.1.3) · <a href="https://github.com/ilyautov/consilium-principis/releases/download/v0.1.3/consilium-principis.mcpb">релизный пакет</a> · <a href="LICENSE">MIT</a> · <a href="CONTRIBUTING.md">Contributing</a> · <a href="SECURITY.md">Security</a></sub>
 </div>

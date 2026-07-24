@@ -2,7 +2,7 @@
 
 # Быстрый старт
 
-> Релиз: [v0.1.2](https://github.com/ilyautov/consilium-principis/releases/download/v0.1.2/consilium-principis.mcpb)
+> Релиз: [v0.1.3](https://github.com/ilyautov/consilium-principis/releases/download/v0.1.3/consilium-principis.mcpb)
 > — `.mcpb` это однофайловое расширение для **Claude Desktop** (Settings → Extensions → установить из файла);
 > для Claude Code достаточно путей ниже, бандл не нужен.
 

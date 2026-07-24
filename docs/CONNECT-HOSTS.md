@@ -2,7 +2,7 @@
 
 # Подключение к разным хостам (не только Claude Code)
 
-> Релиз: [v0.1.2](https://github.com/ilyautov/consilium-principis/releases/download/v0.1.2/consilium-principis.mcpb)
+> Релиз: [v0.1.3](https://github.com/ilyautov/consilium-principis/releases/download/v0.1.3/consilium-principis.mcpb)
 
 Ключевой факт архитектуры: логика советников, контура верности, гейта цитат и 📐 карты
 решения живёт в **MCP-сервере**, то есть в `scripts/mcp_server.py`. Он отдаёт полный
@@ -13,7 +13,7 @@ if method == "initialize":
     return _rpc_result(req_id, {
         "protocolVersion": "2024-11-05",
         "capabilities": {"tools": {}},
-        "serverInfo": {"name": "consilium-principis", "version": "0.1.2"},
+        "serverInfo": {"name": "consilium-principis", "version": "0.1.3"},
         "instructions": INSTRUCTIONS,
     })
 ```

@@ -420,3 +420,78 @@ def test_load_source_gitignore_ok(tmp_path, monkeypatch):
     (tmp_path / ".gitignore").write_text("*.pyc\n", encoding="utf-8")
     text, hint, prov, lic = mcp_server._load_source_text(path=".gitignore")
     assert "*.pyc" in text
+
+
+# ── Kimi LOW: голое имя при ЗАПИСИ вкладывается в advisors/<name>, не rogue <root>/<name> ──
+# (симметрия с read-side _resolve_advisor_corpus: голое имя работает и на чтении, и на записи)
+
+def test_add_source_bare_name_lands_under_advisors_not_root(tmp_path):
+    # голое имя (без разделителя) → advisors/<name>, НЕ <root>/<name> (rogue в корне репо)
+    r = dispatch("add_source", {"advisor_dir": "test-sage", "basename": "canon", "tier": "P1",
+                 "text": "All warfare is based on deception, the canon repeats."})
+    assert r["ok"]
+    landed = os.path.realpath(r["advisor_dir"])
+    assert landed == os.path.realpath(str(tmp_path / "advisors" / "test-sage"))
+    assert not os.path.isdir(str(tmp_path / "test-sage"))                 # rogue-каталог не создан
+    assert os.path.isfile(os.path.join(landed, "sources", "manifest.json"))
+
+
+def test_add_source_path_form_unchanged(tmp_path):
+    # путь-форма ('advisors/x') резолвится как раньше — без двойного вложения advisors/advisors/x
+    r = dispatch("add_source", {"advisor_dir": "advisors/test-path-sage", "basename": "c",
+                 "tier": "P1", "text": "War is based on deception here, the source says."})
+    assert r["ok"]
+    assert os.path.realpath(r["advisor_dir"]) == os.path.realpath(
+        str(tmp_path / "advisors" / "test-path-sage"))
+
+
+def test_add_source_bare_name_targets_existing_advisor(tmp_path):
+    # голое имя УЖЕ существующего советника → целимся в него, не плодим дубль
+    existing = tmp_path / "advisors" / "test-existing"
+    (existing / "sources").mkdir(parents=True)
+    r = dispatch("add_source", {"advisor_dir": "test-existing", "basename": "c", "tier": "P1",
+                 "text": "Strategy rewards patience and disciplined study."})
+    assert r["ok"]
+    assert os.path.realpath(r["advisor_dir"]) == os.path.realpath(str(existing))
+
+
+def test_add_source_dotdot_still_traversal_blocked(tmp_path):
+    # '..' — НЕ голое имя (есть смысл обхода) → путь-форма → write-traversal-гард отбивает
+    r = dispatch("add_source", {"advisor_dir": "..", "text": "x", "tier": "P1"})
+    assert "error" in r
+
+
+def test_resolve_advisor_write_bare_vs_path(tmp_path):
+    # ядро фикса: голое имя → advisors/<name>; путь-форма → как _resolve_under_root
+    d1, e1 = mcp_server._resolve_advisor_write("test-build-sage")
+    assert e1 is None
+    assert os.path.realpath(d1) == os.path.realpath(str(tmp_path / "advisors" / "test-build-sage"))
+    d2, e2 = mcp_server._resolve_advisor_write("advisors/test-build-sage")
+    assert e2 is None and os.path.realpath(d2) == os.path.realpath(d1)   # обе формы → один каталог
+
+
+def test_build_advisor_dedup_key_matches_write_dir(tmp_path):
+    # дедуп-ключ фонового джоба и реальный каталог сборки должны совпасть (голое имя)
+    key, err = mcp_server._resolve_advisor_write("test-sage")
+    build_dir, berr = mcp_server._resolve_advisor_write("test-sage")
+    assert err is None and berr is None and key == build_dir
+
+
+# ── Kimi LOW: validate_manifest различает «провалидировано» и «проверять было нечего/нельзя» ──
+
+def test_validate_manifest_real_validation_marks_checked(tmp_path):
+    dispatch("add_source", {"advisor_dir": "advisors/test-vm", "basename": "c", "tier": "P1",
+             "text": "War is based on deception, the canon says plainly."})
+    out = mcp_server._validate_manifest("advisors/test-vm")
+    assert out["checked"] is True and "ok" in out            # реальная валидация → checked:true
+
+
+def test_validate_manifest_no_manifest_is_unchecked_but_safe(tmp_path):
+    (tmp_path / "advisors" / "test-nm" / "sources").mkdir(parents=True)   # dir есть, manifest нет
+    out = mcp_server._validate_manifest("advisors/test-nm")
+    assert out["checked"] is False and out["ok"] is True and out["problems"] == []
+
+
+def test_validate_manifest_traversal_not_ok_and_unchecked(tmp_path):
+    out = mcp_server._validate_manifest("../outside")
+    assert out["checked"] is False and out["ok"] is False and out["problems"] == []

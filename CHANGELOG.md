@@ -56,6 +56,13 @@ versions — [SemVer](https://semver.org/). Dates in ISO (YYYY-MM-DD).
   to straddle a sentence boundary.
 - `render_session` renders the full verdict (positions, quotes, verdict) from a host that uses
   flat `position`/`quote`/`verdict` field names, instead of showing only advisor names.
+- Write-side tools (`add_source`, `build_advisor`) now resolve a bare advisor name
+  (`marcus-aurelius`) under `advisors/`, matching how the read tools resolve it, instead of
+  creating a stray `<repo>/<name>/` directory that later reads (under `advisors/`) could not find.
+  An existing advisor is targeted in place; path forms and traversal guards are unchanged.
+- `validate_manifest` now reports a `checked` flag so a host cannot mistake "nothing to validate"
+  (no manifest) or "could not read" (path outside the repo) for a passed validation; the
+  outside-repo case is now `ok: false` (consistent with `governance_verify`).
 
 ### Changed
 - The FULL retrieval tier is self-contained (ollama + bge-m3): the dead rerank path, all references

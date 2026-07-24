@@ -249,6 +249,28 @@ def _resolve_advisor_corpus(advisor_dir):
                   "known_advisors": [os.path.basename(d) for d in _advisor_dirs()]}
 
 
+def _resolve_advisor_write(advisor_dir):
+    """Write-side резолюция advisor_dir для тулов СОЗДАНИЯ (add_source/build_advisor). Голое
+    имя ('marcus-aurelius') → каталог СУЩЕСТВУЮЩЕГО советника, если он есть (advisors|lenses),
+    иначе НОВЫЙ 'advisors/<name>' — а НЕ '<root>/<name>' (rogue-каталог в корне репо). Path-форма
+    ('advisors/x') и '.'/'..' проходят как раньше. Возвращает (abs_path, None) | (None, error);
+    хвост всегда через _resolve_under_root → traversal-кламп к корню сохранён.
+
+    Зачем: read-тулы (retrieve/cite) принимают голое имя (_resolve_advisor_corpus), поэтому хост
+    естественно шлёт его И в запись. Старое `_resolve_under_root('marcus-aurelius')` резолвило имя как
+    путь ОТНОСИТЕЛЬНО корня → '<root>/marcus-aurelius', и тул молча писал советника мимо advisors/;
+    потом cite тем же именем искал в advisors/ и не находил (Kimi pre-release, LOW). Разница с
+    read-резолвером: неизвестное имя тут НЕ ошибка (создаём нового под advisors/), а место записи."""
+    s = (advisor_dir or "").strip()
+    is_bare = bool(s) and "/" not in s and "\\" not in s and s not in (".", "..")
+    if is_bare:
+        existing = _resolve_advisor_dir(s)              # уже есть советник/линза с этим именем?
+        if existing:
+            return _resolve_under_root(existing)        # целимся в него (кламп для единообразия)
+        return _resolve_under_root(os.path.join("advisors", s))   # новый → под advisors/, не в корень
+    return _resolve_under_root(s)                       # path-форма / '.' / '..' — как раньше
+
+
 def _validate_session_attribution(session):
     """(session', violations, reconciliations). Для каждой opinion.quote с grounded-маркером
     (blue/green): fidelity-гейт против корпуса ЕГО советника. Не верифицируется → маркер
@@ -946,7 +968,7 @@ def _add_source(advisor_dir, url=None, text=None, path=None, basename=None,
     🟢), не блокируя выбором. mode: auto|tier|clean|raw. front_until/back_from — хост-оверрайды границ."""
     import collect_common as cc
     from corpusbuild import apparatus as ap
-    d, err = _resolve_under_root(advisor_dir)        # write-side traversal-гард
+    d, err = _resolve_advisor_write(advisor_dir)     # голое имя → advisors/<name> + traversal-гард
     if err:
         return err
     try:
@@ -1364,16 +1386,23 @@ def _render_session(session, surface="md", depth="plain", kind="session"):
 
 
 def _validate_manifest(advisor_dir):
+    # `checked` отделяет «провалидировано» от «проверять было нечего/нельзя»: хост, читающий один
+    # булев, не примет несделанную проверку за пройденную (Kimi pre-release, LOW). checked:true —
+    # только когда validate_manifest реально отработал.
     from manifest_builder import validate_manifest
     import json as _json
     d = _resolve_read(advisor_dir)                      # H5 read-гард
-    if d is None:
-        return {"ok": True, "problems": [], "note": "путь вне корня репо — манифест не читаю (traversal)"}
+    if d is None:                                       # путь вне корня — НЕ читали → не ok, не checked
+        return {"ok": False, "checked": False, "problems": [],
+                "note": "путь вне корня репо — манифест не читаю (traversal)"}
     sd = os.path.join(d, "sources")
     mp = os.path.join(sd, "manifest.json")
-    if not os.path.isfile(mp):
-        return {"ok": True, "problems": [], "note": "нет манифеста → все чанки тиром A (🟡-only; задекларируй manifest для 🔵)"}
-    return validate_manifest(_json.load(open(mp, encoding="utf-8")), sd)
+    if not os.path.isfile(mp):                          # нет манифеста — безопасно (🟡-only), но не проверяли
+        return {"ok": True, "checked": False, "problems": [],
+                "note": "нет манифеста → все чанки тиром A (🟡-only; задекларируй manifest для 🔵)"}
+    res = validate_manifest(_json.load(open(mp, encoding="utf-8")), sd)
+    res["checked"] = True                               # реальная валидация состоялась
+    return res
 
 
 # ── lifecycle: весь цикл сборки через MCP, чтобы юзер не выходил из своего агента ──
@@ -1509,8 +1538,9 @@ def _doctor():
 # тонкие делегаты: write-гард не копируем, а передаём СВОЙ _resolve_under_root коллбэком
 # (он резолвит _root() в момент вызова → monkeypatch mcp_server._root в тестах действует).
 def _do_build(advisor_dir, author=None, run_kernels=True, run_index=True):
+    # голое имя → advisors/<name> (не rogue <root>/<name>) + тот же traversal-кламп внутри
     return lifecycle.do_build(advisor_dir, author=author, run_kernels=run_kernels,
-                              run_index=run_index, resolve_under_root=_resolve_under_root)
+                              run_index=run_index, resolve_under_root=_resolve_advisor_write)
 
 
 def _do_seed():
@@ -1524,7 +1554,7 @@ def _do_ingest(handle, out_path=None):
 
 def _build_advisor(advisor_dir, author=None, run_kernels=True, run_index=True):
     """Советник под ключ (МАНИФЕСТ-ГЕЙТ→corpus→kernels→индекс) — ФОНОВЫЙ ДЖОБ (долго)."""
-    advisor_key, _err = _resolve_under_root(advisor_dir)
+    advisor_key, _err = _resolve_advisor_write(advisor_dir)   # ключ дедупа = реальный каталог сборки
 
     with _BUILD_LOCK:
         existing_id = _BUILD_JOBS.get(advisor_key) if advisor_key else None

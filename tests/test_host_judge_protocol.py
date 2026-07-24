@@ -261,6 +261,24 @@ def test_unknown_nonce_is_yellow_branch(host_env):
     assert "не выдумывай" in v["note"].lower() or "НЕ выдумывай" in v["note"]
 
 
+def test_gate_verdict_carries_render_widget_directive(host_env):
+    # point-of-use: у хоста на руках проверенные 🔵 (gate_verdict) — именно здесь напоминаем
+    # «вердикт виджетом, не прозой» (Rule 3). Прошлый нудж стоял только на situation/premortem,
+    # а grounded-совет идёт cite→gate_verdict → к синтезу текстовое правило уже утонуло в контексте.
+    pool, adv = host_env
+    r = _phase1(adv)
+    v = mcp_server._gate_verdict(adv, r["nonce"], {c["id"]: 3 for c in r["candidates"]})
+    assert v["quotes"]                                            # реальный вердикт
+    assert "render_verdict" in v and "render_session" in v["render_verdict"]
+
+
+def test_gate_verdict_yellow_branch_has_no_render_directive(host_env):
+    # 🟡-ветка (кривой nonce) — это НЕ вердикт → нечего рендерить, нудж не вешаем
+    pool, adv = host_env
+    v = mcp_server._gate_verdict(adv, "deadbeef" * 4, {})
+    assert v["marker"] == "🟡" and "render_verdict" not in v
+
+
 def test_nonce_is_single_use(host_env):
     pool, adv = host_env
     r = _phase1(adv)

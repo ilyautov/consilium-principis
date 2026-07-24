@@ -660,6 +660,10 @@ def _gate_verdict(advisor_dir, nonce, ratings=None):
                               "kept": e["id"] in kept_ids} for e in st["candidates"]]}
     out = _cite_result(ranked, st.get("lang"))
     out["audit_logged"] = _append_judge_audit(st["advisor_dir"], record)
+    # Point-of-use виджет-нудж В ТОЧКЕ, где у хоста на руках проверенные 🔵: grounded-совет идёт
+    # cite→gate_verdict, а текстовое Rule 3 к моменту синтеза уже утонуло в контексте (нудж на
+    # situation/premortem мимо этого маршрута). Детерминированный рычаг > текст (память antisycophancy).
+    out["render_verdict"] = _RENDER_VERDICT_DIRECTIVE
     return out
 
 

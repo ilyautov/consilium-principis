@@ -101,10 +101,22 @@ jobs:
               content = call.get("result", {}).get("content")
               if "error" in call or not isinstance(content, list) or not content:
                   raise SystemExit(f"packed MCP tools/call (explain_self) failed: {stdout}")
-              # Форма ответа мало значит: мёртвый explain_self (пустой индекс) вернул бы content=[]
-              # или пустой text и всё равно прошёл бы. Требуем РЕАЛЬНЫЙ непустой текст.
-              if not any(isinstance(c, dict) and c.get("text", "").strip() for c in content):
-                  raise SystemExit(f"packed MCP explain_self returned empty content: {stdout}")
+              # Непустого text НЕДОСТАТОЧНО: если docs/selfdoc не приехал в бандл, explain_self
+              # деградирует до JSON-ШЕЛЛА {"sections": [], "suggestions": […]} — text непустой,
+              # но реального содержания нет. Парсим payload и требуем НЕПУСТОЙ sections — это
+              # ловит именно пропавший индекс (idx is None → sections=[]).
+              payload = None
+              for c in content:
+                  if isinstance(c, dict) and c.get("text", "").strip():
+                      try:
+                          payload = json.loads(c["text"])
+                      except (ValueError, TypeError):
+                          continue
+                      break
+              if not isinstance(payload, dict) or not payload.get("sections"):
+                  raise SystemExit(
+                      f"packed MCP explain_self degraded to an empty selfdoc shell "
+                      f"(no sections — docs/selfdoc missing from bundle?): {stdout}")
           PY
       - name: Build hash-complete registry manifest
         run: |

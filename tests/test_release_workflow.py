@@ -78,11 +78,14 @@ def test_release_verifies_runtime_before_publishing():
     assert "Smoke-test packed MCP server" in workflow
     assert '"method": "initialize"' in workflow
     assert '"method": "tools/list"' in workflow
-    # Смок обязан реально ВЫЗВАТЬ тул и проверить НЕПУСТОЙ ответ — иначе мёртвый explain_self
-    # (пустой selfdoc-индекс) прошёл бы релиз зелёным. Пиним и вызов, и проверку непустоты.
+    # Смок обязан реально ВЫЗВАТЬ тул и проверить, что ответ несёт РЕАЛЬНОЕ содержание.
+    # Непустого text мало: без docs/selfdoc explain_self отдаёт шелл {"sections": []} —
+    # text непустой, но пустой по смыслу. Пиним и вызов, и структурную проверку sections.
     assert '"method": "tools/call"' in workflow
     assert '"name": "explain_self"' in workflow
-    assert "returned empty content" in workflow
+    assert 'payload = json.loads(c["text"])' in workflow
+    assert 'not payload.get("sections")' in workflow
+    assert "empty selfdoc shell" in workflow
 
 
 def test_release_write_token_is_limited_to_publish_job():

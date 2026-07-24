@@ -153,13 +153,14 @@ the concierge will check readiness and assemble a starter board (Marcus Aurelius
 
 ### Via skills.sh (CLI)
 
-One command from the [skills.sh](https://www.skills.sh) registry:
+From the [skills.sh](https://www.skills.sh) registry, one command installs the thin onboarding funnel:
 
-> `npx skills add ilyautov/consilium-principis`
+> `npx skills add ilyautov/consilium-principis/skills/consilium-connect`
 
-The CLI pulls the skill straight from the public GitHub repo and drops `SKILL.md` into
-`~/.claude/skills/` — Claude Code picks it up on the next start. That installs the skill itself; the
-MCP server with all the tools connects separately (see the paths above or [`CONNECT-MCP.md`](CONNECT-MCP.md)).
+This installs only the `consilium-connect` guide skill: it explains that a local MCP server is
+required and walks you to connecting it (see the paths above or [`CONNECT-MCP.md`](CONNECT-MCP.md)).
+The council and all the tools live in the server, not in this markdown — a discovery channel, not a
+working install.
 
 ### Or a plain install
 

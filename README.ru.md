@@ -121,11 +121,11 @@ Claude Code поднимет MCP-сервер и зарегистрирует н
 
 ### Через skills.sh (CLI)
 
-Из реестра [skills.sh](https://www.skills.sh) одной командой:
+Из реестра [skills.sh](https://www.skills.sh) одной командой ставится тонкая воронка-онбординг:
 
-> `npx skills add ilyautov/consilium-principis`
+> `npx skills add ilyautov/consilium-principis/skills/consilium-connect`
 
-CLI берёт навык прямо из публичного GitHub-репозитория и кладёт `SKILL.md` в `~/.claude/skills/` — Claude Code подхватит его при следующем запуске. Так ставится сам навык; MCP-сервер со всеми тулами подключается отдельно (пути выше или [`CONNECT-MCP.md`](CONNECT-MCP.md)).
+Это ставит только скилл-путеводитель `consilium-connect`: он объясняет, что нужен локальный MCP-сервер, и ведёт к его подключению ([`CONNECT-MCP.md`](CONNECT-MCP.md)). Сам совет и все тулы живут в сервере, а не в этом markdown — это канал знакомства, а не рабочая установка.
 
 ### Или обычной установкой
 

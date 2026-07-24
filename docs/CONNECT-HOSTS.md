@@ -218,7 +218,10 @@ gemini extensions install https://github.com/ilyautov/consilium-principis
 
 Extension запускает `python3 ${extensionPath}/scripts/mcp_server.py` локально. На Windows
 поправь `python3` на `py`: per-OS override манифест Gemini не поддерживает (переменные только
-`${extensionPath}`/`${workspacePath}`/`${/}`). Ручной путь — `mcpServers` в settings, конфиг ниже.
+`${extensionPath}`/`${workspacePath}`/`${/}`). Дефолт хрома — русский (по замеренному дизайну);
+для английского меню рецептов добавь в запись сервера `"env": {"CONSILIUM_LANG": "en"}` — ответы
+совета и так следуют языку вопроса, это переключает только детерминированный CLI-хром. Ручной
+путь — `mcpServers` в settings, конфиг ниже.
 
 Ожидаемый (не подтверждённый) конфиг:
 

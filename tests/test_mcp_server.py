@@ -179,6 +179,18 @@ def test_list_recipes_widget_surface_is_clickable():
     assert "recipes" in dispatch("list_recipes", {})        # дефолт = сырые данные
 
 
+def test_list_recipes_surfaces_follow_consilium_lang(monkeypatch):
+    # #4 EN-паритет: chrome виджета/HTML на MCP-серфейсе идёт по CONSILIUM_LANG, не всегда RU
+    # (иначе EN-юзер Cowork получал русский хром). Дефолт (не en) остаётся русским.
+    monkeypatch.setenv("CONSILIUM_LANG", "en")
+    w = dispatch("list_recipes", {"surface": "widget"})["content"]
+    h = dispatch("list_recipes", {"surface": "html"})["content"]
+    assert "What your council can do" in w
+    assert "What your council can do" in h and "lang=en" in h
+    monkeypatch.setenv("CONSILIUM_LANG", "ru")
+    assert "Что умеет твой совет" in dispatch("list_recipes", {"surface": "widget"})["content"]
+
+
 def test_fidelity_check_passes_canon_quote_as_blue():
     r = dispatch("fidelity_check", {"quote": "All warfare is based on deception.",
                                     "advisor_dir": STRAT})

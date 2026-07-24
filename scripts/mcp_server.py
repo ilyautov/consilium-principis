@@ -1212,15 +1212,17 @@ def _quote_of_day(advisor_dir=None, date=None):
 
 
 def _list_recipes(surface="data"):
-    from recipes import load_recipes
+    from recipes import load_recipes, lang_from_env
     rs = load_recipes()
+    lang = lang_from_env()       # #4 EN-паритет: chrome виджета/HTML идёт по CONSILIUM_LANG,
+                                 # иначе EN-юзер Cowork получает русский хром (баг паритета).
     if surface == "widget":      # кликабельное меню для mcp__visualize__show_widget (Cowork)
         from recipes import render_widget
-        return {"surface": "widget", "content": render_widget(rs)}
+        return {"surface": "widget", "content": render_widget(rs, lang=lang)}
     if surface == "html":
         from recipes import render_html
-        return {"surface": "html", "content": render_html(rs)}
-    return {"recipes": rs}       # сырые данные (дефолт) — хост рендерит сам
+        return {"surface": "html", "content": render_html(rs, lang=lang)}
+    return {"recipes": rs}       # сырые данные (дефолт) — хост рендерит сам (оба языка в полях)
 
 
 # ── Decisions-домен (карта/расчёт Ф2, Decision Card, петля исхода, calibrated consult)

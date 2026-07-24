@@ -143,8 +143,9 @@ cd ~/consilium-principis && python3 install.py
 Extensions → установить из файла**. Пользователям Claude Code он не нужен — путей выше достаточно.
 Детали подключения для других MCP-хостов — в [`CONNECT-MCP.md`](CONNECT-MCP.md).
 
-Чтобы **обновить**, повтори установку (мерж, твоя доска `advisors/` сохраняется); чтобы **удалить**,
-снеси `~/.claude/skills/consilium-principis`.
+Чтобы **обновить**, повтори установку (мерж, твоя доска `advisors/` сохраняется). Чтобы **удалить**:
+ставил плагином — `/plugin uninstall consilium-principis` в Claude Code; ставил скриптом — снеси
+`~/.claude/skills/consilium-principis`.
 
 **Claude Desktop или другой MCP-хост:** сервер отдаёт цикл (сборка, заседания, виджеты) тулами. Совместимость хостов различается: сначала посмотри таблицу проверенного статуса в [`docs/CONNECT-HOSTS.md`](docs/CONNECT-HOSTS.md), затем из корня чекаута сгенерируй конфиг командой `python3 scripts/board.py mcp-config --json`.
 

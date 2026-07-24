@@ -26,6 +26,10 @@ versions — [SemVer](https://semver.org/). Dates in ISO (YYYY-MM-DD).
   owner runbook for registry listings (official MCP Registry, Glama, Smithery — local/stdio only).
 
 ### Fixed
+- The recipe menu on the MCP widget/HTML surfaces (Cowork) now honors `CONSILIUM_LANG`; it was
+  always rendered in Russian regardless of the setting.
+- README uninstall instructions now cover the plugin path (`/plugin uninstall`), not only the
+  script path (deleting `~/.claude/skills/…`), so a plugin install is not left registered.
 - `seed-council` now writes a starter `persona.md` for each seeded advisor, so `diversity_check`
   recognizes a fresh board instead of erroring on missing metadata.
 - Python 3.13 compatibility.

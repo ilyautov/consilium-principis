@@ -123,7 +123,10 @@ gemini extensions install https://github.com/ilyautov/consilium-principis
 
 The extension runs `python3 ${extensionPath}/scripts/mcp_server.py` locally. On Windows change
 `python3` to `py`: the Gemini manifest has no per-OS command override (its only variables are
-`${extensionPath}`/`${workspacePath}`/`${/}`). The manual path is an `mcpServers` entry:
+`${extensionPath}`/`${workspacePath}`/`${/}`). The chrome defaults to Russian (a measured design
+choice); for the English recipe menu add `"env": {"CONSILIUM_LANG": "en"}` to the server entry —
+answers already follow the question's language, so this only switches the deterministic CLI chrome.
+The manual path is an `mcpServers` entry:
 
 ```bash
 cd ~/consilium-principis

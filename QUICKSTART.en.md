@@ -88,10 +88,13 @@ For the complete source, manifest, and validation recipe, see
 - Convene a board: “convene a board about [question]”.
 - Calculate a decision: “let’s calculate which is better, X or Y”. The board builds a decision map
   and runs deterministic Monte Carlo over your inputs.
+- Not sure what to ask: “what can you do?” surfaces the recipe menu in plain phrases.
 - Add an advisor or lens: ask in natural language, or use `board.py build-advisor`. Guard against an
   echo chamber with `python3 scripts/diversity_check.py advisors/<a> advisors/<b> ...`.
 - Enable FULL retrieval: `python3 scripts/board.py setup-full`.
-- Connect an MCP host: start with `python3 scripts/board.py mcp-config --json`. On Windows use
+- Connect an MCP host: per-host status is in
+  [`docs/CONNECT-HOSTS.en.md`](https://github.com/ilyautov/consilium-principis/blob/master/docs/CONNECT-HOSTS.en.md);
+  start with `python3 scripts/board.py mcp-config --json`. On Windows use
   `py -3 scripts/board.py mcp-config --json`; if `py` is unavailable, confirm that `python` is
   Python 3.10+ before using it. Do not use the Store `python3` alias.
 

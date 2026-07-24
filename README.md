@@ -177,8 +177,9 @@ The [release](https://github.com/ilyautov/consilium-principis/releases/latest) s
 Extensions → install from file**. Claude Code users don't need it; the paths above are enough. Wiring
 details for other MCP hosts are in [`CONNECT-MCP.en.md`](CONNECT-MCP.en.md).
 
-To **update**, re-run the install (it merges, preserving your `advisors/` board); to **uninstall**,
-delete `~/.claude/skills/consilium-principis`.
+To **update**, re-run the install (it merges, preserving your `advisors/` board). To **uninstall**:
+if you installed as a plugin, run `/plugin uninstall consilium-principis` in Claude Code; if you
+installed via script, delete `~/.claude/skills/consilium-principis`.
 
 **Claude Desktop or another MCP host:** the server exposes its cycle (build, sessions, widgets) as
 tools. Host compatibility varies; see the tested-status table in

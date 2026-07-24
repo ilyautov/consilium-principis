@@ -65,6 +65,20 @@ versions — [SemVer](https://semver.org/). Dates in ISO (YYYY-MM-DD).
   outside-repo case is now `ok: false` (consistent with `governance_verify`).
 
 ### Changed
+- The relevance-judge default is now `host` (was: local `ollama` whenever ollama was running). The
+  server no longer spins up a local chat model to judge passage relevance on every `retrieve`/`cite`;
+  instead the calling host judges via the two-phase protocol. This works on any machine (no ollama
+  and no chat model required), is an order of magnitude faster (a local judge on a large model could
+  exceed the host's 60s transport timeout when a council fanned out), and, with a strong host, judges
+  relevance more accurately. The verbatim 🔵 gate stays deterministic in code regardless of judge, so
+  this moves only the relevance flag, not the moat core. An independent judge (`ollama` local / `api`
+  cloud) is an explicit opt-in via `relevance_gate.judge_backend` or `CONSILIUM_JUDGE_BACKEND`; `auto`
+  never uses the cloud (or even local ollama) without that choice. Rationale: the old default silently
+  broke the judge on a FULL-tier machine that has bge-m3 but no large chat model (the setup only asks
+  for bge-m3), and was slow on capable machines.
+- `embed_batch` pins bge-m3 in memory (`keep_alive`, default 30m; `EMBED_KEEP_ALIVE`) and caps
+  concurrent embed requests to one ollama (`EMBED_MAX_CONCURRENCY`, default 2), so a fanned-out
+  council does not evict the embedder under memory pressure or stampede a cold model into a timeout.
 - The FULL retrieval tier is self-contained (ollama + bge-m3): the dead rerank path, all references
   to the former external engine, and the vestigial `HEPHAESTUS_ENGINE` variable (no code read it)
   are gone. `OLLAMA_HOST` is the offline-test lever.

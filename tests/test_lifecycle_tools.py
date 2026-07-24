@@ -296,6 +296,55 @@ def test_embed_batch_happy_path(monkeypatch):
     assert v == [[0.1, 0.2], [0.3, 0.4]]               # вернул по вектору на вход
 
 
+def test_embed_batch_pins_model_with_keep_alive(monkeypatch):
+    # робастность: bge-m3 не должен вытесняться под давлением больших чат-моделей между
+    # запросами совета — шлём keep_alive, иначе первый холодный запрос рвёт 60с MCP-таймаут
+    pytest.importorskip("numpy")
+    import tier_full
+    captured = {}
+    class _Resp:
+        def __init__(self, p): self._p = p
+        def read(self): return self._p
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+    def _cap(req, timeout=0):
+        captured["body"] = json.loads(req.data.decode())
+        return _Resp(json.dumps({"embeddings": [[0.1, 0.2]]}).encode())
+    monkeypatch.setattr(tier_full.urllib.request, "urlopen", _cap)
+    tier_full.embed_batch(["hi"])
+    assert captured["body"].get("keep_alive") == "30m"           # дефолт-пин
+    monkeypatch.setenv("EMBED_KEEP_ALIVE", "45m")
+    tier_full.embed_batch(["hi"])
+    assert captured["body"].get("keep_alive") == "45m"           # env-оверрайд, читается на вызове
+
+
+def test_embed_batch_caps_concurrency(monkeypatch):
+    # веер из N параллельных cite не должен слать N одновременных embed в один ollama
+    # (thundering herd на холодной модели = каскад 60с-таймаутов). Семафор сериализует.
+    pytest.importorskip("numpy")
+    import tier_full, threading, time
+    monkeypatch.setattr(tier_full, "_EMBED_SEMAPHORE", threading.BoundedSemaphore(2))
+    st = {"cur": 0, "max": 0}
+    lock = threading.Lock()
+    class _Resp:
+        def __init__(self, p): self._p = p
+        def read(self): return self._p
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+    def _slow(req, timeout=0):
+        with lock:
+            st["cur"] += 1; st["max"] = max(st["max"], st["cur"])
+        time.sleep(0.05)
+        with lock:
+            st["cur"] -= 1
+        return _Resp(json.dumps({"embeddings": [[0.1, 0.2]]}).encode())
+    monkeypatch.setattr(tier_full.urllib.request, "urlopen", _slow)
+    threads = [threading.Thread(target=lambda: tier_full.embed_batch(["x"])) for _ in range(6)]
+    for t in threads: t.start()
+    for t in threads: t.join()
+    assert st["max"] <= 2                                        # семафор не пустил больше 2 разом
+
+
 def test_fetch_channel_html_routes_through_guarded_fetch(monkeypatch):
     # P0-4 регрессия-пин: telegram идёт через collect_common.fetch (SSRF-гард), handle санитизирован
     import ingest_telegram as itg, collect_common as cc

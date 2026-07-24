@@ -5,9 +5,11 @@
   api    — независимый облачный (ключ в env; данные уходят провайдеру — честно в лейбле);
   ollama — независимый локальный;
   host   — self-check: судит сам хост (заинтересованная сторона), РЕШЕНИЕ остаётся в коде.
-auto (дефолт): ollama жив → ollama; иначе host. НИКОГДА не облако молча (privacy 2026-07-18).
-Облако (api) — только по ЯВНОМУ выбору: judge_backend="api" в конфиге или env-пин = согласие.
-Явный выбор деградирует по цепочке api → ollama → host (host — пол: его fail-closed = 🟡).
+auto (дефолт, 2026-07-24): host — судит сам хост двухфазным протоколом, работает на ЛЮБОЙ машине
+(без ollama/чат-модели), вербатим-🔵 всё равно детерминирован в коде. Независимый судья (ollama
+локальный / api облачный) — ЯВНЫЙ opt-in (config judge_backend / env-пин), «больше приколюх при
+наличии железа». Privacy: auto НИКОГДА не облако (и даже локальный ollama — только по выбору).
+Явный выбор деградирует к host, если бэкенд недоступен (host — пол: его fail-closed = 🟡).
 Env-пин CONSILIUM_JUDGE_BACKEND — жёсткий (без пробинга): dev/тесты.
 
 Все тесты оффлайн: llm_local.api_available / llm_local.available мокаются.
@@ -44,29 +46,38 @@ def _cfg(monkeypatch, tmp_path, judge=None, extra=None):
     monkeypatch.setattr(relevance_gate, "_config_path", lambda: str(p))
 
 
-# ── матрица auto-резолюции: (api-ключ × ollama) ──
-# ВАЖНО (privacy, 2026-07-18): auto НИКОГДА не уходит в облако молча, даже при наличии
-# api-ключа. Облако = данные уходят провайдеру, а это ЯВНЫЙ выбор (config judge_backend=api
-# / env-пин), не умолчание. До этой правки auto+ключ → api; реверс осознанный.
+# ── матрица auto-резолюции ──
+# ДЕФОЛТ (auto) = host: судит сам хост (в MCP — вызывающая модель) двухфазным протоколом. Работает
+# на ЛЮБОЙ машине (без ollama, без чат-модели); вербатим-🔵 всё равно детерминирован в коде, host
+# двигает лишь флаг релевантности. Независимый судья (ollama/api) — ЯВНЫЙ opt-in (config/env),
+# «больше приколюх при наличии железа». Privacy (2026-07-18): auto НИКОГДА не в облако — теперь
+# тем более (auto даже локальный ollama не берёт без явного выбора).
 
-def test_auto_never_clouds_prefers_ollama_even_with_key(monkeypatch):
+def test_auto_defaults_to_host_even_with_ollama_and_key(monkeypatch):
     _avail(monkeypatch, api=True, ollama=True)
-    assert judge_backend.resolve() == "ollama"         # ключ есть, но auto не клауди → локальный ollama
+    assert judge_backend.resolve() == "host"           # всё доступно, но auto = host (быстро, едет везде)
 
 
 def test_auto_key_but_ollama_down_resolves_host_not_cloud(monkeypatch):
     _avail(monkeypatch, api=True, ollama=False)
-    assert judge_backend.resolve() == "host"           # ключ есть, ollama нет → host (пол), НЕ облако
+    assert judge_backend.resolve() == "host"           # ключ есть, но auto не клауди → host
 
 
-def test_auto_no_key_ollama_up_resolves_ollama(monkeypatch):
+def test_auto_ollama_up_still_defaults_to_host(monkeypatch):
     _avail(monkeypatch, api=False, ollama=True)
-    assert judge_backend.resolve() == "ollama"
+    assert judge_backend.resolve() == "host"           # живой ollama НЕ переопределяет auto→host (opt-in only)
 
 
 def test_auto_nothing_available_resolves_host(monkeypatch):
     _avail(monkeypatch, api=False, ollama=False)
     assert judge_backend.resolve() == "host"           # массовый Claude-only тир
+
+
+def test_explicit_ollama_up_resolves_ollama(monkeypatch, tmp_path):
+    # opt-in работает: явный judge_backend="ollama" + живой ollama → независимый локальный судья
+    _avail(monkeypatch, api=False, ollama=True)
+    _cfg(monkeypatch, tmp_path, judge="ollama")
+    assert judge_backend.resolve() == "ollama"
 
 
 # ── явный конфиг + деградация api → ollama → host ──
@@ -104,7 +115,7 @@ def test_explicit_ollama_down_degrades_to_host(monkeypatch, tmp_path):
 def test_garbage_config_value_falls_back_to_auto(monkeypatch, tmp_path):
     _avail(monkeypatch, api=False, ollama=True)
     _cfg(monkeypatch, tmp_path, judge="gpt-5-please")
-    assert judge_backend.resolve() == "ollama"         # мусор → auto-цепочка (fail-closed коэрс)
+    assert judge_backend.resolve() == "host"           # мусор → auto → host (fail-closed коэрс)
 
 
 def test_gate_config_carries_judge_backend_default_auto(monkeypatch, tmp_path):
@@ -135,10 +146,11 @@ def test_info_labels_are_honest(monkeypatch):
     assert i["backend"] == "host" and i["independence"] == "self-check"
     assert "заинтересованная сторона" in i["label"] and "решение в коде" in i["label"]
 
-    _avail(monkeypatch, api=False, ollama=True)
+    monkeypatch.setenv(judge_backend.ENV_PIN, "ollama")   # ollama-судья теперь opt-in → пиним для лейбла
     i = judge_backend.info()
     assert i["backend"] == "ollama" and i["independence"] == "independent-local"
     assert "локальн" in i["label"]
+    monkeypatch.delenv(judge_backend.ENV_PIN, raising=False)
 
     monkeypatch.setenv(judge_backend.ENV_PIN, "api")   # облако — только по явному согласию (пин)
     i = judge_backend.info()

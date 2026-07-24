@@ -22,6 +22,7 @@ import re
 import sys
 import json
 import hashlib
+import threading
 import urllib.request
 
 import numpy as np
@@ -38,20 +39,35 @@ EMBED_MODEL = os.getenv("EMBED_MODEL", "bge-m3")
 INDEX_VERSION = 1
 
 
+# Кэп одновременных embed-запросов к ЕДИНОМУ локальному ollama. Веер совета (5-10 параллельных
+# cite) без кэпа = thundering herd: на холодной модели первый грузит bge-m3 под нехваткой памяти
+# (конкуренция с большими чат-моделями), остальные встают в очередь и рвут 60с MCP-таймаут. Кэп
+# сериализует: первый прогревает модель, следующие переиспользуют тёплую. Env-настройка.
+_EMBED_SEMAPHORE = threading.BoundedSemaphore(int(os.getenv("EMBED_MAX_CONCURRENCY", "2")))
+
+
 def embed_batch(texts):
     """Батч-эмбеддинг через ollama /api/embed (bge-m3) — ВШИТЫЙ примитив (тот же эндпоинт и
     нормировка, что прежде брались из внешнего RAG-движка). FULL-тиру достаточно ollama, внешний
-    репо не нужен. Возвращает list[list[float]]; нормировку |v|=1 делает вызывающий."""
+    репо не нужен. Возвращает list[list[float]]; нормировку |v|=1 делает вызывающий.
+
+    Робастность на нагруженной машине: (1) keep_alive пинит bge-m3 в памяти между запросами, иначе
+    ollama вытесняет модель под давлением больших чат-моделей и следующий запрос холодно грузится
+    > 60с (наблюдалось на дев-машине с gemma3:27b); (2) _EMBED_SEMAPHORE ограничивает одновременные
+    запросы к единому ollama (см. константу выше)."""
     texts = list(texts)
     if not texts:
         return []
+    payload = {"model": EMBED_MODEL, "input": texts,
+               "keep_alive": os.getenv("EMBED_KEEP_ALIVE", "30m")}     # пин модели в памяти
     req = urllib.request.Request(
         f"{OLLAMA}/api/embed",
-        data=json.dumps({"model": EMBED_MODEL, "input": texts}).encode(),
+        data=json.dumps(payload).encode(),
         headers={"Content-Type": "application/json"},
     )
-    with urllib.request.urlopen(req, timeout=int(os.getenv("EMBED_TIMEOUT", "120"))) as r:
-        embs = json.loads(r.read()).get("embeddings")
+    with _EMBED_SEMAPHORE:                                             # сериализация против herd
+        with urllib.request.urlopen(req, timeout=int(os.getenv("EMBED_TIMEOUT", "120"))) as r:
+            embs = json.loads(r.read()).get("embeddings")
     if not embs or len(embs) != len(texts):
         raise RuntimeError(f"ollama /api/embed: {len(embs or [])} векторов на {len(texts)} входов")
     return embs

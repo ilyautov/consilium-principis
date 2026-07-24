@@ -33,11 +33,15 @@ fidelity-гейт (best_match) ОДИН раз; surface'ы — чистая пр
     "premortem": [ {"advisor": str, "reason": str} ] | None,      # §4: pre-mortem ДО расчёта
     "matrix2x2": {"axes": [str, str],                             # §4: 2×2 ПОСЛЕ расчёта
                   "quadrants": [{"corner": str, "name": str, "council_read": str}]} | None,
-    "synthesis": str,                                  # обязателен
+    "synthesis": str,                                  # обязателен (вердикт)
     "what_you_lose": str | None,                       # чем платишь за синтез
     "step": str | None,
     "forcing_question": str | None,
   }
+Терпимость к алиасам хоста (чтобы вердикт рендерил ДВИЖОК, а не хост руками — трение 2026-07-24):
+  advisors[]: плоские 'position'|'stance' (== opinions[].argument) + 'quote' (dict, == opinions[].quote,
+  marker берётся из него) синтезируются в один opinion (см. _advisor_opinions). Верхний уровень:
+  'verdict' == 'synthesis' (см. _synthesis). Канон всегда в приоритете над алиасом.
 plain по умолчанию: числа сюда не кладём (см. правило «Подача» в SKILL.md) — словесный вывод.
 """
 import html as _html
@@ -66,6 +70,34 @@ def _premortem_items(s):
     return [{"advisor": str(it["advisor"]), "reason": str(it["reason"])}
             for it in p
             if isinstance(it, dict) and it.get("advisor") and it.get("reason")]
+
+
+def _advisor_opinions(a):
+    """Каноничные opinions советника — с терпимостью к алиасам хоста. Канон:
+    a['opinions'] = [{argument, quote?, marker?}]. Но живой хост (Cowork, 2026-07-24) часто шлёт
+    ПЛОСКО: a['position'|'stance'] (строка довода) + a['quote'] (dict {text,source,translation,
+    marker}). Раньше такой объект рендерился ПУСТЫМ (медальоны без содержания) → хост дособирал
+    виджет руками или сваливался в прозу. Синтезируем один opinion из алиасов, чтобы полный
+    вердикт рендерил ДВИЖОК, а не хост. Канон имеет приоритет; маркер берём из opinion или из
+    quote-дикта. Кривой вход → [] (fail-closed, как _disagreement/_premortem_items)."""
+    ops = a.get("opinions")
+    if isinstance(ops, list) and ops:
+        return ops
+    arg = a.get("position") or a.get("stance") or a.get("argument")
+    if not (isinstance(arg, str) and arg.strip()):
+        return []
+    q = a.get("quote") if isinstance(a.get("quote"), dict) else None
+    marker = a.get("marker") or (q.get("marker") if q else None)
+    if q and not q.get("text"):
+        q = None            # marker-only (🟡 без дословной цитаты) — это метка тира, не цитата
+    return [{"argument": arg, "quote": q, "marker": marker}]
+
+
+def _synthesis(s):
+    """Текст синтеза-вердикта, с алиасом: канон 'synthesis', хост часто шлёт 'verdict'.
+    Строка или None (тогда ход — круглый стол без вердикта)."""
+    v = s.get("synthesis") or s.get("verdict")
+    return v if isinstance(v, str) and v.strip() else None
 
 
 def _matrix2x2(s):
@@ -119,12 +151,12 @@ def render_md(s):
         out += ["", f"*Совет переформулирует:* {_e(s['reframe'])}"]
     for a in s.get("advisors", []):
         out += ["", f"## {_e(a['name'])}"]
-        for op in a.get("opinions", []):
+        for op in _advisor_opinions(a):
             mk = _marker(op.get("marker"))
             glyph = (mk[0] + " ") if mk else ""
             out.append(f"{glyph}{_e(op['argument'])}")
             q = op.get("quote")
-            if q:
+            if q and q.get("text"):
                 src = f" ({_e(q['source'])})" if q.get("source") else ""
                 out.append(f"> «{_e(q['text'])}»{src}")
                 if q.get("translation"):
@@ -145,8 +177,9 @@ def render_md(s):
         for q in mx["quadrants"]:
             nm = f" · {_e(q['name'])}" if q["name"] else ""
             out.append(f"- **{_e(q['corner'])}{nm}:** {_e(q['council_read'])}")
-    if s.get("synthesis"):
-        out += ["", "## Синтез", _e(s["synthesis"])]
+    synth = _synthesis(s)
+    if synth:
+        out += ["", "## Синтез", _e(synth)]
         if s.get("what_you_lose"):
             out.append(f"_Чем платишь:_ {_e(s['what_you_lose'])}")
     if s.get("step"):
@@ -352,8 +385,8 @@ def render_opening(o, actions=None):
 def _pull_quote(q, marker):
     """Сценическая pull-цитата: дословные слова + источник-шёпот (виден всегда, честно). Пилюля
     достоверности — только .eng (под капотом). Перевод-глосса рядом."""
-    if not q:
-        return ""
+    if not q or not q.get("text"):
+        return ""                          # без дословного text цитаты нет (только метка тира)
     tr = (f'<span class="tr">{_e(q["translation"])}</span>' if q.get("translation") else "")
     cite = f'<cite>{_e(q["source"])}</cite>' if q.get("source") else ""
     pill = (f'<span class="eng">{_pill(marker)}</span>' if _pill(marker) else "")
@@ -365,7 +398,8 @@ def render_widget(s, actions=None, depth="plain"):
     Рендерит ЛЮБОЙ ход: реакции+вопросы (без synthesis — круглый стол) ИЛИ синтез-вердикт (с synthesis).
     s.questions=[...] → блок «совет спрашивает». actions=[(label,prompt[,icon])] → sendPrompt. depth:
     plain (театр) | expert (.show-eng). Ров: верифиц. цитата+источник видны, пилюли — .eng (тумблер)."""
-    has_synth = bool(s.get("synthesis"))
+    synth = _synthesis(s)
+    has_synth = bool(synth)
     if actions is None:
         actions = ([("занести в журнал", "занеси это решение совета в журнал", "ti-notebook"),
                     ("оспорить синтез", "оспорь синтез совета как адвокат дьявола", "ti-swords")]
@@ -388,7 +422,7 @@ def render_widget(s, actions=None, depth="plain"):
     for i, a in enumerate(s.get("advisors", [])):
         accent = _AVATAR[i % len(_AVATAR)]
         lines = []
-        for op in a.get("opinions", []):
+        for op in _advisor_opinions(a):
             lines.append(f'<p class="speech">{_e(op["argument"])}</p>')
             lines.append(_pull_quote(op.get("quote"), op.get("marker")))
         body = "".join(lines).rstrip()
@@ -435,7 +469,7 @@ def render_widget(s, actions=None, depth="plain"):
         cost = (f'<p class="cost eng">Чем платишь: {_e(s["what_you_lose"])}</p>'
                 if s.get("what_you_lose") else "")
         parts.append('<div class="verdict"><div class="vlabel">Вердикт</div>'
-                     f'<p class="vtext">{_e(s["synthesis"])}</p>{cost}</div>')
+                     f'<p class="vtext">{_e(synth)}</p>{cost}</div>')
 
     if s.get("step"):
         parts.append('<p class="step"><i class="ti ti-arrow-right" aria-hidden="true"></i>'

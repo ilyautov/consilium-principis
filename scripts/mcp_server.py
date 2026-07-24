@@ -2163,7 +2163,20 @@ TOOLS = {
                        "advisors[]-блок — надёжный канал атрибуции (имя — exact-match фолбэк). "
                        "depth=plain по умолчанию. См. session_render.py.",
         "input_schema": {"type": "object",
-                         "properties": {"session": {"type": "object"}, "surface": {"type": "string"},
+                         "properties": {"session": {"type": "object",
+                             "description": (
+                                 "Канон-объект заседания. ВАЖНО — точные имена полей, иначе движок "
+                                 "отрисует только имена советников, а вердикт потеряется: "
+                                 "{question:str, reframe?:str, "
+                                 "advisors:[{name:str, opinions:[{argument:str (довод на языке юзера), "
+                                 "quote?:{text:str, source?:str, translation?:str}, "
+                                 "marker?:'blue'|'green'|'yellow'|'violation'}], advisor_dir?:str}], "
+                                 "disagreement?:{axis:str, sides:[str], resolver?:str}, "
+                                 "premortem?:[{advisor:str, reason:str}], "
+                                 "synthesis:str (ВЕРДИКТ), what_you_lose?:str, step?:str}. "
+                                 "Алиасы тоже приняты (advisor.position→argument, advisor.quote→opinions[].quote, "
+                                 "verdict→synthesis), но канон надёжнее.")},
+                                        "surface": {"type": "string"},
                                         "depth": {"type": "string", "enum": ["plain", "expert"]},
                                         "kind": {"type": "string", "enum": ["session", "opening"]}},
                          "required": ["session"]},

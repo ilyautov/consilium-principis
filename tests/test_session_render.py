@@ -240,3 +240,51 @@ def test_render_md_html_no_synthesis_no_keyerror():
     md = render_md(s)
     html = render_html(s)
     assert "Синтез" not in md and "Синтез" not in html
+
+
+# ── алиасы хоста: плоский position/quote + verdict рендерятся ДВИЖКОМ (не теряются) ──
+# Регрессия 2026-07-24 (живой Cowork): хост собрал заседание с полями position/quote(на
+# советнике)/verdict вместо canon opinions[].{argument,quote,marker}/synthesis. render_widget
+# рендерил ТОЛЬКО медальоны (имена), выкидывая доводы и вердикт → хост дособирал виджет руками
+# или сваливался в прозу. Теперь алиасы синтезируются в canon → полный вердикт рендерит движок.
+_HOST_ALIAS_SESSION = {
+    "question": "Выпускать сейчас или доводить до 100%?",
+    "advisors": [
+        {"name": "Никколо Макиавелли", "advisor_dir": "advisors/machiavelli",
+         "position": "Фортуна бьёт по незащищённому — построй барьер там, где удар критичен.",
+         "quote": {"marker": "blue",
+                   "text": "fortune, who shows her power where valour has not prepared to resist",
+                   "source": "the-prince-marriott.txt",
+                   "translation": "фортуна являет мощь там, где доблесть не приготовилась"}},
+        {"name": "Сунь-цзы", "advisor_dir": "advisors/sun-tzu",
+         "position": "Запускай и дорабатывай на ходу; перфекционизм до релиза = смерть продукта.",
+         "quote": {"marker": "yellow"}},   # marker-only: 🟡 без дословной цитаты
+    ],
+    "verdict": "ВЫПУСКАТЬ СЕЙЧАС как honest-alpha — «100%» это перформативное противоречие.",
+}
+
+
+def test_widget_renders_host_alias_position_quote_and_verdict():
+    w = render_widget(_HOST_ALIAS_SESSION)
+    # доводы (position→argument) отрисованы, не только имена
+    assert "Фортуна бьёт по незащищённому" in w
+    assert "перфекционизм до релиза" in w
+    # дословная цитата+источник из плоского quote видны (ров держится)
+    assert "valour has not prepared to resist" in w and "the-prince-marriott.txt" in w
+    # вердикт (verdict→synthesis) отрисован блоком «Вердикт», не потерян
+    assert "honest-alpha" in w and 'class="verdict"' in w
+
+
+def test_md_renders_host_alias_position_and_verdict():
+    md = render_md(_HOST_ALIAS_SESSION)
+    assert "Фортуна бьёт по незащищённому" in md
+    assert "honest-alpha" in md and "## Синтез" in md
+
+
+def test_canon_opinions_take_priority_over_flat_aliases():
+    # если есть и canon opinions, и плоский position — canon выигрывает (алиас не перетирает)
+    s = {"question": "Q", "advisors": [{
+        "name": "X", "position": "ПЛОСКИЙ довод-алиас",
+        "opinions": [{"marker": "blue", "argument": "КАНОН-довод"}]}]}
+    w = render_widget(s)
+    assert "КАНОН-довод" in w and "ПЛОСКИЙ довод-алиас" not in w

@@ -1,0 +1,11 @@
+{
+  "name": "consilium-principis",
+  "version": "0.1.3",
+  "description": "A personal board of AI personas of real thinkers with a fail-closed fidelity contour, grounded in public-domain texts. The advisor engine runs locally as a bundled MCP server.",
+  "mcpServers": {
+    "consilium-principis": {
+      "command": "python3",
+      "args": ["${extensionPath}/scripts/mcp_server.py"]
+    }
+  }
+}

@@ -209,6 +209,17 @@ Claude Code/Desktop.
 по документации Google в целом похожа на формат Claude Desktop), но подключение Consilium
 к Gemini CLI не тестировалось в рамках этого репозитория.
 
+В корне репозитория лежит готовый **extension-манифест** `gemini-extension.json` — он бандлит
+MCP-сервер, и Gemini ставит его одной командой прямо из GitHub:
+
+```bash
+gemini extensions install https://github.com/ilyautov/consilium-principis
+```
+
+Extension запускает `python3 ${extensionPath}/scripts/mcp_server.py` локально. На Windows
+поправь `python3` на `py`: per-OS override манифест Gemini не поддерживает (переменные только
+`${extensionPath}`/`${workspacePath}`/`${/}`). Ручной путь — `mcpServers` в settings, конфиг ниже.
+
 Ожидаемый (не подтверждённый) конфиг:
 
 ```json
@@ -325,6 +336,22 @@ Store-alias `python3`: он может открыть магазин вмест�
 Windows CI проверяет launcher, выбор конфигов и stdio `initialize`/`tools/list`, но не настоящий
 запуск конкретного хоста. Поэтому этот путь экспериментальный: проверь сгенерированный конфиг в
 своём хосте и сообщи о результате через [SUPPORT.md](../SUPPORT.md).
+
+---
+
+## Одной командой в 30+ агентов (skills.sh)
+
+`npx skills add` (реестр skills.sh, «npm для агентских скиллов») раздаёт markdown-скиллы в десятки
+хостов — Cursor, Windsurf, Cline, Codex и другие. Наш **движок — MCP-сервер**, а не markdown,
+поэтому через skills.sh ставится не он, а тонкий **онбординг-скилл** `consilium-connect`: он честно
+объясняет, что нужен локальный сервер, и ведёт к его подключению (разделы выше).
+
+```bash
+npx skills add ilyautov/consilium-principis/skills/consilium-connect
+```
+
+Это discovery-воронка: агент получает подсказку «вот как подключить Consilium», а не рабочий совет
+без сервера. Полную ценность даёт подключённый MCP-сервер (`doctor` → `seed_council`).
 
 ---
 

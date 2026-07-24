@@ -57,13 +57,31 @@ def test_versions_in_sync():
     p = _load_json(".claude-plugin/plugin.json")
     mcpb = _load_json("manifest.json")
     reg = _load_json("server.json")
+    gem = _load_json("gemini-extension.json")
     assert (
         p["version"]
         == _pyproject_version()
         == _serverinfo_version()
         == mcpb["version"]
         == reg["version"]
-    ), "версия рассинхронизирована между plugin.json/pyproject/serverInfo/manifest.json/server.json"
+        == gem["version"]
+    ), ("версия рассинхронизирована между "
+        "plugin.json/pyproject/serverInfo/manifest.json/server.json/gemini-extension.json")
+
+
+def test_gemini_extension_valid():
+    # gemini-extension.json — манифест Gemini CLI extension: бандлит наш stdio MCP-сервер.
+    # name+version обязательны; сервер стартует локально через ${extensionPath} (не абсолют).
+    g = _load_json("gemini-extension.json")
+    assert g["name"] == "consilium-principis"
+    assert re.fullmatch(r"[a-z0-9-]+", g["name"]), "name kebab-case (Gemini требует)"
+    assert g["version"]
+    srv = g["mcpServers"]["consilium-principis"]
+    assert srv["command"] == "python3", "top-level команда python3 (Windows-оверрайд документирован)"
+    joined = " ".join(srv["args"])
+    assert "${extensionPath}" in joined, "путь к энтрипоинту через переменную Gemini, не абсолют"
+    assert "mcp_server.py" in joined
+    assert "/Users/" not in joined and "/opt/" not in joined, "ноль абсолютных путей"
 
 
 def test_mcpb_manifest_valid():

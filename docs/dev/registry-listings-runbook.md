@@ -84,6 +84,33 @@ Two owner options:
 If Smithery's local/stdio listing ever stops being possible without a hosted runtime, drop
 Smithery and keep the official Registry + Glama.
 
+## 4. Gemini CLI extensions (geminicli.com/extensions)
+
+Model: users install with `gemini extensions install https://github.com/ilyautov/consilium-principis`.
+The root `gemini-extension.json` bundles the stdio MCP server, which runs locally — moat-safe, no
+hosted runtime. Windows users edit `python3` → `py` (the Gemini manifest has no per-OS override).
+
+Owner step: to appear in the Gemini extensions gallery, register/submit the repo per Gemini CLI's
+current process (check `geminicli.com/extensions`). Keep `gemini-extension.json`'s `version` in sync
+with the release — the version guard (`test_versions_in_sync`) enforces it against the other manifests.
+
+## 5. skills.sh (`npx skills add`)
+
+Model: a markdown-skill registry (`npx skills find` / `add`) that installs into 30+ agents from a
+`skills/<name>/SKILL.md` layout. Our value is the **MCP server**, not markdown, so the only thing
+published here is the thin onboarding funnel `skills/consilium-connect/SKILL.md` — it tells the user
+a local server is required and points at `CONNECT-HOSTS`. Never expose the operating-layer skill this
+way: without the server it would reference tools that do not exist.
+
+Users install the funnel with:
+
+```bash
+npx skills add ilyautov/consilium-principis/skills/consilium-connect
+```
+
+Owner step: submit the repo/skill to the skills.sh directory per its current process. This is a
+discovery channel, not a functional listing — do not describe it as "the council in your agent".
+
 ## Order of operations
 
 1. Cut and release `vX.Y.Z` (tag-triggered workflow builds and uploads the MCPB + `server.json`).

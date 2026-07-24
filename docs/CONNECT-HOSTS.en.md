@@ -114,6 +114,17 @@ This integration is unverified. Gemini CLI may expose MCP servers through its ex
 configuration. Use the generated `mcpServers` snippet as a local starting point, confirm the syntax
 against your version, and do not publish the result as supported until it has been smoke-tested.
 
+The repository root ships a ready **extension manifest**, `gemini-extension.json`, that bundles the
+MCP server, so Gemini can install it in one command straight from GitHub:
+
+```bash
+gemini extensions install https://github.com/ilyautov/consilium-principis
+```
+
+The extension runs `python3 ${extensionPath}/scripts/mcp_server.py` locally. On Windows change
+`python3` to `py`: the Gemini manifest has no per-OS command override (its only variables are
+`${extensionPath}`/`${workspacePath}`/`${/}`). The manual path is an `mcpServers` entry:
+
 ```bash
 cd ~/consilium-principis
 python3 scripts/board.py mcp-config --json
@@ -186,6 +197,22 @@ python -c "import sys; assert sys.version_info >= (3, 10)"
 
 Do not use the Microsoft Store `python3` alias. Windows CI covers the launcher, configuration
 selection, and stdio handshake, but not a live run in a specific host; treat the path as experimental.
+
+## One command into 30+ agents (skills.sh)
+
+`npx skills add` (the skills.sh registry, "npm for agent skills") distributes markdown skills into
+dozens of hosts — Cursor, Windsurf, Cline, Codex, and others. Our **engine is an MCP server**, not
+markdown, so skills.sh installs a thin **onboarding skill**, `consilium-connect`, rather than the
+engine itself: it states plainly that a local server is required and walks you through connecting it
+(sections above).
+
+```bash
+npx skills add ilyautov/consilium-principis/skills/consilium-connect
+```
+
+This is a discovery funnel: the agent receives "here is how to connect Consilium", not a working
+council without the server. Full value comes from the connected MCP server (`doctor` →
+`seed_council`).
 
 ## After connecting
 

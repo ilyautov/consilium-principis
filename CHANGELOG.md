@@ -17,6 +17,13 @@ versions — [SemVer](https://semver.org/). Dates in ISO (YYYY-MM-DD).
 - `explain_self` now works in the installed skill: `docs/selfdoc` ships with the runtime.
 - English-language CLI (`CONSILIUM_LANG=en`): the recipe menu (`board.py recipes`), recipe
   matching, and the installer output are now bilingual; English queries match recipes.
+- Gemini CLI extension (`gemini-extension.json`): one-command install via
+  `gemini extensions install`; the bundled MCP server runs locally.
+- skills.sh onboarding funnel (`skills/consilium-connect`): `npx skills add` drops a thin
+  connect-the-server skill across 30+ agents that points at the local MCP server (never the
+  operating-layer skill, which would reference tools that do not exist without the server).
+- Host connection guide for Kimi CLI (`~/.kimi/mcp.json`) in `docs/CONNECT-HOSTS`, plus an
+  owner runbook for registry listings (official MCP Registry, Glama, Smithery — local/stdio only).
 
 ### Fixed
 - `seed-council` now writes a starter `persona.md` for each seeded advisor, so `diversity_check`

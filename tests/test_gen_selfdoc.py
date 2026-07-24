@@ -8,6 +8,24 @@ def test_extract_tests_graceful_without_tests_dir(tmp_path):
     assert g.extract_tests(root=str(tmp_path)) == []
 
 
+def test_should_write_refuses_in_installed_tree(tmp_path):
+    # Футган: graceful-возврат [] выше означал, что gen_selfdoc в installed-дереве МОЛЧА
+    # перезапишет shipped-индекс деградированным (0 тестов/0 терминов). Гард: без dev-only
+    # источников (tests/, docs/GLOSSARY.md) писать нельзя, если не --force.
+    (tmp_path / "scripts").mkdir()                       # scripts/ есть (шипуется), tests/ и GLOSSARY — нет
+    assert g._sources_present(root=str(tmp_path)) is False
+    assert g.should_write(root=str(tmp_path)) is False
+    assert g.should_write(root=str(tmp_path), force=True) is True
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "GLOSSARY.md").write_text("**Термин** — определение.\n", encoding="utf-8")
+    assert g.should_write(root=str(tmp_path)) is True    # полный чекаут → писать можно
+
+
+def test_should_write_allows_real_checkout():
+    assert g.should_write() is True                      # в репо-чекауте источники на месте
+
+
 def test_extract_tools_has_status_and_refs():
     tools = g.extract_tools()
     names = {t["name"] for t in tools}

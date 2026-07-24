@@ -187,7 +187,30 @@ def write_index(idx, path):
 INDEX_PATH = os.path.join(ROOT, "docs", "selfdoc", "index.json")
 
 
-def main():
+def _sources_present(root=None):
+    """Есть ли dev-only источники, без которых индекс выходит деградированным?
+    tests/ и docs/GLOSSARY.md НЕ шипуются в установленный скилл (RUNTIME их не тащит) —
+    их отсутствие = признак installed/partial-дерева, а не source-чекаута."""
+    r = _default_root(root)
+    return os.path.isdir(os.path.join(r, "tests")) and os.path.exists(
+        os.path.join(r, "docs", "GLOSSARY.md"))
+
+
+def should_write(root=None, force=False):
+    """Fail-closed: НЕ перезаписывать shipped docs/selfdoc/index.json деградированным
+    (0 тестов / 0 терминов) индексом в установленном дереве. --force снимает гард."""
+    return bool(force) or _sources_present(root)
+
+
+def main(argv=None):
+    force = "--force" in (list(argv) if argv is not None else sys.argv[1:])
+    if not should_write(force=force):
+        print("gen_selfdoc: dev-only источники отсутствуют (tests/ или docs/GLOSSARY.md) — похоже "
+              "на установленный/частичный скилл, не source-чекаут. Отказываюсь перезаписывать "
+              "shipped docs/selfdoc/index.json деградированным индексом (0 тестов/0 терминов, "
+              "explain_self ослепнет). Запусти в чекауте репозитория или передай --force.",
+              file=sys.stderr)
+        sys.exit(2)
     idx = build_index()
     write_index(idx, INDEX_PATH)
     print("selfdoc index: %d тулов, %d правил, %d рецептов, %d скриптов, %d тестов, %d терминов → %s"

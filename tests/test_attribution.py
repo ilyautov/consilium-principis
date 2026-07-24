@@ -173,3 +173,26 @@ def test_advisor_dir_channel_documented_for_host():
     assert "advisor_dir` каждому советнику" in INSTRUCTIONS
     assert "канал атрибуции" in INSTRUCTIONS
     assert "advisor_dir" in TOOLS["render_session"]["description"]
+
+
+def _session_with_dir(advisor_dir, quote_text, marker="blue", name="Марк Аврелий"):
+    return {"question": "q", "synthesis": "s",
+            "advisors": [{"name": name, "advisor_dir": advisor_dir,
+                          "opinions": [{"marker": marker, "argument": "довод",
+                                        "quote": {"text": quote_text, "source": "src"}}]}]}
+
+
+def test_bare_advisor_dir_keeps_grounded_marker(board):
+    # Регрессия 2026-07-24 (Kimi pre-release): голое имя в advisor_dir (то, что отдают cite/
+    # retrieve и советует INSTRUCTIONS) раньше резолвилось _resolve_under_root → <root>/aurelius
+    # (нет каталога) → дословный 🔵 понижался до violation. Теперь _resolve_advisor_corpus
+    # принимает голое имя → корпус найден → 🔵 сохранён (не ложное понижение).
+    r = dispatch("render_session", {"session": _session_with_dir("aurelius", QUOTE_A), "surface": "md"})
+    assert "attribution_violations" not in r
+    assert "⛔" not in r["content"]
+
+
+def test_bare_advisor_dir_still_flags_cross_attribution(board):
+    # fail-closed цел: голое имя резолвится, но цитата ЧУЖОГО советника под ним → всё равно violation.
+    r = dispatch("render_session", {"session": _session_with_dir("aurelius", QUOTE_B), "surface": "md"})
+    assert "attribution_violations" in r or "⛔" in r["content"]

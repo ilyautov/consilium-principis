@@ -384,3 +384,26 @@ def test_instructions_cover_two_phase_flow():
     assert "не выдумывай оценки" in INSTRUCTIONS.lower()
     assert "рубрик" in INSTRUCTIONS.lower()
     assert "сервер" in INSTRUCTIONS.split("judgment_request", 1)[1][:600].lower()
+
+
+def test_gate_verdict_accepts_bare_advisor_name_across_both_phases(host_env):
+    # Регрессия 2026-07-24 (Kimi pre-release): фаза 1 (cite) хранит РЕЗОЛВНУТЫЙ путь советника;
+    # фаза 2 (gate_verdict) раньше резолвила вход через plain _resolve → голое имя не совпадало
+    # с nonce → 🟡 «вердикт не принят». А фаза 1 сама инструктирует хост голым именем. Теперь оба
+    # конца идут через _resolve_advisor_corpus → голое имя проходит весь двухфазный гейт.
+    pool, adv = host_env
+    bare = os.path.basename(adv)          # 'adv' — резолвится под _root=tmp_path
+    r = mcp_server._cite(bare, "q", use_kernels=False, limit=4)
+    assert r["phase"] == "judgment_request"
+    v = mcp_server._gate_verdict(bare, r["nonce"], {c["id"]: 3 for c in r["candidates"]})
+    assert v["quotes"], "голое имя в фазе 2 обязано принять вердикт, не уйти в 🟡-отказ"
+    assert all(q["marker"] == "🔵" for q in v["quotes"])
+
+
+def test_gate_verdict_still_rejects_wrong_advisor(host_env):
+    # fail-closed цел: чужой советник (не тот, что в nonce) → 🟡, nonce не сожжён (см. M-1).
+    pool, adv = host_env
+    r = _phase1(adv)
+    v = mcp_server._gate_verdict("totally-unknown-advisor", r["nonce"],
+                                 {c["id"]: 3 for c in r["candidates"]})
+    assert v["marker"] == "🟡" and not v["quotes"]

@@ -42,6 +42,20 @@ versions — [SemVer](https://semver.org/). Dates in ISO (YYYY-MM-DD).
 - `seed-council` fails soft (no traceback) when a source cannot be fetched offline.
 - Broken documentation links left by the history cleanup; shipped docs now use absolute links so
   they resolve inside the installed skill.
+- Bare advisor names (`marcus-aurelius`) now resolve everywhere they are accepted, not just in
+  `retrieve`/`cite`/`fidelity_check`: the two-phase `gate_verdict` no longer rejects a bare name it
+  was itself instructed to reuse, `render_session` no longer downgrades a genuine 🔵 quote to a
+  violation when given a bare `advisor_dir`, `cite`'s kernel recall-expansion no longer silently
+  switches off, and `quote_of_day`/`atomic_grounding` no longer report a false empty result. A bare
+  name that is genuinely unknown still fails closed (loud error / 🟡), and cross-advisor attribution
+  is still flagged.
+- The request hot-path (`retrieve`/`cite`) no longer builds a large semantic index inline, which
+  could exceed a host's transport timeout; a missing or stale index degrades to the lexical floor
+  and is rebuilt by a background job.
+- `doctor`'s moat self-test no longer raises a false "рв не держит" when its sample fragment happened
+  to straddle a sentence boundary.
+- `render_session` renders the full verdict (positions, quotes, verdict) from a host that uses
+  flat `position`/`quote`/`verdict` field names, instead of showing only advisor names.
 
 ### Changed
 - The FULL retrieval tier is self-contained (ollama + bge-m3): the dead rerank path, all references

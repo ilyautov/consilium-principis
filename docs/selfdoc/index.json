@@ -839,7 +839,8 @@
         "type": "object",
         "properties": {
           "advisor_dir": {
-            "type": "string"
+            "type": "string",
+            "description": "ТОТ ЖE советник, что в cite фазы 1 — имя ('marcus-aurelius') ИЛИ путь ('advisors/marcus-aurelius'). Должен совпасть с советником nonce, иначе вердикт не принимается (fail-closed 🟡)."
           },
           "nonce": {
             "type": "string"

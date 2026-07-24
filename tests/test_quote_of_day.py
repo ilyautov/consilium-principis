@@ -63,3 +63,14 @@ def test_empty_or_non_p1_pool_no_blue(tmp_path):
     r = _quote_of_day(adv, date="2026-07-11")
     assert r.get("marker") != "🔵"
     assert "note" in r
+
+
+def test_quote_of_day_accepts_bare_advisor_name(tmp_path):
+    # Регрессия 2026-07-24 (Kimi pre-release): голое имя раньше шло в _resolve_read → <root>/<name>
+    # (нет каталога) → ложная нота «нет собранных советников» на собранном советнике. Теперь
+    # _resolve_advisor_corpus принимает имя → цитата дня отдаётся.
+    from mcp_server import _quote_of_day
+    _make_advisor(tmp_path, P1_CHUNKS)
+    r = _quote_of_day("adv", date="2026-07-11")            # голое имя вместо пути
+    assert r.get("marker") == "🔵"
+    assert r.get("text") in [c["text"] for c in P1_CHUNKS]

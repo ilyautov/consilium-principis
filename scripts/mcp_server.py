@@ -275,8 +275,11 @@ def _validate_session_attribution(session):
                 continue
             if not resolved:                          # лениво и один раз на советника
                 explicit = a.get("advisor_dir")
-                if explicit:                          # путь от хоста = данные → root-гард
-                    adv_dir, _err = _resolve_under_root(explicit)
+                if explicit:                          # имя ('marcus-aurelius') ИЛИ путь; _resolve_advisor_corpus
+                    # traversal-safe (через _resolve_read) И принимает голое имя. Раньше стоял
+                    # _resolve_under_root → голое имя (то, что дают cite/retrieve и советует
+                    # INSTRUCTIONS) → <root>/<name> не существует → 🔵 понижался до violation.
+                    adv_dir, _err = _resolve_advisor_corpus(explicit)
                 else:
                     adv_dir = _resolve_advisor_dir(a.get("name"))
                 resolved = True
@@ -588,7 +591,11 @@ def _gate_verdict(advisor_dir, nonce, ratings=None):
     Детерминированно, ноль LLM. Nonce single-use + TTL. M-1 (review): advisor-матч
     валидируется ДО pop (под локом) — чужой advisor_dir получает 🟡, но НЕ сжигает nonce
     (иначе self-DoS-грифинг); сжигаем только при валидном заборе законным советником."""
-    adv_res = _resolve(advisor_dir or "")
+    # Голое имя ('marcus-aurelius') ИЛИ путь — тем же резолвером, что фаза-1 cite (_resolve_advisor_corpus):
+    # фаза 1 хранит РЕЗОЛВНУТЫЙ путь (:_PENDING_VERDICTS[..]["advisor_dir"]=adv_res), а раньше здесь
+    # стоял plain _resolve → голое имя не матчилось с nonce → 🟡 «вердикт не принят» на шаге, к
+    # которому фаза 1 сама инструктирует голым именем. Тот же класс, что b8993bc, одним вызовом позже.
+    adv_res, _aerr = _resolve_advisor_corpus(advisor_dir) if advisor_dir else (None, None)
     now = time.time()
     key = str(nonce or "")
     with _VERDICT_LOCK:
@@ -686,7 +693,8 @@ def _cite(advisor_dir, query, top_k=8, use_kernels=True, limit=4):
     # экспансия ретрива, не то, на что цитата обязана отвечать).
     primary = query if isinstance(query, str) else (query[0] if query else "")
     if use_kernels:
-        queries += _kernel_themes(advisor_dir)
+        queries += _kernel_themes(adv_res)   # adv_res, НЕ сырой advisor_dir: голое имя → kernels.json
+                                             # не находился → recall-рычаг #4 тихо выключался (bare-форма)
     seen_q, uniq_q = set(), []
     for q in queries:
         if q and q not in seen_q:
@@ -1172,8 +1180,8 @@ def _premortem(scenarios, ledger=None):
 
 def _atomic_grounding(text, advisor_dir):
     from atomic import inflation_gap
-    adv = _resolve_read(advisor_dir)                    # H5 read-гард
-    if adv is None:                                     # traversal → нет корпуса → 0 grounded (fail-closed)
+    adv, _aerr = _resolve_advisor_corpus(advisor_dir)   # имя ИЛИ путь; traversal-safe (_resolve_read)
+    if adv is None:                                     # неизвестный/traversal → 0 grounded (fail-closed)
         adv = os.path.join(_root(), "__no_such_advisor__")
     return inflation_gap(text, adv)
 
@@ -1233,7 +1241,9 @@ def _quote_of_day(advisor_dir=None, date=None):
     from corpusbuild.paths import corpus_path
     import hashlib, datetime
     if advisor_dir:
-        adv = _resolve_read(advisor_dir)               # H5 read-гард: traversal → пусто, не читаем
+        adv, _aerr = _resolve_advisor_corpus(advisor_dir)   # имя ('marcus-aurelius') ИЛИ путь;
+        # traversal-safe (через _resolve_read). Раньше _resolve_read → голое имя → <root>/<name>
+        # (нет) → ложная нота «нет собранных советников» на собранном советнике.
         adv_list = [adv] if adv and os.path.isfile(corpus_path(adv)) else []
     else:
         adv_list = [d for d in _advisor_dirs() if os.path.isfile(corpus_path(d))]
@@ -1926,7 +1936,10 @@ TOOLS = {
                        "логируются. Оценки гейтят ТОЛЬКО релевантность; завышение ради цитат ломает "
                        "контур. Кривой/истёкший/повторный nonce или пропущенные оценки → fail-closed (🟡/0).",
         "input_schema": {"type": "object",
-                         "properties": {"advisor_dir": {"type": "string"},
+                         "properties": {"advisor_dir": {"type": "string",
+                             "description": "ТОТ ЖE советник, что в cite фазы 1 — имя ('marcus-aurelius') "
+                             "ИЛИ путь ('advisors/marcus-aurelius'). Должен совпасть с советником nonce, "
+                             "иначе вердикт не принимается (fail-closed 🟡)."},
                                         "nonce": {"type": "string"},
                                         "ratings": {"type": "object"}},
                          "required": ["advisor_dir", "nonce", "ratings"]},

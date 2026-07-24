@@ -22,6 +22,7 @@ General MCP setup, security, and dependencies are in [`../CONNECT-MCP.en.md`](..
 | Cursor | no | yes (per Cursor documentation) | ⚠ unverified on this host; confirm locally |
 | Codex / OpenAI-style CLI | no | ⚠ version-dependent; see below | ⚠ unverified |
 | Gemini CLI | no | ⚠ extensions/MCP configuration; see below | ⚠ unverified |
+| Kimi CLI (Moonshot) | no | yes (per Kimi CLI docs, `~/.kimi/mcp.json`) | ⚠ unverified |
 | Universal MCP host | no plugin format outside Claude Code | yes | ⚠ host-dependent |
 
 “Skill” means a convenience wrapper for automatic registration and commands. The MCP server is a
@@ -117,6 +118,41 @@ against your version, and do not publish the result as supported until it has be
 cd ~/consilium-principis
 python3 scripts/board.py mcp-config --json
 ```
+
+## Kimi CLI (Moonshot)
+
+Unverified on this host. Kimi Code CLI reads MCP configuration from `~/.kimi/mcp.json` in a
+format compatible with other MCP clients (an `mcpServers` key with `command`/`args`, optional
+`env`) and supports stdio servers:
+
+```json
+{
+  "mcpServers": {
+    "consilium-principis": {
+      "command": "python3",
+      "args": ["/ABSOLUTE/PATH/TO/consilium-principis/scripts/mcp_server.py"]
+    }
+  }
+}
+```
+
+Generate the machine-specific path instead of hardcoding an absolute one:
+
+```bash
+cd ~/consilium-principis
+python3 scripts/board.py mcp-config --json
+```
+
+Kimi CLI can also take the configuration ad hoc, without editing `~/.kimi/mcp.json`:
+
+```bash
+kimi --mcp-config-file /path/to/mcp.json
+# or inline: kimi --mcp-config '{"mcpServers": { ... }}'
+```
+
+As with other non-Claude hosts, it is unverified whether Kimi forwards the `initialize`
+instructions to the model. If the council is unaware of its protocol after connecting, ask it to
+call `doctor` and then `seed_council`. On Windows use `py -3` instead of `python3`.
 
 ## Universal MCP host
 

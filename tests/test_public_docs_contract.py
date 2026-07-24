@@ -268,6 +268,7 @@ def test_host_status_matrix_keeps_the_same_hosts_and_warning_level_in_both_langu
         ("Cursor", "unverified"),
         ("Codex / OpenAI-style CLI", "unverified"),
         ("Gemini CLI", "unverified"),
+        ("Kimi CLI (Moonshot)", "unverified"),
         ("Universal MCP host", "host-dependent"),
     ]
     english = matrix("docs/CONNECT-HOSTS.en.md")

@@ -36,6 +36,7 @@ if method == "initialize":
 | Cursor | нет | да (по документации Cursor) | ⚠ не проверено на этом хосте, подтвердите |
 | Codex / OpenAI-style CLI | нет | ⚠ зависит от версии CLI, см. раздел ниже | ⚠ не проверено |
 | Gemini CLI | нет | ⚠ через расширения/MCP-конфиг, см. раздел ниже | ⚠ не проверено |
+| Kimi CLI (Moonshot) | нет | да (по документации Kimi CLI, `~/.kimi/mcp.json`) | ⚠ не проверено |
 | Универсальный MCP-хост | нет (нет плагин-формата вне Claude Code) | да | ⚠ зависит от хоста |
 
 «Скилл» здесь про удобную обёртку (авто-регистрация, слэш-команда). MCP-сервер сам по
@@ -227,7 +228,45 @@ Claude Code/Desktop.
 
 ---
 
-## 6. Универсальный MCP-хост (любой другой)
+## 6. Kimi CLI (Moonshot)
+
+⚠ Не проверено на этом хосте. Kimi Code CLI читает MCP-конфиг из `~/.kimi/mcp.json` в
+формате, совместимом с другими MCP-клиентами (ключ `mcpServers`, поля `command`/`args`,
+опционально `env`), и поддерживает stdio-серверы:
+
+```json
+{
+  "mcpServers": {
+    "consilium-principis": {
+      "command": "python3",
+      "args": ["/ABSOLUTE/PATH/TO/consilium-principis/scripts/mcp_server.py"]
+    }
+  }
+}
+```
+
+Путь под свою машину подставит тот же генератор (не вписывай абсолют руками):
+
+```bash
+cd ~/consilium-principis
+python3 scripts/board.py mcp-config --json
+```
+
+Kimi CLI также принимает конфиг разово, без правки `~/.kimi/mcp.json`:
+
+```bash
+kimi --mcp-config-file /path/to/mcp.json
+# либо инлайн: kimi --mcp-config '{"mcpServers": { ... }}'
+```
+
+⚠ Как и с другими не-Claude хостами, не проверено, прокидывает ли Kimi поле `instructions`
+из `initialize` в контекст модели. Если совет «не в курсе» своего протокола после
+подключения, попроси явно вызвать тулы `doctor`, затем `seed_council`. На Windows используй
+`py -3` вместо `python3` (см. раздел ниже).
+
+---
+
+## 7. Универсальный MCP-хост (любой другой)
 
 Consilium не завязан на конкретный хост: сервер говорит по стандартному MCP (stdio,
 JSON-RPC, `protocolVersion: "2024-11-05"`, `initialize` → `tools/list` → `tools/call`).

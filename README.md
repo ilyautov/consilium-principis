@@ -29,23 +29,23 @@ with no exact line in the corpus, the advisor simply doesn't quote.
 
 ## What this is
 
-**Consilium Principis is a skill for Claude Code (and an MCP server).** You install it in your AI
-agent, and for any decision question it convenes a **board of AI personas of real thinkers**: Sun
-Tzu, Marcus Aurelius, Machiavelli, Epictetus, and whoever else you add. Each speaks through their
-own lens, from their own texts, arguing with you and with each other. At the end you get a synthesis
-and one concrete next step. A quantifiable question ("which is more worthwhile, X or Y") the board
-doesn't eyeball. It breaks it into numbers and runs a Monte Carlo.
+**Consilium Principis is a skill and MCP server for AI agents.** You connect it to your agent, ask a
+question you need to decide on, and it gathers a board around the table: Sun Tzu, Marcus Aurelius,
+Machiavelli, Epictetus, and whoever else you add. Each looks at it through their own lens, leans on
+their own texts, and argues — with you and with the others. At the end you get one synthesis and one
+next step. And if the question is quantifiable ("which is more worthwhile, X or Y"), the board
+doesn't eyeball it — it breaks the decision into numbers and runs them through a Monte Carlo.
 
-This isn't "ask an AI to roleplay a sage" — it's a decision tool, not a roleplay game or an aphorism
-generator. Why you can trust its quotes is covered below.
+This project doesn't ask an AI to roleplay a sage — we tried to build a tool, not a roleplay game or
+an aphorism generator. Why you can trust its quotes comes next.
 
-One honest thing about who's at the table: these are **AI representations of thinkers, built from
-their public texts, not the people themselves**. Nobody is "speaking from beyond the grave." An
-advisor holds the author's lens and leans on their words, but it stays a model, and we say so
-plainly instead of hiding it behind a polished delivery.
+One honest thing about who's at the table: these aren't the thinkers themselves but their **AI
+versions** — a prism of their views over the corpus of their public texts. Nobody is "speaking from
+beyond the grave." An advisor holds the author's lens and leans on their words, but it stays a model
+— and we say so plainly.
 
-It needs no extra keys or payment: it runs on the agent you already have. The honesty contour itself
-needs no network. Full offline is available only with local models.
+No extra keys or payment — Consilium runs on the agent you already have. Checking quotes needs no
+internet; a full offline setup just takes local models.
 
 ## How it differs from other councils
 
@@ -150,6 +150,16 @@ In Claude Code:
 
 Claude Code will spin up the MCP server and register the skill. Then say **"where do I start"**, and
 the concierge will check readiness and assemble a starter board (Marcus Aurelius and Epictetus, public-domain).
+
+### Via skills.sh (CLI)
+
+One command from the [skills.sh](https://www.skills.sh) registry:
+
+> `npx skills add ilyautov/consilium-principis`
+
+The CLI pulls the skill straight from the public GitHub repo and drops `SKILL.md` into
+`~/.claude/skills/` — Claude Code picks it up on the next start. That installs the skill itself; the
+MCP server with all the tools connects separately (see the paths above or [`CONNECT-MCP.md`](CONNECT-MCP.md)).
 
 ### Or a plain install
 

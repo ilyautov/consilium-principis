@@ -24,6 +24,9 @@ versions — [SemVer](https://semver.org/). Dates in ISO (YYYY-MM-DD).
   operating-layer skill, which would reference tools that do not exist without the server).
 - Host connection guide for Kimi CLI (`~/.kimi/mcp.json`) in `docs/CONNECT-HOSTS`, plus an
   owner runbook for registry listings (official MCP Registry, Glama, Smithery — local/stdio only).
+- Bilingual governance docs: English security policy (`SECURITY.en.md`), Russian privacy policy
+  (`PRIVACY_POLICY.ru.md`), and a bilingual pull-request template; English surfaces now link the
+  English security policy.
 
 ### Fixed
 - The recipe menu on the MCP widget/HTML surfaces (Cowork) now honors `CONSILIUM_LANG`; it was

@@ -260,12 +260,12 @@ PRs are welcome, but two rules are non-negotiable: **only public-domain texts** 
 material, not even excerpts) and **never weaken the fail-closed contour** (🔵 only via code
 verification). How to set up, run the offline suite, and open a PR is in [`CONTRIBUTING.en.md`](CONTRIBUTING.en.md).
 Found a way to bypass the fidelity contour or a data leak? That's a first-class vulnerability,
-report it privately via [`SECURITY.md`](SECURITY.md). Support and project governance are in
+report it privately via [`SECURITY.en.md`](SECURITY.en.md). Support and project governance are in
 [`SUPPORT.md`](SUPPORT.md) and [`GOVERNANCE.md`](GOVERNANCE.md); change history is in
 [`CHANGELOG.md`](CHANGELOG.md).
 
 ---
 
 <div align="center">
-<sub>Consilium Principis · early access (v0.1.3) · <a href="https://github.com/ilyautov/consilium-principis/releases/download/v0.1.3/consilium-principis.mcpb">release artifact</a> · <a href="LICENSE">MIT</a> · <a href="CONTRIBUTING.en.md">Contributing</a> · <a href="SECURITY.md">Security</a></sub>
+<sub>Consilium Principis · early access (v0.1.3) · <a href="https://github.com/ilyautov/consilium-principis/releases/download/v0.1.3/consilium-principis.mcpb">release artifact</a> · <a href="LICENSE">MIT</a> · <a href="CONTRIBUTING.en.md">Contributing</a> · <a href="SECURITY.en.md">Security</a></sub>
 </div>

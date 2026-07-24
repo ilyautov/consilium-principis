@@ -9,4 +9,4 @@ makes the final merge decision after considering evidence, tests, user impact, a
 For contested source markers, use the source-dispute form so the claim can be reproduced and audited.
 
 Maintainers may update this governance document as the project grows. Security reports follow
-[SECURITY.md](SECURITY.md), and participation expectations follow [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
+[SECURITY.en.md](SECURITY.en.md), and participation expectations follow [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).

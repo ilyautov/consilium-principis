@@ -91,4 +91,4 @@ python3 scripts/gen_selfdoc.py && python3 scripts/build_manual.py
 
 ## Report a vulnerability
 
-Not via a public issue — see [SECURITY.md](SECURITY.md).
+Not via a public issue — see [SECURITY.en.md](SECURITY.en.md).

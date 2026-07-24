@@ -8,6 +8,6 @@ Unacceptable behaviour includes harassment, threats, discrimination, doxxing, pu
 corpora or credentials, and knowingly misrepresenting a source or test result. Disagreement about a
 quote, marker, or architecture belongs in evidence: provide the source, command, and observed result.
 
-Report conduct concerns privately through the security contact in [SECURITY.md](SECURITY.md). Project
+Report conduct concerns privately through the security contact in [SECURITY.en.md](SECURITY.en.md). Project
 maintainers may remove content, limit participation, or take other proportionate action to protect
 participants and the project.

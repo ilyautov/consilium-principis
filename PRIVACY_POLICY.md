@@ -1,3 +1,5 @@
+**English** · [Русский](PRIVACY_POLICY.ru.md)
+
 # Privacy Policy
 
 Last updated: 2026-07-23
@@ -50,5 +52,5 @@ privilege where your host supports it.
 
 ## Security and questions
 
-Report a suspected vulnerability or data exposure privately through [SECURITY.md](SECURITY.md).
+Report a suspected vulnerability or data exposure privately through [SECURITY.en.md](SECURITY.en.md).
 For installation and ordinary usage help, see [SUPPORT.md](SUPPORT.md).

@@ -70,6 +70,25 @@ def test_contour_selftest_passes_on_real_p1():
         assert check_contour(adv)["ok"] is True
 
 
+def test_contour_selftest_fragment_stays_within_one_sentence():
+    # Регрессия 2026-07-24: старый самотест брал text[10:50] — окно символов, которое на части
+    # корпусов пересекает границу предложения. Гейт матчит по предложениям-юнитам → такой срез
+    # мог дать None и ЛОЖНЫЙ ✗ «рв не держит», хотя ров цел. Инвариант фикса: фрагмент лежит
+    # ВНУТРИ одного предложения (дословный вход, валидный для гейта). (Текст синтетический.)
+    import re
+    from doctor import _selftest_fragment
+    text = ("Одно короткое утверждение здесь. Затем идёт заметно более длинное "
+            "предложение про терпение и позицию доверенному наблюдателю.")
+    frag = _selftest_fragment(text)
+    sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", text)]
+    assert any(frag and frag in s for s in sentences), \
+        "фрагмент самотеста обязан лежать дословно внутри ОДНОГО предложения"
+    # end-to-end: многопредложенческий P1-корпус проходит самотест (дословный→🔵, фейк→None)
+    with tempfile.TemporaryDirectory() as t:
+        adv = _advisor_with_corpus(t, [{"text": text, "tier": "P1", "source": "iv.txt"}])
+        assert check_contour(adv)["ok"] is True
+
+
 def test_contour_skipped_without_corpus():
     with tempfile.TemporaryDirectory() as t:
         adv = os.path.join(t, "advisors", "empty")

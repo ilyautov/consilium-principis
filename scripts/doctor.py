@@ -167,6 +167,25 @@ def check_calibration(root="."):
         return {"name": "calibration", "ok": True, "detail": f"не определено ({e})"}
 
 
+def _selftest_fragment(text):
+    """Дословный фрагмент для самотеста рва — ВНУТРИ ОДНОГО ПРЕДЛОЖЕНИЯ, цельными словами.
+    Раньше брали text[10:50] — фиксированное окно символов, которое на части корпусов (а)
+    попадает в середину слова и (б) ПЕРЕСЕКАЕТ границу предложения («…слово. Следующее…»).
+    Гейт верности матчит по предложениям-юнитам, поэтому фрагмент через границу → None, и
+    самотест давал ЛОЖНЫЙ ✗ «рв не держит», когда ров цел (живой случай 2026-07-24). Берём
+    самое длинное предложение и его словесно-выровненный внутренний срез — ровно то, что
+    передаёт реальный вызывающий. Проверяемое НЕ ослаблено: фейк→None (анти-фабрикация)
+    остаётся; чиним лишь валидность дословного входа для гейта."""
+    import re
+    sentences = re.split(r"(?<=[.!?])\s+", text.strip())
+    sent = max(sentences, key=lambda s: len(s.split())) if sentences else text
+    words = sent.split()
+    if len(words) <= 3:
+        return sent.strip(" .!?,;:")
+    inner = words[1:-1] if len(words) >= 5 else words   # без крайних слов (пунктуация на краю)
+    return " ".join(inner).strip(" .!?,;:")
+
+
 def check_contour(advisor_dir):
     """Самотест рва на конкретном советнике. ok=True если фрагмент P1 matchнулся и фейк→None,
     либо пропущен (нет корпуса с P1 — нечего тестировать)."""
@@ -188,7 +207,7 @@ def check_contour(advisor_dir):
                 break
     if not p1_text:
         return {"name": "contour", "ok": True, "detail": "пропущен (нет P1-чанка)"}
-    frag = p1_text[10:50].strip()
+    frag = _selftest_fragment(p1_text)
     real = best_match(frag, advisor_dir)
     fake = best_match("выдуманная цитата которой нет в этом корпусе про блокчейн", advisor_dir)
     ok = (real is not None and real[0] in ("P1", "P2")) and fake is None

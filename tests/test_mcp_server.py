@@ -383,6 +383,7 @@ def test_retrieve_rejects_oversize_top_k_before_retrieval(tmp_path, monkeypatch)
     monkeypatch.setattr(m, "_root", lambda: str(tmp_path))
     monkeypatch.setenv("CONSILIUM_JUDGE_BACKEND", "host")
     (tmp_path / "advisors" / "a").mkdir(parents=True)
+    (tmp_path / "advisors" / "a" / "corpus.jsonl").write_text("", encoding="utf-8")  # корпус есть → резолвится
 
     rejected = m._retrieve("q", "advisors/a", top_k=33)
     assert "error" in rejected
@@ -428,6 +429,63 @@ def test_cite_rejects_more_than_eight_queries_without_iterating_items(tmp_path, 
 
     result = m._cite("adv", PoisonedList(["q"] * (m._MAX_CITE_QUERIES + 1)), use_kernels=False)
     assert result["quotes"] == [] and result["marker"] == "🟡" and "error" in result
+
+
+def _mk_corpus_advisor(root, slug, lines):
+    """Синтетический советник с корпусом под advisors/<slug>/build/corpus.jsonl."""
+    import json as _json
+    d = root / "advisors" / slug / "build"
+    d.mkdir(parents=True)
+    (d / "corpus.jsonl").write_text(
+        "\n".join(_json.dumps({"text": t, "tier": "P1"}, ensure_ascii=False) for t in lines) + "\n",
+        encoding="utf-8")
+
+
+def test_retrieve_accepts_bare_advisor_name_not_only_path(tmp_path, monkeypatch):
+    """board_status отдаёт ГОЛОЕ имя ('marcus-aurelius'); retrieve обязан его принять, а не молча
+    вернуть passages:[]. Живой инцидент 2026-07-24: агент передал 'marcus-aurelius' вместо
+    'advisors/marcus-aurelius' → тихий ноль → конфабуляция «ретривер сломан»."""
+    import mcp_server as m
+    monkeypatch.setattr(m, "_root", lambda: str(tmp_path))
+    monkeypatch.setenv("CONSILIUM_JUDGE_BACKEND", "host")
+    monkeypatch.setenv("OLLAMA_HOST", "http://127.0.0.1:59999")   # лексический пол, детерминизм
+    _mk_corpus_advisor(tmp_path, "sage",
+                       ["Про деньги и дело всё честно и просто.", "Деньги любят счёт и терпение."])
+
+    bare = m._retrieve("деньги", "sage", top_k=3)
+    assert "error" not in bare
+    assert bare["passages"], "голое имя советника должно резолвиться в реальные пассажи"
+
+    path = m._retrieve("деньги", "advisors/sage", top_k=3)   # путь-форма даёт то же
+    assert path["passages"]
+
+
+def test_retrieve_fails_loud_on_unknown_advisor_not_silent_empty(tmp_path, monkeypatch):
+    """Неизвестный advisor_dir → ЯВНАЯ ошибка со списком известных, НЕ тихий passages:[].
+    Тихий ноль на неверном id — то, что заставило хост выдумать поломку ядра."""
+    import mcp_server as m
+    monkeypatch.setattr(m, "_root", lambda: str(tmp_path))
+    _mk_corpus_advisor(tmp_path, "sage", ["текст советника"])
+
+    res = m._retrieve("q", "nonesuch", top_k=3)
+    assert "error" in res and "passages" not in res
+    assert "sage" in res.get("known_advisors", [])
+
+
+def test_cite_accepts_bare_name_and_fails_loud_on_unknown(tmp_path, monkeypatch):
+    """cite симметричен retrieve: голое имя резолвится; неизвестный — громкая ошибка (не тихий 🟡)."""
+    import mcp_server as m
+    monkeypatch.setattr(m, "_root", lambda: str(tmp_path))
+    monkeypatch.setenv("CONSILIUM_JUDGE_BACKEND", "host")
+    monkeypatch.setenv("OLLAMA_HOST", "http://127.0.0.1:59999")
+    _mk_corpus_advisor(tmp_path, "sage", ["Деньги любят счёт."])
+
+    ok = m._cite("sage", "деньги", use_kernels=False)
+    assert "error" not in ok            # резолвился (кандидаты/фаза-1, но НЕ ошибка резолюции)
+
+    bad = m._cite("nonesuch", "деньги", use_kernels=False)
+    assert bad["quotes"] == [] and bad["marker"] == "🟡" and "error" in bad
+    assert "sage" in bad.get("known_advisors", [])
 
 
 def test_cite_returns_ready_verified_quotes():

@@ -441,7 +441,8 @@
         "type": "object",
         "properties": {
           "advisor_dir": {
-            "type": "string"
+            "type": "string",
+            "description": "Советник: имя как в board_status/roster ('marcus-aurelius') ИЛИ путь 'advisors/marcus-aurelius'."
           },
           "query": {
             "type": [
@@ -1165,7 +1166,8 @@
             "type": "string"
           },
           "advisor_dir": {
-            "type": "string"
+            "type": "string",
+            "description": "Советник: имя как в board_status/roster ('marcus-aurelius') ИЛИ путь 'advisors/marcus-aurelius'. Неизвестный → явная ошибка со списком известных."
           },
           "top_k": {
             "type": "integer"

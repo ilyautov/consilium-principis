@@ -25,8 +25,10 @@ def _pool(n, start=0.95, step=0.02):
 
 
 @pytest.fixture()
-def cite_env(monkeypatch):
+def cite_env(monkeypatch, tmp_path):
     """Мокнутый пул из 20 кандидатов + все verbatim-🔵 + судья-счётчик через gate_quote."""
+    monkeypatch.setattr(mcp_server, "_root", lambda: str(tmp_path))
+    (tmp_path / "advisors" / "x").mkdir(parents=True)          # советник = существующий каталог (retrieve/cite резолвят по нему)
     pool = _pool(20)
     monkeypatch.setattr(retrieval, "retrieve", lambda q, adv, top_k=8: list(pool))
     monkeypatch.setattr(mcp_server, "_fidelity_check",

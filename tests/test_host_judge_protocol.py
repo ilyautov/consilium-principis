@@ -52,6 +52,7 @@ def host_env(monkeypatch, tmp_path):
     monkeypatch.setattr(retrieval, "retrieve", lambda q, adv, top_k=8: list(pool))
     monkeypatch.setattr(mcp_server, "_fidelity_check",
                         lambda quote, adv: {"status": "🔵", "verbatim": True, "source": "src"})
+    (tmp_path / "adv").mkdir(parents=True, exist_ok=True)   # советник = существующий каталог (retrieve/cite резолвят по нему)
     return pool, str(tmp_path / "adv")
 
 

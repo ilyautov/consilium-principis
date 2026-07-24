@@ -77,7 +77,9 @@ def test_retrieve_rejects_outside_root(monkeypatch, tmp_path):
     import mcp_server as srv
     _planted_root(srv, monkeypatch, tmp_path)
     out = srv._retrieve(PHRASE, "../outside")
-    assert out.get("passages") == []                            # traversal-корпус не отдан пассажами
+    # traversal → fail-loud «неизвестный советник», НЕ тихий passages; корпус извне не прочитан
+    assert "error" in out and out.get("passages", []) == []
+    assert PHRASE not in str(out)                               # контент извне не утёк
 
 
 def test_cite_rejects_outside_root(monkeypatch, tmp_path):

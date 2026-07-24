@@ -157,8 +157,8 @@ def _fidelity_check(quote, advisor_dir):
     Делегирует единому marker_status (H6) — формула маркера живёт в одном месте.
     Read-гард H5: advisor_dir вне корня (traversal) → 🟡 fail-closed, корпус не читаем."""
     from engine.fidelity import marker_status
-    adv = _resolve_read(advisor_dir)
-    if adv is None:
+    adv, aerr = _resolve_advisor_corpus(advisor_dir)    # принимает и голое имя; нет корпуса → 🟡 fail-closed
+    if aerr:
         return {"status": "🟡", "verbatim": False, "source": ""}
     return marker_status(quote, adv)
 
@@ -219,6 +219,34 @@ def _resolve_advisor_dir(name):
     alias_hits = [d for d in dirs
                   if key in (n.lower() for n in _persona_names(d))]
     return alias_hits[0] if len(alias_hits) == 1 else None
+
+
+def _resolve_advisor_corpus(advisor_dir):
+    """Резолюция advisor_dir для тулов, ЧИТАЮЩИХ корпус (retrieve/cite/fidelity_check).
+    Принимает И repo-относительный путь ('advisors/marcus-aurelius'), И ГОЛОЕ имя/алиас советника
+    ('marcus-aurelius') — именно голое имя отдают board_status/roster, поэтому хост естественно
+    передаёт его. Возвращает (dir, None) когда корпус найден; иначе (None, error) со списком
+    известных советников.
+
+    КЛЮЧЕВОЕ (fail-LOUD): не тот advisor_dir → ЯВНАЯ ошибка, а НЕ тихий passages:[]. Молчаливый
+    ноль на неверном id заставляет хост конфабулировать «сломанный ретривер» — живой инцидент
+    2026-07-24: агент передал 'marcus-aurelius' вместо 'advisors/marcus-aurelius', получил тихие нули и выдумал
+    поломку ядра (ретривер был цел). Легит пустой матч (корпус ЕСТЬ, совпадений нет) сюда НЕ
+    попадает — остаётся passages:[] у вызывающего. H5 traversal-гард сохранён (через _resolve_read).
+
+    Дискриминатор — СУЩЕСТВОВАНИЕ каталога советника, НЕ наличие файла корпуса: инцидент был про
+    несуществующий каталог ('<root>/marcus-aurelius' вместо '<root>/advisors/marcus-aurelius'), а реальный-но-ещё-не-
+    собранный советник (каталог есть, корпуса нет) должен деградировать в passages:[] у ретрива, а
+    не в ошибку резолюции."""
+    cand = _resolve_read(advisor_dir)                       # путь-форма, клампится к корню (H5)
+    if cand and os.path.isdir(cand):
+        return cand, None
+    alt = _resolve_advisor_dir(advisor_dir)                 # голое имя/алиас → advisors|lenses/* (только сущ. каталоги)
+    if alt:
+        return alt, None
+    return None, {"error": "неизвестный советник %r" % (advisor_dir,),
+                  "hint": "advisor_dir — это имя советника ('marcus-aurelius') ИЛИ путь ('advisors/marcus-aurelius').",
+                  "known_advisors": [os.path.basename(d) for d in _advisor_dirs()]}
 
 
 def _validate_session_attribution(session):
@@ -332,9 +360,9 @@ def _retrieve(query, advisor_dir, top_k=3):
     import relevance_gate
     import judge_backend
     import lang_check
-    adv_res = _resolve_read(advisor_dir)                # H5 read-гард: traversal → пусто, не читаем
-    if adv_res is None:
-        return {"passages": []}
+    adv_res, aerr = _resolve_advisor_corpus(advisor_dir)   # имя ИЛИ путь; нет корпуса → ЯВНАЯ ошибка
+    if aerr:                                                # (не тихий passages:[] → хост не выдумает поломку)
+        return aerr
     passages = retrieval.retrieve(query, adv_res, top_k=top_k)
     # Borderline-гейт релевантности: топически-близкий-но-не-отвечающий пассаж (камуфляж
     # смежного домена) флагуется relevance_gated (не выбрасываем — прозрачность). Инертен,
@@ -649,9 +677,11 @@ def _cite(advisor_dir, query, top_k=8, use_kernels=True, limit=4):
     import relevance_gate
     import judge_backend
     import lang_check
-    adv_res = _resolve_read(advisor_dir)                # H5 read-гард: traversal → пустой 🟡, не читаем
-    if adv_res is None:
-        return _cite_result([], {})
+    adv_res, aerr = _resolve_advisor_corpus(advisor_dir)   # имя ИЛИ путь; нет корпуса → ЯВНАЯ ошибка
+    if aerr:                                                # (не тихий 🟡 → хост видит «не тот советник»)
+        base = _cite_result([], {})
+        base.update(aerr)
+        return base
     # Судить релевантность против РЕАЛЬНОГО вопроса юзера, НЕ против кернел-тем (те — recall-
     # экспансия ретрива, не то, на что цитата обязана отвечать).
     primary = query if isinstance(query, str) else (query[0] if query else "")
@@ -1863,7 +1893,9 @@ TOOLS = {
                        "text. Может вернуть phase=judgment_request (host-режим судьи): тогда цитат ещё "
                        "нет — честно оцени кандидатов по рубрике 0-3 и вызови gate_verdict.",
         "input_schema": {"type": "object",
-                         "properties": {"advisor_dir": {"type": "string"},
+                         "properties": {"advisor_dir": {"type": "string",
+                                            "description": "Советник: имя как в board_status/roster "
+                                                           "('marcus-aurelius') ИЛИ путь 'advisors/marcus-aurelius'."},
                                         "query": {"type": ["string", "array"],
                                                   "items": {"type": "string"}},
                                         "top_k": {"type": "integer"},
@@ -1889,7 +1921,10 @@ TOOLS = {
         "description": "Grounded-пассажи из корпуса советника под запрос (чистый контекст для ризонинга).",
         "input_schema": {"type": "object",
                          "properties": {"query": {"type": "string"},
-                                        "advisor_dir": {"type": "string"},
+                                        "advisor_dir": {"type": "string",
+                                            "description": "Советник: имя как в board_status/roster "
+                                                           "('marcus-aurelius') ИЛИ путь 'advisors/marcus-aurelius'. "
+                                                           "Неизвестный → явная ошибка со списком известных."},
                                         "top_k": {"type": "integer"}},
                          "required": ["query", "advisor_dir"]},
         "handler": _retrieve,

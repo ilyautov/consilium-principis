@@ -98,8 +98,13 @@ jobs:
               if not isinstance(responses[1].get("result", {}).get("tools"), list):
                   raise SystemExit("packed MCP tools/list response is invalid")
               call = responses[2]
-              if "error" in call or not isinstance(call.get("result", {}).get("content"), list):
+              content = call.get("result", {}).get("content")
+              if "error" in call or not isinstance(content, list) or not content:
                   raise SystemExit(f"packed MCP tools/call (explain_self) failed: {stdout}")
+              # Форма ответа мало значит: мёртвый explain_self (пустой индекс) вернул бы content=[]
+              # или пустой text и всё равно прошёл бы. Требуем РЕАЛЬНЫЙ непустой текст.
+              if not any(isinstance(c, dict) and c.get("text", "").strip() for c in content):
+                  raise SystemExit(f"packed MCP explain_self returned empty content: {stdout}")
           PY
       - name: Build hash-complete registry manifest
         run: |

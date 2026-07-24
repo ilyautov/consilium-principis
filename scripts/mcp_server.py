@@ -1091,9 +1091,21 @@ def _build_tree(d):
     return node(move, [_build_tree(c) for c in d.get("children", [])])
 
 
+# Point-of-use напоминание про рендер: правило 3 INSTRUCTIONS требует отдавать ход совета
+# ВИДЖЕТОМ, но живой догфуд 2026-07-24 показал — хост сваливается в прозу «по инерции» даже с
+# жёстким правилом (текстовый нудж в INSTRUCTIONS замерно слаб, antisycophancy-phase1). Вешаем
+# напоминание на РЕЗУЛЬТАТ терминальных структурных тулов (их зовут ровно перед синтезом) —
+# point-of-use салиентнее правила в INSTRUCTIONS. Это тоже нудж (не гейт), гарантий нет.
+_RENDER_VERDICT_DIRECTIVE = (
+    "Когда будешь отдавать вердикт совета юзеру — НЕ прозой: собери canon-объект заседания и "
+    "вызови render_session(surface=widget) → mcp__visualize__show_widget (Cowork). Проза/markdown "
+    "ТОЛЬКО если show_widget в хосте недоступен. (Правило 3 INSTRUCTIONS.)")
+
+
 def _situation_analyze(tree, opponent="person", stance="competitive"):
     res = analyze(_build_tree(tree), opponent=opponent, stance=stance)
     res["principal_variation"] = [m.claim for m in res["principal_variation"]]  # JSON-сериализуемо
+    res["render_verdict"] = _RENDER_VERDICT_DIRECTIVE
     return res
 
 
@@ -1152,7 +1164,10 @@ def _mirror_report(stated, decisions):
 
 def _premortem(scenarios, ledger=None):
     from premortem import premortem
-    return premortem(scenarios, ledger=ledger)
+    out = premortem(scenarios, ledger=ledger)
+    if isinstance(out, dict):
+        out["render_verdict"] = _RENDER_VERDICT_DIRECTIVE   # point-of-use: финал → виджет, не проза
+    return out
 
 
 def _atomic_grounding(text, advisor_dir):

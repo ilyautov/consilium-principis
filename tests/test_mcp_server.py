@@ -265,6 +265,17 @@ def test_premortem_via_dispatch_untrusted_without_history():
     assert r["trustworthy"] is False
 
 
+def test_terminal_council_tools_carry_render_verdict_directive():
+    """Point-of-use нудж: premortem/situation_analyze несут напоминание отдать вердикт
+    ВИДЖЕТОМ (правило 3) — хост сваливается в прозу по инерции (догфуд 2026-07-24)."""
+    pm = dispatch("premortem", {"scenarios": [{"label": "a", "value": 0.5, "prob": 1.0}]})
+    assert "render_verdict" in pm and "show_widget" in pm["render_verdict"]
+    tree = {"move": None, "children": [
+        {"move": {"by": "you", "claim": "довод", "grounded": True, "strength": 0.6}}]}
+    sa = dispatch("situation_analyze", {"tree": tree})
+    assert "render_verdict" in sa and "show_widget" in sa["render_verdict"]
+
+
 def test_advisor_weights_via_dispatch():
     r = dispatch("advisor_weights", {"records": [
         {"advisor": "a", "outcome": "good", "endorsed": True},

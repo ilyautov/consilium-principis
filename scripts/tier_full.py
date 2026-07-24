@@ -236,6 +236,22 @@ def _embed_query(question: str) -> np.ndarray:
     return qv / (np.linalg.norm(qv) + 1e-9)
 
 
+def index_ready(advisor_dir: str) -> bool:
+    """Дёшево: индекс существует И fingerprint совпал — БЕЗ сборки и БЕЗ эмбеддинга.
+    Нужен hot-path'у (engine.retrieval), чтобы НЕ триггерить инлайн build_index в ответе на
+    запрос: на большом корпусе (Тиньков ~2000 чанков) сборка > 60с рвёт таймаут MCP-транспорта
+    (живой инцидент 2026-07-24, «нет опоры»). retrieve() ниже по-прежнему авто-лечит индекс для
+    прямых/CLI-вызовов (контракт generation-publication) — гейт только для прод-ретрива."""
+    corpus_file, emb_path, meta_path = _reader_snapshot(advisor_dir)
+    if not (os.path.isfile(emb_path) and os.path.isfile(meta_path)):
+        return False
+    try:
+        meta = json.load(open(meta_path, encoding="utf-8"))
+    except Exception:
+        return False
+    return _fingerprint_matches(meta, advisor_dir, corpus_file=corpus_file)
+
+
 def retrieve(question: str, advisor_dir: str, top_k: int = 3):
     """Возвращает top_k пассажей: [{"text","score","source"}].
     score = косинус bge-m3 поверх нашего корпуса (Mn @ qv по нормированным векторам)."""

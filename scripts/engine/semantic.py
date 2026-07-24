@@ -43,6 +43,17 @@ class SemanticEngine(Engine):
         rescored.sort(key=lambda p: p.score, reverse=True)
         return rescored[:top_k]
 
+    def index_ready(self, advisor_dir):
+        """Индекс собран и свеж? Делегирует tier_full.index_ready (файлы + fingerprint, БЕЗ
+        эмбеддинга). Прод-путь спрашивает это ДО retrieve, чтобы не запускать 60с-сборку
+        в ответе на запрос (инцидент 2026-07-24). Ollama недоступна / tier_full не импортится
+        → не готов (деградируем на пол)."""
+        try:
+            import tier_full
+            return bool(tier_full.index_ready(advisor_dir))
+        except Exception:
+            return False
+
     def build_index(self, advisor_dir):
         import tier_full, os
         tier_full.build_index(advisor_dir)

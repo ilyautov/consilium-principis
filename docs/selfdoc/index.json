@@ -4,7 +4,7 @@
     "rule_count": 19,
     "recipe_count": 16,
     "script_count": 71,
-    "test_count": 165,
+    "test_count": 166,
     "glossary_count": 112
   },
   "tools": [
@@ -2945,6 +2945,10 @@
     {
       "path": "tests/test_synth_eval.py",
       "covers": "synth eval"
+    },
+    {
+      "path": "tests/test_tier_full_hotpath.py",
+      "covers": "tier full hotpath"
     },
     {
       "path": "tests/test_tier_in_contract.py",

@@ -84,6 +84,18 @@ def retrieve(question, adv_dir, top_k=3, prefer=None):
     форсит бэкенд явно (eval-CLI); None (дефолт, прод-путь) → auto-резолюция."""
     from . import resolve_engine   # lazy (идиом lexical.py): тесты патчат engine.resolve_engine
     eng = resolve_engine(adv_dir, prefer=prefer)
+    # Hot-path readiness-гейт: НЕ строим тяжёлый семантический индекс в ответе на запрос.
+    # Несобранный/устаревший индекс → инлайн-эмбеддинг большого корпуса (Тиньков ~2000 чанков)
+    # > 60с рвёт таймаут MCP-транспорта (живой инцидент 2026-07-24, «нет опоры»). Спрашиваем
+    # дёшево (файлы+fingerprint, без эмбеддинга) и деградируем на лексический пол наблюдаемо;
+    # явная сборка живёт в фоновом джобе build_advisor/doctor/build_index. Прямые/CLI-вызовы
+    # tier_full.retrieve по-прежнему авто-лечат индекс (контракт generation-publication).
+    _ready = getattr(eng, "index_ready", None)   # стаб без метода (тесты) → считаем готовым
+    if callable(_ready) and not _ready(adv_dir):
+        print(f"[retrieve] {type(eng).__name__}: индекс не готов (нет/устарел); "
+              f"деградация → лексический пол (собери индекс фоном: build_advisor/doctor)",
+              file=_sys.stderr)
+        return lexical_retrieve(question, adv_dir, top_k=top_k)
     try:
         out = []
         for p in eng.retrieve(question, adv_dir, top_k=top_k):

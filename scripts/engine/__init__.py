@@ -72,6 +72,13 @@ class Engine(ABC):
         ...
 
     # --- backend-независимые ниже ---
+    def index_ready(self, advisor_dir: str) -> bool:
+        """Готов ли бэкенд отдать ретрив БЕЗ тяжёлой инлайн-сборки в hot-path? Пол (lexical/
+        simple) всегда готов — считает на лету. Семантика переопределяет: индекс есть И свеж
+        (см. SemanticEngine.index_ready). Прод-путь (retrieval.retrieve) спрашивает ЭТО перед
+        вызовом семантики, иначе большой несобранный корпус висит > таймаута MCP."""
+        return True
+
     def abstain_check(self, question: str, advisor_dir: str) -> AbstainResult:
         threshold = self.abstain_threshold(advisor_dir)
         hits = self.retrieve(question, advisor_dir, top_k=1)

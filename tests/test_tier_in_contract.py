@@ -81,6 +81,7 @@ def _fake_tier_full(rows):
     m = types.ModuleType("tier_full")
     m.available = lambda: True
     m.build_index = lambda adv: None
+    m.index_ready = lambda adv: True   # фейк всегда отдаёт rows → «индекс готов» (hot-path-гейт)
     m.retrieve = lambda q, adv, top_k=3: rows[:top_k]
     return m
 

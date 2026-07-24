@@ -6,16 +6,16 @@
 
 # Consilium Principis
 
-**You ask one AI, you get one confident answer. Sometimes it's off. And to sound smart, it'll even invent a quote.**
+**A personal board of several AI advisors — for decisions where one confident answer isn't enough.**
 
 <img src="assets/demo-refusal-en.gif" width="760" alt="Consilium refuses a fabricated quote and confirms a real one word-for-word" />
 
 <sub>Live: a made-up "Aurelius quote" is refused; a real line is confirmed 🔵 word-for-word with its source. The verdict is computed by code on every run, not scripted.</sub>
 
-**A personal board of directors made of great minds, for your decisions.** Several thinkers at one table, each through their own lens: they argue with you and with each other. And unlike "ask an AI to roleplay a sage," they **prove the quote or honestly stay silent**. No fabrication.
-
-Every 🔵 quote is checked by code against the author's genuine text, **word-for-word**. What isn't
-in the corpus, the advisor **does not say**. You can verify it, not just take it on faith.
+Each advisor looks through their own lens, argues with you and with the others, and the board
+converges on a single next step. But above all: Consilium doesn't pass off a plausible fabrication
+as the author's words — a 🔵 quote is checked by code against the source text **word-for-word**;
+with no exact line in the corpus, the advisor simply doesn't quote.
 
 [![CI](https://github.com/ilyautov/consilium-principis/actions/workflows/ci.yml/badge.svg)](https://github.com/ilyautov/consilium-principis/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
@@ -36,9 +36,8 @@ own lens, from their own texts, arguing with you and with each other. At the end
 and one concrete next step. A quantifiable question ("which is more worthwhile, X or Y") the board
 doesn't eyeball. It breaks it into numbers and runs a Monte Carlo.
 
-This isn't "ask an AI to roleplay a sage." Verbatim quotes (🔵) are checked against the author's
-genuine corpus word-for-word, and outside the corpus the advisor honestly stays silent instead of
-making things up (fail-closed). A decision tool, not a roleplay game or an aphorism generator.
+This isn't "ask an AI to roleplay a sage" — it's a decision tool, not a roleplay game or an aphorism
+generator. Why you can trust its quotes is covered below.
 
 One honest thing about who's at the table: these are **AI representations of thinkers, built from
 their public texts, not the people themselves**. Nobody is "speaking from beyond the grave." An
@@ -56,17 +55,15 @@ of voices. It's that a claim can be **re-verified**, and where it can't, the cou
 | | "Roleplay a sage" (one AI) | LLM-Council-style board | **Consilium** |
 |---|:---:|:---:|:---:|
 | Different lenses, disagreement as a feature | ± | ✅ | ✅ |
-| Verbatim quote with a source | ✗ | ✗ | ✅ |
-| **Quote checked verbatim against the source** | ✗ | ✗ | **✅** |
+| **Verbatim quote checked word-for-word against the original, with its source** | ✗ | ✗ | **✅** |
 | **Honestly silent outside the corpus (fail-closed)** | ✗ | ✗ | **✅** |
 | Quantifiable question → Monte Carlo (📐) | ✗ | ✗ | ✅ |
 | No extra keys or payment | ± | ✗ | ✅ |
 
-<sub>The topic isn't snake-oil. A "personal board of directors" is a mainstream HBR concept; the bet
-on grounding and citation transparency was validated by Delphi ($16M from Sequoia for exactly this),
-and disagreement-as-a-feature by academia (multi-persona debate, the ALCE benchmark). We differ from
-the grift by rigor: a verifiable quote and an honest refusal, not "invent an aphorism in the spirit
-of a great mind."</sub>
+<sub>A "personal board of directors" is a mainstream practice (an HBR concept); the bet on grounding
+and citation transparency has been validated by both the market (Delphi, $16M from Sequoia) and
+academia (multi-persona debate, the ALCE benchmark). Our angle is rigor: a verifiable quote and an
+honest refusal.</sub>
 
 ## How it looks
 
@@ -121,7 +118,9 @@ separates a decision tool from "roleplay a sage": every claim can be re-checked.
 | 📐 | **calculation**: your own numbers, run through Monte Carlo; not truth, not a quote, just your own model run N times |
 | *abstention* | question outside the corpus → the advisor **stays silent instead of making things up** |
 
-Plus **different lenses, not a chorus**: each advisor keeps their own angle, and their disagreement is a working part, not a bug (you see the decision from sides you'd otherwise collapse into one). The contour runs on any machine, no internet, no keys, no cost. Only search precision can get weaker; honesty never does. Under the hood, honesty is held up by a two-phase relevance gate (a model judges the candidates, code applies the threshold): topically-close-but-not-actually-answering material won't slip through as 🔵. The judge is *independent* only with a local (ollama) or API backend; on the default keys-free path the host model self-judges (an interested party), which `doctor` labels honestly — and the verbatim 🔵 gate never depends on it.
+Plus **different lenses, not a chorus**: each advisor keeps their own angle, and their disagreement is a working part, not a bug. You see the decision from sides you'd otherwise collapse into one.
+
+The honesty contour itself is code, not a model: it checks every quote against its source on any machine, no keys, no cost. Without semantics only search precision gets weaker — honesty never does. Candidate relevance is scored by a two-phase gate: a model judges, code applies the threshold, so topically-close-but-not-actually-answering material won't slip through as 🔵. By default the host does that scoring — an interested party, which `doctor` labels honestly; want an independent judge, connect a local (ollama) or API backend, an explicit choice. The verbatim 🔵 gate never depends on the judge: code holds it.
 
 ## Calculate, not just discuss: the 📐 decision map
 

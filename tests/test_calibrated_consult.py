@@ -15,6 +15,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "scripts"))
 
 import json  # noqa: E402
+import time  # noqa: E402
 import calibrated_consult as cc  # noqa: E402
 import mcp_server as srv  # noqa: E402
 
@@ -382,8 +383,11 @@ def _open_close_with_pred(monkeypatch, tmp_path, prob, followed):
 
 def test_resolve_tool_sets_outcome_then_journal(tmp_path, monkeypatch):
     cid = _open_close_with_pred(monkeypatch, tmp_path, 0.9, True)
+    # Консульт создаётся с СЕГОДНЯШНЕЙ датой, а гейт «исход раньше создания» fail-closed:
+    # зашитая календарная дата протухает и роняет тест (так и случилось 2026-08-18).
+    today = time.strftime("%Y-%m-%d")
     res = srv.dispatch("calibrated_consult_resolve",
-                       {"consult_id": cid, "outcome": {"resolved_on": "2026-08-17",
+                       {"consult_id": cid, "outcome": {"resolved_on": today,
                                                        "occurred": False}})
     assert res["ok"] is True
     j = srv.dispatch("calibrated_consult_journal", {})

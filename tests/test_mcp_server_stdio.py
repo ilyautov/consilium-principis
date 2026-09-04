@@ -80,11 +80,43 @@ def test_stdio_recovers_after_non_object_requests_then_initializes(monkeypatch):
 
 
 def test_tools_call_rejects_non_object_params_and_arguments():
-    """tools/call принимает только JSON-объекты params и arguments."""
-    for params in ([], "bad", 1, {"name": "doctor"}, {"name": "doctor", "arguments": []}):
+    """tools/call принимает только JSON-объекты params и arguments (когда arguments дан)."""
+    for params in ([], "bad", 1, {"name": "doctor", "arguments": []},
+                   {"name": "doctor", "arguments": "x"}):
         response = M._handle_rpc({"jsonrpc": "2.0", "id": 9,
                                   "method": "tools/call", "params": params})
         assert response["error"]["code"] == -32602
+
+
+def test_tools_call_arguments_is_optional_per_mcp_spec():
+    """По спеке MCP `arguments` опционален: тул без обязательных параметров зовётся без него
+    (и с null). Раньше это был -32602 — хосты, опускающие поле, не могли вызвать doctor/board_status."""
+    for params in ({"name": "list_recipes"}, {"name": "list_recipes", "arguments": None}):
+        response = M._handle_rpc({"jsonrpc": "2.0", "id": 10,
+                                  "method": "tools/call", "params": params})
+        assert "error" not in response, response
+        assert response["result"]["content"][0]["type"] == "text"
+
+
+def test_tools_call_signature_mismatch_is_invalid_params_not_internal_error():
+    """Лишний/неизвестный аргумент — ошибка КЛИЕНТА (-32602), а не «внутренняя ошибка» -32603."""
+    response = M._handle_rpc({"jsonrpc": "2.0", "id": 11, "method": "tools/call",
+                              "params": {"name": "list_recipes", "arguments": {"nope": 1}}})
+    assert response["error"]["code"] == -32602
+    assert "nope" in response["error"]["message"]
+
+
+def test_tools_call_non_string_name_is_unknown_tool_not_crash():
+    """name-массив раньше ронял `name not in TOOLS` TypeError (unhashable) → теперь -32601."""
+    response = M._handle_rpc({"jsonrpc": "2.0", "id": 12, "method": "tools/call",
+                              "params": {"name": ["doctor"], "arguments": {}}})
+    assert response["error"]["code"] == -32601
+
+
+def test_ping_returns_empty_result():
+    """`ping` — liveness по спеке MCP: пустой result, а не -32601."""
+    response = M._handle_rpc({"jsonrpc": "2.0", "id": 13, "method": "ping"})
+    assert response == {"jsonrpc": "2.0", "id": 13, "result": {}}
 
 
 def test_notification_gets_no_response(monkeypatch):

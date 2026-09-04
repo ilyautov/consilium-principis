@@ -1,4 +1,5 @@
 """Валидационный гейт корпуса: распределение тиров, флаг неразмеченного (A), инварианты рва."""
+import sys
 import json
 from collections import Counter
 from . import paths
@@ -11,10 +12,10 @@ def report(advisor_dir: str) -> dict:
     tiers = dict(Counter(c.get("tier", "A") for c in chunks))
     unlabeled = tiers.get("A", 0)
     ok = unlabeled == 0 and len(chunks) > 0
-    print(f"[доктор] {advisor_dir}: чанков {len(chunks)}, тиры {tiers}")
+    print(f"[доктор] {advisor_dir}: чанков {len(chunks)}, тиры {tiers}", file=sys.stderr)
     if unlabeled:
-        print(f"  ⚠️  {unlabeled} чанков с тиром A (неразмечено/fail-closed) — разметь источник в манифесте")
-    print(f"  {'✓ OK' if ok else '✗ ГЕЙТ НЕ ПРОЙДЕН'}")
+        print(f"  ⚠️  {unlabeled} чанков с тиром A (неразмечено/fail-closed) — разметь источник в манифесте", file=sys.stderr)
+    print(f"  {'✓ OK' if ok else '✗ ГЕЙТ НЕ ПРОЙДЕН'}", file=sys.stderr)
     return {"ok": ok, "tiers": tiers, "chunks": len(chunks), "unlabeled": unlabeled}
 
 
@@ -40,5 +41,5 @@ def calibration(advisor_dir: str) -> dict:
                         untraced += 1
     ok = groundless == 0 and untraced == 0
     print(f"[доктор-калибровка] {advisor_dir}: безземельных кернелов {groundless}, "
-          f"кросс-домен без trace {untraced} → {'✓ OK' if ok else '✗ ГЕЙТ'}")
+          f"кросс-домен без trace {untraced} → {'✓ OK' if ok else '✗ ГЕЙТ'}", file=sys.stderr)
     return {"ok": ok, "groundless_kernels": groundless, "untraced_cross_domain": untraced}

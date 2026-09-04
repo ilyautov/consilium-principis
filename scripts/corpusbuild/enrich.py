@@ -1,6 +1,7 @@
 """Калиброванный enrichment: LLM-расшифровка P1 в примеры/ситуации/кросс-домен/осовременивание.
 Всегда derived+never_quote, trace к источнику. L2.3.2: кросс-домен обязан трассироваться к кернелу.
 make_enrichment_record — чистая, юнит-гейт инвариантов."""
+import sys
 import json
 from . import ids, paths
 
@@ -54,5 +55,5 @@ def build_enrichment(advisor_dir: str, kinds=None, limit: int = 60) -> list:
     with open(out, "w", encoding="utf-8") as f:
         for r in out_recs:
             f.write(json.dumps(r, ensure_ascii=False) + "\n")
-    print(f"[enrich] {advisor_dir}: {len(out_recs)} derived-записей → {out}")
+    print(f"[enrich] {advisor_dir}: {len(out_recs)} derived-записей → {out}", file=sys.stderr)
     return out_recs

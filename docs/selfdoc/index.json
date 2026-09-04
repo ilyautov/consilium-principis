@@ -3,8 +3,8 @@
     "tool_count": 61,
     "rule_count": 19,
     "recipe_count": 16,
-    "script_count": 71,
-    "test_count": 166,
+    "script_count": 72,
+    "test_count": 169,
     "glossary_count": 112
   },
   "tools": [
@@ -187,7 +187,8 @@
             "type": "string"
           },
           "dest": {
-            "type": "string"
+            "type": "string",
+            "description": "каталог линзы: только advisors/<имя> или lenses/<имя> (по умолчанию advisors/<slug>)"
           },
           "license": {
             "type": "string"
@@ -2289,6 +2290,11 @@
       "doc": "Доверие через стабильность — держится ли вердикт при повторных прогонах (анти-театр)."
     },
     {
+      "path": "scripts/stdio_guard.py",
+      "subsystem": "other",
+      "doc": "Изоляция JSON-RPC-канала MCP-сервера от stdout и от кодировки локали."
+    },
+    {
       "path": "scripts/synth_eval.py",
       "subsystem": "eval",
       "doc": "Генератор синтетических eval-данных для Consilium-Principis."
@@ -2331,6 +2337,10 @@
     {
       "path": "tests/test_attribution.py",
       "covers": "attribution"
+    },
+    {
+      "path": "tests/test_board_init_preserves_config.py",
+      "covers": "board init preserves config"
     },
     {
       "path": "tests/test_board_render.py",
@@ -2941,6 +2951,10 @@
       "covers": "stability"
     },
     {
+      "path": "tests/test_stdio_isolation.py",
+      "covers": "stdio isolation"
+    },
+    {
       "path": "tests/test_swallow.py",
       "covers": "swallow"
     },
@@ -2963,6 +2977,10 @@
     {
       "path": "tests/test_tool_dispatch_smoke.py",
       "covers": "tool dispatch smoke"
+    },
+    {
+      "path": "tests/test_write_zone_guard.py",
+      "covers": "write zone guard"
     }
   ],
   "glossary": [

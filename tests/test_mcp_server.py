@@ -536,7 +536,7 @@ def test_build_lens_tool_grounds_and_is_citable(monkeypatch, tmp_path):
     # сквозной: build_lens → корпус → cite отдаёт 🔵 из текста-основы, прочтение остаётся 🟡
     import mcp_server
     monkeypatch.setattr(mcp_server, "_root", lambda: str(tmp_path))   # write-гард: корень=tmp
-    dest = str(tmp_path / "test-lens")
+    dest = str(tmp_path / "advisors" / "test-lens")
     r = dispatch("build_lens", {
         "name": "Тест-линза", "dest": dest, "kind": "personality",
         "ground_text": "All warfare is based on deception, says the canon of strategy.",
@@ -559,7 +559,7 @@ def test_build_lens_grounds_from_url(monkeypatch, tmp_path):
                         "*** START OF THE PROJECT GUTENBERG EBOOK ***\n"
                         "He who is feared is safer than he who is loved, in the council of princes.\n"
                         "*** END OF THE PROJECT GUTENBERG EBOOK ***")
-    dest = str(tmp_path / "url-lens")
+    dest = str(tmp_path / "advisors" / "url-lens")
     r = dispatch("build_lens", {"name": "URL-линза", "dest": dest, "kind": "personality",
                  "ground_url": "https://www.gutenberg.org/cache/epub/1/pg1.txt",
                  "reading_notes": "Читаю про надёжность стимула."})
@@ -571,12 +571,12 @@ def test_build_lens_grounds_from_url(monkeypatch, tmp_path):
 
 
 def test_build_lens_requires_some_ground(tmp_path):
-    r = dispatch("build_lens", {"name": "пусто", "dest": str(tmp_path / "x")})
+    r = dispatch("build_lens", {"name": "пусто", "dest": str(tmp_path / "advisors" / "x")})
     assert "error" in r and "основу" in r["error"]
 
 
 def test_build_lens_path_traversal_guarded(tmp_path):
-    r = dispatch("build_lens", {"name": "t", "dest": str(tmp_path / "y"),
+    r = dispatch("build_lens", {"name": "t", "dest": str(tmp_path / "advisors" / "y"),
                  "ground_path": "../../../../../../etc/passwd"})
     assert "error" in r and ("traversal" in r["error"].lower() or "вне корня" in r["error"])
 

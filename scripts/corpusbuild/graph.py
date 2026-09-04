@@ -1,5 +1,6 @@
 """Сборка графа провенанса и правило слабого звена (L2.2).
 marker_of / weakest_link — чистые, ядро контура на трассе."""
+import sys
 import json, os
 from . import paths
 
@@ -58,5 +59,5 @@ def assemble_graph(advisor_dir: str) -> list:
     with open(out, "w", encoding="utf-8") as f:
         for e in edges:
             f.write(json.dumps(e, ensure_ascii=False) + "\n")
-    print(f"[graph] {advisor_dir}: {len(edges)} рёбер → {out}")
+    print(f"[graph] {advisor_dir}: {len(edges)} рёбер → {out}", file=sys.stderr)
     return edges

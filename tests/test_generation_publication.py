@@ -292,7 +292,9 @@ def test_add_source_mutation_and_build_observe_one_source_manifest_snapshot(tmp_
         return original_load(path, default)
 
     monkeypatch.setattr(mcp_server, "_load_json", block_manifest)
-    monkeypatch.setattr(mcp_server, "_resolve_under_root", lambda value: (str(advisor), None))
+    # add_source идёт через write-zone гард (advisors|lenses); тест — про снапшот манифеста,
+    # а не про гард, поэтому подменяем именно его
+    monkeypatch.setattr(mcp_server, "_resolve_write_zone", lambda value: (str(advisor), None))
 
     def add():
         try:

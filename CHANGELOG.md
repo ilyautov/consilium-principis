@@ -5,6 +5,29 @@ versions — [SemVer](https://semver.org/). Dates in ISO (YYYY-MM-DD).
 
 ## [Unreleased]
 
+### Fixed
+- MCP stdio transport: the JSON-RPC channel is now a private duplicate of fd 1 and `sys.stdout`
+  is routed to stderr while serving (`scripts/stdio_guard.py`). Progress output from a background
+  advisor build (`corpusbuild.*`) and child processes (`pip install numpy`, `ollama pull`,
+  `collect_pd.py`) no longer leaks into the protocol stream and kills the server on the host side.
+- MCP stdio transport: stdin/stdout are forced to UTF-8 regardless of the OS locale. On Windows
+  the pipe defaulted to cp1251/cp1252, so the first response carrying 🔵 or Cyrillic raised
+  `UnicodeEncodeError`, and a Cyrillic quote from the host was silently mangled into a false 🟡.
+- MCP protocol conformance: `tools/call` no longer requires the optional `arguments` field
+  (`null`/absent = `{}`), `ping` answers `{}` instead of `-32601`, an argument-signature mismatch
+  returns `-32602 Invalid params` instead of `-32603 Internal error`, and a non-string tool name
+  no longer crashes the request.
+- Security: write-side tools (`add_source`, `build_advisor`, `build_lens`) may now write only
+  strictly inside `advisors/<name>` or `lenses/<name>`. Previously the guard only clamped to the
+  repository root, so `build_lens(dest=".claude/commands")` could drop a host-supplied `lens.md`
+  into a directory the agent executes as slash-commands (persistent prompt-injection chain).
+- `board_init.py` (run by every `install.py`) merges into an existing `board_config.json` instead
+  of rewriting it: settings made via `config_set` (`abstain_threshold`, `hybrid_alpha`,
+  `language`, `interface_mode`, …) and `chunk_chars` survive reinstalls, as `install.py` always
+  promised. `--reset` rebuilds from scratch; an explicit `--abstain-threshold` still overrides.
+- Tests: `test_calibrated_consult` used a hard-coded `resolved_on` date that fell behind the
+  consult's creation date on 2026-08-18 and failed the fail-closed gate; it is now relative to today.
+
 ## [0.1.3] — 2026-07-24
 
 ### Added

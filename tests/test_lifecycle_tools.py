@@ -56,7 +56,7 @@ def test_ollama_ensure_reports_manual_when_binary_absent(monkeypatch):
 
 def test_add_source_text_lands_and_sets_tier_then_builds(tmp_path):
     # без шелла: text → sources/ + tier-манифест → pipeline собирает корпус с этим тиром
-    adv = str(tmp_path / "adv")
+    adv = str(tmp_path / "advisors" / "adv")
     r = dispatch("add_source", {"advisor_dir": adv,
                  "text": "All warfare is based on deception, the canon repeats.",
                  "basename": "canon", "tier": "P1"})
@@ -77,7 +77,7 @@ def test_add_source_url_uses_fetch_and_strips_gutenberg(monkeypatch, tmp_path):
     monkeypatch.setattr(cc, "fetch", lambda url, timeout=30:
                         "*** START OF THE PROJECT GUTENBERG EBOOK X ***\nReal body text here.\n"
                         "*** END OF THE PROJECT GUTENBERG EBOOK X ***")
-    adv = str(tmp_path / "adv2")
+    adv = str(tmp_path / "advisors" / "adv2")
     r = dispatch("add_source", {"advisor_dir": adv,
                  "url": "https://www.gutenberg.org/cache/epub/1/pg1.txt"})
     assert r["ok"]
@@ -86,7 +86,7 @@ def test_add_source_url_uses_fetch_and_strips_gutenberg(monkeypatch, tmp_path):
 
 
 def test_add_source_rejects_non_pd_host_without_license(tmp_path):
-    r = dispatch("add_source", {"advisor_dir": str(tmp_path / "a3"),
+    r = dispatch("add_source", {"advisor_dir": str(tmp_path / "advisors" / "a3"),
                  "url": "https://example.com/some-copyrighted-book.txt"})
     assert "error" in r and "PD" in r["error"]
 
@@ -94,17 +94,17 @@ def test_add_source_rejects_non_pd_host_without_license(tmp_path):
 def test_add_source_blocks_ssrf_even_with_license(tmp_path):
     # license НЕ должен открывать egress: слоёный гард режет внутренний адрес независимо.
     # http-loopback теперь режется ещё РАНЬШЕ — https-only слоем (до DNS), тоже fail-closed:
-    r = dispatch("add_source", {"advisor_dir": str(tmp_path / "a4"),
+    r = dispatch("add_source", {"advisor_dir": str(tmp_path / "advisors" / "a4"),
                  "url": "http://127.0.0.1:11434/api/tags", "license": "public-domain"})
     assert "error" in r and "http без шифрования" in r["error"]
     # https-loopback проходит слой схемы и обязан упереться в SSRF-гард (лицензия не помогает):
-    r2 = dispatch("add_source", {"advisor_dir": str(tmp_path / "a4"),
+    r2 = dispatch("add_source", {"advisor_dir": str(tmp_path / "advisors" / "a4"),
                   "url": "https://127.0.0.1:11434/api/tags", "license": "public-domain"})
     assert "error" in r2 and "SSRF" in r2["error"]          # loopback заблокирован, лицензия не помогла
 
 
 def test_add_source_blocks_path_traversal(tmp_path):
-    r = dispatch("add_source", {"advisor_dir": str(tmp_path / "a5"),
+    r = dispatch("add_source", {"advisor_dir": str(tmp_path / "advisors" / "a5"),
                  "path": "../../../../../../etc/passwd"})
     assert "error" in r and ("traversal" in r["error"].lower() or "вне корня" in r["error"])
 
@@ -134,7 +134,7 @@ def test_ollama_install_hint_is_platform_aware(monkeypatch):
 
 def test_add_source_provenance_header_not_citable(tmp_path):
     # P0: provenance-хедер `# SOURCE/# FETCHED/# LICENSE` не должен попадать в корпус/цитаты
-    adv = str(tmp_path / "adv-hdr")
+    adv = str(tmp_path / "advisors" / "adv-hdr")
     dispatch("add_source", {"advisor_dir": adv, "basename": "canon", "tier": "P1",
              "text": "All warfare is based on deception, the canon repeats."})
     from corpusbuild import pipeline, paths
@@ -196,7 +196,7 @@ def test_diagnostic_tools_carry_plain_hint():
 
 def test_short_quote_not_blue(tmp_path):
     # P1: одиночное общее слово дословно совпадёт, но 🔵 для него бессмысленно → 🟡 (порог длины)
-    adv = str(tmp_path / "adv-short")
+    adv = str(tmp_path / "advisors" / "adv-short")
     dispatch("add_source", {"advisor_dir": adv, "basename": "c", "tier": "P1",
              "text": "The discipline of strategy rewards patience."})
     from corpusbuild import pipeline

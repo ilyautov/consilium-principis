@@ -88,7 +88,10 @@ def run_setup(consent=True):
     for s in steps:
         if s.get("auto") and consent:
             try:
-                subprocess.run(s["cmd"], check=True)
+                from stdio_guard import child_stdout
+                # stdout ребёнка (pip/ollama) → stderr, не fd 1: из MCP-тула setup_full он
+                # иначе шёл прямо в канал JSON-RPC хоста
+                subprocess.run(s["cmd"], check=True, stdout=child_stdout())
                 results.append({**s, "ran": True})
             except Exception as e:
                 results.append({**s, "ran": False, "error": str(e)})

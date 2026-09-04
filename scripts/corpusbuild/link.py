@@ -1,5 +1,6 @@
 """S1→P1 кросс-язычный семантический мост (русский Тарасов → английский Макиавелли).
 nearest_p1 — чистая (тестируема без сети); build_links эмбеддит и зовёт её."""
+import sys
 import json
 from . import embed, ids, paths
 
@@ -29,5 +30,5 @@ def build_links(advisor_dir: str, top_m: int = 3, min_cos: float = 0.45) -> list
     with open(out, "w", encoding="utf-8") as f:
         for l in links:
             f.write(json.dumps(l, ensure_ascii=False) + "\n")
-    print(f"[link] {advisor_dir}: {len(links)} рёбер S1→P1 (из {len(s1c)} S1-чанков) → {out}")
+    print(f"[link] {advisor_dir}: {len(links)} рёбер S1→P1 (из {len(s1c)} S1-чанков) → {out}", file=sys.stderr)
     return links

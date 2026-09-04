@@ -1,6 +1,7 @@
 """Извлечь мета-идеи (кернелы) и ЗАЗЕМЛИТЬ их к P1-пассажам. L2.3.1: безземельный кернел не существует.
 Экстракция переиспользует уже фальсиф-валидную логику exp_kernels (отдельный скрипт). ground_kernel /
 drop_groundless — чистые, тестируемы без сети."""
+import sys
 import json
 from . import embed, ids, paths
 
@@ -33,5 +34,5 @@ def build_kernels(advisor_dir: str, author: str, k: int = 6, ground_n: int = 5, 
     out = f"{paths.build_dir(advisor_dir)}/kernels.json"
     with open(out, "w", encoding="utf-8") as f:
         json.dump(items, f, ensure_ascii=False, indent=2)
-    print(f"[kernels] {advisor_dir}: {len(items)} заземлённых кернелов → {out}")
+    print(f"[kernels] {advisor_dir}: {len(items)} заземлённых кернелов → {out}", file=sys.stderr)
     return items

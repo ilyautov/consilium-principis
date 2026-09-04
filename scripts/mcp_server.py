@@ -21,6 +21,7 @@ import re
 import sys
 import json
 import time
+import inspect
 import secrets
 import threading
 
@@ -78,6 +79,35 @@ def _resolve_under_root(p):
     return None, {"error": "путь вне корня репо запрещён (path-traversal). Используй путь внутри проекта.",
                   "hint": "Этот файл вне проекта — я не могу к нему обратиться. Вставь текст напрямую "
                           "или положи файл внутрь проекта."}
+
+
+# Зоны, куда тулы СОЗДАНИЯ советника/линзы (add_source/build_advisor/build_lens) имеют право
+# писать. Ревью (security M1): кламп «под корнем репо» пропускал dest=".claude/commands" или
+# "commands" — build_lens писал туда lens.md с host-supplied reading_notes, т.е. отравленный
+# источник → хост → персистентная slash-команда/промпт-файл. Теперь запись — только строго
+# ВНУТРИ advisors/<имя> или lenses/<имя>; сам каталог зоны, корень, .git/.claude/commands/
+# skills/scripts/docs и любые секретные сегменты — отказ.
+_WRITE_ZONES = ("advisors", "lenses")
+
+
+def _resolve_write_zone(p):
+    """Write-side гард каталога советника: (abs_path, None) | (None, error). Требует
+    <root>/{advisors|lenses}/<имя>[/...] (не сам каталог зоны) и не-секретный путь."""
+    rp, err = _resolve_under_root(p)
+    if err:
+        return None, err
+    root = os.path.realpath(_root())
+    rel = os.path.relpath(rp, root).replace(os.sep, "/")
+    parts = rel.split("/")
+    if len(parts) < 2 or parts[0] not in _WRITE_ZONES or parts[1] in ("", ".", ".."):
+        return None, {"error": "запись советника/линзы разрешена только внутри advisors/<имя> или "
+                               "lenses/<имя>; получено %r" % (p,),
+                      "hint": "Дай голое имя ('marcus-aurelius') или путь вида 'advisors/<имя>'. "
+                              "Каталоги команд/скиллов/скриптов и корень проекта — не место для корпуса."}
+    if _is_sensitive_path(rel):                 # по rel: где лежит сам репо — не повод для отказа
+        return None, {"error": "путь содержит служебный/секретный сегмент (.git/.consilium/.env/ключи) — "
+                               "запись запрещена: %r" % (p,)}
+    return rp, None
 
 
 def _load_json(path, default):
@@ -253,8 +283,8 @@ def _resolve_advisor_write(advisor_dir):
     """Write-side резолюция advisor_dir для тулов СОЗДАНИЯ (add_source/build_advisor). Голое
     имя ('marcus-aurelius') → каталог СУЩЕСТВУЮЩЕГО советника, если он есть (advisors|lenses),
     иначе НОВЫЙ 'advisors/<name>' — а НЕ '<root>/<name>' (rogue-каталог в корне репо). Path-форма
-    ('advisors/x') и '.'/'..' проходят как раньше. Возвращает (abs_path, None) | (None, error);
-    хвост всегда через _resolve_under_root → traversal-кламп к корню сохранён.
+    ('advisors/x') проходит; '.'/'..'/корень/чужие каталоги — отказ. Возвращает (abs_path, None) |
+    (None, error); хвост всегда через _resolve_write_zone → кламп к корню И к зоне advisors|lenses.
 
     Зачем: read-тулы (retrieve/cite) принимают голое имя (_resolve_advisor_corpus), поэтому хост
     естественно шлёт его И в запись. Старое `_resolve_under_root('marcus-aurelius')` резолвило имя как
@@ -266,9 +296,9 @@ def _resolve_advisor_write(advisor_dir):
     if is_bare:
         existing = _resolve_advisor_dir(s)              # уже есть советник/линза с этим именем?
         if existing:
-            return _resolve_under_root(existing)        # целимся в него (кламп для единообразия)
-        return _resolve_under_root(os.path.join("advisors", s))   # новый → под advisors/, не в корень
-    return _resolve_under_root(s)                       # path-форма / '.' / '..' — как раньше
+            return _resolve_write_zone(existing)        # целимся в него (гард для единообразия)
+        return _resolve_write_zone(os.path.join("advisors", s))   # новый → под advisors/, не в корень
+    return _resolve_write_zone(s)                       # path-форма: только внутри advisors|lenses
 
 
 def _validate_session_attribution(session):
@@ -907,7 +937,9 @@ def _ollama_pull(model="bge-m3"):
         return {"ok": False, "model": model,
                 "error": "недопустимое имя модели (ожидается напр. bge-m3 или gemma3:27b)"}
     try:
-        subprocess.run(["ollama", "pull", model], check=True, timeout=900)
+        from stdio_guard import child_stdout
+        # stdout ребёнка НЕ наследует fd 1 сервера: прогресс pull шёл бы прямо в канал JSON-RPC
+        subprocess.run(["ollama", "pull", model], check=True, timeout=900, stdout=child_stdout())
         return {"ok": True, "model": model, "status": _ollama_status()}
     except FileNotFoundError:
         return {"ok": False, "model": model,
@@ -1098,13 +1130,13 @@ def _build_lens(name, ground_text=None, ground_url=None, ground_path=None, readi
         else:
             return {"error": "дай основу: ground_text | ground_url | ground_path"}
     if dest:
-        d, err = _resolve_under_root(dest)            # write-side traversal-гард
+        d, err = _resolve_write_zone(dest)            # write-side гард: только advisors|lenses/<имя>
         if err:
             return err
     else:
         # slug — host-supplied: САНИТИЗИРУЕМ (иначе slug="../.." писал бы вне корня) + гард.
         s = re.sub(r"[^a-z0-9]+", "-", (slug or name or "lens").lower()).strip("-") or "lens"
-        d, err = _resolve_under_root(os.path.join("advisors", s))   # личная линза → гитигнор-зона
+        d, err = _resolve_write_zone(os.path.join("advisors", s))   # личная линза → гитигнор-зона
         if err:
             return err
     res = lens_builder.build_lens(d, name=name, ground_text=ground_text, reading_notes=reading_notes,
@@ -1937,7 +1969,9 @@ TOOLS = {
                                                  "enum": ["personality", "method", "self"]},
                                         "axis": {"type": "string"},
                                         "slug": {"type": "string"},
-                                        "dest": {"type": "string"},
+                                        "dest": {"type": "string",
+                                                 "description": "каталог линзы: только advisors/<имя> "
+                                                                "или lenses/<имя> (по умолчанию advisors/<slug>)"},
                                         "license": {"type": "string"},
                                         "run_kernels": {"type": "boolean"}},
                          "required": ["name"]},
@@ -2829,18 +2863,32 @@ def _handle_rpc(msg):
         return _rpc_result(req_id, {"tools": [
             {"name": t["name"], "description": t["description"], "inputSchema": t["input_schema"]}
             for t in list_tools()]})
+    if method == "ping":                      # liveness по спеке MCP: пустой result
+        return _rpc_result(req_id, {})
     if method == "tools/call":
         params = msg.get("params")
-        if (not isinstance(params, dict) or "arguments" not in params
-                or not isinstance(params["arguments"], dict)):
+        if not isinstance(params, dict):
+            return _rpc_error(req_id, -32602, "Invalid params")
+        # По спеке MCP `arguments` ОПЦИОНАЛЕН: тулы без обязательных параметров (doctor,
+        # board_status, catalog_list) хосты зовут без него. Отсутствие/null = {}.
+        args = params.get("arguments")
+        args = {} if args is None else args
+        if not isinstance(args, dict):
             return _rpc_error(req_id, -32602, "Invalid params")
         name = params.get("name")
         # Неизвестный тул детектим ЯВНО до вызова — иначе KeyError ВНУТРИ хендлера
         # (напр. неполный session-объект) маскировался бы под «неизвестный тул».
-        if name not in TOOLS:
+        if not isinstance(name, str) or name not in TOOLS:
             return _rpc_error(req_id, -32601, f"неизвестный тул: {name!r}")
+        # Несовпадение аргументов с сигнатурой (лишний/пропущенный) — это -32602 Invalid params
+        # клиента, а не -32603 «внутренняя ошибка» сервера. Проверяем bind ДО вызова, чтобы
+        # не путать с TypeError из глубины хендлера (тот остаётся -32603, как настоящий баг).
         try:
-            out = dispatch(name, params.get("arguments", {}))
+            inspect.signature(TOOLS[name]["handler"]).bind(**args)
+        except TypeError as e:
+            return _rpc_error(req_id, -32602, f"неверные аргументы тула {name!r}: {e}")
+        try:
+            out = dispatch(name, args)
             return _rpc_result(req_id, {
                 "content": [{"type": "text", "text": json.dumps(out, ensure_ascii=False)}]})
         except Exception as e:
@@ -2863,13 +2911,18 @@ def _line_within_limit(line, max_len=_MAX_LINE):
     return len(line) <= max_len
 
 
-def _serve_stdio():
+def _serve_stdio(stream=None, out=None):
     """Минимальный построчный JSON-RPC по stdio. Замена — официальный MCP SDK на тот же dispatch.
 
     Читаем через readline(_MAX_LINE + 1): длинную строку НЕ буферизуем целиком — при переросте
     капа дренируем остаток строки чанками и отвечаем JSON-RPC-ошибкой (id=null), не пытаясь
-    json-парсить гигабайты."""
-    stream = sys.stdin
+    json-парсить гигабайты.
+
+    stream/out — потоки протокола (дефолт: sys.stdin/sys.stdout — для тестов на StringIO).
+    Боевой вход main() отдаёт сюда ДУБЛИКАТ fd 1 и уводит sys.stdout в stderr
+    (stdio_guard): ни один print() тула/сборки/дочернего процесса не попадёт в канал."""
+    stream = sys.stdin if stream is None else stream
+    out = sys.stdout if out is None else out
     while True:
         line = stream.readline(_MAX_LINE + 1)
         if line == "":                          # EOF
@@ -2881,8 +2934,8 @@ def _serve_stdio():
                     break
                 line = chunk
             resp = _rpc_error(None, -32600, "сообщение превышает лимит размера (%d байт)" % _MAX_LINE)
-            sys.stdout.write(json.dumps(resp, ensure_ascii=False) + "\n")
-            sys.stdout.flush()
+            out.write(json.dumps(resp, ensure_ascii=False) + "\n")
+            out.flush()
             continue
         line = line.strip()
         if not line:
@@ -2891,14 +2944,21 @@ def _serve_stdio():
             msg = json.loads(line)
         except Exception:
             resp = _rpc_error(None, -32700, "Parse error")
-            sys.stdout.write(json.dumps(resp, ensure_ascii=False) + "\n")
-            sys.stdout.flush()
+            out.write(json.dumps(resp, ensure_ascii=False) + "\n")
+            out.flush()
             continue
         resp = _handle_rpc(msg)
         if resp is not None:
-            sys.stdout.write(json.dumps(resp, ensure_ascii=False) + "\n")
-            sys.stdout.flush()
+            out.write(json.dumps(resp, ensure_ascii=False) + "\n")
+            out.flush()
+
+
+def main():
+    """Точка входа stdio-транспорта. Канал RPC — дубликат fd 1 в UTF-8; sys.stdout → stderr;
+    stdin — UTF-8 независимо от локали (Windows cp1251). См. stdio_guard."""
+    from stdio_guard import bind_rpc_stdin, bind_rpc_stdout
+    _serve_stdio(bind_rpc_stdin(), bind_rpc_stdout())
 
 
 if __name__ == "__main__":
-    _serve_stdio()
+    main()

@@ -1,24 +1,19 @@
 ---
 name: consilium-principis
 description: >
-  Личный совет директоров из AI-персонажей реальных мыслителей. Пользователь выбирает
-  фигуры (public-domain из коробки: Сунь-цзы, Марк Аврелий, Эпиктет, Макиавелли; современных —
-  из СВОИХ легальных материалов), скилл строит профили и проводит ЗАСЕДАНИЕ-форум по вопросу
-  пользователя: советники обращаются к нему, спорят между собой, синтез, шаг к действию. На
-  считаемом вопросе-решении — 📐 карта решения + Монте-Карло. Отличие от наивных аналогов =
-  защитный контур: маркеры верности (цитата vs экстраполяция), цитаты только из
-  верифицированного корпуса через двухфазный судья-гейт, несогласие-как-фича (спорят С
-  пользователем), diversity-check против эхо-камеры, мост к действию, петля исхода. Используй
-  когда: «созови совет», «спроси Аврелия», «собери совет директоров», «совет по решению»,
-  «что выгоднее — X или Y», «добавь советника/линзу», «board», «council», «посоветуй как [фигура]».
-  In English: a personal board of directors of AI personas grounded in public-domain thinkers
-  (Sun Tzu, Marcus Aurelius, Epictetus, Machiavelli out of the box; modern figures from the
-  user's own legal materials), with a fail-closed fidelity contour — verbatim-vs-extrapolation
-  markers, citations only from a verified corpus via a two-phase judge gate, disagreement as a
-  feature, diversity-check against echo chambers, a bridge to action, an outcome loop. Answers
-  follow the language of the question. Trigger with: "convene the board", "ask Aurelius",
-  "council of advisors", "board of directors", "premortem", "what's better — X or Y",
-  "add an advisor/lens", "advise me like [figure]", "board", "council".
+  Личный совет директоров из AI-персонажей реальных мыслителей. Пользователь выбирает фигуры
+  (public-domain из коробки: Сунь-цзы, Марк Аврелий, Эпиктет, Макиавелли; современных из своих
+  легальных материалов), скилл строит профили и проводит заседание по его вопросу: советники
+  спорят между собой и с пользователем, дальше синтез и шаг к действию. На считаемом решении
+  добавляется карта решения и Монте-Карло. Защитный контур: цитаты только из верифицированного
+  корпуса через судью-гейт, маркеры «цитата или экстраполяция», diversity-check против
+  эхо-камеры. Триггеры: «созови совет», «спроси Аврелия», «собери совет директоров»,
+  «что выгоднее X или Y», «добавь советника», board, council.
+
+  In English: a personal board of AI personas grounded in public-domain thinkers, fail-closed
+  fidelity, every quote verified word for word or the board abstains. Answers follow the language
+  of the question. Triggers: "convene the board", "ask Aurelius", "council of advisors",
+  "premortem", "advise me like [figure]".
 ---
 
 # Consilium-Principis — личный совет директоров (personal-board)

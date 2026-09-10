@@ -19,7 +19,18 @@ with no exact line in the corpus, the advisor simply doesn't quote.
 
 [![CI](https://github.com/ilyautov/consilium-principis/actions/workflows/ci.yml/badge.svg)](https://github.com/ilyautov/consilium-principis/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
+[![Version](https://img.shields.io/github/v/release/ilyautov/consilium-principis?label=version&color=blueviolet)](CHANGELOG.md)
+[![Stars](https://img.shields.io/github/stars/ilyautov/consilium-principis?style=flat&label=stars&logo=github&logoColor=white)](https://github.com/ilyautov/consilium-principis/stargazers)
+
+**Quick start**, in Claude Code:
+
+```text
+/plugin marketplace add ilyautov/consilium-principis
+/plugin install consilium-principis@consilium-marketplace
+```
+
+Other agents, the MCP server and the offline suite are in [Installation](#installation).
 ![no extra keys · no extra cost](https://img.shields.io/badge/no%20extra%20keys%20%C2%B7%20no%20extra%20cost-success)
 ![MCP ready](https://img.shields.io/badge/MCP-ready-purple)
 

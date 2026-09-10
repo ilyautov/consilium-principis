@@ -26,11 +26,42 @@ import os
 import sys
 import json
 
+import pytest
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "scripts"))   # ТОЛЬКО scripts/ — engine это пакет
 
 from engine.fidelity import marker_status
 import relevance_gate
+
+
+@pytest.fixture(autouse=True)
+def _dead_ollama(monkeypatch):
+    """Офлайн-инвариант этого файла ставим сами, а не надеемся на окружение.
+
+    Файл объявлен герметичным, но герметичным он был только при запуске с
+    OLLAMA_HOST из докстринга. Без него проба судьи (llm_local.available)
+    уходит на ДЕФОЛТНЫЙ 127.0.0.1:11434, а сокет-гард conftest пропускает
+    loopback намеренно: на нём же держится graceful fallback. На машине с
+    поднятой ollama проба удавалась, _judge_available становился True,
+    gate_quote звал судью, judge_fn теста бросал AssertionError, её глотал
+    fail-closed `except Exception` в gate_quote и возвращал withhold. Наружу
+    это выходило как `assert False is True` без следа настоящей причины:
+    падало у разработчика и проходило в CI, где ollama нет.
+
+    Одного monkeypatch.setenv мало: llm_local связывает OLLAMA константой
+    модуля НА ИМПОРТЕ, а импорт случается раньше фикстуры. Поэтому целим и
+    env (для всего, что читает его лениво), и саму константу. Плюс чистим
+    memo доступности судьи: его TTL пережил бы подмену внутри сессии.
+    """
+    import llm_local
+
+    dead = "http://127.0.0.1:59999"
+    monkeypatch.setenv("OLLAMA_HOST", dead)
+    monkeypatch.setattr(llm_local, "OLLAMA", dead, raising=False)
+    relevance_gate._judge_avail_memo.clear()
+    yield
+    relevance_gate._judge_avail_memo.clear()
 
 
 # Дословно из P1-чанка = слова автора; из S1 = дословно, но комментарий.

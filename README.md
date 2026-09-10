@@ -291,7 +291,7 @@ report it privately via [`SECURITY.en.md`](SECURITY.en.md). Support and project 
 - [**humanizer-ru**](https://github.com/ilyautov/humanizer-ru): strips the AI fingerprint out of Russian text
 - [**marketplaces-mcp-ru**](https://github.com/ilyautov/marketplaces-mcp-ru): Wildberries, Ozon, Yandex Market and Avito straight from the agent
 - [**small-business-ru**](https://github.com/ilyautov/small-business-ru): 34 skills for Russian small business, the numbers computed in code
-- [**hefest**](https://github.com/ilyautov/hefest): chemical safety for an industrial plant, fully offline
+- [**hefest**](https://github.com/ilyautov/hefest): chemical safety for an industrial plant, kept inside the plant's own network
 - [**cordon**](https://github.com/ilyautov/cordon): a deterministic layer between untrusted content and agent actions
 
 Everything else: [github.com/ilyautov](https://github.com/ilyautov). Useful? Star it, that is how other people find it.

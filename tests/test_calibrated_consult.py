@@ -15,8 +15,16 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "scripts"))
 
 import json  # noqa: E402
+from datetime import date  # noqa: E402
+
 import calibrated_consult as cc  # noqa: E402
 import mcp_server as srv  # noqa: E402
+
+# Карты, созданные через инструмент calibrated_consult_open, датируются сегодняшним
+# днём. Литеральная дата исхода уезжает в прошлое относительно карты, и гейт
+# «исход не может лечь до решения» валит тест на ровном месте. Дата исхода для
+# таких тестов считается от сегодня, а не пишется руками.
+TODAY = date.today().isoformat()
 
 
 def _prior(**over):
@@ -383,7 +391,7 @@ def _open_close_with_pred(monkeypatch, tmp_path, prob, followed):
 def test_resolve_tool_sets_outcome_then_journal(tmp_path, monkeypatch):
     cid = _open_close_with_pred(monkeypatch, tmp_path, 0.9, True)
     res = srv.dispatch("calibrated_consult_resolve",
-                       {"consult_id": cid, "outcome": {"resolved_on": "2026-08-17",
+                       {"consult_id": cid, "outcome": {"resolved_on": TODAY,
                                                        "occurred": False}})
     assert res["ok"] is True
     j = srv.dispatch("calibrated_consult_journal", {})
@@ -393,7 +401,7 @@ def test_resolve_tool_sets_outcome_then_journal(tmp_path, monkeypatch):
 def test_resolve_tool_unknown_id_fail_closed(tmp_path, monkeypatch):
     _point_root(monkeypatch, tmp_path)
     res = srv.dispatch("calibrated_consult_resolve",
-                       {"consult_id": "cc_NOPE", "outcome": {"resolved_on": "2026-08-17",
+                       {"consult_id": "cc_NOPE", "outcome": {"resolved_on": TODAY,
                                                              "occurred": True}})
     assert "error" in res
 
@@ -428,6 +436,6 @@ def test_resolve_tool_without_close_fail_closed(tmp_path, monkeypatch):
                        {"question": "q", "prior_call": "a", "prior_confidence": 0.5})["consult_id"]
     # резолв открытого консульта (нет close → нет прогноза) → fail-closed
     res = srv.dispatch("calibrated_consult_resolve",
-                       {"consult_id": cid, "outcome": {"resolved_on": "2026-08-17",
+                       {"consult_id": cid, "outcome": {"resolved_on": TODAY,
                                                        "occurred": True}})
     assert "error" in res

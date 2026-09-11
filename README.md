@@ -305,4 +305,4 @@ report it privately via [`SECURITY.en.md`](SECURITY.en.md). Support and project 
 - [**hefest**](https://github.com/ilyautov/hefest): chemical safety for an industrial plant, kept inside the plant's own network
 - [**cordon**](https://github.com/ilyautov/cordon): a deterministic layer between untrusted content and agent actions
 
-Everything else: [github.com/ilyautov](https://github.com/ilyautov). Useful? Star it, that is how other people find it.
+Everything in one list, grouped by what it does: [ilyautov.github.io](https://ilyautov.github.io/). Source: [github.com/ilyautov](https://github.com/ilyautov). Useful? Star it, that is how other people find it.

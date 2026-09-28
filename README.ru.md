@@ -1,6 +1,6 @@
 > [English](README.md) · **Русский**
 
-![Советник и ИИ-помощник изучают тексты источников за круглым столом](assets/readme-banner.png)
+![Советник и ИИ-помощник изучают тексты источников за круглым столом](assets/readme-banner-v2.png)
 
 # Consilium Principis
 

@@ -1,6 +1,6 @@
 > **English** · [Русский](README.ru.md)
 
-![An AI assistant and an advisor study source texts at a round council table](assets/readme-banner.png)
+![An AI assistant and an advisor study source texts at a round council table](assets/readme-banner-v2.png)
 
 # Consilium Principis
 

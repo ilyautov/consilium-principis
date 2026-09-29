@@ -131,7 +131,7 @@ separates a decision tool from "roleplay a sage": every claim can be re-checked.
 
 Plus **different lenses, not a chorus**: each advisor keeps their own angle, and their disagreement is a working part, not a bug. You see the decision from sides you'd otherwise collapse into one.
 
-The honesty contour itself is code, not a model: it checks every quote against its source on any machine, no keys, no cost. Without semantics only search precision gets weaker — honesty never does. Candidate relevance is scored by a two-phase gate: a model judges, code applies the threshold, so topically-close-but-not-actually-answering material won't slip through as 🔵. By default the host does that scoring — an interested party, which `doctor` labels honestly; want an independent judge, connect a local (ollama) or API backend, an explicit choice. The verbatim 🔵 gate never depends on the judge: code holds it.
+The honesty contour itself is code, not a model: it checks every quote against its source on any machine, no keys, no cost. Without semantics only search precision gets weaker — honesty never does. Candidate relevance is scored by a two-phase gate: a model judges, code applies the threshold, so topically-close-but-not-actually-answering material won't slip through as 🔵. By default the host does that scoring — an interested party, which `doctor` labels honestly; want an independent judge, connect a local (ollama) or API backend, an explicit choice. The API backend is OpenRouter (`openrouter.ai`) with your own `OPENROUTER_API_KEY`: the query and candidate passages are sent there for scoring. Nothing leaves your machine unless you turn it on. The verbatim 🔵 gate never depends on the judge: code holds it.
 
 ## Calculate, not just discuss: the 📐 decision map
 

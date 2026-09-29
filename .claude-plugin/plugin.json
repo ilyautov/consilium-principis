@@ -1,12 +1,15 @@
 {
   "name": "consilium-principis",
+  "displayName": "Consilium Principis",
   "description": "A personal board of directors made of AI personas of real thinkers, grounded in public-domain texts, with a fidelity contour: quotes checked word-for-word by code, fail-closed abstention when there are no grounds.",
   "version": "0.1.3",
   "author": {
-    "name": "Ilya Autov",
-    "email": "ilyautov@gmail.com"
+    "name": "Ilya Utov",
+    "email": "ilyautov@gmail.com",
+    "url": "https://github.com/ilyautov"
   },
   "homepage": "https://github.com/ilyautov/consilium-principis",
   "repository": "https://github.com/ilyautov/consilium-principis",
-  "license": "MIT"
+  "license": "MIT",
+  "supportUrl": "https://github.com/ilyautov/consilium-principis/issues"
 }

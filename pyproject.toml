@@ -12,7 +12,7 @@ description = "Личный совет директоров из AI-персон
 readme = "README.md"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
-authors = [{ name = "Ilya Autov" }]
+authors = [{ name = "Ilya Utov" }]
 keywords = [
     "ai-advisory-board", "council", "persona-agents", "decision-support",
     "rag", "citation-verification", "fail-closed", "claude-code-skill", "mcp",

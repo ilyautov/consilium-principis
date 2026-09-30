@@ -85,3 +85,7 @@ docs/dev/*
 !docs/dev/mcp-registry-publish-runbook.md
 .worktrees/
 .superpowers/
+
+# Demo videos live in GitHub Releases (the Claude plugin directory cannot scan video)
+assets/*.mp4
+assets/*.webm

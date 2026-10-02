@@ -1,21 +1,23 @@
-**English** · [Русский](README.ru.md)
+> **English** · [Русский](README.ru.md)
 
-<div align="center">
-
-<img src="assets/logo-consilium-principis.png" width="300" alt="Consilium Principis" />
+![An AI assistant and an advisor study source texts at a round council table](assets/readme-banner-v2.png)
 
 # Consilium Principis
 
-**A personal board of several AI advisors — for decisions where one confident answer isn't enough.**
+**Several perspectives. One decision. Quotes checked against the source.**
 
-<img src="assets/demo-refusal-en.gif" width="760" alt="Consilium refuses a fabricated quote and confirms a real one word-for-word" />
+An AI advisory board for Claude Code and MCP hosts. Ask about a difficult choice: advisors examine it through different lenses, challenge one another and give you one next step. A line marked 🔵 is checked by code against the source text word for word. If the line is absent, the advisor does not present it as a quote.
 
-<sub>Live: a made-up "Aurelius quote" is refused; a real line is confirmed 🔵 word-for-word with its source. The verdict is computed by code on every run, not scripted.</sub>
+> **Example:** “What would Marcus Aurelius say about this?” Consilium can label a model's interpretation 🟡, show a source-checked passage 🔵, or decline to quote when the corpus does not support one. [Watch the live refusal and verification →](#how-it-looks)
 
-Each advisor looks through their own lens, argues with you and with the others, and the board
-converges on a single next step. But above all: Consilium doesn't pass off a plausible fabrication
-as the author's words — a 🔵 quote is checked by code against the source text **word-for-word**;
-with no exact line in the corpus, the advisor simply doesn't quote.
+**Quick start in Claude Code**
+
+```text
+/plugin marketplace add ilyautov/consilium-principis
+/plugin install consilium-principis@consilium-marketplace
+```
+
+Then ask: **“Help me decide what to focus on.”** For Claude Desktop, other MCP hosts and local setup, see [Installation](#installation). The plugin uses your existing agent; model/provider charges, if any, follow your host setup.
 
 [![CI](https://github.com/ilyautov/consilium-principis/actions/workflows/ci.yml/badge.svg)](https://github.com/ilyautov/consilium-principis/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
@@ -23,20 +25,7 @@ with no exact line in the corpus, the advisor simply doesn't quote.
 [![Version](https://img.shields.io/github/v/release/ilyautov/consilium-principis?label=version&color=blueviolet)](CHANGELOG.md)
 [![Stars](https://img.shields.io/github/stars/ilyautov/consilium-principis?style=flat&label=stars&logo=github&logoColor=white)](https://github.com/ilyautov/consilium-principis/stargazers)
 
-**Quick start**, in Claude Code:
-
-```text
-/plugin marketplace add ilyautov/consilium-principis
-/plugin install consilium-principis@consilium-marketplace
-```
-
-Other agents, the MCP server and the offline suite are in [Installation](#installation).
-![no extra keys · no extra cost](https://img.shields.io/badge/no%20extra%20keys%20%C2%B7%20no%20extra%20cost-success)
-![MCP ready](https://img.shields.io/badge/MCP-ready-purple)
-
-</div>
-
----
+**Explore:** [See a session](#how-it-looks) · [How quote verification works](#why-you-can-trust-this) · [Installation](#installation) · [Limits](LIMITATIONS.md)
 
 ## What this is
 
@@ -55,8 +44,7 @@ versions** — a prism of their views over the corpus of their public texts. Nob
 beyond the grave." An advisor holds the author's lens and leans on their words, but it stays a model
 — and we say so plainly.
 
-No extra keys or payment — Consilium runs on the agent you already have. Checking quotes needs no
-internet; a full offline setup just takes local models.
+Consilium needs no separate API key. It runs on the agent you already have, whose model or provider may have its own charges. Checking quotes needs no internet; a full offline setup requires local models.
 
 ## How it differs from other councils
 
@@ -69,7 +57,7 @@ of voices. It's that a claim can be **re-verified**, and where it can't, the cou
 | **Verbatim quote checked word-for-word against the original, with its source** | ✗ | ✗ | **✅** |
 | **Honestly silent outside the corpus (fail-closed)** | ✗ | ✗ | **✅** |
 | Quantifiable question → Monte Carlo (📐) | ✗ | ✗ | ✅ |
-| No extra keys or payment | ± | ✗ | ✅ |
+| No separate key required by the project | ± | ± | ✅ |
 
 <sub>A "personal board of directors" is a mainstream practice (an HBR concept); the bet on grounding
 and citation transparency has been validated by both the market (Delphi, $16M from Sequoia) and
@@ -80,7 +68,9 @@ honest refusal.</sub>
 
 <div align="center">
 
-<sub>The refusal + word-for-word verification is in the demo up top. More scenarios — wrong-mouth attribution, Monte Carlo, cross-lingual: **[demo gallery →](docs/demo/gallery.md)**</sub>
+<img src="assets/demo-refusal-en.gif" width="760" alt="Live demo: Consilium refuses an invented quote and verifies a real passage against its source" />
+
+<sub>Live run: an invented Aurelius quote is refused; a real passage is checked against its source. More scenarios — wrong attribution, Monte Carlo, cross-lingual: **[demo gallery →](docs/demo/gallery.md)**</sub>
 
 </div>
 
@@ -264,8 +254,7 @@ quote against the real text or declines to attribute it. Disagreement between ad
 not a bug: each speaks through a different lens.
 
 **Does it need an API key or extra payment?**
-No. It runs on the AI agent you already have (Claude Code). The verification contour needs no network;
-full offline operation is available only if you add local models.
+Consilium itself needs no separate key or subscription. It uses your existing agent, whose model or provider may have its own charges. Quote verification needs no network; full offline operation requires local models.
 
 **Which thinkers are included, and can I add my own?**
 Public-domain figures (the Stoics, Sun Tzu, Machiavelli) are assembled from their own texts with one

@@ -5,6 +5,24 @@ versions — [SemVer](https://semver.org/). Dates in ISO (YYYY-MM-DD).
 
 ## [Unreleased]
 
+### Fixed
+- **The skill installs in Hermes Agent.** `SKILL.md` sits at the repo root, so
+  Hermes skills-guard scanned the whole repository and rated it DANGEROUS (the
+  attack-defence tests with `/etc/passwd` and `__import__('os')` matched
+  CRITICAL rules; `--force` does not override that). A new `.skillignore` leaves
+  installers exactly the `RUNTIME` set from `install.py`, plus it drops the
+  research probes in `scripts/experiments/`, `moat_check.py` and
+  `federation/dogfood_byok.py`, which nothing at runtime imports. Verdict: SAFE.
+- `eval.py --engine` keeps the forced backend in a module flag instead of
+  writing `EVAL_ENGINE` into `os.environ`; the variable still works.
+- The Linux ollama hint in `setup_full.py` points to the official download page
+  and install script instead of `curl … | sh`; QUICKSTART describes removing
+  the skill folder instead of quoting `rm -rf`.
+
+### Added
+- `tests/test_skillignore.py`: `.skillignore` covers everything outside
+  `RUNTIME`, and shipped files have no Hermes rules at HIGH or above.
+
 ## [0.1.3] — 2026-07-24
 
 ### Added

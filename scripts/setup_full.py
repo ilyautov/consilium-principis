@@ -18,7 +18,7 @@ EMBED_MODEL = "bge-m3"
 
 INSTALL_HINTS = {
     "darwin": "поставь ollama: `brew install ollama` (или скачай https://ollama.com/download), затем `ollama serve`",
-    "linux": "поставь ollama: `curl -fsSL https://ollama.com/install.sh | sh`, затем `ollama serve`",
+    "linux": "поставь ollama по инструкции https://ollama.com/download/linux (официальный скрипт https://ollama.com/install.sh), затем `ollama serve`",
     "windows": "скачай установщик ollama: https://ollama.com/download (download), запусти Ollama",
 }
 

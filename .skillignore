@@ -1,0 +1,68 @@
+# Hermes Agent (skills-guard) и ClawHub ставят скилл из корня репозитория и
+# сканируют каждый файл. Здесь всё, что не входит в RUNTIME из install.py:
+# тесты, документация, лаунчеры, манифесты плагина. Гейт:
+# tests/test_skillignore.py.
+/.claude-plugin/
+/.env.example
+/.gitattributes
+/.github/
+/.gitignore
+/.mcp.json
+/.mcpbignore
+/CHANGELOG.md
+/CODE_OF_CONDUCT.md
+/CONNECT-MCP.en.md
+/CONNECT-MCP.md
+/CONTRIBUTING.en.md
+/CONTRIBUTING.md
+/GOVERNANCE.md
+/LICENSE
+/LIMITATIONS.md
+/LIMITATIONS.ru.md
+/Makefile
+/PRIVACY_POLICY.md
+/PRIVACY_POLICY.ru.md
+/QUICKSTART.en.md
+/README.md
+/README.ru.md
+/SECURITY.en.md
+/SECURITY.md
+/SUPPORT.md
+/advisors/
+/commands/
+/gemini-extension.json
+/glama.json
+/install.bat
+/install.command
+/install.py
+/install.sh
+/manifest.json
+/mcp.example.json
+/package-lock.json
+/package.json
+/pyproject.toml
+/requirements/
+/server.json
+/skills/
+/tests/
+/docs/CONNECT-HOSTS.en.md
+/docs/CONNECT-HOSTS.md
+/docs/FEDERATION.md
+/docs/GLOSSARY.md
+/docs/MANUAL.md
+/docs/PROJECT-LOG.md
+/docs/demo/
+/docs/dev/
+/docs/onboarding-recipe.en.md
+/docs/onboarding-recipe.md
+/docs/research/
+# install.py не копирует: per-advisor данные и регенерируемые артефакты.
+golden/
+build/
+__pycache__/
+*.pyc
+# Исследовательские пробы и eval мейнтейнера: рабочий код их не импортирует,
+# а для прогонов они пишут ключи и бэкенд прямо в os.environ (Hermes: HIGH).
+/scripts/experiments/
+/scripts/moat_check.py
+/scripts/federation/dogfood_byok.py

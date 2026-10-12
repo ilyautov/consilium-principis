@@ -80,7 +80,7 @@ For the complete source, manifest, and validation recipe, see
 - **Update:** run the install again (`python3 install.py` or the Path 2 installer) — the machinery is
   overwritten while **your board (`advisors/`, `golden/`) is preserved** (merge, not wipe).
 - **Uninstall:** installed as a plugin — `/plugin uninstall consilium-principis` in Claude Code.
-  Installed via script — delete the folder `rm -rf ~/.claude/skills/consilium-principis` (Windows:
+  Installed via script — delete the folder `~/.claude/skills/consilium-principis` (Windows:
   remove `%USERPROFILE%\.claude\skills\consilium-principis`). The skill writes nothing outside it.
 
 ## Next steps

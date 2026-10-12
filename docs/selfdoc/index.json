@@ -4,7 +4,7 @@
     "rule_count": 19,
     "recipe_count": 16,
     "script_count": 71,
-    "test_count": 166,
+    "test_count": 167,
     "glossary_count": 112
   },
   "tools": [
@@ -2935,6 +2935,10 @@
     {
       "path": "tests/test_situation.py",
       "covers": "situation"
+    },
+    {
+      "path": "tests/test_skillignore.py",
+      "covers": "skillignore"
     },
     {
       "path": "tests/test_stability.py",

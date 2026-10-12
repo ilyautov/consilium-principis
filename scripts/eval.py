@@ -64,6 +64,14 @@ except Exception:
 # Живой путь берёт порог per-backend из движка (semantic 0.50 / lexical 0.04). Калибровка 0.50.
 ABSTAIN_THRESHOLD_DEFAULT = 0.50
 
+# Форс бэкенда для eval-контура: `eval.py --engine` или EVAL_ENGINE. Флаг CLI
+# живёт в модуле, а не пишется в os.environ: так он не протекает в чужой код.
+_ФОРС_ДВИЖКА = []
+
+
+def _форс_движка():
+    return _ФОРС_ДВИЖКА[-1] if _ФОРС_ДВИЖКА else os.getenv("EVAL_ENGINE")
+
 # Маркеры, ЗАЯВЛЯЮЩИЕ дословность (должны быть verbatim в корпусе):
 GROUNDED_MARKERS = ("🔵", "T1", "T2")
 # Маркеры экстраполяции / не-найденного источника (в корпусе НЕ ожидаются, провалом не считаются):
@@ -190,7 +198,7 @@ def retrieve(question, adv_dir, top_k=3, prefer=None):
         raise RuntimeError("engine.retrieval недоступен: прод-ретрив живёт в engine-пакете, "
                            "eval без него не считает (мягкой копии больше нет).")
     if prefer is None:
-        prefer = os.getenv("EVAL_ENGINE")      # EVAL_ENGINE читает ТОЛЬКО eval-контур
+        prefer = _форс_движка()      # EVAL_ENGINE читает ТОЛЬКО eval-контур
     return _retrieval.retrieve(question, adv_dir, top_k=top_k, prefer=prefer)
 
 
@@ -474,7 +482,7 @@ def build_metrics(advisor_dirs, backend_label):
         if en:
             strata["en"] = _retrieval_stratum(en)
         if ENGINE_OK:
-            thr = _engine.resolve_engine(p, prefer=os.getenv("EVAL_ENGINE")).abstain_threshold(p)
+            thr = _engine.resolve_engine(p, prefer=_форс_движка()).abstain_threshold(p)
         else:
             thr = load_abstain_threshold()
         ab = abstention_eval(p, thr)
@@ -523,7 +531,7 @@ def build_scores(advisor_dirs, backend_label):
 def _resolve_backend_label(paths):
     """Единый ярлык бэкенда для --emit-metrics / --emit-scores (движок или тир)."""
     if ENGINE_OK:
-        return _engine.resolve_engine(paths[0], prefer=os.getenv("EVAL_ENGINE")).name
+        return _engine.resolve_engine(paths[0], prefer=_форс_движка()).name
     return "full" if TIER_FULL else "lexical"
 
 
@@ -539,7 +547,7 @@ def main(argv=None):
                     help="записать замороженные СЫРЫЕ хиты/скоры JSON (вход слой-2 гейта) и выйти")
     args = ap.parse_args(argv)
     if args.engine:
-        os.environ["EVAL_ENGINE"] = args.engine
+        _ФОРС_ДВИЖКА.append(args.engine)
     paths = args.advisors or []
     if not paths:
         print("Дай папки советников: python eval.py advisors/munger ...", file=sys.stderr)
@@ -588,7 +596,7 @@ def main(argv=None):
     print("             Полная проверка — на трассах генерации tier-FULL (validation-агент, CiteGuard).")
 
     if ENGINE_OK:
-        _eng_name = _engine.resolve_engine(paths[0], prefer=os.getenv("EVAL_ENGINE")).name if paths else "?"
+        _eng_name = _engine.resolve_engine(paths[0], prefer=_форс_движка()).name if paths else "?"
         tier_label = f"ENGINE:{_eng_name}"
     else:
         tier_label = "FULL (bge-m3)" if TIER_FULL else "SIMPLE (лексич. char-3gram fallback)"
@@ -669,10 +677,10 @@ def main(argv=None):
     any_abs = False
     for p in paths:
         if ENGINE_OK:
-            thr = _engine.resolve_engine(p, prefer=os.getenv("EVAL_ENGINE")).abstain_threshold(p)
+            thr = _engine.resolve_engine(p, prefer=_форс_движка()).abstain_threshold(p)
         else:
             thr = load_abstain_threshold()
-        print(f"  порог abstain_threshold={thr} (board_config.json, backend={os.getenv('EVAL_ENGINE') or 'auto'})")
+        print(f"  порог abstain_threshold={thr} (board_config.json, backend={_форс_движка() or 'auto'})")
         a = abstention_eval(p, thr)
         if a is None:
             continue

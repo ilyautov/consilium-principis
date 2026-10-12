@@ -92,7 +92,7 @@ python3 scripts/eval.py advisors/<имя>                       # 🔵 verified 
 - **Обновить:** повтори установку (`python3 install.py` или установщик Пути 2) — машинерия
   перезапишется, **твоя доска (`advisors/`, `golden/`) сохранится** (слияние, не снос).
 - **Удалить:** ставил плагином — `/plugin uninstall consilium-principis` в Claude Code. Ставил
-  скриптом — снеси папку `rm -rf ~/.claude/skills/consilium-principis` (Windows: удали каталог
+  скриптом — удали папку `~/.claude/skills/consilium-principis` (Windows: удали каталог
   `%USERPROFILE%\.claude\skills\consilium-principis`). Ничего вне неё скилл не пишет.
 
 ---

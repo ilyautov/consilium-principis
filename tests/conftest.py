@@ -39,6 +39,30 @@ def _pin_judge_backend_single_phase(monkeypatch):
     monkeypatch.setenv("CONSILIUM_JUDGE_BACKEND", "ollama")
 
 
+@pytest.fixture(scope="session", autouse=True)
+def _block_real_subscription_cli():
+    """CLI-ПЕСОЧНИЦА: подписочные бэкенды (claude/codex/kimi) — это и сеть, и квота юзера.
+    Реальный запуск CLI из теста обязан упасть ГРОМКО; тесты подменяют cli_backends._run своим
+    monkeypatch (он перекрывает гард и возвращает его на teardown). Утечка LLM_BACKEND=
+    claude|codex|kimi из соседнего теста тоже не дойдёт до провода.
+    Session-scoped setattr/restore, как у сокет-гарда, а НЕ function-scoped monkeypatch: autouse-
+    фикстура с monkeypatch инстанцирует его раньше FS-гарда и сдвигает порядок teardown — гард
+    `git status` ловил чужой ещё не снятый фейк subprocess.run (ошибки в test_install и др.)."""
+    import sys
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                    "scripts"))
+    import cli_backends
+
+    def _refuse(argv, *a, **k):
+        raise AssertionError("тест запустил реальный подписочный CLI: %r" % (argv[:2],))
+    orig = cli_backends._run
+    cli_backends._run = _refuse
+    try:
+        yield
+    finally:
+        cli_backends._run = orig
+
+
 # ───────────────────────── сокет-песочница (M4) ─────────────────────────
 
 _AF_UNIX = getattr(socket, "AF_UNIX", None)

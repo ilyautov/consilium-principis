@@ -5,7 +5,43 @@ versions — [SemVer](https://semver.org/). Dates in ISO (YYYY-MM-DD).
 
 ## [Unreleased]
 
+### Added
+- **Verdict mechanics (`council_verdict`).** After a forum on a decision with 2+ options and 2+
+  seats, each advisor hands in a scorecard (0-10 per option, lens weight 1-3, confidence, ruin risk,
+  door, what would change its mind, a question for the user). Code, not the host, computes the
+  weighted option scores with the math shown, spread, council confidence and the label (GO / GO WITH
+  CONDITIONS / RESHAPE / DON'T / WAIT), then applies overrides: ruin cap (a seat at "likely ruin"
+  without a mitigation it endorsed caps the verdict at RESHAPE), one-way-door cap (split council on
+  an irreversible step caps at GO WITH CONDITIONS and requires the cheapest test), unanimity alarm.
+  Weights can be multiplied by the outcome loop's `advisor_weights` (clamped 0.5-1.5). Cruxes are
+  typed (fact / numbers / values), the minority report carries "right if…", kill criteria and dated
+  steps are checked for completeness. Rendered inside the session widget (`session_render`), rule 19
+  in `INSTRUCTIONS`. Mechanics adapted from roast-room (MIT).
+- **"Where the lens misfires"** section in `persona.md` (`scaffold-persona`, `mdmeta.parse_misfires`,
+  `diversity_check` exposes it), with factual lines pre-filled for the public-domain seats.
+- **Subscription backends (`scripts/cli_backends.py`).** Claude Code, Codex and Kimi Code CLIs as
+  LLM backends without an API key: `LLM_BACKEND=claude|codex|kimi` for `llm_local.generate` and the
+  independent relevance judge. Calls run with argv (no shell), an empty temp cwd, tools and MCP off,
+  no saved sessions; quota/auth/timeout failures (including Kimi's exit-0 quota error) fail closed.
+- **Federation on subscriptions.** `scripts/federation/sub_worker.py` and the MCP tools
+  `subscriptions_status` / `federation_run_subscriptions` let each installed CLI play each advisor
+  with its own model; the server still sets every 🔵. A failing subscription drops out and its
+  replica is returned to the queue at once (`nack`). Shared worker code moved to
+  `federation/worker_common.py`; retrieve refusals are now reported instead of silently yielding
+  zero quotes.
+- `install.py --host codex|kimi|all` (experimental): installs the skill where Codex CLI
+  (`$CODEX_HOME/skills`) and Kimi Code CLI find it, and registers the MCP server (Codex through
+  `codex mcp add`, Kimi through an atomic merge into `~/.kimi-code/mcp.json` with a backup). The
+  MCP server runs from the host's skill folder, so the skill and MCP share one board.
+- A stale Codex entry (server path no longer exists) is detected and replaced; `[mcp_servers.
+  consilium-principis.*]` sub-tables such as tool `approval_mode`, which `codex mcp add` drops, are
+  restored, and `config.toml` is backed up first. Without the `codex` binary the exact command is
+  printed instead. `--dry-run` prints the plan per host; re-runs are idempotent; each host ends with
+  a stdio `initialize` check. Kimi reuses an existing `~/.claude/skills` install.
+
 ### Fixed
+- Test suite: a session-scoped guard makes any test that would launch a real subscription CLI fail
+  loudly.
 - **The skill installs in Hermes Agent.** `SKILL.md` sits at the repo root, so
   Hermes skills-guard scanned the whole repository and rated it DANGEROUS (the
   attack-defence tests with `/etc/passwd` and `__import__('os')` matched

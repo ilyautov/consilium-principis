@@ -37,11 +37,15 @@ fidelity-гейт (best_match) ОДИН раз; surface'ы — чистая пр
     "what_you_lose": str | None,                       # чем платишь за синтез
     "step": str | None,
     "forcing_question": str | None,
+    "council_verdict" | "verdict": dict | None,       # ОПЦ. результат council_verdict.compute_verdict
   }
 Терпимость к алиасам хоста (чтобы вердикт рендерил ДВИЖОК, а не хост руками — трение 2026-07-24):
   advisors[]: плоские 'position'|'stance' (== opinions[].argument) + 'quote' (dict, == opinions[].quote,
   marker берётся из него) синтезируются в один opinion (см. _advisor_opinions). Верхний уровень:
   'verdict' == 'synthesis' (см. _synthesis). Канон всегда в приоритете над алиасом.
+Вердикт-механика (council_verdict): dict-результат compute_verdict кладётся в 'council_verdict'
+  (или в 'verdict', если там dict с 'label' — строковый 'verdict' остаётся алиасом синтеза). Есть —
+  рендерится блок метки/оценок/поправок; нет — вывод байт-в-байт прежний.
 plain по умолчанию: числа сюда не кладём (см. правило «Подача» в SKILL.md) — словесный вывод.
 """
 import html as _html
@@ -100,6 +104,19 @@ def _synthesis(s):
     return v if isinstance(v, str) and v.strip() else None
 
 
+def _council_verdict(s):
+    """Результат council_verdict.compute_verdict из объекта заседания или None. Канон —
+    'council_verdict'; 'verdict' принимается, только если это dict с 'label' (строка 'verdict' —
+    алиас синтеза, см. _synthesis). Кривой dict → None через verdict_view (рендер не падает)."""
+    v = s.get("council_verdict")
+    if not isinstance(v, dict):
+        v = s.get("verdict")
+    if not (isinstance(v, dict) and v.get("label")):
+        return None
+    from council_verdict import verdict_view
+    return v if verdict_view(v) is not None else None
+
+
 def _matrix2x2(s):
     """Нормализованный 2×2 (§4, оси = top_uncertainties расчёта) или None. Fail-closed:
     без ровно двух непустых осей или без валидных квадрантов блок не рендерится."""
@@ -144,7 +161,7 @@ def _onclick(prompt):
 
 # ---------- markdown (портативный, работает в голом Claude Code) ----------
 
-def render_md(s):
+def render_md(s, depth="plain"):
     # _e и в md: Cowork рендерит .md как rich-HTML → raw <img onerror> исполнился бы
     out = ["# Заседание совета", "", f"**Вопрос:** {_e(s['question'])}"]
     if s.get("reframe"):
@@ -182,6 +199,10 @@ def render_md(s):
         out += ["", "## Синтез", _e(synth)]
         if s.get("what_you_lose"):
             out.append(f"_Чем платишь:_ {_e(s['what_you_lose'])}")
+    cv = _council_verdict(s)
+    if cv:
+        from council_verdict import render_verdict_md
+        out += ["", render_verdict_md(cv, lang=None, depth=depth)]
     if s.get("step"):
         out += ["", "## Шаг", _e(s["step"])]
     if s.get("forcing_question"):
@@ -471,6 +492,10 @@ def render_widget(s, actions=None, depth="plain"):
         parts.append('<div class="verdict"><div class="vlabel">Вердикт</div>'
                      f'<p class="vtext">{_e(synth)}</p>{cost}</div>')
 
+    cv = _council_verdict(s)
+    if cv:
+        parts.append(_verdict_widget(cv))
+
     if s.get("step"):
         parts.append('<p class="step"><i class="ti ti-arrow-right" aria-hidden="true"></i>'
                      f'{_e(s["step"])}</p>')
@@ -493,6 +518,61 @@ def render_widget(s, actions=None, depth="plain"):
         for label, p, icon in norm)
     parts.append(f'<div class="acts">{btns}</div></div>')
     return "".join(parts)
+
+
+def _verdict_widget(result):
+    """Блок вердикт-механики в сцене: тем же .rift, что «где расходятся» (CSS не трогаем —
+    стиль сцены байт-в-байт прежний). Инженерия (математика, веса, опровержители, развилки) —
+    в div.eng, видна под тумблером/при depth=expert. Всё экранировано."""
+    from council_verdict import verdict_view
+    v = verdict_view(result)
+    t = v["t"]
+    sd = lambda x: f'<span class="sd">{_e(x)}</span>'
+    rows = [sd(v["scores_line"] + " · " + v["conf_line"])] if v["scores_line"] else []
+    rows += [sd(x) for x in v["overrides"]]
+    if v["wait"]:
+        rows.append(sd(v["wait"]))
+    if v["pillar"]:
+        rows.append(sd(f'{t["pillar"]}: {", ".join(v["pillar"])}'))
+    rows += [sd(x) for x in v["minority"]]
+    if v["test"]:
+        rows.append(sd(f'{t["test"]}: {v["test"]}'))
+    if v["kill"]:
+        rows.append(sd(f'{t["kill"]}: {"; ".join(v["kill"])}'))
+    rows += [sd(f'{t["steps"]}: {x}') for x in v["steps"]]
+    if v["missing"]:
+        rows.append(sd(f'{t["missing"]}: {", ".join(v["missing"])}'))
+    rows += [f'<span class="rs">{_e(t["ask"])}: {_e(q)}</span>' for q in v["questions"]]
+    eng = list(v["math"])
+    eng += [x for x in (v["weights"], v["spread_hint"], v["tie"], v["unanimity"]) if x]
+    eng += [f'{t["falsif"]}: {x}' for x in v["falsifiers"]]
+    eng += [f'{t["cruxes"]}: {x}' for x in v["cruxes"]]
+    eng_html = ('<div class="eng">' + "".join(sd(x) for x in eng) + '</div>') if eng else ""
+    return (f'<div class="rift"><div class="rl">{_e(t["head"])} · {_e(v["label"])}</div>'
+            f'<b style="font-weight:500">{_e(v["headline"])}</b>{"".join(rows)}{eng_html}</div>')
+
+
+def _verdict_html(result):
+    """Секция вердикт-механики для self-contained HTML (без новых стилей)."""
+    from council_verdict import verdict_view
+    v = verdict_view(result)
+    t = v["t"]
+    items = [v["scores_line"] + " · " + v["conf_line"]] if v["scores_line"] else []
+    items += v["overrides"] + ([v["wait"]] if v["wait"] else [])
+    if v["pillar"]:
+        items.append(f'{t["pillar"]}: {", ".join(v["pillar"])}')
+    items += v["minority"]
+    if v["test"]:
+        items.append(f'{t["test"]}: {v["test"]}')
+    if v["kill"]:
+        items.append(f'{t["kill"]}: {"; ".join(v["kill"])}')
+    items += [f'{t["steps"]}: {x}' for x in v["steps"]]
+    if v["missing"]:
+        items.append(f'{t["missing"]}: {", ".join(v["missing"])}')
+    items += [f'{t["ask"]}: {q}' for q in v["questions"]]
+    lis = "".join(f"<li>{_e(x)}</li>" for x in items)
+    return (f'<section class=verdict><h3>{_e(t["head"])}: {_e(v["label"])}</h3>'
+            f'<p><b>{_e(v["headline"])}</b></p><ul>{lis}</ul></section>')
 
 
 # ---------- self-contained HTML (универсальный фолбэк, вне Cowork) ----------
@@ -533,6 +613,9 @@ def render_html(s, title="Заседание совета"):
         body.append(f'<section class=synth><h3>Синтез</h3><p>{_e(s["synthesis"])}</p>'
                     + (f'<p class=lose><em>Чем платишь: {_e(s["what_you_lose"])}</em></p>'
                        if s.get("what_you_lose") else "") + "</section>")
+    cv = _council_verdict(s)
+    if cv:
+        body.append(_verdict_html(cv))
     if s.get("step"):
         body.append(f'<section class=step><h3>Шаг</h3><p>{_e(s["step"])}</p></section>')
     if s.get("forcing_question"):

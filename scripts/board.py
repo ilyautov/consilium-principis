@@ -66,7 +66,7 @@ def cmd_principis(args):
 def cmd_scaffold_persona(args):
     """Записать стартовый persona.md советнику (F2: рецепт не круговой). Тот же шаблон, что и seed.
     Не затирает без --force. Имя фигуры: --name «...» (иначе берётся из имени папки-слага)."""
-    from scaffold import scaffold_persona
+    from scaffold import PD_MISFIRES, scaffold_persona
     paths = [a for a in args if not a.startswith("--")]
     if not paths:
         print("дай advisors/{имя}  [--name «Имя фигуры»]")
@@ -79,7 +79,8 @@ def cmd_scaffold_persona(args):
         return 1
     os.makedirs(adv, exist_ok=True)
     with open(out, "w", encoding="utf-8") as f:
-        f.write(scaffold_persona(name))
+        # курированный PD-слаг (marcus-aurelius, …) → сразу с «Где линза ошибается»
+        f.write(scaffold_persona(name, misfires=PD_MISFIRES.get(os.path.basename(adv.rstrip("/")))))
     print(f"✓ {out} создан — заполни lenses/domains и секции (без них diversity_check не судит).")
     return 0
 

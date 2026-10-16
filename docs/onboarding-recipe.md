@@ -144,7 +144,7 @@ python3 scripts/collect_pd.py advisors/<slug> --url <gutenberg-url> --name <sour
    ```
    - frontmatter: `name, aliases, domains, lenses, consent_status, role_framing` (диверсити судит по `lenses`/`domains` — заполни обязательно).
    - `role_framing` — **3-е лицо** (снижает sycophancy): советник держит свою линзу и скорее оспорит, чем поддакнет.
-   - секции: `## Конституция` (от 1-го лица, ядро голоса) · `## Как спорит` · `## Чего не делает (never_do)` + `never_quote` (явно перечисли известные ФЕЙК-цитаты этой фигуры) · `## Quote bank` (🔵) · `## Где challenge-ит` (под задачу пользователя).
+   - секции: `## Конституция` (от 1-го лица, ядро голоса) · `## Как спорит` · `## Чего не делает (never_do)` + `never_quote` (явно перечисли известные ФЕЙК-цитаты этой фигуры) · `## Quote bank` (🔵) · `## Где challenge-ит` (под задачу пользователя) · `## Где линза ошибается` (опц.: ситуации, где правила фигуры дают осечку — честно, без цитат; для PD-фигур `scaffold-persona` подставит готовые строки).
 4. **ПРОВЕРИТЬ КАЖДУЮ цитату банка контуром** (это и есть ров — не пропускай):
    ```bash
    python3 -c "import sys; sys.path.insert(0,'scripts'); from engine.fidelity import best_match; print(best_match('<точная цитата>', 'advisors/<slug>'))"

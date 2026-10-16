@@ -43,25 +43,9 @@ from federation.executor import claim_brief, submit_candidate
 import llm_local
 from mcp_server import _fidelity_check, _retrieve
 
-# Человекочитаемые имена для промпта воркера. Ключ = slug каталога advisors/<slug>.
-_DISPLAY = {
-    "machiavelli": "Никколо Макиавелли",
-    "marcus-aurelius": "Марк Аврелий",
-    "sun-tzu": "Сунь-цзы",
-}
-
-_WORKER_PROMPT = """Ты играешь советника: {display}.
-Ответь на вопрос его методом и голосом — кратко, по делу, честно (можешь и возразить).
-
-Опору на подлинный текст {display} ты НЕ цитируешь по памяти — цитата из головы даёт 🟡
-(наш сервер её не подтвердит). Вместо этого дай КОРОТКИЙ поисковый запрос НА АНГЛИЙСКОМ
-(язык корпуса) — по нему сервер достанет ДОСЛОВНУЮ цитату из подлинных сочинений и сверит её
-(🔵). Запрос — на английском, даже если твой ответ по-русски. Цитата не нужна — оставь пустым.
-
-Вопрос: {question}
-
-Верни СТРОГО JSON без пояснений и без markdown-ограды:
-{{"argument": "<совет советника по-русски, 3-6 предложений>", "cite_query": "<короткий англ. запрос под твой довод, или пусто>"}}"""
+from federation.worker_common import (DISPLAY as _DISPLAY, WORKER_PROMPT as _WORKER_PROMPT,
+                                      parse_candidate as _parse_candidate)
+from federation.worker_common import ground_via_cite as _ground_common
 
 _BASELINE_PROMPT = """Ответь на вопрос кратко и по делу, как один компетентный советник.
 Вопрос: {question}"""
@@ -82,42 +66,9 @@ def _load_key_from_dotenv():
     return False
 
 
-def _parse_candidate(raw_text):
-    """Модель вернула строку → {argument, cite_query}. Терпим к markdown-ограде/мусору."""
-    s = raw_text.strip()
-    s = re.sub(r"^```(?:json)?", "", s).strip()
-    s = re.sub(r"```$", "", s).strip()
-    m = re.search(r"\{.*\}", s, re.DOTALL)   # выхватить первый JSON-объект
-    if m:
-        s = m.group(0)
-    try:
-        obj = json.loads(s)
-    except Exception:
-        # модель не дала валидный JSON — весь ответ идёт аргументом, без cite-запроса.
-        return {"argument": raw_text.strip()[:8000], "cite_query": ""}
-    return {"argument": str(obj.get("argument", "")).strip(),
-            "cite_query": str(obj.get("cite_query", "")).strip()}
-
-
 def _ground_via_cite(cite_query, advisor_dir, top_k=3, take=2):
-    """Воркер грундится через НАШ retrieve: дословные пассажи из корпуса под англ. cite-запрос.
-    Текст берём ДОСЛОВНО — центральный гейт на assemble подтвердит 🔵 (мы 🔵 сами не ставим)."""
-    if not cite_query:
-        return []
-    try:
-        r = _retrieve(cite_query, advisor_dir, top_k=top_k)
-    except Exception:
-        return []
-    quotes, seen = [], set()
-    for p in (r.get("passages") or []):
-        t = (p.get("text") or "").strip()
-        if not t or t in seen:
-            continue                 # дедуп: retrieve иногда отдаёт near-dup пассажи
-        seen.add(t)
-        quotes.append({"text": t})
-        if len(quotes) >= take:
-            break
-    return quotes
+    """Тонкая обёртка над worker_common.ground_via_cite с нашим _retrieve (общая логика с sub_worker)."""
+    return _ground_common(cite_query, advisor_dir, _retrieve, top_k=top_k, take=take)
 
 
 def run_worker_pass(backend, model, roles, timeout=2.0):

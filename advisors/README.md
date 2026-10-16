@@ -36,5 +36,5 @@ python3 scripts/eval.py advisors/<slug>
 
 `scaffold-persona` (шаг 4) кладёт готовый скелет `persona.md` (frontmatter name/aliases/domains/lenses/
 consent_status/role_framing + секции Конституция / Как спорит / Чего не делает+never_quote / Quote bank 🔵 /
-Где challenge) — заполни его под фигуру. Проверить отдельную цитату:
+Где challenge / Где линза ошибается) — заполни его под фигуру. Проверить отдельную цитату:
 `from engine.fidelity import best_match` → `best_match("<цитата>", "advisors/<slug>")` → `('P1', источник)` = годна на 🔵.

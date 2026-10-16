@@ -91,4 +91,11 @@ def resolve(advisor_dir=None) -> str:
 def info(advisor_dir=None) -> dict:
     """{"backend", "independence", "label"} — честный лейбл уровня для doctor/статуса."""
     b = resolve(advisor_dir)
-    return {"backend": b, "independence": _INDEPENDENCE[b], "label": _LABELS[b]}
+    out = {"backend": b, "independence": _INDEPENDENCE[b], "label": _LABELS[b]}
+    if b == "api":
+        import llm_local
+        cli = llm_local._cli_backend()
+        if cli:                                         # api-уровень едет по подписке CLI, не по ключу
+            out["via"] = cli
+            out["label"] = "независимый (подписка %s — данные уходят провайдеру)" % cli
+    return out

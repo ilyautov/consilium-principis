@@ -15,6 +15,9 @@ diversity_check.py — проверка ортогональности сост�
 """
 import sys, os, re, itertools
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from mdmeta import parse_misfires
+
 def parse_frontmatter_list(text, key):
     # ищем строку 'key: [a, b, c]' внутри первого --- ... --- блока
     m = re.search(r"^---\s*(.*?)\s*^---", text, re.S | re.M)
@@ -36,6 +39,7 @@ def load_advisor(path):
         "name": name.group(1).strip() if name else os.path.basename(path),
         "lenses": set(parse_frontmatter_list(t, "lenses")),
         "domains": set(parse_frontmatter_list(t, "domains")),
+        "misfires": parse_misfires(t),          # «Где линза ошибается» (опц.; нет секции → [])
     }
 
 def jaccard(a, b):

@@ -121,6 +121,29 @@ def _calc_label_text(label):
             % (label["n_uncertainties"], label["seed"], label["n"], label["n"]))
 
 
+def _council_verdict_tool(scorecard, track_weights=None, lang=None):
+    """Вердикт-механика после форума (read-only, ноль LLM): метку считает КОД —
+    взвешенные баллы → полоса → потолки (разорение / необратимость при расколе) → тревога
+    единодушия → ЖДАТЬ. Хост не может «забыть» потолок: он применяется здесь, не в прозе."""
+    from council_verdict import compute_verdict, render_verdict_md, validate_scorecard
+    errors = validate_scorecard(scorecard)
+    if errors:
+        return {"error": "Scorecard вердикта не проходит гейты — метка не посчитана (fail-closed).",
+                "errors": errors, "hint": _RELAY_AS_QUESTIONS_HINT}
+    try:
+        res = compute_verdict(scorecard, track_weights=track_weights)
+    except ValueError as e:                     # кривой track_weights
+        return {"error": str(e), "hint": _RELAY_AS_QUESTIONS_HINT}
+    out = {"verdict": res,
+           "content": render_verdict_md(res, lang=lang if lang in ("ru", "en") else None),
+           "hint": ("Положи `verdict` в объект заседания как council_verdict и отрисуй "
+                    "render_session(surface=widget) — метку и поправки НЕ пересказывай и не смягчай.")}
+    if res["missing"]:
+        out["hint"] += (" Вердикт неполный (%s) — добери у совета до подписи."
+                        % ", ".join(res["missing"]))
+    return out
+
+
 def _run_calculation(map, seed=_CALC_SEED_DEFAULT, n=None):
     """Валидация (fail-closed, errors → вопросы совета) → mc_run (считает ТОЛЬКО код,
     детерминированно) → результат ядра + label_text («📐 рамка») + point-of-use директива.

@@ -19,6 +19,9 @@ install.py — поставить скилл personal-board (Consilium) в ~/.cl
   python3 install.py --name my-board # другое имя скилла
   python3 install.py --in-place      # не копировать, настроить прямо здесь (dev)
   python3 install.py --print         # показать, что будет сделано, и выйти
+  python3 install.py --host codex    # скилл в ~/.codex/skills + MCP через `codex mcp add`
+  python3 install.py --host kimi     # MCP в ~/.kimi-code/mcp.json (+скилл, если его нет в ~/.claude/skills)
+  python3 install.py --host all --dry-run  # Claude Code + Codex + Kimi: только план, без изменений
 """
 from __future__ import annotations
 import argparse, json, os, shutil, subprocess, sys
@@ -52,6 +55,30 @@ _MSG = {
         "start1": "     • «с чего начать» → соберу стартовый совет (Аврелий + Эпиктет)",
         "start2": "     • «что умеешь?»   → меню рецептов простыми фразами",
         "restart": "   Перезапусти Claude Code, чтобы он увидел новый скилл.",
+        "done_partial": "\n⚠️  Скилл поставлен, но MCP-подключение не завершено — см. ⚠️ выше.",
+        "host_flags": "❌ --in-place не сочетается с --host {host}: MCP-хост не должен смотреть в чекаут репо.",
+        "host_target": "❌ --target задаёт одну папку; с --host all его не указывай.",
+        "plan_title": "План установки (--dry-run, ничего не меняю):",
+        "plan_skill_copy": "  [{host}] скилл → {dest}",
+        "plan_skill_reuse": "  [{host}] скилл уже ставится/стоит в {dest} — {host} подхватит его, копию не делаю",
+        "plan_mcp": "  [{host}] MCP: {action}  ({config})",
+        "plan_mcp_cmd": "         команда: {line}",
+        "act_add": "добавлю запись", "act_replace": "заменю запись (другая команда)",
+        "act_replace_stale": "заменю запись (старый путь сервера не существует)",
+        "act_unchanged": "уже подключено, без изменений",
+        "did_add": "запись добавлена", "did_replace": "запись заменена (была другая команда)",
+        "did_replace_stale": "запись заменена (старый путь сервера не существовал)",
+        "did_unchanged": "уже подключено, без изменений",
+        "host_section": "\n━━ {host} ━━",
+        "mcp_done": "🔌 [{host}] MCP {action}: {config}",
+        "mcp_backup": "   бэкап: {backup}",
+        "mcp_preserved": "   под-таблицы [mcp_servers.consilium-principis.*] (approval_mode тулов) восстановлены после `codex mcp add`",
+        "mcp_fail": "⚠️  [{host}] MCP не подключён: {reason}. {hint}",
+        "mcp_manual": "   Команда для ручного запуска:\n   {line}",
+        "check_ok": "🩺 [{host}] {detail}",
+        "check_fail": "⚠️  [{host}] проверка: {detail}. {recovery}",
+        "restart_host": "   Перезапусти {host}, чтобы он увидел скилл и MCP-сервер (поддержка {host} экспериментальная: проверь «с чего начать»).",
+        "host_name_codex": "Codex CLI", "host_name_kimi": "Kimi Code CLI", "host_name_claude": "Claude Code",
     },
     "en": {
         "need_py": "❌ Python 3.10+ required, currently {ver}. Install from https://python.org.",
@@ -72,6 +99,30 @@ _MSG = {
         "start1": '     • "where do I start" → I\'ll assemble a starter council (Aurelius + Epictetus)',
         "start2": '     • "what can you do?" → a recipe menu in plain phrases',
         "restart": "   Restart Claude Code so it picks up the new skill.",
+        "done_partial": "\n⚠️  The skill is installed, but the MCP connection is not complete — see ⚠️ above.",
+        "host_flags": "❌ --in-place cannot be combined with --host {host}: an MCP host must not point at the repo checkout.",
+        "host_target": "❌ --target sets a single folder; do not pass it with --host all.",
+        "plan_title": "Install plan (--dry-run, nothing is changed):",
+        "plan_skill_copy": "  [{host}] skill → {dest}",
+        "plan_skill_reuse": "  [{host}] the skill is (being) installed at {dest} — {host} picks it up, no second copy",
+        "plan_mcp": "  [{host}] MCP: {action}  ({config})",
+        "plan_mcp_cmd": "         command: {line}",
+        "act_add": "will add the entry", "act_replace": "will replace the entry (different command)",
+        "act_replace_stale": "will replace the entry (old server path does not exist)",
+        "act_unchanged": "already connected, no change",
+        "did_add": "entry added", "did_replace": "entry replaced (the command was different)",
+        "did_replace_stale": "entry replaced (the old server path did not exist)",
+        "did_unchanged": "already connected, no change",
+        "host_section": "\n━━ {host} ━━",
+        "mcp_done": "🔌 [{host}] MCP {action}: {config}",
+        "mcp_backup": "   backup: {backup}",
+        "mcp_preserved": "   [mcp_servers.consilium-principis.*] sub-tables (tool approval_mode) restored after `codex mcp add`",
+        "mcp_fail": "⚠️  [{host}] MCP not connected: {reason}. {hint}",
+        "mcp_manual": "   Run this command yourself:\n   {line}",
+        "check_ok": "🩺 [{host}] {detail}",
+        "check_fail": "⚠️  [{host}] check: {detail}. {recovery}",
+        "restart_host": "   Restart {host} so it picks up the skill and the MCP server ({host} support is experimental: try \"where do I start\").",
+        "host_name_codex": "Codex CLI", "host_name_kimi": "Kimi Code CLI", "host_name_claude": "Claude Code",
     },
 }
 
@@ -148,31 +199,9 @@ def write_breadcrumb(dest: Path, semantic: bool) -> None:
         json.dumps(crumb, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-def main() -> None:
-    ap = argparse.ArgumentParser(description="Поставить personal-board (Consilium) в ~/.claude/skills/")
-    ap.add_argument("--name", default=SKILL_NAME, help="имя скилла в ~/.claude/skills/")
-    ap.add_argument("--target", default="", help="переопределить целевую папку целиком")
-    ap.add_argument("--in-place", action="store_true", help="не копировать; настроить прямо здесь (dev)")
-    ap.add_argument("--print", action="store_true", dest="print_only", help="показать план и выйти")
-    ap.add_argument("--setup-full", action="store_true", help="поднять FULL-тир (ollama + pull bge-m3)")
-    args = ap.parse_args()
-    M = _messages(_lang())
-
-    if not py_ok():
-        print(M["need_py"].format(ver=sys.version.split()[0]), file=sys.stderr)
-        sys.exit(1)
-
-    dest = HERE if args.in_place else (Path(args.target).expanduser() if args.target
-                                       else SKILLS_HOME / args.name)
-
-    if args.print_only:
-        print(M["src"].format(here=HERE))
-        print(M["dst"].format(dest=dest, mode=M["mode_inplace"] if args.in_place else M["mode_copy"]))
-        print(M["machinery"].format(items=", ".join(RUNTIME)))
-        print(M["preserved"])
-        return
-
-    if args.in_place:
+def setup_skill(dest: Path, in_place: bool, setup_full: bool, M) -> None:
+    """Скопировать/настроить скилл в dest: тир, board_init (fail-closed), breadcrumb, doctor."""
+    if in_place:
         print(M["setup_inplace"].format(dest=dest))
     else:
         print(M["copying"].format(dest=dest))
@@ -181,7 +210,7 @@ def main() -> None:
     semantic = detect_semantic(dest)
     print(M["tier"].format(tier=M["tier_full"] if semantic else M["tier_simple"]))
     if not semantic:
-        if args.setup_full:
+        if setup_full:
             print(M["raising_full"])
             subprocess.run([sys.executable, "scripts/setup_full.py"], cwd=dest)
         else:
@@ -200,6 +229,150 @@ def main() -> None:
     print(M["selfcheck"])
     sys.stdout.flush()  # иначе вывод субпроцесса перемешается с буфером print
     subprocess.run([sys.executable, "scripts/board.py", "doctor"], cwd=dest)
+
+
+def _host_module():
+    """scripts/host_install.py грузим лениво: путь --host claude его не трогает вовсе."""
+    scripts = str(HERE / "scripts")
+    if scripts not in sys.path:
+        sys.path.insert(0, scripts)
+    import host_install
+    return host_install
+
+
+def _host_mcp(hi, step, dry_run):
+    if step["mcp"] == "codex":
+        return hi.install_codex(step["skill_dir"], codex_dir=step["codex_home"], dry_run=dry_run)
+    return hi.install_kimi(step["skill_dir"], kimi_dir=step["kimi_home"], dry_run=dry_run)
+
+
+def _host_check(hi, step):
+    if step["mcp"] == "codex":
+        return hi.check_codex(codex_dir=step["codex_home"])
+    return hi.check_kimi(kimi_dir=step["kimi_home"])
+
+
+def _report_mcp(M, host, res, dry_run):
+    if dry_run:
+        if res.get("ok"):
+            print(M["plan_mcp"].format(host=host, action=M["act_" + res["action"]], config=res["config"]))
+            if res.get("command_line") and res["action"] != "unchanged":
+                print(M["plan_mcp_cmd"].format(line=res["command_line"]))
+        else:
+            print(M["mcp_fail"].format(host=host, reason=res.get("reason"), hint=res.get("hint") or res.get("error") or ""))
+        return
+    if res.get("ok"):
+        print(M["mcp_done"].format(host=host, action=M["did_" + res["action"]], config=res["config"]))
+        if res.get("backup"):
+            print(M["mcp_backup"].format(backup=res["backup"]))
+        if res.get("preserved_subtables"):
+            print(M["mcp_preserved"])
+    else:
+        print(M["mcp_fail"].format(host=host, reason=res.get("reason"),
+                                   hint=res.get("hint") or res.get("error") or ""))
+        if res.get("manual"):
+            print(M["mcp_manual"].format(line=res["command_line"]))
+
+
+def install_hosts(args, M) -> int:
+    """--host codex|kimi|all или --dry-run: скилл + MCP по хостам (scripts/host_install.py)."""
+    hi = _host_module()
+    hosts = list(hi.HOSTS) if args.host == "all" else [args.host]
+    if args.in_place and hosts != ["claude"]:
+        print(M["host_flags"].format(host=args.host), file=sys.stderr)
+        return 2
+    if args.target and len(hosts) > 1:
+        print(M["host_target"], file=sys.stderr)
+        return 2
+    target = str(Path(args.target).expanduser()) if args.target else None
+    steps = hi.plan(hosts, name=args.name, target=target)
+    if args.in_place:
+        steps[0]["skill_dir"] = str(HERE)
+    name = lambda host: M["host_name_" + host]
+
+    if args.dry_run or args.print_only:
+        print(M["src"].format(here=HERE))
+        print(M["plan_title"])
+        for step in steps:
+            key = "plan_skill_copy" if step["copy"] else "plan_skill_reuse"
+            print(M[key].format(host=name(step["host"]), dest=step["skill_dir"]))
+            if step["mcp"]:
+                _report_mcp(M, name(step["host"]), _host_mcp(hi, step, dry_run=True), dry_run=True)
+        print(M["machinery"].format(items=", ".join(RUNTIME)))
+        print(M["preserved"])
+        return 0
+
+    failed = False
+    for step in steps:
+        host = name(step["host"])
+        print(M["host_section"].format(host=host))
+        dest = Path(step["skill_dir"])
+        if step["mcp"] == "kimi" and not os.path.isdir(step["kimi_home"]):
+            # Kimi не установлен: не плодим ~/.kimi-code ради скилла, который некому читать.
+            res = hi.install_kimi(step["skill_dir"], kimi_dir=step["kimi_home"], dry_run=True)
+            _report_mcp(M, host, res, dry_run=False)
+            failed = True
+            continue
+        if step["copy"]:
+            setup_skill(dest, args.in_place, args.setup_full, M)
+        else:
+            print(M["plan_skill_reuse"].format(host=host, dest=dest))
+        if step["mcp"]:
+            res = _host_mcp(hi, step, dry_run=False)
+            _report_mcp(M, host, res, dry_run=False)
+            if res.get("ok"):
+                check = _host_check(hi, step)
+                if check["ok"]:
+                    print(M["check_ok"].format(host=host, detail=check["detail"]))
+                else:
+                    failed = True
+                    print(M["check_fail"].format(host=host, detail=check["detail"], recovery=check["recovery"]))
+            else:
+                failed = True
+    print(M["done_partial"] if failed else M["done"])
+    for dest in dict.fromkeys(step["skill_dir"] for step in steps):
+        print(M["skill_at"].format(dest=dest))
+    print(M["empty_board"])
+    print(M["start1"])
+    print(M["start2"])
+    for step in steps:
+        key = "restart" if step["host"] == "claude" else "restart_host"
+        print(M[key].format(host=name(step["host"])))
+    return 1 if failed else 0
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser(description="Поставить personal-board (Consilium) в ~/.claude/skills/")
+    ap.add_argument("--name", default=SKILL_NAME, help="имя скилла в ~/.claude/skills/")
+    ap.add_argument("--target", default="", help="переопределить целевую папку целиком")
+    ap.add_argument("--in-place", action="store_true", help="не копировать; настроить прямо здесь (dev)")
+    ap.add_argument("--print", action="store_true", dest="print_only", help="показать план и выйти")
+    ap.add_argument("--setup-full", action="store_true", help="поднять FULL-тир (ollama + pull bge-m3)")
+    ap.add_argument("--host", choices=["claude", "codex", "kimi", "all"], default="claude",
+                    help="куда ставить: claude (по умолчанию), codex, kimi или all (экспериментально для codex/kimi)")
+    ap.add_argument("--dry-run", action="store_true",
+                    help="показать план по хостам (скилл + MCP) и выйти, ничего не меняя")
+    args = ap.parse_args()
+    M = _messages(_lang())
+
+    if not py_ok():
+        print(M["need_py"].format(ver=sys.version.split()[0]), file=sys.stderr)
+        sys.exit(1)
+
+    if args.host != "claude" or args.dry_run:
+        sys.exit(install_hosts(args, M))
+
+    dest = HERE if args.in_place else (Path(args.target).expanduser() if args.target
+                                       else SKILLS_HOME / args.name)
+
+    if args.print_only:
+        print(M["src"].format(here=HERE))
+        print(M["dst"].format(dest=dest, mode=M["mode_inplace"] if args.in_place else M["mode_copy"]))
+        print(M["machinery"].format(items=", ".join(RUNTIME)))
+        print(M["preserved"])
+        return
+
+    setup_skill(dest, args.in_place, args.setup_full, M)
 
     print(M["done"])
     print(M["skill_at"].format(dest=dest))

@@ -403,6 +403,31 @@ def _doctor_failure(detail, recovery):
     return {"name": "mcp-install", "ok": False, "detail": detail, "recovery": recovery}
 
 
+def initialize_handshake(command, args, timeout=_HANDSHAKE_TIMEOUT):
+    """One bounded stdio ``initialize`` exchange with the server.
+
+    Returns ``"ok"``, ``"timeout"``, ``"start_failed:<error>"`` or ``"failed"``.  Shared by
+    Claude Desktop's doctor check and the Codex/Kimi host checks (scripts/host_install.py).
+    """
+    request = {"jsonrpc": "2.0", "id": _HANDSHAKE_ID, "method": "initialize",
+               "params": {"protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": {"name": "consilium-doctor", "version": "1"}}}
+    try:
+        completed = subprocess.run([command, *args], input=json.dumps(request) + "\n", text=True,
+                                   capture_output=True, timeout=timeout, check=False)
+    except subprocess.TimeoutExpired:
+        return "timeout"
+    except OSError as exc:
+        return "start_failed:%s" % exc
+    try:
+        replies = [json.loads(line) for line in completed.stdout.splitlines() if line.strip()]
+    except json.JSONDecodeError:
+        replies = []
+    valid = any(reply.get("id") == _HANDSHAKE_ID
+                and reply.get("result", {}).get("serverInfo", {}).get("name") == NAME
+                for reply in replies if isinstance(reply, dict))
+    return "ok" if completed.returncode == 0 and valid else "failed"
+
+
 def check_install(record_path=None, home=None, timeout=_HANDSHAKE_TIMEOUT):
     """Validate the sanitized install record and perform a bounded stdio initialize handshake."""
     record_path = record_path or install_record_path(home=home)
@@ -437,25 +462,14 @@ def check_install(record_path=None, home=None, timeout=_HANDSHAKE_TIMEOUT):
         if entry != {"command": command, "args": args}:
             return _doctor_failure("MCP host config no longer matches the install record: %s" % path,
                                    "Run scripts/board.py mcp-install to repair the host configuration.")
-    request = {"jsonrpc": "2.0", "id": _HANDSHAKE_ID, "method": "initialize",
-               "params": {"protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": {"name": "consilium-doctor", "version": "1"}}}
-    try:
-        completed = subprocess.run([command, *args], input=json.dumps(request) + "\n", text=True,
-                                   capture_output=True, timeout=timeout, check=False)
-    except subprocess.TimeoutExpired:
+    status = initialize_handshake(command, args, timeout=timeout)
+    if status == "timeout":
         return _doctor_failure("MCP initialize handshake timed out after %ss" % timeout,
                                "Run scripts/board.py mcp-install, then completely restart Claude Desktop.")
-    except OSError as exc:
-        return _doctor_failure("MCP server could not start: %s" % exc,
+    if status.startswith("start_failed:"):
+        return _doctor_failure("MCP server could not start: %s" % status[len("start_failed:"):],
                                "Check the Python command and rerun scripts/board.py mcp-install.")
-    try:
-        replies = [json.loads(line) for line in completed.stdout.splitlines() if line.strip()]
-    except json.JSONDecodeError:
-        replies = []
-    valid = any(reply.get("id") == _HANDSHAKE_ID
-                and reply.get("result", {}).get("serverInfo", {}).get("name") == NAME
-                for reply in replies if isinstance(reply, dict))
-    if completed.returncode != 0 or not valid:
+    if status != "ok":
         return _doctor_failure("MCP initialize handshake failed",
                                "Inspect the server error, rerun scripts/board.py mcp-install, then restart Claude Desktop.")
     return {"name": "mcp-install", "ok": True, "detail": "MCP runtime responds to initialize"}

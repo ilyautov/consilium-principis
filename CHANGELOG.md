@@ -3,10 +3,7 @@
 Format — [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 versions — [SemVer](https://semver.org/). Dates in ISO (YYYY-MM-DD).
 
-## [0.2.0] — unreleased
-
-Manifests and download links say 0.2.0; the `.mcpb` artifact has to be published under the
-v0.2.0 release tag for those links to resolve.
+## [0.2.0] — 2026-10-16
 
 ### Added
 - **Verdict mechanics (`council_verdict`).** After a forum on a decision with 2+ options and 2+
@@ -284,7 +281,8 @@ offline on pure stdlib.
 - Personal data (board, sessions, registries, `.env`) is in `.gitignore` and not part of the
   distribution.
 
-[Unreleased]: https://github.com/ilyautov/consilium-principis/compare/v0.1.3...HEAD
+[Unreleased]: https://github.com/ilyautov/consilium-principis/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/ilyautov/consilium-principis/releases/tag/v0.2.0
 [0.1.3]: https://github.com/ilyautov/consilium-principis/releases/tag/v0.1.3
 [0.1.2]: https://github.com/ilyautov/consilium-principis/releases/tag/v0.1.2
 [0.1.1]: https://github.com/ilyautov/consilium-principis/releases/tag/v0.1.1

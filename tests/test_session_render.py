@@ -288,3 +288,57 @@ def test_canon_opinions_take_priority_over_flat_aliases():
         "opinions": [{"marker": "blue", "argument": "КАНОН-довод"}]}]}
     w = render_widget(s)
     assert "КАНОН-довод" in w and "ПЛОСКИЙ довод-алиас" not in w
+
+
+# ── AI-disclosure (EU AI Act Art. 50) на КАЖДОМ surface заседания, не только на занавесе ──
+import pytest  # noqa: E402
+from session_render import export_session, render_decision_record  # noqa: E402
+
+_RU_DISC = "AI-симуляция по текстам авторов — не сами авторы и не одобрено ими или наследниками."
+_EN_DISC = "AI simulation based on the authors’ texts: not the authors themselves"
+
+
+@pytest.mark.parametrize("sess", [S, _HOST_ALIAS_SESSION,
+                                  {"question": "q", "advisors": [], "questions": ["?"]}])
+def test_every_surface_carries_disclosure_ru(sess, monkeypatch):
+    monkeypatch.delenv("CONSILIUM_LANG", raising=False)
+    md, w, h = render_md(sess), render_widget(sess), render_html(sess)
+    for out in (md, h):
+        assert out.count(_RU_DISC) == 1                          # ровно одна строка, без дублей
+        assert "🔵 — дословно из корпуса, 🟡 — экстраполяция." in out
+    assert w.count(_RU_DISC) == 1
+    assert 'class="disclosure"' in w and 'class="legend eng"' not in w   # видима, не под .eng
+    assert "🔵" not in w and "🟡" not in w                        # дизайн-система: без эмодзи
+
+
+def test_opening_carries_same_disclosure(monkeypatch):
+    monkeypatch.delenv("CONSILIUM_LANG", raising=False)
+    w = render_opening({"advisors": [{"name": "Макиавелли"}]})
+    assert w.count(_RU_DISC) == 1
+    w_en = render_opening({"advisors": [{"name": "Machiavelli"}], "lang": "en"})
+    assert _EN_DISC in w_en and _RU_DISC not in w_en
+
+
+def test_export_carries_disclosure_md_and_html(monkeypatch):
+    monkeypatch.delenv("CONSILIUM_LANG", raising=False)
+    for surface in ("md", "html"):
+        out = export_session(S, surface=surface)["content"]
+        assert out.count(_RU_DISC) == 1
+
+
+def test_disclosure_english_by_session_lang_and_env(monkeypatch):
+    monkeypatch.delenv("CONSILIUM_LANG", raising=False)
+    en = dict(S, lang="en")
+    for out in (render_md(en), render_html(en), render_widget(en),
+                export_session(en)["content"], export_session(en, surface="html")["content"]):
+        assert _EN_DISC in out and _RU_DISC not in out
+    assert "🔵 verbatim from the corpus, 🟡 extrapolation." in render_md(en)
+    monkeypatch.setenv("CONSILIUM_LANG", "en")
+    assert _EN_DISC in render_md(S)
+    assert _RU_DISC in render_md(dict(S, lang="ru"))             # явный lang объекта сильнее env
+
+
+def test_decision_record_carries_disclosure(monkeypatch):
+    monkeypatch.delenv("CONSILIUM_LANG", raising=False)
+    md = render_decision_record({"question": "q", "decision": {"choice": "x"}})
+    assert _RU_DISC in md and md.rstrip().endswith("🟡 — экстраполяция.")

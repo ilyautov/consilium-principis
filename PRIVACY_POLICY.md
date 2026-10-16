@@ -38,6 +38,15 @@ outside your machine when you choose to enable or invoke them:
 - Optional OpenRouter-backed features send the request content and any supplied context needed for
   that call to OpenRouter. Enable it only with a key you control and only for data you are willing to
   send to that provider.
+- Subscription backends (`LLM_BACKEND=claude|codex|kimi` for the relevance judge, and
+  `federation_run_subscriptions` / `scripts/federation/sub_worker.py` for a multi-model council) run
+  the Claude Code, Codex or Kimi Code CLI you installed and logged into. The question, the advisor's
+  role prompt and retrieved corpus passages go to that CLI's provider (Anthropic, OpenAI or Moonshot
+  AI) under your account and its terms, and spend your subscription quota. Nothing is sent this way
+  unless you set the backend or explicitly start the workers. The project never reads or stores the
+  CLIs' credentials; calls run in an empty temporary folder with tools and MCP servers turned off.
+  Kimi Code takes the prompt as a command-line argument, so other local users can see it in the
+  process list while the call runs.
 
 The project does not claim that a third-party service, host, or provider is private. Review each
 provider's settings and privacy terms before sending sensitive material.

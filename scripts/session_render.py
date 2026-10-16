@@ -45,12 +45,63 @@ fidelity-гейт (best_match) ОДИН раз; surface'ы — чистая пр
   'verdict' == 'synthesis' (см. _synthesis). Канон всегда в приоритете над алиасом.
 Вердикт-механика (council_verdict): dict-результат compute_verdict кладётся в 'council_verdict'
   (или в 'verdict', если там dict с 'label' — строковый 'verdict' остаётся алиасом синтеза). Есть —
-  рендерится блок метки/оценок/поправок; нет — вывод байт-в-байт прежний.
+  рендерится блок метки/оценок/поправок; нет — вывод байт-в-байт прежний. Печать (seal) здесь
+  НЕ проверяется — это чистая презентация; проверку/пересчёт делает MCP-граница
+  (council_verdict.gate_session_verdict в render_session/export_session). Здесь — только
+  типизация: кривой dict не роняет рендер и не протаскивает неэкранированный текст.
+AI-disclosure (EU AI Act Art. 50): КАЖДЫЙ surface заседания (md, html, widget, опенинг, экспорт)
+  несёт одну строку раскрытия (_disclosure). Язык — 'lang' объекта ('ru'|'en'), иначе
+  CONSILIUM_LANG (та же логика, что у блока вердикта).
 plain по умолчанию: числа сюда не кладём (см. правило «Подача» в SKILL.md) — словесный вывод.
 """
 import html as _html
 
 _e = _html.escape
+
+
+def _lang(s):
+    """Язык подачи заседания: s['lang'] ('ru'|'en'), иначе CONSILIUM_LANG (council_verdict._lang)."""
+    from council_verdict import _lang as _cv_lang
+    lg = s.get("lang") if isinstance(s, dict) else None
+    return _cv_lang(lg if lg in ("ru", "en") else None)
+
+
+# AI-disclosure одной строкой (EU AI Act Art. 50: ясно, при каждом показе — не только на занавесе).
+_DISCLOSURE = {
+    "ru": ("AI-симуляция по текстам авторов — не сами авторы и не одобрено ими или наследниками. "
+           "🔵 — дословно из корпуса, 🟡 — экстраполяция."),
+    "en": ("AI simulation based on the authors’ texts: not the authors themselves, and not "
+           "endorsed by them or their estates. 🔵 verbatim from the corpus, 🟡 extrapolation."),
+}
+# виджет без эмодзи (дизайн-система Cowork): маркеры названы словами пилюль
+_DISCLOSURE_WIDGET = {
+    "ru": ("AI-симуляция по текстам авторов — не сами авторы и не одобрено ими или наследниками. ",
+           "дословно", " — из корпуса, ", "в духе автора", " — экстраполяция; отказ вместо выдумки, "
+           "если совпадения нет."),
+    "en": ("AI simulation based on the authors’ texts: not the authors themselves, and not "
+           "endorsed by them or their estates. ", "verbatim", " from the corpus, ",
+           "in the author's spirit", " is extrapolation; a refusal instead of an invention when "
+           "there is no match."),
+}
+
+
+def _disclosure(s):
+    return _DISCLOSURE[_lang(s)]
+
+
+def _disclosure_plate(s, emoji=False):
+    """Видимая (не .eng) плашка раскрытия для виджета; стиль .disclosure уже в _STAGE_STYLE.
+    emoji=True — занавес (опенинг): там маркеры ещё не встречались, глифы 🔵/🟡 объясняют их
+    заранее (как и раньше); в ходе заседания — словами пилюль (дизайн-система без эмодзи)."""
+    if emoji:
+        txt = _e(_disclosure(s)).replace("🔵", "<b>🔵</b>").replace("🟡", "<b>🟡</b>")
+        return ('<div class="disclosure"><i class="ti ti-info-circle" aria-hidden="true"></i>'
+                f'<span>{txt}</span></div>')
+    head, blue, mid, yellow, tail = _DISCLOSURE_WIDGET[_lang(s)]
+    return ('<div class="disclosure"><i class="ti ti-info-circle" aria-hidden="true"></i>'
+            f'<span>{_e(head)}<span style="color:var(--color-text-info,#185FA5)">{_e(blue)}</span>'
+            f'{_e(mid)}<span style="color:var(--color-text-warning,#854F0B)">{_e(yellow)}</span>'
+            f'{_e(tail)}</span></div>')
 
 
 def _disagreement(s):
@@ -114,7 +165,10 @@ def _council_verdict(s):
     if not (isinstance(v, dict) and v.get("label")):
         return None
     from council_verdict import verdict_view
-    return v if verdict_view(v) is not None else None
+    try:                                     # verdict_view не бросает; пояс+подтяжки для рендера
+        return v if verdict_view(v) is not None else None
+    except Exception:                        # noqa: BLE001 — кривой вердикт не роняет заседание
+        return None
 
 
 def _matrix2x2(s):
@@ -202,13 +256,13 @@ def render_md(s, depth="plain"):
     cv = _council_verdict(s)
     if cv:
         from council_verdict import render_verdict_md
-        out += ["", render_verdict_md(cv, lang=None, depth=depth)]
+        out += ["", render_verdict_md(cv, lang=_lang(s), depth=depth)]
     if s.get("step"):
         out += ["", "## Шаг", _e(s["step"])]
     if s.get("forcing_question"):
         out += ["", f"**Вопрос-форсаж:** {_e(s['forcing_question'])}"]
-    out += ["", "---",
-            "🔵 дословная цитата (с источником) · 🟡 мысль в духе автора · отказ вместо выдумки."]
+    out += ["", "---", _disclosure(s) + (" Отказ вместо выдумки." if _lang(s) == "ru"
+                                         else " A refusal instead of an invention.")]
     return "\n".join(out)
 
 
@@ -363,10 +417,7 @@ _STAGE_STYLE = (
 # музейный Lister-GPT паттерн — открытое отрицание буквальной идентичности; NO FAKES: прозрачность,
 # не щит). Несёт: что это (AI-представление) · метод (заземлено на публичных текстах) · что
 # гарантирует 🔵 и чего НЕ гарантирует (не сами люди / 🟡 — не их слова).
-_DISCLOSURE_PLATE = (
-    '<div class="disclosure"><i class="ti ti-info-circle" aria-hidden="true"></i>'
-    '<span>Это AI-советники — представления мыслителей, заземлённые на их публичных текстах, '
-    'а не сами люди. <b>🔵</b> — дословно из корпуса; <b>🟡</b> — экстраполяция, не их слова.</span></div>')
+# Текст — общий с ходами заседания (_disclosure_plate), чтобы занавес и каждый ход говорили одно.
 
 
 def render_opening(o, actions=None):
@@ -400,7 +451,7 @@ def render_opening(o, actions=None):
             '<div class="eyebrow"><i class="ti ti-masks-theater" aria-hidden="true"></i>Совет в сборе</div>'
             f'<div class="roster">{"".join(seats)}</div>'
             '<div class="rule"><i class="ti ti-diamond" aria-hidden="true"></i></div>'
-            f'{invite}{asks}{btns}{_DISCLOSURE_PLATE}</div>')
+            f'{invite}{asks}{btns}{_disclosure_plate(o, emoji=True)}</div>')
 
 
 def _pull_quote(q, marker):
@@ -494,7 +545,7 @@ def render_widget(s, actions=None, depth="plain"):
 
     cv = _council_verdict(s)
     if cv:
-        parts.append(_verdict_widget(cv))
+        parts.append(_verdict_widget(cv, _lang(s)))
 
     if s.get("step"):
         parts.append('<p class="step"><i class="ti ti-arrow-right" aria-hidden="true"></i>'
@@ -508,10 +559,7 @@ def render_widget(s, actions=None, depth="plain"):
                  '<span class="lbl-show">показать инженерию</span>'
                  '<span class="lbl-hide">скрыть инженерию</span></button></div>')
 
-    parts.append('<p class="legend eng"><span style="color:var(--color-text-info,#185FA5)">'
-                 'дословно</span> — сверено с корпусом первоисточника · '
-                 '<span style="color:var(--color-text-warning,#854F0B)">в духе автора</span> — '
-                 'экстраполяция · отказ вместо выдумки, если совпадения нет.</p>')
+    parts.append(_disclosure_plate(s))       # видима всегда (раньше легенда пряталась под .eng)
 
     btns = "".join(
         f'<button onclick="{_onclick(p)}"><i class="ti {icon}" aria-hidden="true"></i>{_e(label)}</button>'
@@ -520,12 +568,14 @@ def render_widget(s, actions=None, depth="plain"):
     return "".join(parts)
 
 
-def _verdict_widget(result):
+def _verdict_widget(result, lang=None):
     """Блок вердикт-механики в сцене: тем же .rift, что «где расходятся» (CSS не трогаем —
     стиль сцены байт-в-байт прежний). Инженерия (математика, веса, опровержители, развилки) —
     в div.eng, видна под тумблером/при depth=expert. Всё экранировано."""
     from council_verdict import verdict_view
-    v = verdict_view(result)
+    v = verdict_view(result, lang)
+    if v is None:
+        return ""
     t = v["t"]
     sd = lambda x: f'<span class="sd">{_e(x)}</span>'
     rows = [sd(v["scores_line"] + " · " + v["conf_line"])] if v["scores_line"] else []
@@ -552,10 +602,12 @@ def _verdict_widget(result):
             f'<b style="font-weight:500">{_e(v["headline"])}</b>{"".join(rows)}{eng_html}</div>')
 
 
-def _verdict_html(result):
+def _verdict_html(result, lang=None):
     """Секция вердикт-механики для self-contained HTML (без новых стилей)."""
     from council_verdict import verdict_view
-    v = verdict_view(result)
+    v = verdict_view(result, lang)
+    if v is None:
+        return ""
     t = v["t"]
     items = [v["scores_line"] + " · " + v["conf_line"]] if v["scores_line"] else []
     items += v["overrides"] + ([v["wait"]] if v["wait"] else [])
@@ -615,13 +667,15 @@ def render_html(s, title="Заседание совета"):
                        if s.get("what_you_lose") else "") + "</section>")
     cv = _council_verdict(s)
     if cv:
-        body.append(_verdict_html(cv))
+        body.append(_verdict_html(cv, _lang(s)))
     if s.get("step"):
         body.append(f'<section class=step><h3>Шаг</h3><p>{_e(s["step"])}</p></section>')
     if s.get("forcing_question"):
         body.append(f'<p class=forcing><b>Вопрос-форсаж:</b> {_e(s["forcing_question"])}</p>')
-    body.append('<p class=legend>🔵 дословная цитата (с источником) · 🟡 мысль в духе автора · '
-                'цитата — в оригинале, перевод рядом как глосса.</p>')
+    body.append(f'<p class=legend>{_e(_disclosure(s))} '
+                + ('Цитата — в оригинале, перевод рядом как глосса.' if _lang(s) == "ru"
+                   else 'Quotes stay in the original; the translation sits beside them as a gloss.')
+                + '</p>')
     return (
         "<!doctype html><html lang=ru><meta charset=utf-8>"
         "<meta name=viewport content='width=device-width,initial-scale=1'>"
@@ -725,7 +779,8 @@ def render_decision_record(record, surface="md"):
     green = prov.get("green", 0)
     yellow = prov.get("yellow", 0)
     out += ["", "---",
-            f"Provenance: {blue}🔵 / {green}🟢 / {yellow}🟡 — сколько заземлено vs без опоры."]
+            f"Provenance: {blue}🔵 / {green}🟢 / {yellow}🟡 — сколько заземлено vs без опоры.",
+            _disclosure(record)]
     return "\n".join(out)
 
 

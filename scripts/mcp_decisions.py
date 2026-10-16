@@ -136,8 +136,12 @@ def _council_verdict_tool(scorecard, track_weights=None, lang=None):
         return {"error": str(e), "hint": _RELAY_AS_QUESTIONS_HINT}
     out = {"verdict": res,
            "content": render_verdict_md(res, lang=lang if lang in ("ru", "en") else None),
-           "hint": ("Положи `verdict` в объект заседания как council_verdict и отрисуй "
-                    "render_session(surface=widget) — метку и поправки НЕ пересказывай и не смягчай.")}
+           "hint": ("Положи `verdict` в объект заседания как council_verdict БЕЗ ИЗМЕНЕНИЙ (поле "
+                    "seal — печать кода: правка любого поля или вердикт от руки → render_session "
+                    "снимет блок с verdict_rejected) и отрисуй render_session(surface=widget) — "
+                    "метку и поправки НЕ пересказывай и не смягчай. Надёжнее (переживает рестарт "
+                    "сервера): положи сам scorecard в council_scorecard (+ track_weights в "
+                    "council_track_weights) — render_session пересчитает вердикт сам.")}
     if res["missing"]:
         out["hint"] += (" Вердикт неполный (%s) — добери у совета до подписи."
                         % ", ".join(res["missing"]))

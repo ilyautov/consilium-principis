@@ -85,6 +85,40 @@ def rights_clear(fig):
     )
 
 
+def translation_status(fig, year=None):
+    """Статус ПЕРЕВОДА по юрисдикциям. Автор давно умер, но перевод — отдельное произведение
+    с собственным сроком: US — публикация до 1931 → PD; страны «жизнь+70» (ЕС, UK, РФ ст.1281) —
+    год смерти переводчика + 70. Пример (аудит 2026-10-16): Giles (Сунь-цзы, 1910) умер в 1958 →
+    в ЕС/UK/РФ перевод охраняется до конца 2028, хотя US-PD. → None (данных нет) | dict.
+    rights_clear это НЕ меняет: основание посева — US-PD с Gutenberg; статус — честное
+    предупреждение юзеру вне США, а не гейт (fail-closed по автору уже есть)."""
+    r = fig.get("rights") if isinstance(fig, dict) else None
+    t = r.get("translation") if isinstance(r, dict) else None
+    if not isinstance(t, dict):
+        return None
+    import datetime
+    year = year or datetime.date.today().year
+    tdy, py = t.get("translator_death_year"), t.get("published_year")
+    out = {"translator": t.get("translator", "")}
+    if isinstance(py, int) and not isinstance(py, bool):
+        out["us"] = "public_domain" if py < 1931 else "check"
+    if isinstance(tdy, int) and not isinstance(tdy, bool):
+        free_from = tdy + 71                     # срок истекает 31 декабря (смерть + 70)
+        out["life_plus_70"] = "public_domain" if year >= free_from else "protected"
+        out["life_plus_70_free_from"] = free_from
+    return out
+
+
+def translation_warning(fig, year=None):
+    """Одна человеческая строка, если перевод охраняется в странах «жизнь+70», иначе None."""
+    st = translation_status(fig, year)
+    if st and st.get("life_plus_70") == "protected":
+        return ("перевод %s в ЕС/UK/РФ охраняется до %d года (в США — общественное достояние): "
+                "корпус собирается у тебя локально для личного использования; не распространяй его"
+                % (st["translator"], st["life_plus_70_free_from"]))
+    return None
+
+
 def strip_for_signature(raw):
     """Текст ПОСЛЕ снятия Gutenberg-обёртки — детерминированная основа подписи и сборки."""
     import collect_pd
@@ -145,7 +179,8 @@ def _resolve_ref(ref, root):
     if not fig.get("name") or not isinstance(s, dict) or not s.get("url"):
         return None  # кривая запись → как «нет в каталоге» (callers отдают error-dict)
     return {"name": fig["name"], "edition": s.get("edition", ""), "pd_basis": s.get("pd_basis", ""),
-            "url": s["url"], "expected": s.get("expected")}
+            "url": s["url"], "expected": s.get("expected"),
+            "translation_warning": translation_warning(fig)}
 
 
 def preview_source(ref, *, root, fetch):
@@ -156,8 +191,11 @@ def preview_source(ref, *, root, fetch):
         raw = _decode(fetch(r["url"]))
     except Exception as e:
         return {"ok": False, "error": f"источник недоступен (оффлайн?): {e}"}
-    return build_preview(name=r["name"], edition=r["edition"], pd_basis=r["pd_basis"],
-                         url=r["url"], raw=raw)
+    out = build_preview(name=r["name"], edition=r["edition"], pd_basis=r["pd_basis"],
+                        url=r["url"], raw=raw)
+    if r.get("translation_warning"):
+        out["warnings"].append(r["translation_warning"])
+    return out
 
 
 def add_from_catalog(ref, *, root, license, fetch, build):

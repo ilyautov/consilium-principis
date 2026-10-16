@@ -106,6 +106,7 @@ def test_session_roles_in_enqueue_order(queue, tmp_path):
 
 def test_parse_models():
     assert sub_worker._parse_models("claude=opus, codex=gpt-5,junk,=x") == {"claude": "opus", "codex": "gpt-5"}
+    assert sub_worker._parse_models("claude=--yolo,codex=a b,kimi=kimi-k2:latest") == {"kimi": "kimi-k2:latest"}
 
 
 def test_parse_candidate_tolerates_fences_and_non_object():
@@ -137,7 +138,7 @@ def test_spawn_launches_detached_worker(queue, monkeypatch, tmp_path):
         return 4242
     r = spawn.run_subscriptions(queue, "s 7/../x", str(tmp_path / "state"),
                                 backends=["claude", "codex"], roles=["my-cfo"],
-                                models={"claude": "opus", "codex": "gpt-5", "evil": "x,y"}, popen=popen)
+                                models={"claude": "opus", "codex": "gpt-5"}, popen=popen)
     assert r["spawned"] and r["pid"] == 4242
     assert r["backends"] == ["claude"] and r["missing"] == ["codex"]
     argv = seen["argv"]
@@ -174,3 +175,125 @@ def test_retrieve_refusal_is_reported_not_silent(queue, installed, tmp_path):
     assert row["ok"] and row["n_quotes"] == 0 and row["cite_query"] == "fortune"
     assert row["ground_errors"] == ["retrieve отказал: неизвестный советник"]
     assert any("⚠ retrieve отказал" in m for m in logs)
+
+
+# --- аудит: внутренние сбои, модели, реестр PID и отмена ------------------------------
+
+def test_internal_error_nacks_and_continues(queue, installed, tmp_path):
+    """Неожиданное исключение (не CLIBackendError) не убивает поток: реплика nack'ается,
+    строка {error: internal}, следующая роль играется."""
+    open_session(queue, "s10", _plan(tmp_path), replicas_default=1)
+    calls = []
+
+    def gen(prompt, backend, model=None, timeout=None):
+        calls.append(prompt)
+        if len(calls) == 1:
+            raise KeyError("boom")
+        return _gen(prompt, backend)
+    report = sub_worker.run(queue, ["claude"], ["marcus-aurelius", "my-cfo"], generate_fn=gen,
+                            retrieve_fn=_retrieve, log=lambda m: None)
+    rows = report["claude"]
+    assert rows[0] == {"role": "marcus-aurelius", "ok": False, "error": "internal", "detail": "KeyError"}
+    assert rows[1]["ok"] is True and rows[1]["role"] == "my-cfo"
+    st = queue.status("s10")
+    assert st["claimed"] == 0 and st["pending"] == 1 and st["done"] == 1
+
+
+def test_internal_error_in_retrieve_is_contained(queue, installed, tmp_path):
+    open_session(queue, "s11", _plan(tmp_path), replicas_default=1)
+
+    def bad_retrieve(q, d, top_k=3):
+        raise RuntimeError("индекс сломан")
+    report = sub_worker.run(queue, ["claude"], ["marcus-aurelius"], generate_fn=_gen,
+                            retrieve_fn=bad_retrieve, log=lambda m: None)
+    row = report["claude"][0]
+    # ground_via_cite может сам превратить сбой retrieve в ground_errors — оба исхода честные,
+    # главное: поток жив, реплика не висит claimed.
+    assert row["ok"] is True or row["error"] == "internal"
+    assert queue.status("s11")["claimed"] == 0
+
+
+def test_spawn_rejects_invalid_models(queue, installed, tmp_path):
+    open_session(queue, "s12", _plan(tmp_path), replicas_default=1)
+    never = lambda argv, log: pytest.fail("не должен стартовать")  # noqa: E731
+    r = spawn.run_subscriptions(queue, "s12", str(tmp_path), backends=["claude"],
+                                models={"claude": "--yolo", "evil": "x", "codex": "ok-model"}, popen=never)
+    assert "недопустимые записи models" in r["error"]
+    assert "claude='--yolo'" in r["error"] and "evil=" in r["error"] and "codex='" not in r["error"]
+
+
+def test_spawn_registers_pid_and_cancel_kills_group(queue, installed, tmp_path):
+    open_session(queue, "s13", _plan(tmp_path), replicas_default=1)
+    state = tmp_path / "state"
+    pids = iter([5001, 5002])
+    for _ in range(2):
+        r = spawn.run_subscriptions(queue, "s13", str(state), backends=["claude"],
+                                    popen=lambda argv, log: next(pids))
+        assert r["spawned"]
+    reg = json.loads((state / "sub-workers.json").read_text(encoding="utf-8"))
+    assert [e["pid"] for e in reg["s13"]] == [5001, 5002]
+    assert reg["s13"][0]["backends"] == ["claude"] and reg["s13"][0]["started_at"]
+    assert reg["s13"][0]["log"].endswith(".log")
+    killed = []
+
+    def killer(pid):
+        killed.append(pid)
+        return "gone" if pid == 5002 else "killed"
+    out = spawn.cancel_subscriptions(str(state), "s13", killer=killer)
+    assert killed == [5001, 5002]
+    assert out["cancelled"] == [5001] and out["gone"] == [5002] and out["errors"] == []
+    assert "s13" not in json.loads((state / "sub-workers.json").read_text(encoding="utf-8"))
+    again = spawn.cancel_subscriptions(str(state), "s13", killer=lambda p: pytest.fail("уже вычищено"))
+    assert again["cancelled"] == [] and "note" in again
+
+
+def test_cancel_skips_invalid_pids_and_other_sessions(tmp_path):
+    reg = {"a": [{"pid": 1}, {"pid": 0}, {"pid": -5}, {"pid": True}, {"pid": "123"}, {"pid": 777}],
+           "b": [{"pid": 888}]}
+    (tmp_path / "sub-workers.json").write_text(json.dumps(reg), encoding="utf-8")
+    killed = []
+    out = spawn.cancel_subscriptions(str(tmp_path), "a", killer=lambda p: killed.append(p) or "killed")
+    assert killed == [777] and out["cancelled"] == [777] and len(out["errors"]) == 5
+    left = json.loads((tmp_path / "sub-workers.json").read_text(encoding="utf-8"))
+    assert left == {"b": [{"pid": 888}]}                     # чужая сессия не тронута
+
+
+def test_cancel_without_registry(tmp_path):
+    out = spawn.cancel_subscriptions(str(tmp_path), "nope", killer=lambda p: pytest.fail("x"))
+    assert out["cancelled"] == [] and "note" in out
+
+
+def test_killer_error_reported(tmp_path):
+    (tmp_path / "sub-workers.json").write_text(json.dumps({"a": [{"pid": 4242}]}), encoding="utf-8")
+
+    def boom(pid):
+        raise PermissionError("not permitted")
+    out = spawn.cancel_subscriptions(str(tmp_path), "a", killer=boom)
+    assert out["errors"][0]["pid"] == 4242 and "PermissionError" in out["errors"][0]["error"]
+
+
+@pytest.mark.skipif(os.name == "nt", reason="группы процессов POSIX")
+def test_real_kill_group_terminates_worker(tmp_path):
+    import subprocess
+    import time
+    p = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"], start_new_session=True)
+    try:
+        assert spawn._kill_group(p.pid) == "killed"
+        p.wait(timeout=10)
+        assert spawn._kill_group(p.pid) == "gone"
+    finally:
+        if p.poll() is None:
+            p.kill()
+
+
+def test_log_rotation_keeps_tail(tmp_path):
+    log = tmp_path / "w.log"
+    log.write_bytes(b"A" * (spawn.LOG_MAX_BYTES + 10) + b"TAIL-END")
+    spawn._rotate_log(str(log))
+    data = log.read_bytes()
+    assert len(data) <= spawn.LOG_KEEP_BYTES + 64 and data.endswith(b"TAIL-END")
+    small = tmp_path / "s.log"
+    small.write_bytes(b"x" * 10)
+    spawn._rotate_log(str(small))
+    assert small.read_bytes() == b"x" * 10
+    spawn._rotate_log(str(tmp_path / "missing.log"))          # нет файла — не падаем

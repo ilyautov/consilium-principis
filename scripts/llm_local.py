@@ -71,6 +71,10 @@ def generate(prompt, model=None, temperature=0.3, timeout=120, num_predict=None,
     cli = _cli_backend() if allow_cloud else None
     if cli:
         import cli_backends
+        if cli not in cli_backends.JUDGE_SAFE and os.getenv("CONSILIUM_ALLOW_KIMI_JUDGE") != "1":
+            # Kimi в судьях — только по явному opt-in: у него нет жёсткого выключателя тулов, а
+            # судья кормится сырым текстом корпуса (инъекции). Деградируем как при сбое подписки.
+            return _raw_generate(prompt, GEN_MODEL, temperature, timeout, **extra)
         try:
             return cli_backends.generate(prompt, cli, model=model,
                                          timeout=max(timeout, 60))
@@ -97,6 +101,8 @@ def api_available():
     cli = _cli_backend()
     if cli:
         import cli_backends
+        if cli not in cli_backends.JUDGE_SAFE and os.getenv("CONSILIUM_ALLOW_KIMI_JUDGE") != "1":
+            return False   # generate всё равно уйдёт в ollama — не врём судье/лейблу «подписка kimi»
         return cli_backends.available(cli)
     return False
 

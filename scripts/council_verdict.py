@@ -25,10 +25,28 @@
     разбросе 1 и 7.0 при разбросе 6 — разные ответы, среднее этого не видит.
   • единодушие НЕ меняет метку, а поднимает тревогу: согласие пяти линз на одном вопросе —
     чаще признак того, что сильнейшую альтернативу никто не аргументировал (эхо-камера).
+  • ранжирование — по СЫРОМУ (неокруглённому) баллу; округление до 0.1 — только для показа и
+    полосы. Статус-кво выигрывает лишь при точной (до 1e-9) ничьей сырых баллов: 6.46 и 6.54
+    оба видны как 6.5, но это не ничья — побеждает 6.54 (в notes пишется пояснение).
+
+Печать (seal) — «метку считает КОД, а не хост» на MCP-границе. compute_verdict кладёт в
+результат seal = HMAC-SHA256 канонического JSON результата (без самого seal) на ключе,
+случайном на процесс (_SEAL_KEY, secrets.token_bytes(32) при импорте). verify_seal(result)
+проверяет его. Почему ключ на процесс, а не постоянный: render_session исполняется в ТОМ ЖЕ
+процессе MCP-сервера, что и тул council_verdict, — секрет не нужно хранить на диске, его
+нельзя вычитать из репо, и хост не может подделать {"label": "GO"} или «подкрутить» поправку.
+Цена: после рестарта сервера старые печати недействительны — поэтому надёжный путь через
+процессы — передать в объект заседания сырой council_scorecard (+ council_track_weights):
+render_session пересчитает вердикт сам (gate_session_verdict). Сам session_render печать НЕ
+проверяет (чистая презентация, CLI/тесты зовут его напрямую) — проверка — работа MCP-границы.
 """
 import datetime
+import hashlib
+import hmac
+import json
 import math
 import os
+import secrets
 import sys
 from decimal import ROUND_HALF_UP, Decimal
 from html import escape as _html_escape
@@ -71,6 +89,11 @@ UNANIMITY_WINDOW = 1            # все оценки на общем фавор
 
 SINGLE_VOICE_ERROR = "совет из одного голоса — это консультация, не вердикт"
 
+RAW_TIE_EPS = 1e-9              # «точная» ничья сырых баллов (float-шум суммирования, не 0.1)
+
+# ключ печати — случайный на процесс (см. docstring модуля: почему не постоянный)
+_SEAL_KEY = secrets.token_bytes(32)
+
 
 def _e(x):
     """Экранирование для md: Cowork рендерит .md как rich-HTML (как в session_render.render_md),
@@ -79,8 +102,11 @@ def _e(x):
 
 
 def label_text(code, lang="ru"):
-    """Код метки → подпись на языке подачи (ru по умолчанию, en при lang='en')."""
-    return (LABELS_EN if lang == "en" else LABELS_RU).get(code, str(code))
+    """Код метки → подпись на языке подачи (ru по умолчанию, en при lang='en').
+    Не-строка (list/dict от кривого хоста) не роняет — просто str()."""
+    if not isinstance(code, str):
+        return str(code)
+    return (LABELS_EN if lang == "en" else LABELS_RU).get(code, code)
 
 
 def _lang(lang):
@@ -346,12 +372,16 @@ def validate_scorecard(card):
     elif len(seats) < 2:
         errors.append(SINGLE_VOICE_ERROR[0].upper() + SINGLE_VOICE_ERROR[1:] +
                       ": нужно минимум два места (seats).")
-    for i, seat in enumerate(seats):
+    seen = set()            # сверка без регистра/краевых пробелов — как в _track_multipliers:
+    for i, seat in enumerate(seats):   # иначе «Сенека» и «сенека » — два места с ОДНИМ треком
         name = _validate_seat(seat, i, option_ids, errors)
         if name is not None:
-            if name in seat_names:
-                errors.append("Имя советника «%s» повторяется — у каждого места одно имя." % name)
+            key = name.strip().lower()
+            if key in seen:
+                errors.append("Имя советника «%s» повторяется (без учёта регистра и пробелов) — "
+                              "у каждого места одно имя." % name)
             else:
+                seen.add(key)
                 seat_names.append(name)
 
     _validate_cruxes(card, seat_names, errors)
@@ -470,11 +500,14 @@ def compute_verdict(card, track_weights=None):
                        "status_quo": oid == sq_id, "score": sc, "raw": raw,
                        "math": "%s (%s) / %s = %.1f" % (oid, terms, _fmt(total_w), sc)})
 
-    top = max(x["score"] for x in scores)
-    tied = [x["id"] for x in scores if x["score"] == top]
+    # ранжирование по СЫРОМУ баллу: округлённый — только для показа (см. docstring модуля)
+    top_raw = max(x["raw"] for x in scores)
+    tied = [x["id"] for x in scores if top_raw - x["raw"] <= RAW_TIE_EPS]
     tie = len(tied) > 1
     rec_id = sq_id if (tie and sq_id in tied) else tied[0]
     rec = next(x for x in scores if x["id"] == rec_id)
+    rounded_peers = [x["id"] for x in scores
+                     if x["id"] not in tied and x["score"] == rec["score"]]
 
     rec_seat_scores = [s["scores"][rec_id] for s in seats]
     spread = max(rec_seat_scores) - min(rec_seat_scores)
@@ -495,6 +528,10 @@ def compute_verdict(card, track_weights=None):
                        % (rec_id, rec_label, rec["score"], label_text(label)))
     base_label = label
     overrides, missing, notes = [], [], []
+    if rounded_peers:
+        notes.append("После округления %s и %s показаны с одинаковым баллом %.1f, но по точному "
+                     "счёту выше %s — это не ничья." % (rec_id, ", ".join(rounded_peers),
+                                                       rec["score"], rec_id))
 
     # 1. ruin_cap — риск разорения без одобренной самим советником страховки
     endorsed = {m["seat"] for m in (card.get("ruin_mitigations") or []) if m.get("endorsed") is True}
@@ -600,7 +637,7 @@ def compute_verdict(card, track_weights=None):
     else:
         call = "Рекомендация совета: %s «%s» — %s." % (rec_id, rec_label, label_text(label))
 
-    return {
+    result = {
         "label": label,
         "label_ru": label_text(label, "ru"),
         "label_en": label_text(label, "en"),
@@ -639,6 +676,77 @@ def compute_verdict(card, track_weights=None):
         "questions": {s["name"]: s["question_for_user"] for s in seats},
         "notes": notes,
     }
+    result["seal"] = _seal(result)
+    return result
+
+
+# ── печать (seal) ───────────────────────────────────────────────────────────
+
+def _canon_num(x):
+    """Нормализация перед хешем: целый float == int (8.0 ≡ 8) — хост, пересериализуя JSON,
+    часто теряет «.0»; это не подделка. Нецелые float сравниваются как есть (repr)."""
+    if isinstance(x, float) and x.is_integer():
+        return int(x)
+    if isinstance(x, dict):
+        return {k: _canon_num(v) for k, v in x.items()}
+    if isinstance(x, (list, tuple)):
+        return [_canon_num(v) for v in x]
+    return x
+
+
+def _seal(result):
+    body = {k: v for k, v in result.items() if k != "seal"}
+    canon = json.dumps(_canon_num(body), sort_keys=True, ensure_ascii=False,
+                       separators=(",", ":"))
+    return hmac.new(_SEAL_KEY, canon.encode("utf-8"), hashlib.sha256).hexdigest()
+
+
+def verify_seal(result):
+    """True ⇔ result — неизменённый выход compute_verdict ЭТОГО процесса. Никогда не бросает
+    (кривой вход / не-JSON-сериализуемое → False)."""
+    if not isinstance(result, dict) or not isinstance(result.get("seal"), str):
+        return False
+    try:
+        expected = _seal(result)
+    except (TypeError, ValueError, RecursionError):
+        return False
+    return hmac.compare_digest(expected, result["seal"])
+
+
+VERDICT_REJECTED_RU = ("метка не подтверждена кодом council_verdict — пересчитай через "
+                       "council_verdict и передай результат как есть")
+
+
+def gate_session_verdict(session):
+    """MCP-граница render_session/export_session: (session', verdict_rejected | None).
+
+    • есть council_scorecard → вердикт ПЕРЕСЧИТЫВАЕТСЯ здесь (с council_track_weights, если
+      есть); любой вердикт хоста игнорируется. Scorecard не проходит гейты → блок вердикта
+      снят, причина — в verdict_rejected.
+    • иначе dict в council_verdict (или dict в verdict) должен нести валидную печать; нет —
+      блок снят из рендера, причина — в verdict_rejected. Строковый verdict (алиас синтеза)
+      не трогаем. Исходный объект не мутируется (поверхностная копия)."""
+    if not isinstance(session, dict):
+        return session, None
+    alias_dict = isinstance(session.get("verdict"), dict)
+    card = session.get("council_scorecard")
+    if card is not None:
+        out = {k: v for k, v in session.items() if k != "council_verdict"
+               and not (k == "verdict" and alias_dict)}
+        try:
+            out["council_verdict"] = compute_verdict(
+                card, track_weights=session.get("council_track_weights"))
+        except ValueError as e:
+            return out, ("council_scorecard не проходит гейты — вердикт не отрисован: %s" % e)
+        return out, None
+    cand = session.get("council_verdict")
+    if not isinstance(cand, dict):
+        cand = session.get("verdict") if alias_dict else None
+    if cand is None or verify_seal(cand):
+        return session, None
+    out = {k: v for k, v in session.items() if k != "council_verdict"
+           and not (k == "verdict" and alias_dict)}
+    return out, VERDICT_REJECTED_RU
 
 
 # ── подача ──────────────────────────────────────────────────────────────────
@@ -687,92 +795,119 @@ _RULE_EN = {
 }
 
 
+def _L(x):
+    """Список или [] — всё прочее (5, "x", dict, None) кривой вход от хоста: не итерируем."""
+    return x if isinstance(x, list) else []
+
+
+def _D(x):
+    return x if isinstance(x, dict) else {}
+
+
+def _s(x):
+    """Безопасная строка для подачи (None → '')."""
+    return "" if x is None else str(x)
+
+
+def _sfmt(x, default="?"):
+    """_fmt, который не бросает (не-число, огромный int, list…) → default."""
+    try:
+        return _fmt(x)
+    except (TypeError, ValueError, OverflowError):
+        return default
+
+
 def _override_line(o, rec_id, lang):
     rule = o.get("rule")
     if lang == "ru":
         if rule == "unanimity":
             return "Тревога единодушия: аргументировать %s в полную силу (метка не меняется)." \
-                % o.get("alternative")
-        return str(o.get("reason") or o.get("effect") or rule)
+                % _s(o.get("alternative"))
+        return _s(o.get("reason") or o.get("effect") or rule)
     if rule == "ruin_cap":
-        return _RULE_EN[rule] % (", ".join(o.get("seats") or []), rec_id, label_text(o.get("to"), "en"))
+        return _RULE_EN[rule] % (", ".join(_s(x) for x in _L(o.get("seats"))), rec_id,
+                                 label_text(o.get("to"), "en"))
     if rule == "one_way_cap":
-        return _RULE_EN[rule] % (_fmt(o.get("spread", 0)), label_text(o.get("to"), "en"))
+        return _RULE_EN[rule] % (_sfmt(o.get("spread", 0)), label_text(o.get("to"), "en"))
     if rule == "unanimity":
-        return _RULE_EN[rule] % o.get("alternative")
+        return _RULE_EN[rule] % _s(o.get("alternative"))
     if rule == "wait":
         return "Wait: label set to WAIT."
-    return str(rule)
+    return _s(rule)
 
 
 def verdict_view(result, lang=None):
-    """Результат compute_verdict → плоские строки для подачи ({...} или None на кривом входе)."""
-    if not isinstance(result, dict) or result.get("label") not in LABELS_RU:
+    """Результат compute_verdict → плоские строки для подачи ({...} или None на кривом входе).
+    НИКОГДА не бросает: каждый список/словарь типизируется, кривые элементы пропускаются
+    (хост может прислать scores: 5, minority: 5, overrides: "x", options не списком…)."""
+    if not isinstance(result, dict):
+        return None
+    code = result.get("label")
+    if not (isinstance(code, str) and code in LABELS_RU):
         return None
     lang = _lang(lang)
     t = _T[lang]
-    rec = result.get("recommended") if isinstance(result.get("recommended"), dict) else {}
-    rec_id = str(rec.get("id", ""))
+    rec = _D(result.get("recommended"))
+    rec_id = _s(rec.get("id"))
     sc_parts = []
-    for x in result.get("scores") or []:
+    for x in _L(result.get("scores")):
         if not isinstance(x, dict):
             continue
-        sq = " (%s)" % t["sq"] if x.get("status_quo") else ""
+        sq = " (%s)" % t["sq"] if x.get("status_quo") is True else ""
         try:
-            sc_parts.append("%s %.1f%s" % (x.get("id"), float(x.get("score")), sq))
-        except (TypeError, ValueError):
+            sc_parts.append("%s %.1f%s" % (_s(x.get("id")), float(x.get("score")), sq))
+        except (TypeError, ValueError, OverflowError):
             continue
     if lang == "ru":
-        headline = str(result.get("call") or "")
-    elif rec.get("status_quo"):
-        headline = "Best option: don't act, keep things as they are (%s \"%s\")." % (rec_id, rec.get("label", ""))
+        headline = _s(result.get("call"))
+    elif rec.get("status_quo") is True:
+        headline = "Best option: don't act, keep things as they are (%s \"%s\")." % (
+            rec_id, _s(rec.get("label")))
     else:
-        headline = "Council recommends %s \"%s\": %s." % (rec_id, rec.get("label", ""),
-                                                          label_text(result["label"], "en"))
-    try:
-        spread = _fmt(result.get("spread", 0))
-    except (TypeError, ValueError):
-        spread = "?"
+        headline = "Council recommends %s \"%s\": %s." % (rec_id, _s(rec.get("label")),
+                                                          label_text(code, "en"))
+    spread = _sfmt(result.get("spread", 0))
+    questions = _D(result.get("questions"))
     view = {
-        "label": label_text(result["label"], lang),
-        "code": result["label"],
+        "label": label_text(code, lang),
+        "code": code,
         "headline": headline,
         "scores_line": "%s: %s" % (t["scores"], " · ".join(sc_parts)) if sc_parts else "",
-        "conf_line": t["conf"] % (result.get("council_confidence", "?"), spread),
-        "overrides": [_override_line(o, rec_id, lang) for o in (result.get("overrides") or [])
+        "conf_line": t["conf"] % (_s(result.get("council_confidence", "?")), spread),
+        "overrides": [_override_line(o, rec_id, lang) for o in _L(result.get("overrides"))
                       if isinstance(o, dict)],
-        "minority": [t["minority"] % (m.get("seat", ""), m.get("claim", ""), m.get("right_if", ""))
-                     for m in (result.get("minority") or []) if isinstance(m, dict)],
-        "kill": [str(k) for k in (result.get("kill_criteria") or [])],
-        "steps": ["%s: %s" % (s.get("when", ""), s.get("action", ""))
-                  for s in (result.get("steps") or []) if isinstance(s, dict)],
-        "test": str(result["cheapest_test"]) if result.get("cheapest_test") else "",
+        "minority": [t["minority"] % (_s(m.get("seat")), _s(m.get("claim")), _s(m.get("right_if")))
+                     for m in _L(result.get("minority")) if isinstance(m, dict)],
+        "kill": [_s(k) for k in _L(result.get("kill_criteria")) if k is not None],
+        "steps": ["%s: %s" % (_s(st.get("when")), _s(st.get("action")))
+                  for st in _L(result.get("steps")) if isinstance(st, dict)],
+        "test": _s(result.get("cheapest_test")) if result.get("cheapest_test") else "",
         "wait": "",
-        "pillar": [str(p.get("seat", "")) for p in (result.get("pillar_fixes") or [])
+        "pillar": [_s(p.get("seat")) for p in _L(result.get("pillar_fixes"))
                    if isinstance(p, dict)],
-        "questions": ["%s: %s" % (k, v) for k, v in (result.get("questions") or {}).items()]
-        if isinstance(result.get("questions"), dict) else [],
-        "missing": [t["missing_names"].get(m, str(m)) for m in (result.get("missing") or [])],
+        "questions": ["%s: %s" % (k, _s(v)) for k, v in questions.items()],
+        "missing": [t["missing_names"].get(m, m) if isinstance(m, str) else _s(m)
+                    for m in _L(result.get("missing"))],
         "t": t,
     }
     w = result.get("wait")
     if isinstance(w, dict):
-        view["wait"] = t["wait"] % (w.get("trigger", ""), w.get("date", ""), w.get("if_fails", ""))
+        view["wait"] = t["wait"] % (_s(w.get("trigger")), _s(w.get("date")), _s(w.get("if_fails")))
     # expert
-    view["math"] = [str(x.get("math")) for x in (result.get("scores") or [])
+    view["math"] = [_s(x.get("math")) for x in _L(result.get("scores"))
                     if isinstance(x, dict) and x.get("math")]
-    ws = result.get("weights") if isinstance(result.get("weights"), dict) else {}
-    view["weights"] = (t["weights"] % result.get("weights_source", "relevance")) + ": " + " · ".join(
-        "%s %s" % (k, _fmt(v.get("effective", 0))) for k, v in ws.items() if isinstance(v, dict)) \
-        if ws else ""
+    ws = _D(result.get("weights"))
+    view["weights"] = (t["weights"] % (_s(result.get("weights_source", "relevance")),)) + ": " + \
+        " · ".join("%s %s" % (k, _sfmt(v.get("effective", 0))) for k, v in ws.items()
+                   if isinstance(v, dict)) if ws else ""
     view["spread_hint"] = t["spread_hint"] % (spread, rec_id)
-    view["tie"] = (t["tie"] % "/".join(result.get("tied") or [])) if result.get("tie") else ""
-    view["falsifiers"] = ["%s: %s" % (k, v) for k, v in (result.get("falsifiers") or {}).items()] \
-        if isinstance(result.get("falsifiers"), dict) else []
-    cx = result.get("cruxes") if isinstance(result.get("cruxes"), dict) else {}
-    view["cruxes"] = ["[%s] %s" % (t["kinds"].get(k, k), c.get("question", ""))
-                      for k in CRUX_KINDS for c in (cx.get(k) or []) if isinstance(c, dict)]
-    view["unanimity"] = str(result.get("unanimity_instruction") or "") if lang == "ru" else (
+    view["tie"] = (t["tie"] % "/".join(_s(x) for x in _L(result.get("tied")))) \
+        if result.get("tie") is True else ""
+    view["falsifiers"] = ["%s: %s" % (k, _s(v)) for k, v in _D(result.get("falsifiers")).items()]
+    cx = _D(result.get("cruxes"))
+    view["cruxes"] = ["[%s] %s" % (t["kinds"].get(k, k), _s(c.get("question")))
+                      for k in CRUX_KINDS for c in _L(cx.get(k)) if isinstance(c, dict)]
+    view["unanimity"] = _s(result.get("unanimity_instruction") or "") if lang == "ru" else (
         "Every seat ranks %s first within 1 point. Name the strongest unargued alternative as a "
         "crux and have the most exposed lenses argue it at full strength." % rec_id
         if result.get("unanimity_alarm") else "")

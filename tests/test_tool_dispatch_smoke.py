@@ -45,6 +45,7 @@ _SMOKE = {
     "council_verdict": lambda t: {"scorecard": {}},
     "subscriptions_status": lambda t: {},
     "federation_run_subscriptions": lambda t: {"session_id": "no-such-session"},
+    "federation_cancel_subscriptions": lambda t: {"session_id": "no-such-session"},
 }
 
 

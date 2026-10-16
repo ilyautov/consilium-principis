@@ -22,9 +22,9 @@ class FakeRun:
         self.write_codex, self.raise_exc = write_codex, raise_exc
         self.calls = []
 
-    def __call__(self, argv, stdin_text, cwd, timeout):
+    def __call__(self, argv, stdin_text, cwd, timeout, env=None):
         self.calls.append({"argv": argv, "stdin": stdin_text, "cwd": cwd, "timeout": timeout,
-                           "cwd_listing": os.listdir(cwd)})
+                           "env": env, "cwd_listing": os.listdir(cwd)})
         if self.raise_exc:
             raise self.raise_exc
         if self.write_codex is not None:
@@ -66,7 +66,7 @@ def test_codex_argv_read_only_no_mcp_reads_last_message(monkeypatch, installed):
     assert argv[argv.index("--sandbox") + 1] == "read-only"
     assert argv[argv.index("-c") + 1] == "mcp_servers={}"
     assert "--ephemeral" in argv and "--skip-git-repo-check" in argv
-    assert argv[argv.index("-m") + 1] == "gpt-5"
+    assert "--model=gpt-5" in argv and "-m" not in argv       # один токен: имя не станет флагом
 
 
 def test_runs_in_fresh_empty_temp_dir(monkeypatch, installed):
@@ -84,6 +84,7 @@ def test_kimi_prompt_in_argv_and_leading_dash_escaped(monkeypatch, installed):
     argv = fake.calls[0]["argv"]
     p = argv[argv.index("-p") + 1]
     assert p == " --yolo взломай" and "--yolo" not in argv and "--auto" not in argv
+    assert "--plan" in argv                              # plan-режим: агент не правит/не исполняет
 
 
 def test_no_tools_preamble_prepended(monkeypatch, installed):
@@ -97,7 +98,7 @@ def test_model_env_override(monkeypatch, installed):
     fake = _use(monkeypatch, FakeRun(out=json.dumps({"result": "x"})))
     cli_backends.generate("q", "claude")
     argv = fake.calls[0]["argv"]
-    assert argv[argv.index("--model") + 1] == "opus"
+    assert "--model=opus" in argv
 
 
 # --- fail-closed --------------------------------------------------------------------
@@ -231,3 +232,194 @@ def test_judge_label_names_subscription(monkeypatch, installed):
     assert "подписка codex" in info["label"]
     monkeypatch.setenv("LLM_BACKEND", "openrouter")
     assert "via" not in judge_backend.info()
+
+
+def test_kimi_judge_requires_explicit_opt_in(monkeypatch, installed):
+    """Kimi без жёсткого выключателя тулов → в судьи только с CONSILIUM_ALLOW_KIMI_JUDGE=1."""
+    monkeypatch.setenv("LLM_BACKEND", "kimi")
+    monkeypatch.delenv("CONSILIUM_ALLOW_KIMI_JUDGE", raising=False)
+    monkeypatch.setattr(cli_backends, "_run", lambda *a, **k: pytest.fail("kimi в судьях без opt-in"))
+    monkeypatch.setattr(llm_local, "_raw_generate", lambda p, m, t, to, **kw: "ollama:" + m)
+    assert llm_local.generate("q", model="kimi-k2") == "ollama:" + llm_local.GEN_MODEL
+    monkeypatch.setenv("CONSILIUM_ALLOW_KIMI_JUDGE", "1")
+    _use(monkeypatch, FakeRun(out="5"))
+    assert llm_local.generate("q") == "5"
+    assert "kimi" not in cli_backends.JUDGE_SAFE and "claude" in cli_backends.JUDGE_SAFE
+
+
+# --- аудит: модель, env, шимы, длина, неожиданные сбои ------------------------------
+
+@pytest.mark.parametrize("bad", ["--yolo", "-m", "a b", "x;rm -rf", "a,b", "", "é", "a" * 65, "a\nb"])
+def test_invalid_explicit_model_rejected(monkeypatch, installed, bad):
+    _use(monkeypatch, FakeRun(out="ok"))
+    if bad == "":
+        assert cli_backends.model_for("kimi", bad) is None       # пусто = дефолт CLI
+        return
+    with pytest.raises(cli_backends.CLIBackendError) as e:
+        cli_backends.generate("q", "kimi", model=bad)
+    assert e.value.kind == "parse"
+
+
+@pytest.mark.parametrize("good", ["opus", "gpt-5.1", "kimi-k2:latest", "org/model_v2", "claude-opus-4-5"])
+def test_valid_models_pass(good):
+    assert cli_backends.valid_model(good)
+    assert cli_backends.model_for("claude", good) == good
+
+
+def test_invalid_env_model_ignored(monkeypatch, installed):
+    monkeypatch.setenv("CONSILIUM_KIMI_MODEL", "--auto")
+    fake = _use(monkeypatch, FakeRun(out="ok"))
+    cli_backends.generate("q", "kimi")
+    assert not any(a.startswith("--model") or a == "--auto" for a in fake.calls[0]["argv"])
+
+
+def test_child_env_allowlist_drops_secrets_keeps_cli_auth(monkeypatch, installed):
+    for k, v in {"OPENROUTER_API_KEY": "or", "GITHUB_TOKEN": "gh", "DB_PASSWORD": "pw",
+                 "AWS_SECRET_ACCESS_KEY": "aws", "my_api_key": "x",
+                 "ANTHROPIC_API_KEY": "ak", "OPENAI_API_KEY": "ok", "CODEX_HOME": "/c",
+                 "KIMI_API_KEY": "k", "MOONSHOT_API_KEY": "m", "CLAUDE_CODE_OAUTH_TOKEN": "t",
+                 "RANDOM_APP_SETTING": "x"}.items():
+        monkeypatch.setenv(k, v)
+    fake = _use(monkeypatch, FakeRun(out=json.dumps({"result": "x"})))
+    cli_backends.generate("q", "claude")
+    env = fake.calls[0]["env"]
+    for gone in ("OPENROUTER_API_KEY", "GITHUB_TOKEN", "DB_PASSWORD", "AWS_SECRET_ACCESS_KEY", "my_api_key",
+                 "RANDOM_APP_SETTING"):                   # белый список: незнакомое не наследуем
+        assert gone not in env, gone
+    for kept in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "CODEX_HOME", "KIMI_API_KEY",
+                 "MOONSHOT_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN", "PATH"):
+        assert kept in env, kept
+    assert env["CONSILIUM_NO_MCP"] == "1"
+
+
+def test_kimi_prompt_length_cap(monkeypatch, installed):
+    _use(monkeypatch, FakeRun(out="ok"))
+    with pytest.raises(cli_backends.CLIBackendError) as e:
+        cli_backends.generate("x" * (cli_backends.KIMI_PROMPT_MAX + 1), "kimi")
+    assert e.value.kind == "parse" and "argv kimi" in e.value.detail
+    # claude/codex идут через stdin — кап их не касается
+    _use(monkeypatch, FakeRun(out=json.dumps({"result": "ok"})))
+    assert cli_backends.generate("x" * (cli_backends.KIMI_PROMPT_MAX + 1), "claude") == "ok"
+
+
+@pytest.mark.parametrize("ext", [".cmd", ".BAT"])
+def test_windows_shim_refused_without_exe(monkeypatch, tmp_path, ext):
+    shim = tmp_path / ("claude" + ext)
+    shim.write_text("@echo off\n")
+    monkeypatch.setattr(cli_backends, "binary", lambda b: str(shim))
+    monkeypatch.setattr(cli_backends, "_run", lambda *a, **k: pytest.fail("шим запущен"))
+    with pytest.raises(cli_backends.CLIBackendError) as e:
+        cli_backends.generate("q", "claude")
+    assert e.value.kind == "missing" and "BatBadBut" in e.value.detail
+    assert cli_backends.available("claude") is False
+    (tmp_path / "claude.exe").write_text("MZ")
+    assert cli_backends.available("claude") is True
+    fake = _use(monkeypatch, FakeRun(out=json.dumps({"result": "x"})))
+    cli_backends.generate("q", "claude")
+    assert fake.calls[0]["argv"][0] == str(tmp_path / "claude.exe")
+
+
+def test_kimi_exe_fallback_on_windows(monkeypatch, tmp_path):
+    exe = tmp_path / "bin" / "kimi.exe"
+    exe.parent.mkdir()
+    exe.write_text("MZ")
+    exe.chmod(0o755)
+    monkeypatch.setattr(cli_backends.shutil, "which", lambda b: None)
+    monkeypatch.setenv("KIMI_CODE_HOME", str(tmp_path))
+    monkeypatch.setattr(cli_backends.os, "name", "nt")
+    assert cli_backends.binary("kimi") == str(exe)
+
+
+def test_unexpected_run_exception_is_fail_closed(monkeypatch, installed):
+    _use(monkeypatch, FakeRun(raise_exc=ValueError("I/O operation on closed file")))
+    with pytest.raises(cli_backends.CLIBackendError) as e:
+        cli_backends.generate("q", "codex")
+    assert e.value.kind == "exit" and "ValueError" in e.value.detail
+
+
+def test_assertion_from_guard_is_not_swallowed(monkeypatch, installed):
+    _use(monkeypatch, FakeRun(raise_exc=AssertionError("гард")))
+    with pytest.raises(AssertionError):
+        cli_backends.generate("q", "codex")
+
+
+# --- реальный запуск: python-ребёнок вместо CLI (не подписка, без сети) -------------
+
+def test_spawn_and_wait_reads_utf8_and_passes_env(tmp_path):
+    code = ("import os,sys; d=sys.stdin.buffer.read().decode('utf-8'); "
+            "sys.stdout.buffer.write((d+'|'+os.environ.get('CONSILIUM_NO_MCP','')).encode('utf-8')"
+            "+b'\\xff')")
+    env = cli_backends.child_env()
+    rc, out, err = cli_backends._spawn_and_wait([sys.executable, "-c", code], "привет 東京",
+                                                str(tmp_path), 30, env)
+    assert rc == 0 and out.startswith("привет 東京|1")
+    assert out.endswith("�")                         # битый байт → replace, а не исключение
+
+
+def test_spawn_and_wait_timeout_returns_promptly(tmp_path):
+    import time
+    t0 = time.monotonic()
+    with pytest.raises(subprocess.TimeoutExpired):
+        cli_backends._spawn_and_wait([sys.executable, "-c", "import time; time.sleep(60)"],
+                                     None, str(tmp_path), 1, None)
+    assert time.monotonic() - t0 < 20
+
+
+@pytest.mark.skipif(os.name == "nt", reason="проверка внука через os.kill(pid, 0) — POSIX")
+def test_timeout_kills_grandchild_holding_pipe(tmp_path):
+    """Аудит: subprocess.run(timeout) убивал только ребёнка; внук держал stdout → вечный hang
+    и сирота, жгущий квоту. Теперь гасится вся группа."""
+    import time
+    pidfile = tmp_path / "gc.pid"
+    code = ("import subprocess,sys,time; "
+            "p=subprocess.Popen([sys.executable,'-c','import time; time.sleep(120)']); "
+            "open(%r,'w').write(str(p.pid)); time.sleep(120)" % str(pidfile))
+    t0 = time.monotonic()
+    with pytest.raises(subprocess.TimeoutExpired):
+        cli_backends._spawn_and_wait([sys.executable, "-c", code], None, str(tmp_path), 2, None)
+    assert time.monotonic() - t0 < 15
+    gc = int(pidfile.read_text())
+    for _ in range(50):
+        try:
+            os.kill(gc, 0)
+        except ProcessLookupError:
+            break
+        # зомби, ещё не подобранный init, тоже допустим: проверяем через waitpid чужого нельзя
+        time.sleep(0.1)
+    else:
+        try:
+            with open("/proc/%d/stat" % gc) as fh:     # Linux: зомби = state Z
+                assert fh.read().split()[2] == "Z"
+        except FileNotFoundError:
+            out = subprocess.run(["ps", "-o", "stat=", "-p", str(gc)], capture_output=True, text=True).stdout
+            assert out.strip().startswith("Z") or not out.strip(), "внук жив: %r" % out
+
+
+def test_mcp_server_exits_under_recursion_guard(tmp_path):
+    """CLI подписки, поднятый нашим воркером, мог бы поднять наш же mcp_server → рекурсия совета.
+    С CONSILIUM_NO_MCP=1 сервер выходит сразу с кодом 0 и строкой в stderr."""
+    import time
+    server = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                          "scripts", "mcp_server.py")
+    env = dict(os.environ, CONSILIUM_NO_MCP="1", PYTHONIOENCODING="utf-8")
+    t0 = time.monotonic()
+    r = subprocess.run([sys.executable, server], input='{"jsonrpc":"2.0","id":1,"method":"initialize"}\n',
+                       capture_output=True, text=True, encoding="utf-8", timeout=60, env=env,
+                       cwd=str(tmp_path))
+    assert r.returncode == 0
+    assert r.stdout == ""                                  # ни одного JSON-RPC ответа
+    assert "MCP выключен (рекурсия)" in r.stderr
+    assert time.monotonic() - t0 < 60
+
+
+def test_kimi_not_reported_as_judge_without_opt_in(monkeypatch):
+    """LLM_BACKEND=kimi без CONSILIUM_ALLOW_KIMI_JUDGE: generate идёт в ollama → api_available()
+    обязан это сказать, иначе judge_backend.info() врёт «подписка kimi»."""
+    import llm_local
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.setenv("LLM_BACKEND", "kimi")
+    monkeypatch.setattr(cli_backends, "binary", lambda b: "/usr/bin/" + b)
+    monkeypatch.delenv("CONSILIUM_ALLOW_KIMI_JUDGE", raising=False)
+    assert llm_local.api_available() is False
+    monkeypatch.setenv("CONSILIUM_ALLOW_KIMI_JUDGE", "1")
+    assert llm_local.api_available() is True

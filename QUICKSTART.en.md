@@ -2,7 +2,7 @@
 
 # Quick start
 
-> Release: [v0.1.3](https://github.com/ilyautov/consilium-principis/releases/download/v0.1.3/consilium-principis.mcpb)
+> Release: [v0.2.0](https://github.com/ilyautov/consilium-principis/releases/download/v0.2.0/consilium-principis.mcpb)
 > — the `.mcpb` is a single-file extension for **Claude Desktop** (Settings → Extensions → install from
 > file); for Claude Code the paths below are enough, no bundle needed.
 
@@ -75,6 +75,11 @@ python3 scripts/eval.py advisors/<name>
 For the complete source, manifest, and validation recipe, see
 [`advisors/README.md`](advisors/README.md) and [`docs/onboarding-recipe.en.md`](https://github.com/ilyautov/consilium-principis/blob/master/docs/onboarding-recipe.en.md).
 
+### Codex CLI or Kimi Code CLI (experimental)
+
+`python3 install.py --host codex` (or `kimi`, or `all`). Add `--dry-run` to print the plan without
+changing anything.
+
 ## Update / uninstall
 
 - **Update:** run the install again (`python3 install.py` or the Path 2 installer) — the machinery is
@@ -88,6 +93,8 @@ For the complete source, manifest, and validation recipe, see
 - Convene a board: “convene a board about [question]”.
 - Calculate a decision: “let’s calculate which is better, X or Y”. The board builds a decision map
   and runs deterministic Monte Carlo over your inputs.
+- Seat different models: “run the council on my subscriptions” uses the Claude Code, Codex or Kimi
+  Code CLIs you are logged into (no API key; your question goes to those providers).
 - Not sure what to ask: “what can you do?” surfaces the recipe menu in plain phrases.
 - Add an advisor or lens: ask in natural language, or use `board.py build-advisor`. Guard against an
   echo chamber with `python3 scripts/diversity_check.py advisors/<a> advisors/<b> ...`.

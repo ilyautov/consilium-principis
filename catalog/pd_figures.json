@@ -20,7 +20,12 @@
       "rights": {
         "death_year": 180,
         "text_status": "public_domain",
-        "consenter_circle": "exhausted"
+        "consenter_circle": "exhausted",
+        "translation": {
+          "translator": "George Long",
+          "translator_death_year": 1879,
+          "published_year": 1862
+        }
       }
     },
     {
@@ -42,7 +47,12 @@
       "rights": {
         "death_year": 135,
         "text_status": "public_domain",
-        "consenter_circle": "exhausted"
+        "consenter_circle": "exhausted",
+        "translation": {
+          "translator": "George Long",
+          "translator_death_year": 1879,
+          "published_year": 1877
+        }
       }
     },
     {
@@ -64,7 +74,12 @@
       "rights": {
         "death_year": -496,
         "text_status": "public_domain",
-        "consenter_circle": "exhausted"
+        "consenter_circle": "exhausted",
+        "translation": {
+          "translator": "Lionel Giles",
+          "translator_death_year": 1958,
+          "published_year": 1910
+        }
       }
     },
     {
@@ -82,7 +97,12 @@
       "rights": {
         "death_year": 1527,
         "text_status": "public_domain",
-        "consenter_circle": "exhausted"
+        "consenter_circle": "exhausted",
+        "translation": {
+          "translator": "W. K. Marriott",
+          "translator_death_year": 1927,
+          "published_year": 1908
+        }
       }
     }
   ]

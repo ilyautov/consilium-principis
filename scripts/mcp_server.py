@@ -1247,8 +1247,14 @@ def _scaffold_principis(answers):
 
 
 def _export_session(session, surface="md", include_abstentions=True):
+    # MCP-граница: вердикт без печати кода не уходит в шеримый пруф (тот же гейт, что render_session)
+    from council_verdict import gate_session_verdict
     from session_render import export_session
-    return export_session(session, surface=surface, include_abstentions=include_abstentions)
+    session, rejected = gate_session_verdict(session)
+    out = export_session(session, surface=surface, include_abstentions=include_abstentions)
+    if rejected:
+        out["verdict_rejected"] = rejected
+    return out
 
 
 def _proof_card(quote, advisor_dir):
@@ -1345,8 +1351,13 @@ def _render_session(session, surface="md", depth="plain", kind="session"):
     depth: plain (дефолт) | expert. Любой ход совета в Cowork рендерь виджетом, не прозой."""
     import session_render as SR
     violations, reconciliations = [], []
+    verdict_rejected = None
     if kind != "opening":                             # атрибуция (§1.1): ДО рендера, раз на объект
         session, violations, reconciliations = _validate_session_attribution(session)
+        # «метку считает код, не хост»: council_scorecard → пересчёт здесь; иначе вердикт-dict
+        # обязан нести печать compute_verdict этого процесса — нет печати → блок снят
+        from council_verdict import gate_session_verdict
+        session, verdict_rejected = gate_session_verdict(session)
 
     # §4.3 замыкание петли: «синтез выдан» = естественный конец заседания → point-of-use нудж
     # записать решение (салиентнее правила в instructions). Только на synthesis-ходе: опенинг и
@@ -1376,6 +1387,8 @@ def _render_session(session, surface="md", depth="plain", kind="session"):
                            "(cite по advisor_dir этого советника)." % len(violations))
         if reconciliations:
             out["marker_reconciliations"] = reconciliations
+        if verdict_rejected:
+            out["verdict_rejected"] = verdict_rejected
         return out
 
     if surface == "widget":
@@ -1816,6 +1829,16 @@ def _subscriptions_status(probe=False):
     """Какие подписочные CLI (claude/codex/kimi) есть. probe=True — живой пинг (крошка квоты)."""
     from federation.spawn import subscriptions_status
     return subscriptions_status(probe=bool(probe))
+
+
+def _federation_cancel_subscriptions(session_id):
+    """Остановить фоновых подписочных воркеров сессии (реестр .consilium/sub-workers.json).
+    Мутирующий: убивает процессы — только по просьбе юзера."""
+    error = _validate_bounded_string(session_id, "session_id", _FED_MAX_IDENTIFIER_BYTES)
+    if error:
+        return {"error": error}
+    from federation.spawn import cancel_subscriptions
+    return cancel_subscriptions(os.path.join(_root(), ".consilium"), session_id)
 
 
 def _federation_run_subscriptions(session_id, backends=None, roles=None, models=None):
@@ -2445,6 +2468,13 @@ TOOLS = {
             "required": ["session_id"]},
         "handler": _federation_run_subscriptions,
     },
+    "federation_cancel_subscriptions": {
+        "description": "Остановить фоновых подписочных воркеров сессии (запущенных "
+                       "federation_run_subscriptions): гасит их процессы вместе с CLI-детьми и "
+                       "чистит реестр. МУТИРУЮЩИЙ — по просьбе юзера (передумал, квота горит).",
+        "input_schema": _obj({"session_id": "string"}, ["session_id"]),
+        "handler": _federation_cancel_subscriptions,
+    },
     "calibrated_consult_open": {
         "description": "Анти-оверрелайанс ИНСТРУМЕНТ (не совет): зафиксировать ТВОЮ позицию + "
                        "уверенность (0..1) ДО ответа совета, чтобы потом увидеть свой сдвиг. "
@@ -2789,6 +2819,7 @@ Codex / Kimi Code). Юзер ЯВНО согласился и назвал по�
 → federation_run_subscriptions(session_id, backends) → federation_poll до pending=0 и claimed=0 →
 federation_assemble. Скажи юзеру одной строкой, что вопрос уйдёт провайдерам этих подписок и
 потратит их квоту. Выбывшая подписка (квота/логин) в отчёте воркера — назови её, не молчи.
+Юзер передумал — federation_cancel_subscriptions(session_id) останавливает фоновых воркеров.
 
 16. AI-DISCLOSURE (EU AI Act Art. 50 — прозрачность, НЕ маскировка). При ПЕРВОМ контакте в сессии
 (опенинг / первый ответ на созыв) сделай ЯВНЫМ и различимым, что это AI-советники — представления
@@ -2845,8 +2876,10 @@ catalog_preview) — плашка происхождения под именем
    ЖДАТЬ. НЕ пропускай, не смягчай, не перекрашивай метку прозой. errors → вопросы совета.
    unanimity_alarm → вынеси сильнейшую альтернативу отдельной развилкой и дай самым уязвимым линзам
    отстоять её в полную силу ДО подписи. missing → добери до подписи.
-   (д) Отображение: положи `verdict` в объект заседания как council_verdict → render_session(widget).
-   Блок вердикта рисуется внутри виджета; не пересказывай его в чате.
+   (д) Отображение: положи `verdict` в объект заседания как council_verdict РОВНО КАК ВЕРНУЛ КОД
+   (на нём печать; правленый или самодельный вердикт render/export отклонят — verdict_rejected) —
+   или положи сам scorecard в council_scorecard (+ council_track_weights), сервер пересчитает.
+   → render_session(widget). Блок вердикта рисуется внутри виджета; не пересказывай его в чате.
 
 
 RESPONSE LANGUAGE (overrides formatting; never overrides Rule 0). Answer in the language of the
@@ -2899,7 +2932,7 @@ def _handle_rpc(msg):
         return _rpc_result(req_id, {
             "protocolVersion": "2024-11-05",
             "capabilities": {"tools": {}},
-            "serverInfo": {"name": "consilium-principis", "version": "0.1.3"},
+            "serverInfo": {"name": "consilium-principis", "version": "0.2.0"},
             "instructions": instructions,
         })
     if method in ("notifications/initialized", "initialized"):
@@ -2980,4 +3013,9 @@ def _serve_stdio():
 
 
 if __name__ == "__main__":
+    if os.environ.get("CONSILIUM_NO_MCP") == "1":
+        # Нас поднял CLI подписки, запущенный НАШИМ же воркером (cli_backends ставит этот env):
+        # отдать ему тулы = рекурсия совета в самого себя. Выходим тихо и сразу.
+        print("consilium: запущен из подписочного воркера — MCP выключен (рекурсия)", file=sys.stderr)
+        sys.exit(0)
     _serve_stdio()

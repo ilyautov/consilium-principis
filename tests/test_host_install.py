@@ -474,3 +474,143 @@ def test_default_host_claude_does_not_touch_host_installer(monkeypatch, tmp_path
     install.main()
     assert made == [tmp_path / "t"]
     assert "Перезапусти Claude Code" in capsys.readouterr().out
+
+
+# ── сбои runner'а, кавычки, ротация бэкапов, кодировка ──────────────────────
+def _raising_on_add(fake, exc):
+    """runner, который на `mcp add` портит config.toml (как прерванный codex) и бросает exc."""
+    def runner(argv):
+        if argv[2] == "add":
+            fake.calls.append(list(argv))
+            Path(fake.config).write_text("half-written by a killed codex", encoding="utf-8")
+            raise exc
+        return fake(argv)
+    return runner
+
+
+@pytest.mark.parametrize("exc", [
+    host_install.subprocess.TimeoutExpired(["codex", "mcp", "add"], 60),
+    PermissionError(13, "Permission denied"),
+    FileNotFoundError(2, "No such file or directory"),
+])
+def test_codex_add_exception_rolls_back_like_nonzero_exit(tmp_path, exc):
+    codex_dir = tmp_path / "codex"
+    codex_dir.mkdir()
+    (codex_dir / "config.toml").write_text(STALE, encoding="utf-8")
+    fake = FakeCodex(str(codex_dir))
+    res = host_install.install_codex(str(_skill(tmp_path)), codex_dir=str(codex_dir),
+                                     runner=_raising_on_add(fake, exc), which=_which)
+    assert not res["ok"] and res["reason"] == "codex_add_failed" and res["rolled_back"]
+    assert res["error"]
+    assert (codex_dir / "config.toml").read_text(encoding="utf-8") == STALE
+
+
+def test_codex_add_timeout_on_fresh_install_leaves_no_config(tmp_path):
+    codex_dir = tmp_path / "codex"
+    codex_dir.mkdir()
+    fake = FakeCodex(str(codex_dir))
+    exc = host_install.subprocess.TimeoutExpired(["codex"], 60)
+    res = host_install.install_codex(str(_skill(tmp_path)), codex_dir=str(codex_dir),
+                                     runner=_raising_on_add(fake, exc), which=_which)
+    assert not res["ok"] and res["rolled_back"]
+    assert not (codex_dir / "config.toml").exists()
+
+
+def test_codex_get_exception_is_reported_not_raised(tmp_path):
+    def runner(argv):
+        raise host_install.subprocess.TimeoutExpired(argv, 60)
+    res = host_install.install_codex(str(_skill(tmp_path)), codex_dir=str(tmp_path / "c"),
+                                     runner=runner, which=_which)
+    assert not res["ok"] and res["reason"] == "codex_get_failed" and "таймаут" in res["error"]
+    chk = host_install.check_codex(codex_dir=str(tmp_path / "c"), runner=runner, which=_which)
+    assert not chk["ok"]
+
+
+def test_codex_command_line_quotes_per_platform():
+    cmd, args = r"C:\Program Files\Python312\python.exe", [r"C:\Users\Іван\skill dir\scripts\mcp_server.py"]
+    win = host_install.codex_command_line(cmd, args, platform="win32")
+    assert win == ('codex mcp add %s -- "C:\\Program Files\\Python312\\python.exe" '
+                   '"C:\\Users\\Іван\\skill dir\\scripts\\mcp_server.py"' % NAME)
+    assert "'" not in win                                   # одинарные кавычки cmd.exe не понимает
+    posix = host_install.codex_command_line("/usr/bin/python3", ["/home/a b/it's/mcp_server.py"],
+                                            platform="darwin")
+    assert shlex.split(posix) == ["codex", "mcp", "add", NAME, "--", "/usr/bin/python3",
+                                  "/home/a b/it's/mcp_server.py"]
+    assert host_install.codex_command_line("/p", ["/s.py"], platform="linux") == \
+        "codex mcp add %s -- /p /s.py" % NAME
+
+
+def test_install_codex_manual_line_uses_injected_platform(tmp_path):
+    skill = _skill(tmp_path, name="my skill")
+    res = host_install.install_codex(str(skill), codex_dir=str(tmp_path / "c"), which=lambda n: None,
+                                     runner=FakeCodex(str(tmp_path / "c")), platform="win32")
+    assert res["reason"] == "codex_not_found"
+    assert '"%s"' % (skill / "scripts" / "mcp_server.py") in res["command_line"]
+
+
+def _stamp(i):
+    return "2026010%d-120000-000000" % i
+
+
+def test_prune_backups_keeps_newest_three_and_ignores_foreign_files(tmp_path):
+    cfg = tmp_path / "config.toml"
+    cfg.write_text("x", encoding="utf-8")
+    for i in range(1, 7):
+        (tmp_path / ("config.toml.bak." + _stamp(i))).write_text(str(i), encoding="utf-8")
+    foreign = ["config.toml.bak", "config.toml.bak.manual", "config.toml.bak.2026-01-01",
+               "other.toml.bak." + _stamp(1), "mcp.json.bak." + _stamp(1)]
+    for name in foreign:
+        (tmp_path / name).write_text("keep", encoding="utf-8")
+    removed = host_install.prune_backups(str(cfg))
+    assert sorted(os.path.basename(p) for p in removed) == ["config.toml.bak." + _stamp(i) for i in (1, 2, 3)]
+    left = sorted(n for n in os.listdir(tmp_path) if n.startswith("config.toml.bak.2026010"))
+    assert left == ["config.toml.bak." + _stamp(i) for i in (4, 5, 6)]
+    for name in foreign:
+        assert (tmp_path / name).exists()
+    assert cfg.read_text(encoding="utf-8") == "x"
+
+
+def test_codex_install_prunes_old_backups_but_keeps_the_fresh_one(tmp_path):
+    codex_dir = tmp_path / "codex"
+    codex_dir.mkdir()
+    (codex_dir / "config.toml").write_text(STALE, encoding="utf-8")
+    for i in range(1, 6):
+        (codex_dir / ("config.toml.bak." + _stamp(i))).write_text("old", encoding="utf-8")
+    res = host_install.install_codex(str(_skill(tmp_path)), codex_dir=str(codex_dir),
+                                     runner=FakeCodex(str(codex_dir)), which=_which)
+    assert res["ok"] and os.path.isfile(res["backup"])
+    backups = sorted(n for n in os.listdir(codex_dir) if ".bak." in n)
+    assert len(backups) == 3 and os.path.basename(res["backup"]) == backups[-1]
+    assert Path(res["backup"]).read_text(encoding="utf-8") == STALE
+
+
+def test_kimi_install_prunes_old_backups(tmp_path):
+    kimi_dir = tmp_path / "kimi"
+    kimi_dir.mkdir()
+    (kimi_dir / "mcp.json").write_text(json.dumps({"mcpServers": {}}), encoding="utf-8")
+    for i in range(1, 6):
+        (kimi_dir / ("mcp.json.bak." + _stamp(i))).write_text("{}", encoding="utf-8")
+    res = host_install.install_kimi(str(_skill(tmp_path)), kimi_dir=str(kimi_dir))
+    assert res["ok"] and res["backup"] and os.path.isfile(res["backup"])
+    backups = sorted(n for n in os.listdir(kimi_dir) if n.startswith("mcp.json.bak."))
+    assert len(backups) == 3 and os.path.basename(res["backup"]) == backups[-1]
+
+
+def test_default_runner_decodes_utf8_with_replace(monkeypatch):
+    seen = {}
+
+    def fake_run(argv, **kwargs):
+        seen.update(kwargs)
+        return _Done()
+    monkeypatch.setattr(host_install.subprocess, "run", fake_run)
+    host_install._default_runner(["codex", "mcp", "get", NAME, "--json"])
+    assert seen["encoding"] == "utf-8" and seen["errors"] == "replace" and seen["text"] is True
+    assert seen["timeout"] == host_install._CODEX_TIMEOUT and seen["check"] is False
+
+
+def test_default_runner_survives_non_utf8_output(tmp_path):
+    script = tmp_path / "emit.py"
+    script.write_text("import sys; sys.stdout.buffer.write(b'ok \\xff\\xfe \\xd0\\x98')", encoding="utf-8")
+    done = host_install._default_runner([sys.executable, str(script)])
+    assert done.returncode == 0 and done.stdout.startswith("ok ") and done.stdout.endswith("И")
+    assert "\ufffd" in done.stdout

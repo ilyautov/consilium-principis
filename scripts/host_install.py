@@ -54,6 +54,7 @@ from file_atomic import atomic_write_text
 NAME = mcp_install.NAME
 HOSTS = ("claude", "codex", "kimi")
 _CODEX_TIMEOUT = 60
+_KEEP_BACKUPS = 3
 
 
 # ── каталоги ────────────────────────────────────────────────────────────────
@@ -142,6 +143,35 @@ def _backup(path):
     return backup
 
 
+# Ровно наш формат имени: <файл>.bak.YYYYMMDD-HHMMSS-ffffff (_backup здесь и
+# mcp_install._backup_config). Чужие *.bak* пользователя под шаблон не попадают.
+_BACKUP_SUFFIX = re.compile(r"^\.bak\.\d{8}-\d{6}-\d{6}$")
+
+
+def prune_backups(path, keep=_KEEP_BACKUPS):
+    """Оставить `keep` самых свежих бэкапов `path`, созданных инсталлятором; вернуть удалённые.
+
+    Имя содержит метку времени фиксированной ширины, поэтому порядок по имени = порядок
+    по времени (mtime у copy2 — время оригинала, ему верить нельзя).
+    """
+    folder, base = os.path.split(os.path.abspath(path))
+    try:
+        names = os.listdir(folder)
+    except OSError:
+        return []
+    ours = sorted(n for n in names
+                  if n.startswith(base) and _BACKUP_SUFFIX.match(n[len(base):]))
+    removed = []
+    for name in ours[:-keep] if keep > 0 else ours:
+        victim = os.path.join(folder, name)
+        try:
+            os.remove(victim)
+            removed.append(victim)
+        except OSError:
+            pass                                   # не смогли удалить старый бэкап — не повод падать
+    return removed
+
+
 def _read_text(path):
     try:
         with open(path, encoding="utf-8") as handle:
@@ -172,17 +202,38 @@ def _check_entry(host, command, args, timeout, rerun):
 
 # ── Codex ────────────────────────────────────────────────────────────────────
 def _default_runner(argv):
-    return subprocess.run(argv, capture_output=True, text=True, timeout=_CODEX_TIMEOUT, check=False)
+    # encoding явно: на Windows text=True взял бы кодовую страницу консоли и упал на кириллице
+    return subprocess.run(argv, capture_output=True, text=True, encoding="utf-8", errors="replace",
+                          timeout=_CODEX_TIMEOUT, check=False)
 
 
-def codex_command_line(command, args, name=NAME):
-    """Точная команда для ручной регистрации (когда бинаря codex нет)."""
-    return " ".join(shlex.quote(part) for part in ["codex", "mcp", "add", name, "--", command, *args])
+def _run(runner, argv):
+    """runner → (completed|None, error|None). Таймаут и OSError (нет бинаря, нет прав) — ошибка, не краш."""
+    try:
+        return runner(argv), None
+    except subprocess.TimeoutExpired as exc:
+        return None, "%s: таймаут %s с" % (" ".join(argv[:3]), exc.timeout)
+    except OSError as exc:
+        return None, "%s: %s" % (" ".join(argv[:3]), exc)
+
+
+def codex_command_line(command, args, name=NAME, platform=None):
+    """Точная команда для ручной регистрации (когда бинаря codex нет), с кавычками под ОС.
+
+    win32 → subprocess.list2cmdline (правила cmd/CreateProcess), иначе shlex.join (POSIX sh).
+    platform подменяет sys.platform в тестах.
+    """
+    argv = ["codex", "mcp", "add", name, "--", command, *args]
+    if (platform or sys.platform) == "win32":
+        return subprocess.list2cmdline(argv)
+    return shlex.join(argv)
 
 
 def _codex_get(codex, runner, name=NAME):
     """Текущая запись из `codex mcp get --json` → (entry|None, error|None)."""
-    completed = runner([codex, "mcp", "get", name, "--json"])
+    completed, error = _run(runner, [codex, "mcp", "get", name, "--json"])
+    if error:
+        return None, error
     if completed.returncode != 0:
         return None, None                                  # записи нет — это не ошибка
     try:
@@ -239,7 +290,7 @@ def extract_server_subtables(toml_text, name=NAME):
 
 
 def install_codex(skill_dir, codex_dir=None, home=None, runner=None, which=None,
-                  dry_run=False, python=None, name=NAME):
+                  dry_run=False, python=None, name=NAME, platform=None):
     """Зарегистрировать MCP-сервер в Codex CLI через `codex mcp add`.
 
     Протухший путь (файл сервера исчез) или другая команда → замена. Совпадает → без изменений.
@@ -252,7 +303,7 @@ def install_codex(skill_dir, codex_dir=None, home=None, runner=None, which=None,
                 "hint": "Задай CODEX_HOME=%s в окружении и запусти снова." % codex_dir}
     runner = runner or _default_runner
     command, args = server_command(skill_dir, python=python)
-    line = codex_command_line(command, args, name)
+    line = codex_command_line(command, args, name, platform=platform)
     base = {"host": "codex", "command": command, "args": args, "command_line": line,
             "config": os.path.join(codex_dir, "config.toml")}
     if _refuse_secrets(command, args):
@@ -278,6 +329,8 @@ def install_codex(skill_dir, codex_dir=None, home=None, runner=None, which=None,
     before = _read_text(config)
     preserved = extract_server_subtables(before, name) if current else ""
     backup = _backup(config)
+    if backup:
+        prune_backups(config)                      # свежий бэкап — самый новый, он точно остаётся
 
     def rollback(reason, **extra):
         if backup:
@@ -288,7 +341,9 @@ def install_codex(skill_dir, codex_dir=None, home=None, runner=None, which=None,
         return {**base, "ok": False, "reason": reason, "backup": backup,
                 "rolled_back": bool(backup) or before is None, **extra}
 
-    completed = runner([codex, "mcp", "add", name, "--", command, *args])
+    completed, error = _run(runner, [codex, "mcp", "add", name, "--", command, *args])
+    if error:
+        return rollback("codex_add_failed", error=error)   # таймаут/OSError: add мог успеть записать
     if completed.returncode != 0:
         return rollback("codex_add_failed", error=(completed.stderr or completed.stdout or "").strip())
     if preserved:
@@ -350,6 +405,8 @@ def install_kimi(skill_dir, kimi_dir=None, home=None, dry_run=False, python=None
     outcome = mcp_install._merge_target(target, command, args, do_backup=True)
     if not outcome["ok"]:
         return {**base, "ok": False, "reason": outcome["reason"], "error": outcome.get("error")}
+    if outcome.get("backup"):
+        prune_backups(target)
     return {**base, "ok": True, "changed": outcome["changed"], "action": action,
             "backup": outcome["backup"], "previous": previous}
 

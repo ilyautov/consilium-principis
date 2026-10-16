@@ -45,38 +45,63 @@ def worker_id_for(backend, model=None):
     return backend + (":" + model if model else "")
 
 
+def _nack_quiet(queue, brief, wid, reason, log):
+    """nack, который сам не роняет поток: очередь могла уже переназначить задачу (stale)."""
+    try:
+        queue.nack(brief["task_id"], wid, brief["claim_token"], reason)
+    except Exception as e:                                       # noqa: BLE001
+        log("  [%s] nack не прошёл (%s) — реплику вернёт истечение lease" % (wid, type(e).__name__))
+
+
 def play_roles(queue, backend, roles, generate_fn, retrieve_fn, model=None, log=print,
                timeout=cli_backends.DEFAULT_TIMEOUT):
     """Один бэкенд проходит роли по разу. → список {role, ok, n_quotes | error}.
     Сбой CLI (квота/логин/таймаут) на первой же роли → бэкенд выбывает целиком: остальные роли
-    он тоже не сыграет (квота не воскреснет через минуту), а взятая реплика возвращается nack'ом."""
+    он тоже не сыграет (квота не воскреснет через минуту), а взятая реплика возвращается nack'ом.
+    Любое ДРУГОЕ исключение (баг парсера, retrieve, очереди) → nack этой реплики, строка
+    {error: "internal"} и переход к следующей роли: поток-демон не умирает молча, реплика не
+    висит claimed до конца lease."""
     wid = worker_id_for(backend, model)
     played = []
     for role in roles:
-        brief = claim_brief(queue, worker_id=wid, roles=[role], timeout=CLAIM_TIMEOUT)
+        try:
+            brief = claim_brief(queue, worker_id=wid, roles=[role], timeout=CLAIM_TIMEOUT)
+        except Exception as e:                                   # noqa: BLE001
+            log("  [%s] claim «%s» упал: %s" % (wid, role, type(e).__name__))
+            played.append({"role": role, "ok": False, "error": "internal",
+                           "detail": type(e).__name__})
+            continue
         if brief.get("empty"):
             continue
-        prompt = WORKER_PROMPT.format(display=display_name(brief["role"], brief["advisor_dir"]),
-                                      question=brief["question"])
-        log("  [%s] играет «%s»…" % (wid, brief["role"]))
         try:
-            answer = generate_fn(prompt, backend, model=model, timeout=timeout)
-        except cli_backends.CLIBackendError as e:
-            # nack сразу возвращает реплику в pending: её доиграет другой бэкенд/хост, а не ждём
-            # 300 с lease. Реплика, исчерпавшая попытки, честно хоронится очередью (dead).
-            queue.nack(brief["task_id"], wid, brief["claim_token"], "%s:%s" % (backend, e.kind))
-            log("  [%s] выбыл: %s" % (wid, e))
-            played.append({"role": brief["role"], "ok": False, "error": e.kind, "detail": e.detail})
-            return played
-        heartbeat_task(queue, brief["task_id"], wid, brief["claim_token"])
-        parsed = parse_candidate(answer)
-        ground_errors = []
-        quotes = ground_via_cite(parsed["cite_query"], brief["advisor_dir"], retrieve_fn,
-                                 errors=ground_errors)
-        for err in ground_errors:
-            log("  [%s] ⚠ %s" % (wid, err))
-        res = submit_candidate(queue, brief["task_id"], wid, brief["claim_token"], wid,
-                               {"argument": parsed["argument"], "quotes": quotes})
+            prompt = WORKER_PROMPT.format(display=display_name(brief["role"], brief["advisor_dir"]),
+                                          question=brief["question"])
+            log("  [%s] играет «%s»…" % (wid, brief["role"]))
+            try:
+                answer = generate_fn(prompt, backend, model=model, timeout=timeout)
+            except cli_backends.CLIBackendError as e:
+                # nack сразу возвращает реплику в pending: её доиграет другой бэкенд/хост, а не
+                # ждём 300 с lease. Реплика, исчерпавшая попытки, честно хоронится очередью (dead).
+                _nack_quiet(queue, brief, wid, "%s:%s" % (backend, e.kind), log)
+                log("  [%s] выбыл: %s" % (wid, e))
+                played.append({"role": brief["role"], "ok": False, "error": e.kind,
+                               "detail": e.detail})
+                return played
+            heartbeat_task(queue, brief["task_id"], wid, brief["claim_token"])
+            parsed = parse_candidate(answer)
+            ground_errors = []
+            quotes = ground_via_cite(parsed["cite_query"], brief["advisor_dir"], retrieve_fn,
+                                     errors=ground_errors)
+            for err in ground_errors:
+                log("  [%s] ⚠ %s" % (wid, err))
+            res = submit_candidate(queue, brief["task_id"], wid, brief["claim_token"], wid,
+                                   {"argument": parsed["argument"], "quotes": quotes})
+        except Exception as e:                                   # noqa: BLE001
+            _nack_quiet(queue, brief, wid, "%s:internal" % backend, log)
+            log("  [%s] внутренний сбой на «%s»: %s" % (wid, brief.get("role", role), type(e).__name__))
+            played.append({"role": brief.get("role", role), "ok": False, "error": "internal",
+                           "detail": type(e).__name__})
+            continue
         if res.get("rejected"):
             log("  [%s] кандидат отклонён: %s" % (wid, res["rejected"]))
             played.append({"role": brief["role"], "ok": False, "error": "rejected",
@@ -125,13 +150,16 @@ def session_roles(queue, session_id):
 
 
 def _parse_models(spec):
-    """'claude=opus,codex=gpt-5' → {'claude': 'opus', 'codex': 'gpt-5'}."""
+    """'claude=opus,codex=gpt-5' → {'claude': 'opus', 'codex': 'gpt-5'}. Невалидное имя модели
+    (вне белого списка cli_backends.valid_model) отбрасывается: бэкенд сыграет дефолтом CLI,
+    а не получит в argv что-то похожее на флаг."""
     out = {}
     for part in (spec or "").split(","):
         if "=" in part:
             k, v = part.split("=", 1)
-            if k.strip() and v.strip():
-                out[k.strip()] = v.strip()
+            k, v = k.strip(), v.strip()
+            if k and cli_backends.valid_model(v):
+                out[k] = v
     return out
 
 

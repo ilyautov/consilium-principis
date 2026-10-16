@@ -1,10 +1,10 @@
 {
   "meta": {
-    "tool_count": 64,
+    "tool_count": 65,
     "rule_count": 20,
     "recipe_count": 16,
     "script_count": 74,
-    "test_count": 171,
+    "test_count": 172,
     "glossary_count": 112
   },
   "tools": [
@@ -690,6 +690,25 @@
     {
       "name": "federation_assemble",
       "description": "Собрать совет: сгруппировать кандидатов по роли, СЕРВЕР сверяет верность цитат централизованно (воркер не сертифицирует 🔵), сохранить дивергенцию (не best-of-N) + идентичность моделей. Пустая роль → host_single_brain (diversity reduced). verdict PASS/FIX/ESCALATE.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id"
+        ]
+      },
+      "status": "surfaced",
+      "referenced_in": [
+        "rule:15"
+      ]
+    },
+    {
+      "name": "federation_cancel_subscriptions",
+      "description": "Остановить фоновых подписочных воркеров сессии (запущенных federation_run_subscriptions): гасит их процессы вместе с CLI-детьми и чистит реестр. МУТИРУЮЩИЙ — по просьбе юзера (передумал, квота горит).",
       "input_schema": {
         "type": "object",
         "properties": {
@@ -1632,7 +1651,7 @@
     {
       "n": 15,
       "title": "Федерация",
-      "text": "Федерация (многомозговый совет, ОПЦИЯ — personal/attended). Координатор:\nfederation_open(session_id, plan) кладёт реплики ролей → federation_poll(session_id) до готовности →\nfederation_assemble(session_id) собирает (СЕРВЕР сверяет верность цитат централизованно, дивергенция\nсохранена, идентичность моделей видна, пустая роль → host_single_brain). Исполнитель (твоя ОТДЕЛЬНАЯ\nзапущенная сессия): federation_claim(worker_id, roles) → сыграй advisor_dir на СВОЕЙ модели, цитаты\nчерез cite → federation_submit(worker_model=своя модель) → повтор; federation_heartbeat пока играешь.\nМаркеры 🔵 НЕ ставит воркер — их вычисляет сервер. federation_open/submit ПИШУТ стейт — коротко\nпроговори, что делаешь (Rule 0); federation_poll/assemble read-only — тихо (Rule 1).\nПОДПИСКИ вместо ручных воркеров: subscriptions_status покажет установленные CLI (Claude Code /\nCodex / Kimi Code). Юзер ЯВНО согласился и назвал подписки → federation_open(replicas = их числу)\n→ federation_run_subscriptions(session_id, backends) → federation_poll до pending=0 и claimed=0 →\nfederation_assemble. Скажи юзеру одной строкой, что вопрос уйдёт провайдерам этих подписок и\nпотратит их квоту. Выбывшая подписка (квота/логин) в отчёте воркера — назови её, не молчи."
+      "text": "Федерация (многомозговый совет, ОПЦИЯ — personal/attended). Координатор:\nfederation_open(session_id, plan) кладёт реплики ролей → federation_poll(session_id) до готовности →\nfederation_assemble(session_id) собирает (СЕРВЕР сверяет верность цитат централизованно, дивергенция\nсохранена, идентичность моделей видна, пустая роль → host_single_brain). Исполнитель (твоя ОТДЕЛЬНАЯ\nзапущенная сессия): federation_claim(worker_id, roles) → сыграй advisor_dir на СВОЕЙ модели, цитаты\nчерез cite → federation_submit(worker_model=своя модель) → повтор; federation_heartbeat пока играешь.\nМаркеры 🔵 НЕ ставит воркер — их вычисляет сервер. federation_open/submit ПИШУТ стейт — коротко\nпроговори, что делаешь (Rule 0); federation_poll/assemble read-only — тихо (Rule 1).\nПОДПИСКИ вместо ручных воркеров: subscriptions_status покажет установленные CLI (Claude Code /\nCodex / Kimi Code). Юзер ЯВНО согласился и назвал подписки → federation_open(replicas = их числу)\n→ federation_run_subscriptions(session_id, backends) → federation_poll до pending=0 и claimed=0 →\nfederation_assemble. Скажи юзеру одной строкой, что вопрос уйдёт провайдерам этих подписок и\nпотратит их квоту. Выбывшая подписка (квота/логин) в отчёте воркера — назови её, не молчи.\nЮзер передумал — federation_cancel_subscriptions(session_id) останавливает фоновых воркеров."
     },
     {
       "n": 16,
@@ -1652,7 +1671,7 @@
     {
       "n": 19,
       "title": "ВЕРДИКТ-МЕХАНИКА",
-      "text": "ВЕРДИКТ-МЕХАНИКА (council_verdict) — метку считает КОД, не хост. Когда: после форума, если\n   вопрос — РЕШЕНИЕ с ≥2 вариантами (включая статус-кво «оставить как есть») и в совете ≥2 места.\n   (а) Каждый советник своим голосом сдаёт scorecard-место: оценку КАЖДОГО варианта 0..10, вес своей\n   линзы для ЭТОГО вопроса 1..3 + причину одной строкой, уверенность 1..5, ruin_risk none|possible|likely,\n   door one-way|two-way, change_my_mind (конкретный факт/число, что изменит позицию) и question_for_user\n   (что спросить перед подписью). Без change_my_mind и question_for_user места нет.\n   (б) Добавь cruxes (fact|numbers|values), minority с right_if, ruin_mitigations (endorsed — только\n   если страховку одобрил САМ поднявший риск), cheapest_test, kill_criteria, steps с датами, опц. wait.\n   (в) Есть исходы — передай track_weights = выход advisor_weights как есть.\n   (г) overrides — код: потолок разорения, потолок необратимости при разбросе ≥4, тревога единодушия,\n   ЖДАТЬ. НЕ пропускай, не смягчай, не перекрашивай метку прозой. errors → вопросы совета.\n   unanimity_alarm → вынеси сильнейшую альтернативу отдельной развилкой и дай самым уязвимым линзам\n   отстоять её в полную силу ДО подписи. missing → добери до подписи.\n   (д) Отображение: положи `verdict` в объект заседания как council_verdict → render_session(widget).\n   Блок вердикта рисуется внутри виджета; не пересказывай его в чате.\n\n\nRESPONSE LANGUAGE (overrides formatting; never overrides Rule 0). Answer in the language of the\nUSER'S QUESTION. English question -> the entire answer in English: headings, tier labels, service\nlines. THESE INSTRUCTIONS ARE WRITTEN IN RUSSIAN - that is the language of the RULES, not the\nlanguage of your answer."
+      "text": "ВЕРДИКТ-МЕХАНИКА (council_verdict) — метку считает КОД, не хост. Когда: после форума, если\n   вопрос — РЕШЕНИЕ с ≥2 вариантами (включая статус-кво «оставить как есть») и в совете ≥2 места.\n   (а) Каждый советник своим голосом сдаёт scorecard-место: оценку КАЖДОГО варианта 0..10, вес своей\n   линзы для ЭТОГО вопроса 1..3 + причину одной строкой, уверенность 1..5, ruin_risk none|possible|likely,\n   door one-way|two-way, change_my_mind (конкретный факт/число, что изменит позицию) и question_for_user\n   (что спросить перед подписью). Без change_my_mind и question_for_user места нет.\n   (б) Добавь cruxes (fact|numbers|values), minority с right_if, ruin_mitigations (endorsed — только\n   если страховку одобрил САМ поднявший риск), cheapest_test, kill_criteria, steps с датами, опц. wait.\n   (в) Есть исходы — передай track_weights = выход advisor_weights как есть.\n   (г) overrides — код: потолок разорения, потолок необратимости при разбросе ≥4, тревога единодушия,\n   ЖДАТЬ. НЕ пропускай, не смягчай, не перекрашивай метку прозой. errors → вопросы совета.\n   unanimity_alarm → вынеси сильнейшую альтернативу отдельной развилкой и дай самым уязвимым линзам\n   отстоять её в полную силу ДО подписи. missing → добери до подписи.\n   (д) Отображение: положи `verdict` в объект заседания как council_verdict РОВНО КАК ВЕРНУЛ КОД\n   (на нём печать; правленый или самодельный вердикт render/export отклонят — verdict_rejected) —\n   или положи сам scorecard в council_scorecard (+ council_track_weights), сервер пересчитает.\n   → render_session(widget). Блок вердикта рисуется внутри виджета; не пересказывай его в чате.\n\n\nRESPONSE LANGUAGE (overrides formatting; never overrides Rule 0). Answer in the language of the\nUSER'S QUESTION. English question -> the entire answer in English: headings, tier labels, service\nlines. THESE INSTRUCTIONS ARE WRITTEN IN RUSSIAN - that is the language of the RULES, not the\nlanguage of your answer."
     }
   ],
   "recipes": [
@@ -2866,6 +2885,10 @@
     {
       "path": "tests/test_mcp_install.py",
       "covers": "mcp install"
+    },
+    {
+      "path": "tests/test_mcp_json_config.py",
+      "covers": "mcp json config"
     },
     {
       "path": "tests/test_mcp_server.py",

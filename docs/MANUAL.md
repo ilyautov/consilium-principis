@@ -245,11 +245,11 @@ python scripts/gen_selfdoc.py
 - **situation**: `situation.py`
 - **tier**: `tier_full.py`
 
-Тестов: 171.
+Тестов: 172.
 
 ## Слой 3 — Справочник
 
-### Тулы (64)
+### Тулы (65)
 
 - 🌐 **`add_source`** — Затянуть источник в sources/ советника БЕЗ шелла: url (фетч + авто-strip Gutenberg) | text (вставка) | path (локальный текст-файл). Проставляет тир (P1=🔵 первоисточник). Скачивание — ПОДТВЕРДИ у юзера; не-PD хост требует license=public-domain. Потом build_advisor для сборки корпуса. · rule:0, rule:11
 - 🌐 **`advisor_weights`** — Калибровка совета по ИСХОДУ (петля U1): кто был прав ДЛЯ ТЕБЯ → вес голоса. records=[{advisor,outcome,endorsed}]. Laplace: без данных вес нейтрален. · rule:12, rule:19
@@ -279,6 +279,7 @@ python scripts/gen_selfdoc.py
 - 🌐 **`explain_self`** — Объяснить устройство самого проекта: что это, как работает конкретный тул/правило/концепт (моат/firewall/архитектура), термин глоссария. Возвращает ФАКТЫ с source_ref — проговори их юзеру. topic: пусто|overview | tool:<имя> | rule:<N> | recipe:<id> | concept:moat|firewall|architecture|extend | term:<слово> | свободный текст. · rule:10
 - 🌐 **`export_session`** — Шеримый пруф заседания (по ЯВНОМУ запросу юзера — правило 0). Отдаёт самодостаточный md (дефолт) | html артефакт: вопрос → советники → 🔵-цитаты с источником → синтез + панель «что совет НЕ стал выдумывать» (session.abstentions) + атрибуция. Приватность: только текущее заседание (переданный объект), файлов не пишет — верни `content` юзеру, сохраняет он. · rule:12
 - 🌐 **`federation_assemble`** — Собрать совет: сгруппировать кандидатов по роли, СЕРВЕР сверяет верность цитат централизованно (воркер не сертифицирует 🔵), сохранить дивергенцию (не best-of-N) + идентичность моделей. Пустая роль → host_single_brain (diversity reduced). verdict PASS/FIX/ESCALATE. · rule:15
+- 🌐 **`federation_cancel_subscriptions`** — Остановить фоновых подписочных воркеров сессии (запущенных federation_run_subscriptions): гасит их процессы вместе с CLI-детьми и чистит реестр. МУТИРУЮЩИЙ — по просьбе юзера (передумал, квота горит). · rule:15
 - 🌐 **`federation_claim`** — Исполнитель забирает роль-таск (блокирующе до timeout) → структурный бриф {task_id, claim_token, role, advisor_dir, question} или {empty}. Сыграй advisor_dir на СВОЕЙ модели, цитаты через cite, затем federation_submit. · rule:15
 - 🌐 **`federation_heartbeat`** — Исполнитель продлевает lease роль-таска (task_id, worker_id, claim_token), пока играет роль. stale → задача уже переназначена. · rule:15
 - 🌐 **`federation_open`** — Координатор совета-федерации: разложить план ролей в очередь по N реплик (многомозговый совет — исполнители играют роли на СВОИХ моделях). plan = [{role, advisor_dir, question, replicas?}]. Стейт локально в .consilium/. Personal/attended (опциональный многомозговый режим). · rule:15

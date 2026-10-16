@@ -765,3 +765,11 @@ def test_malformed_verdict_through_mcp_never_raises():
         for surface in ("md", "html", "widget"):
             r = srv._render_session(_session(council_verdict=bad), surface=surface)
             assert r.get("verdict_rejected") and "<img" not in r["content"]
+
+
+def test_opening_kind_on_full_renderer_still_gates_verdict():
+    """kind="opening" + md/html рисует полный рендерер → гейт печати обязан работать и там."""
+    import mcp_server as srv
+    for surface in ("md", "html"):
+        out = srv._render_session(_forged_session(), surface=surface, kind="opening")
+        assert out.get("verdict_rejected") and "ИДТИ" not in out["content"], surface

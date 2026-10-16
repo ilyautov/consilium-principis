@@ -15,9 +15,9 @@
   • argv-список, shell=False — промпт НИКОГДА не интерполируется в shell;
   • cwd = свежий пустой temp-каталог — агент CLI не видит ни репо, ни advisors/, ни home-файлов;
   • инструменты выключены там, где CLI это умеет: claude `--tools ""`, codex `--sandbox read-only`;
-    Kimi — `-p` без `--yolo/--auto` плюс `--plan` (режим планирования: без правок и команд), и
-    промпт явно запрещает тулы. Текст корпуса в промпте мог бы prompt-инъекцией толкнуть агента
-    к тулам — plan-режим это второй слой поверх запрета в промпте;
+    Kimi — `-p` без `--yolo/--auto` плюс `--agent-file` с профилем `tools: []` (пустой список =
+    ноль тулов; `--plan` kimi 2.0.0 с `-p` не сочетает: «Cannot combine --prompt with --plan»), и
+    промпт явно запрещает тулы. Профиль лежит в ОТДЕЛЬНОМ temp-каталоге, не в cwd агента;
   • MCP выключен: claude `--strict-mcp-config` (без --mcp-config = ноль серверов), codex
     `-c mcp_servers={}`. Иначе CLI поднял бы НАШ же mcp_server → рекурсия совета в самого себя.
     Страховка для всех трёх (и для Kimi, у которого такого флага нет): в env ребёнка
@@ -51,9 +51,19 @@ import tempfile
 BACKENDS = ("claude", "codex", "kimi")
 DEFAULT_TIMEOUT = 180
 
+# Профиль агента Kimi без тулов. Парсер kimi 2.0.0 (agentFile.ts): `tools: ["*"]` = все тулы,
+# любой другой список (в т.ч. пустой) = ровно эти тулы.
+KIMI_AGENT_FILE = """---
+name: consilium-text-only
+description: Text-only responder for Consilium Principis; no tools.
+tools: []
+---
+You answer with plain text only. You have no tools. Never read files, run commands or browse.
+"""
+
 # Бэкенды, которым доверен путь СУДЬИ релевантности (llm_local.generate). Судья кормится сырым
-# текстом корпуса (поверхность инъекций), а у Kimi нет жёсткого выключателя тулов — только
-# plan-режим. Поэтому kimi в судьи только по явному CONSILIUM_ALLOW_KIMI_JUDGE=1.
+# текстом корпуса (поверхность инъекций), а выключатель тулов Kimi (профиль `tools: []`) живьём
+# не проверен (квота кончилась). Поэтому kimi в судьи только по явному CONSILIUM_ALLOW_KIMI_JUDGE=1.
 JUDGE_SAFE = ("claude", "codex")
 
 # Kimi: промпт в argv. Лимит командной строки Windows ~32К UTF-16, POSIX ARG_MAX больше, но длинный
@@ -198,7 +208,7 @@ def child_env(base=None):
     return env
 
 
-def _argv(backend, exe, model, prompt, out_file):
+def _argv(backend, exe, model, prompt, out_file, agent_file=None):
     """argv + stdin для бэкенда. Промпт идёт через stdin везде, где CLI это умеет.
     Модель — одним токеном `--model=<v>` (clap у codex, commander у claude/kimi принимают `=`)."""
     if backend == "claude":
@@ -219,7 +229,9 @@ def _argv(backend, exe, model, prompt, out_file):
         raise CLIBackendError(backend, "parse", "промпт слишком длинный для argv kimi (%d > %d символов)"
                               % (len(prompt), KIMI_PROMPT_MAX))
     p = (" " + prompt) if prompt.startswith("-") else prompt
-    argv = [exe, "-p", p, "--output-format", "text", "--plan"]
+    argv = [exe, "-p", p, "--output-format", "text"]
+    if agent_file:
+        argv += ["--agent-file", agent_file]
     if model:
         argv.append("--model=" + model)
     return argv, None
@@ -310,9 +322,15 @@ def generate(prompt, backend, model=None, timeout=DEFAULT_TIMEOUT, no_tools=True
         raise CLIBackendError(backend, "empty", "пустой промпт")
     full = (_NO_TOOLS_PREAMBLE + prompt) if no_tools else prompt
     chosen = model_for(backend, model)
-    with tempfile.TemporaryDirectory(prefix="consilium-cli-") as cwd:
+    with tempfile.TemporaryDirectory(prefix="consilium-cli-") as cwd, \
+            tempfile.TemporaryDirectory(prefix="consilium-agent-") as aux:
         out_file = os.path.join(cwd, "last-message.txt")
-        argv, stdin_text = _argv(backend, exe, chosen, full, out_file)
+        agent_file = None
+        if backend == "kimi":
+            agent_file = os.path.join(aux, "consilium-text-only.md")
+            with open(agent_file, "w", encoding="utf-8") as fh:
+                fh.write(KIMI_AGENT_FILE)
+        argv, stdin_text = _argv(backend, exe, chosen, full, out_file, agent_file)
         try:
             code, out, err = _run(argv, stdin_text, cwd, timeout, child_env())
         except subprocess.TimeoutExpired:

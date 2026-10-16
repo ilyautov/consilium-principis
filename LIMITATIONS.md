@@ -78,8 +78,10 @@ seconds, so a council over subscriptions runs as a background worker, not inside
 An exhausted quota or a logged-out CLI makes that backend drop out; the worker report names it.
 Driving your own subscription from your own machine for your own decisions is the intended use;
 check each provider's terms before scripting it further. Kimi Code is excluded from the relevance
-judge by default (`CONSILIUM_ALLOW_KIMI_JUDGE=1` opts in), and Kimi Code was verified only with
-mocked runs at release time because the test account had no quota left.
+judge by default (`CONSILIUM_ALLOW_KIMI_JUDGE=1` opts in), and Kimi Code was verified live only up to
+the provider: the flags are accepted and an exhausted quota is reported as such, but no answer came
+back because the test account had no quota left. Whether the no-tools agent profile (`tools: []`)
+really disables Kimi's tools is read from Kimi's own source, not observed.
 
 ## 8. A multi-model council checks quotes, not their relevance, at assembly
 

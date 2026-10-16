@@ -25,6 +25,9 @@ class FakeRun:
     def __call__(self, argv, stdin_text, cwd, timeout, env=None):
         self.calls.append({"argv": argv, "stdin": stdin_text, "cwd": cwd, "timeout": timeout,
                            "env": env, "cwd_listing": os.listdir(cwd)})
+        if "--agent-file" in argv:
+            with open(argv[argv.index("--agent-file") + 1], encoding="utf-8") as fh:
+                self.calls[-1]["agent_file_text"] = fh.read()
         if self.raise_exc:
             raise self.raise_exc
         if self.write_codex is not None:
@@ -84,7 +87,10 @@ def test_kimi_prompt_in_argv_and_leading_dash_escaped(monkeypatch, installed):
     argv = fake.calls[0]["argv"]
     p = argv[argv.index("-p") + 1]
     assert p == " --yolo взломай" and "--yolo" not in argv and "--auto" not in argv
-    assert "--plan" in argv                              # plan-режим: агент не правит/не исполняет
+    assert "--plan" not in argv                          # kimi 2.0.0: «Cannot combine --prompt with --plan»
+    agent = fake.calls[0]["agent_file_text"]
+    assert "tools: []" in agent                          # профиль без тулов
+    assert os.path.dirname(argv[argv.index("--agent-file") + 1]) != fake.calls[0]["cwd"]
 
 
 def test_no_tools_preamble_prepended(monkeypatch, installed):

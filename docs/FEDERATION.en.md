@@ -30,7 +30,7 @@ replicas and collapse the council into one model. Quotes are fetched by our retr
 sets 🔵.
 
 How a call is isolated (`scripts/cli_backends.py`): argv without a shell; an empty temporary working
-folder; tools off (`--tools ""`, `--sandbox read-only`, Kimi in plan mode); MCP servers off, so the
+folder; tools off (`--tools ""`, `--sandbox read-only`, Kimi with a no-tools agent profile); MCP servers off, so the
 CLI cannot start our own server and recurse; no saved sessions; secrets other than the CLI's own
 auth are not passed through. A failing subscription (quota, logout, timeout) drops out and its
 replica goes straight back to the queue, and the worker report names the reason.

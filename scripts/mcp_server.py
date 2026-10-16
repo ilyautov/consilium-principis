@@ -1352,7 +1352,10 @@ def _render_session(session, surface="md", depth="plain", kind="session"):
     import session_render as SR
     violations, reconciliations = [], []
     verdict_rejected = None
-    if kind != "opening":                             # атрибуция (§1.1): ДО рендера, раз на объект
+    # Гейты нужны везде, где рисует ПОЛНЫЙ рендерер: опенинг только на widget идёт через
+    # render_opening; opening+md/html падает в render_md/html — без гейта это был бы обход
+    # атрибуции и печати вердикта (security review 2026-10-16).
+    if not (kind == "opening" and surface == "widget"):   # атрибуция (§1.1): ДО рендера, раз на объект
         session, violations, reconciliations = _validate_session_attribution(session)
         # «метку считает код, не хост»: council_scorecard → пересчёт здесь; иначе вердикт-dict
         # обязан нести печать compute_verdict этого процесса — нет печати → блок снят

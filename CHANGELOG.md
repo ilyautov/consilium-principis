@@ -71,7 +71,7 @@ v0.2.0 release tag for those links to resolve.
   entry with the plain plugin-root path. Both contexts checked with the real CLI.
 - Subscription CLIs: a timeout kills the whole process group; output is decoded as UTF-8 with
   replacement; Windows `.cmd`/`.bat` shims are refused unless a matching `.exe` exists; model names
-  are whitelisted and passed as one `--model=` token; Kimi runs with `--plan` and a 60k prompt cap;
+  are whitelisted and passed as one `--model=` token; Kimi runs with a no-tools agent profile (`--agent-file`, `tools: []`; kimi 2.0.0 rejects `--plan` together with `-p`, found in a live run) and a 60k prompt cap;
   child processes get an allow-listed environment plus `CONSILIUM_NO_MCP=1`, and the MCP server
   exits at once under that flag, so a CLI cannot recurse into the council.
 - Kimi is no longer used as the relevance judge unless `CONSILIUM_ALLOW_KIMI_JUDGE=1`, and the

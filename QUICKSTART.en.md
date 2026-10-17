@@ -2,7 +2,7 @@
 
 # Quick start
 
-> Release: [v0.2.0](https://github.com/ilyautov/consilium-principis/releases/download/v0.2.0/consilium-principis.mcpb)
+> Release: [v0.2.1](https://github.com/ilyautov/consilium-principis/releases/download/v0.2.1/consilium-principis.mcpb)
 > — the `.mcpb` is a single-file extension for **Claude Desktop** (Settings → Extensions → install from
 > file); for Claude Code the paths below are enough, no bundle needed.
 

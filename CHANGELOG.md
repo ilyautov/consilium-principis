@@ -5,6 +5,8 @@ versions — [SemVer](https://semver.org/). Dates in ISO (YYYY-MM-DD).
 
 ## [Unreleased]
 
+## [0.2.1] — 2026-10-17
+
 ### Fixed
 - **The MCP server works on Windows.** stdio is now forced to UTF-8: a Windows pipe defaults to the
   console code page, and the first reply carrying Cyrillic (`initialize` instructions) crashed the
@@ -292,7 +294,8 @@ offline on pure stdlib.
 - Personal data (board, sessions, registries, `.env`) is in `.gitignore` and not part of the
   distribution.
 
-[Unreleased]: https://github.com/ilyautov/consilium-principis/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/ilyautov/consilium-principis/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/ilyautov/consilium-principis/releases/tag/v0.2.1
 [0.2.0]: https://github.com/ilyautov/consilium-principis/releases/tag/v0.2.0
 [0.1.3]: https://github.com/ilyautov/consilium-principis/releases/tag/v0.1.3
 [0.1.2]: https://github.com/ilyautov/consilium-principis/releases/tag/v0.1.2

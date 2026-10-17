@@ -2,7 +2,7 @@
 
 # Подключение Consilium как MCP-сервера
 
-> Релиз: [v0.2.0](https://github.com/ilyautov/consilium-principis/releases/download/v0.2.0/consilium-principis.mcpb)
+> Релиз: [v0.2.1](https://github.com/ilyautov/consilium-principis/releases/download/v0.2.1/consilium-principis.mcpb)
 
 Два способа пользоваться Consilium, выбери под свой хост (можно оба, один репозиторий):
 

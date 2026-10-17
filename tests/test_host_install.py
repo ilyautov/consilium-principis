@@ -22,6 +22,33 @@ sys.path.insert(0, os.path.join(REPO, "scripts"))
 import host_install  # noqa: E402
 import install  # noqa: E402
 
+
+def _toml_has_path(text, path):
+    """Путь в TOML-строке: basic string экранирует «\\» (Windows-пути) — сверяем обе формы."""
+    path = str(path)
+    return path in text or path.replace("\\", "\\\\") in text
+
+
+def _split_cmdline(line):
+    """Разбор command_line так, как установщик её собирал: list2cmdline на win32, shlex иначе."""
+    if sys.platform == "win32":
+        import subprocess
+        out, cur, quoted = [], "", False
+        for ch in line:                    # хватает для наших строк: пробелы и двойные кавычки
+            if ch == '"':
+                quoted = not quoted
+            elif ch == " " and not quoted:
+                if cur:
+                    out.append(cur)
+                cur = ""
+            else:
+                cur += ch
+        if cur:
+            out.append(cur)
+        assert subprocess.list2cmdline(out) == line
+        return out
+    return shlex.split(line)
+
 NAME = host_install.NAME
 FAKE_SERVER = (
     "import json, sys\n"
@@ -201,7 +228,7 @@ def test_codex_replaces_stale_path_and_restores_approval_tables(tmp_path):
     res = host_install.install_codex(str(skill), codex_dir=str(codex_dir), runner=fake, which=_which)
     assert res["ok"] and res["action"] == "replace_stale" and res["preserved_subtables"]
     text = (codex_dir / "config.toml").read_text(encoding="utf-8")
-    assert str(skill / "scripts" / "mcp_server.py") in text
+    assert _toml_has_path(text, skill / "scripts" / "mcp_server.py")
     assert "/nonexistent/old" not in text
     assert text.count("[mcp_servers.consilium-principis.tools.cite]") == 1
     assert '[mcp_servers.consilium-principis.tools.federation_claim]\napproval_mode = "approve"' in text
@@ -245,7 +272,7 @@ def test_codex_missing_binary_prints_exact_command_and_touches_nothing(tmp_path)
     res = host_install.install_codex(str(skill), codex_dir=str(codex_dir), runner=FakeCodex(str(codex_dir)),
                                      which=lambda n: None)
     assert not res["ok"] and res["reason"] == "codex_not_found" and res["manual"]
-    assert shlex.split(res["command_line"]) == ["codex", "mcp", "add", NAME, "--", sys.executable,
+    assert _split_cmdline(res["command_line"]) == ["codex", "mcp", "add", NAME, "--", sys.executable,
                                                 str(skill / "scripts" / "mcp_server.py")]
     assert not codex_dir.exists()
 
@@ -383,6 +410,7 @@ def test_check_kimi_against_the_real_server(tmp_path):
 # ── install.py --host ───────────────────────────────────────────────────────
 def _isolate(monkeypatch, tmp_path):
     monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path / "home"))   # Path.home() на Windows
     monkeypatch.setenv("CODEX_HOME", str(tmp_path / "codex"))
     monkeypatch.setenv("KIMI_CODE_HOME", str(tmp_path / "kimi"))
     monkeypatch.setenv("CONSILIUM_LANG", "ru")
@@ -430,7 +458,8 @@ def test_install_host_codex_end_to_end(monkeypatch, tmp_path, capsys):
     assert _run(monkeypatch, "--host", "codex") == 0
     skill = tmp_path / "codex" / "skills" / NAME
     assert made == [str(skill)]
-    assert str(skill / "scripts" / "mcp_server.py") in (tmp_path / "codex" / "config.toml").read_text(encoding="utf-8")
+    assert _toml_has_path((tmp_path / "codex" / "config.toml").read_text(encoding="utf-8"),
+                          skill / "scripts" / "mcp_server.py")
     out = capsys.readouterr().out
     assert "Готово" in out and "Codex CLI" in out and "initialize" in out
 

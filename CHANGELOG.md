@@ -3,6 +3,17 @@
 Format — [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 versions — [SemVer](https://semver.org/). Dates in ISO (YYYY-MM-DD).
 
+## [Unreleased]
+
+### Fixed
+- **The MCP server works on Windows.** stdio is now forced to UTF-8: a Windows pipe defaults to the
+  console code page, and the first reply carrying Cyrillic (`initialize` instructions) crashed the
+  server with `UnicodeEncodeError`, so no host could connect. The doctor's `initialize` check reads
+  the reply as UTF-8 too. A real-subprocess test with a cp1252 pipe guards it; the in-process stdio
+  tests could not see the pipe encoding. Found by the Windows CI on the 0.2.0 PR.
+- Installer tests compare TOML-escaped paths, parse the Windows command line the way it is built
+  and set `USERPROFILE` next to `HOME`.
+
 ## [0.2.0] — 2026-10-16
 
 ### Added

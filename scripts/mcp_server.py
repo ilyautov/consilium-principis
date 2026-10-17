@@ -2983,7 +2983,15 @@ def _serve_stdio():
 
     Читаем через readline(_MAX_LINE + 1): длинную строку НЕ буферизуем целиком — при переросте
     капа дренируем остаток строки чанками и отвечаем JSON-RPC-ошибкой (id=null), не пытаясь
-    json-парсить гигабайты."""
+    json-парсить гигабайты.
+
+    JSON-RPC по stdio — всегда UTF-8: на Windows пайп по умолчанию в кодовой странице (cp1252), и
+    первый же ответ с кириллицей (ensure_ascii=False) ронял сервер UnicodeEncodeError."""
+    for _s in (sys.stdin, sys.stdout):
+        try:
+            _s.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass                                # подменённый поток (тесты, StringIO) — как есть
     stream = sys.stdin
     while True:
         line = stream.readline(_MAX_LINE + 1)

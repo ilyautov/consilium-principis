@@ -413,7 +413,7 @@ def initialize_handshake(command, args, timeout=_HANDSHAKE_TIMEOUT):
                "params": {"protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": {"name": "consilium-doctor", "version": "1"}}}
     try:
         completed = subprocess.run([command, *args], input=json.dumps(request) + "\n", text=True,
-                                   capture_output=True, timeout=timeout, check=False)
+                                   encoding="utf-8", errors="replace", capture_output=True, timeout=timeout, check=False)
     except subprocess.TimeoutExpired:
         return "timeout"
     except OSError as exc:

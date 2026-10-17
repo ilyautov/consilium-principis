@@ -6,6 +6,89 @@ versions — [SemVer](https://semver.org/). Dates in ISO (YYYY-MM-DD).
 ## [Unreleased]
 
 ### Fixed
+- **The MCP server works on Windows.** stdio is now forced to UTF-8: a Windows pipe defaults to the
+  console code page, and the first reply carrying Cyrillic (`initialize` instructions) crashed the
+  server with `UnicodeEncodeError`, so no host could connect. The doctor's `initialize` check reads
+  the reply as UTF-8 too. A real-subprocess test with a cp1252 pipe guards it; the in-process stdio
+  tests could not see the pipe encoding. Found by the Windows CI on the 0.2.0 PR.
+- Installer tests compare TOML-escaped paths, parse the Windows command line the way it is built
+  and set `USERPROFILE` next to `HOME`.
+
+## [0.2.0] — 2026-10-16
+
+### Added
+- **Verdict mechanics (`council_verdict`).** After a forum on a decision with 2+ options and 2+
+  seats, each advisor hands in a scorecard (0-10 per option, lens weight 1-3, confidence, ruin risk,
+  door, what would change its mind, a question for the user). Code, not the host, computes the
+  weighted option scores with the math shown, spread, council confidence and the label (GO / GO WITH
+  CONDITIONS / RESHAPE / DON'T / WAIT), then applies overrides: ruin cap (a seat at "likely ruin"
+  without a mitigation it endorsed caps the verdict at RESHAPE), one-way-door cap (split council on
+  an irreversible step caps at GO WITH CONDITIONS and requires the cheapest test), unanimity alarm.
+  Weights can be multiplied by the outcome loop's `advisor_weights` (clamped 0.5-1.5). Cruxes are
+  typed (fact / numbers / values), the minority report carries "right if…", kill criteria and dated
+  steps are checked for completeness. Rendered inside the session widget (`session_render`), rule 19
+  in `INSTRUCTIONS`. Mechanics adapted from roast-room (MIT).
+- **"Where the lens misfires"** section in `persona.md` (`scaffold-persona`, `mdmeta.parse_misfires`,
+  `diversity_check` exposes it), with factual lines pre-filled for the public-domain seats.
+- **Subscription backends (`scripts/cli_backends.py`).** Claude Code, Codex and Kimi Code CLIs as
+  LLM backends without an API key: `LLM_BACKEND=claude|codex|kimi` for `llm_local.generate` and the
+  independent relevance judge. Calls run with argv (no shell), an empty temp cwd, tools and MCP off,
+  no saved sessions; quota/auth/timeout failures (including Kimi's exit-0 quota error) fail closed.
+- **Federation on subscriptions.** `scripts/federation/sub_worker.py` and the MCP tools
+  `subscriptions_status` / `federation_run_subscriptions` let each installed CLI play each advisor
+  with its own model; the server still sets every 🔵. A failing subscription drops out and its
+  replica is returned to the queue at once (`nack`). Shared worker code moved to
+  `federation/worker_common.py`; retrieve refusals are now reported instead of silently yielding
+  zero quotes.
+- `install.py --host codex|kimi|all` (experimental): installs the skill where Codex CLI
+  (`$CODEX_HOME/skills`) and Kimi Code CLI find it, and registers the MCP server (Codex through
+  `codex mcp add`, Kimi through an atomic merge into `~/.kimi-code/mcp.json` with a backup). The
+  MCP server runs from the host's skill folder, so the skill and MCP share one board.
+- A stale Codex entry (server path no longer exists) is detected and replaced; `[mcp_servers.
+  consilium-principis.*]` sub-tables such as tool `approval_mode`, which `codex mcp add` drops, are
+  restored, and `config.toml` is backed up first. Without the `codex` binary the exact command is
+  printed instead. `--dry-run` prints the plan per host; re-runs are idempotent; each host ends with
+  a stdio `initialize` check. Kimi reuses an existing `~/.claude/skills` install.
+- **Translation rights in the catalog.** `catalog/pd_figures.json` records translator, translator
+  death year and publication year for each public-domain seat; `catalog.translation_status` /
+  `translation_warning` report where the English translation itself is still protected (life + 70 in
+  the EU/UK/RU, US public domain before 1931). `preview_source` surfaces the warning; the Sun Tzu
+  (Giles, d. 1958) manifest carries a rights note. LIMITATIONS §10.
+- `docs/FEDERATION.en.md`: English version of the federation guide with a language switcher.
+- Privacy policy and LIMITATIONS (§7–§9) describe subscription egress (Anthropic / OpenAI /
+  Moonshot), the tested CLI versions, that federation checks verbatimness rather than relevance, and
+  that a verdict is only as good as the scores fed into it.
+- README comparison table now includes persona boards with quote checks (e.g. roast-room).
+
+- **Sealed verdicts.** `council_verdict` stamps its result with an HMAC (per-process key);
+  `render_session` and `export_session` redraw only a sealed verdict or recompute from
+  `council_scorecard`, and report a hand-made or edited one as `verdict_rejected`. Ranking uses the
+  raw score (status quo wins only an exact tie); seat names that differ only by case are rejected.
+- **AI disclosure on every surface.** Markdown, HTML, the session widget, the opening plate, export
+  and the decision record carry one visible line saying the text is AI-generated and which marks
+  are verbatim (EU AI Act Art. 50). In the widget it replaces the legend that was hidden behind the
+  engineering toggle.
+- `federation_cancel_subscriptions` stops background subscription workers of a session (checks the
+  process group before killing on POSIX).
+### Fixed
+- Test suite: a session-scoped guard makes any test that would launch a real subscription CLI fail
+  loudly.
+- **The MCP server starts when the repo is opened as a project.** `.mcp.json` used
+  `${CLAUDE_PLUGIN_ROOT}`, which Claude Code leaves unexpanded outside a plugin, so the server died
+  with CONNECTION_CLOSED. It now uses `${CLAUDE_PLUGIN_ROOT:-.}`, and `plugin.json` carries its own
+  entry with the plain plugin-root path. Both contexts checked with the real CLI.
+- Subscription CLIs: a timeout kills the whole process group; output is decoded as UTF-8 with
+  replacement; Windows `.cmd`/`.bat` shims are refused unless a matching `.exe` exists; model names
+  are whitelisted and passed as one `--model=` token; Kimi runs with a no-tools agent profile (`--agent-file`, `tools: []`; kimi 2.0.0 rejects `--plan` together with `-p`, found in a live run) and a 60k prompt cap;
+  child processes get an allow-listed environment plus `CONSILIUM_NO_MCP=1`, and the MCP server
+  exits at once under that flag, so a CLI cannot recurse into the council.
+- Kimi is no longer used as the relevance judge unless `CONSILIUM_ALLOW_KIMI_JUDGE=1`, and the
+  judge label says so instead of claiming "subscription kimi".
+- A worker thread survives unexpected errors (the replica is returned to the queue); a bad
+  `models` entry rejects the whole `federation_run_subscriptions` call; worker logs are trimmed.
+- `install.py --host codex`: a timeout or OS error during `codex mcp add` restores `config.toml`
+  from the backup; the printed command is quoted for the platform; only the last 3 installer
+  backups are kept.
 - **The skill installs in Hermes Agent.** `SKILL.md` sits at the repo root, so
   Hermes skills-guard scanned the whole repository and rated it DANGEROUS (the
   attack-defence tests with `/etc/passwd` and `__import__('os')` matched
@@ -209,7 +292,8 @@ offline on pure stdlib.
 - Personal data (board, sessions, registries, `.env`) is in `.gitignore` and not part of the
   distribution.
 
-[Unreleased]: https://github.com/ilyautov/consilium-principis/compare/v0.1.3...HEAD
+[Unreleased]: https://github.com/ilyautov/consilium-principis/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/ilyautov/consilium-principis/releases/tag/v0.2.0
 [0.1.3]: https://github.com/ilyautov/consilium-principis/releases/tag/v0.1.3
 [0.1.2]: https://github.com/ilyautov/consilium-principis/releases/tag/v0.1.2
 [0.1.1]: https://github.com/ilyautov/consilium-principis/releases/tag/v0.1.1

@@ -128,7 +128,7 @@ def test_validator_rejects_mismatched_checksum(tmp_path):
 
 def test_validator_rejects_version_tag_mismatch(tmp_path):
     artifact = make_bundle(tmp_path, entries=complete_entries())
-    registry = write_registry(tmp_path, version="0.2.0", sha256_value=sha256(artifact))
+    registry = write_registry(tmp_path, version="99.0.0", sha256_value=sha256(artifact))
 
     result = run_validator(TAG, artifact, registry)
 

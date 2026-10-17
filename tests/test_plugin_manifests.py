@@ -137,7 +137,9 @@ def test_mcp_json_uses_plugin_root_no_absolutes():
     m = json.loads(raw)
     srv = m["mcpServers"]["consilium-principis"]
     joined = " ".join(srv["args"])
-    assert "${CLAUDE_PLUGIN_ROOT}" in joined
+    # .mcp.json общий: его читает и проект (CLAUDE_PLUGIN_ROOT не задан → «.» = cwd проекта),
+    # и плагин (там перекрыт инлайном из plugin.json). См. tests/test_mcp_json_config.py.
+    assert "${CLAUDE_PLUGIN_ROOT:-.}" in joined
     assert "mcp_server.py" in joined
     assert "/Users/" not in raw and "/opt/" not in raw, "ноль абсолютных unix-путей"
     assert not re.search(r"[A-Za-z]:\\\\", raw), "ноль абсолютных windows-путей"

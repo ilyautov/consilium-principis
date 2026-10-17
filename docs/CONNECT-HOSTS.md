@@ -2,7 +2,7 @@
 
 # Подключение к разным хостам (не только Claude Code)
 
-> Релиз: [v0.1.3](https://github.com/ilyautov/consilium-principis/releases/download/v0.1.3/consilium-principis.mcpb)
+> Релиз: [v0.2.0](https://github.com/ilyautov/consilium-principis/releases/download/v0.2.0/consilium-principis.mcpb)
 
 Ключевой факт архитектуры: логика советников, контура верности, гейта цитат и 📐 карты
 решения живёт в **MCP-сервере**, то есть в `scripts/mcp_server.py`. Он отдаёт полный
@@ -13,7 +13,7 @@ if method == "initialize":
     return _rpc_result(req_id, {
         "protocolVersion": "2024-11-05",
         "capabilities": {"tools": {}},
-        "serverInfo": {"name": "consilium-principis", "version": "0.1.3"},
+        "serverInfo": {"name": "consilium-principis", "version": "0.2.0"},
         "instructions": INSTRUCTIONS,
     })
 ```
@@ -34,9 +34,9 @@ if method == "initialize":
 | Claude Code | manual (`claude mcp add`) | да | ⚠ экспериментально: нет host-specific CI smoke |
 | Claude Desktop | нет своего скилл-формата, MCP-сервер даёт весь функционал | да | ⚠ экспериментально: нет host-specific CI smoke |
 | Cursor | нет | да (по документации Cursor) | ⚠ не проверено на этом хосте, подтвердите |
-| Codex / OpenAI-style CLI | нет | ⚠ зависит от версии CLI, см. раздел ниже | ⚠ не проверено |
+| Codex CLI | да, `~/.codex/skills` (`install.py --host codex`) | да, через `codex mcp add` | ⚠ экспериментально: установщик проверен на codex-cli 0.161.0 (временный `CODEX_HOME`), живой сессии в CI нет |
 | Gemini CLI | нет | ⚠ через расширения/MCP-конфиг, см. раздел ниже | ⚠ не проверено |
-| Kimi CLI (Moonshot) | нет | да (по документации Kimi CLI, `~/.kimi/mcp.json`) | ⚠ не проверено |
+| Kimi Code CLI (Moonshot) | да, читает `~/.claude/skills` или `~/.kimi-code/skills` (`install.py --host kimi`) | да, `~/.kimi-code/mcp.json` | ⚠ экспериментально: формат по Kimi Code 2.0.0, живой сессии в CI нет |
 | Универсальный MCP-хост | нет (нет плагин-формата вне Claude Code) | да | ⚠ зависит от хоста |
 
 «Скилл» здесь про удобную обёртку (авто-регистрация, слэш-команда). MCP-сервер сам по
@@ -178,27 +178,45 @@ python3 scripts/board.py mcp-config --json
 
 ---
 
-## 4. Codex / OpenAI-style CLI
+## 4. Codex CLI
 
-⚠ Не проверено. Честно: поддержка MCP в Codex CLI менялась между версиями, и на момент
-написания этого файла нет подтверждённого теста подключения Consilium к Codex. Если Codex
-CLI в вашей версии поддерживает MCP-серверы (обычно через `~/.codex/config.toml` или
-аналогичный конфиг с секцией `mcp_servers`), конфиг по смыслу тот же, команда и путь:
+⚠ Экспериментально. Установщик проверен на codex-cli 0.161.0 во временном `CODEX_HOME`
+(`codex mcp add/get/list`), живой сессии Codex в CI нет. После установки проверь на своей машине.
 
-```toml
-[mcp_servers.consilium-principis]
-command = "python3"
-args = ["/ABSOLUTE/PATH/TO/consilium-principis/scripts/mcp_server.py"]
+```bash
+cd ~/consilium-principis
+python3 install.py --host codex --dry-run   # план: что поставит и какую команду codex выполнит
+python3 install.py --host codex
 ```
 
-(Формат секции `[mcp_servers.<name>]` с `command`/`args` типичен для Codex CLI на момент
-написания, но **не проверен на реальном запуске в рамках этого проекта**. Актуальный синтаксис
-уточните в документации своей версии Codex CLI.)
+Что делает:
 
-Как и с Cursor, неясно (⚠ не проверено), прокидывает ли Codex поле `instructions` из
-`initialize` в системный промпт модели. Если нет, попросите модель явно вызвать тул
-`doctor`, затем `seed_council`, чтобы получить тот же старт, что даёт «с чего начать» в
-Claude Code/Desktop.
+1. Копирует скилл в `$CODEX_HOME/skills/consilium-principis/` (по умолчанию `~/.codex`), где
+   Codex ищет `SKILL.md`, и инициализирует доску так же, как для Claude Code.
+2. Регистрирует MCP-сервер командой `codex mcp add consilium-principis -- <python>
+   <папка скилла>/scripts/mcp_server.py`. TOML руками не правится. Скилл и MCP-тулы
+   смотрят в одну папку, поэтому доска у них общая.
+3. Если запись уже есть и указывает на несуществующий файл (например, старый чекаут репо),
+   заменяет её. Если запись совпадает, ничего не меняет.
+4. Проверяет результат: `codex mcp get --json`, путь существует, сервер отвечает на stdio
+   `initialize`.
+
+Ограничения:
+
+- `codex mcp add` переписывает `config.toml` целиком: пропадают комментарии и под-таблицы
+  `[mcp_servers.consilium-principis.*]` (например `tools.cite.approval_mode`). Установщик
+  перед этим делает бэкап `config.toml.bak.<время>`, а под-таблицы дописывает обратно.
+  Комментарии остаются только в бэкапе.
+- Если бинаря `codex` нет в PATH, установщик ничего не правит и печатает точную команду
+  `codex mcp add …` для ручного запуска.
+- Доска Codex (`~/.codex/skills/consilium-principis`) отдельная от доски Claude Code.
+
+Ручной путь без установщика: `codex mcp add consilium-principis -- python3
+/ABSOLUTE/PATH/TO/consilium-principis/scripts/mcp_server.py`.
+
+Неизвестно, передаёт ли Codex поле `instructions` из `initialize` в системный промпт модели.
+Если нет, попроси модель явно вызвать тул `doctor`, затем `seed_council`: это тот же старт, что
+даёт «с чего начать» в Claude Code и Desktop.
 
 ---
 
@@ -242,41 +260,38 @@ Extension запускает `python3 ${extensionPath}/scripts/mcp_server.py` л
 
 ---
 
-## 6. Kimi CLI (Moonshot)
+## 6. Kimi Code CLI (Moonshot)
 
-⚠ Не проверено на этом хосте. Kimi Code CLI читает MCP-конфиг из `~/.kimi/mcp.json` в
-формате, совместимом с другими MCP-клиентами (ключ `mcpServers`, поля `command`/`args`,
-опционально `env`), и поддерживает stdio-серверы:
-
-```json
-{
-  "mcpServers": {
-    "consilium-principis": {
-      "command": "python3",
-      "args": ["/ABSOLUTE/PATH/TO/consilium-principis/scripts/mcp_server.py"]
-    }
-  }
-}
-```
-
-Путь под свою машину подставит тот же генератор (не вписывай абсолют руками):
+⚠ Экспериментально. Пути и формат взяты у Kimi Code CLI 2.0.0, живой сессии Kimi в CI нет.
+После установки проверь на своей машине.
 
 ```bash
 cd ~/consilium-principis
-python3 scripts/board.py mcp-config --json
+python3 install.py --host kimi --dry-run
+python3 install.py --host kimi
 ```
 
-Kimi CLI также принимает конфиг разово, без правки `~/.kimi/mcp.json`:
+Что делает:
 
-```bash
-kimi --mcp-config-file /path/to/mcp.json
-# либо инлайн: kimi --mcp-config '{"mcpServers": { ... }}'
-```
+1. Скилл: Kimi сам читает `~/.claude/skills`, `~/.codex/skills`, `~/.agents/skills` и
+   `~/.kimi-code/skills`. Если Consilium уже стоит в `~/.claude/skills/consilium-principis`,
+   вторую копию установщик не делает, и у Claude Code с Kimi одна доска. Иначе копирует скилл
+   в `~/.kimi-code/skills/consilium-principis/`.
+2. MCP: добавляет запись `consilium-principis` в `$KIMI_CODE_HOME/mcp.json` (по умолчанию
+   `~/.kimi-code/mcp.json`, формат `{"mcpServers": {...}}`). Запись идёт под локом и атомарно,
+   с бэкапом `mcp.json.bak.<время>`; соседние серверы не трогаются, битый JSON не
+   перезаписывается.
+3. Проверяет результат: запись есть, путь существует, сервер отвечает на stdio `initialize`.
 
-⚠ Как и с другими не-Claude хостами, не проверено, прокидывает ли Kimi поле `instructions`
-из `initialize` в контекст модели. Если совет «не в курсе» своего протокола после
-подключения, попроси явно вызвать тулы `doctor`, затем `seed_council`. На Windows используй
-`py -3` вместо `python3` (см. раздел ниже).
+Если каталога `~/.kimi-code` нет (Kimi не установлен), установщик ничего не создаёт и сообщает
+об этом. `kimi doctor` проверяет только `config.toml` и `tui.toml`, `mcp.json` он не валидирует.
+
+`python3 install.py --host all` ставит Claude Code, Codex и Kimi за один проход; Kimi в этом
+случае использует скилл из `~/.claude/skills`.
+
+Неизвестно, передаёт ли Kimi поле `instructions` из `initialize` в контекст модели. Если совет
+после подключения не знает своего протокола, попроси явно вызвать тулы `doctor`, затем
+`seed_council`. На Windows используй `py -3` вместо `python3` (см. раздел ниже).
 
 ---
 

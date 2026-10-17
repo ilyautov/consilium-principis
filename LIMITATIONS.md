@@ -67,3 +67,41 @@ and drops to 🟡. A translation may sit beside the quote as a gloss, but the gl
 Advisor weighting ("who has been right *for you*"), calibrated delivery, and the outcome loop
 only become meaningful once you have logged decisions and their outcomes. Until that journal
 exists, the board applies defaults and cannot yet tell you whose counsel has served you well.
+
+## 7. Subscription backends depend on third-party CLIs
+
+The Claude Code, Codex and Kimi Code backends drive those CLIs in non-interactive mode. Their flags
+and output formats are verified against claude 2.1.296, codex-cli 0.161.0 and kimi 2.0.0; a newer
+CLI can change them, and a broken call fails closed (the judge falls back to the next level, a
+federation worker drops out and returns its replica to the queue). A call takes roughly 5–30
+seconds, so a council over subscriptions runs as a background worker, not inside one MCP call.
+An exhausted quota or a logged-out CLI makes that backend drop out; the worker report names it.
+Driving your own subscription from your own machine for your own decisions is the intended use;
+check each provider's terms before scripting it further. Kimi Code is excluded from the relevance
+judge by default (`CONSILIUM_ALLOW_KIMI_JUDGE=1` opts in), and Kimi Code was verified live only up to
+the provider: the flags are accepted and an exhausted quota is reported as such, but no answer came
+back because the test account had no quota left. Whether the no-tools agent profile (`tools: []`)
+really disables Kimi's tools is read from Kimi's own source, not observed.
+
+## 8. A multi-model council checks quotes, not their relevance, at assembly
+
+When several models play the advisors (federation), the server re-checks every quote word-for-word
+against the right advisor's corpus, so a model cannot hand itself a 🔵. It does not yet judge
+whether a verbatim line is *on topic*: a real but loosely related line can arrive as 🔵. Treat 🔵
+in federation output as "these are the author's words", not "this is the best line for your
+question". Different models give more varied answers; the research does not show they give more
+accurate ones.
+
+## 9. The verdict is only as good as the scores
+
+`council_verdict` computes the label, the spread and the caps from the advisors' scorecards; the
+host cannot soften a cap. But the scores themselves are model judgments. A 7.5 is a summary of the
+council's reasoning, not a probability of success.
+
+## 10. Translations have their own copyright
+
+The seeded authors died centuries ago, but a translation is a separate work. All seeded editions
+were published before 1931 and are public domain in the US. In "life + 70" countries (EU, UK,
+Russia) Lionel Giles's 1910 *Art of War* (Giles died in 1958) stays protected until the end of
+2028. The catalog preview warns about it; build the corpus locally for personal use and do not
+redistribute it there before 2029.

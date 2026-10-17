@@ -34,3 +34,16 @@ def parse_sections(body):
     if cur is not None:
         sections[cur] = "\n".join(buf).strip()
     return sections
+
+
+def parse_misfires(text):
+    """persona.md → список строк секции «## Где линза ошибается» (слепые пятна линзы). Берём
+    пункты списка (- / * / ·); плейсхолдер _(...)_ и HTML-комментарии пропускаем. Нет секции → []."""
+    _, body = parse_frontmatter(text)
+    sec = parse_sections(body).get("Где линза ошибается", "")
+    out = []
+    for line in sec.splitlines():
+        m = re.match(r"^\s*[-*·]\s+(.*\S)\s*$", line)
+        if m:
+            out.append(m.group(1))
+    return out

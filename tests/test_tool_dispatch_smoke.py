@@ -42,6 +42,10 @@ _SMOKE = {
     "setup_full": lambda t: {"consent": False},
     "build_advisor": lambda t: {"advisor_dir": os.path.join(str(t), "advisors", "some-advisor")},
     "ingest_telegram": lambda t: {"handle": "@some_nonexistent_test_channel"},
+    "council_verdict": lambda t: {"scorecard": {}},
+    "subscriptions_status": lambda t: {},
+    "federation_run_subscriptions": lambda t: {"session_id": "no-such-session"},
+    "federation_cancel_subscriptions": lambda t: {"session_id": "no-such-session"},
 }
 
 

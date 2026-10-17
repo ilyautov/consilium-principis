@@ -97,3 +97,19 @@ def test_notification_gets_no_response(monkeypatch):
 def test_eof_terminates_cleanly(monkeypatch):
     """Пустой вход → цикл завершается по EOF молча (не висит, не падает)."""
     assert _run_stdio(monkeypatch, "") == []
+
+
+def test_real_subprocess_answers_initialize_under_non_utf8_pipe():
+    """Windows-регрессия (CI 2026-10-17): пайп в cp1252 → ответ с кириллицей ронял сервер.
+    Настоящий подпроцесс, не StringIO: кодировку пайпа in-process тест не видит."""
+    import subprocess
+    server = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                          "scripts", "mcp_server.py")
+    env = dict(os.environ, PYTHONIOENCODING="cp1252")
+    env.pop("CONSILIUM_NO_MCP", None)
+    req = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}}) + "\n"
+    out = subprocess.run([sys.executable, server], input=req.encode("utf-8"), capture_output=True,
+                         env=env, timeout=60)
+    assert out.returncode == 0, out.stderr.decode("utf-8", "replace")[-500:]
+    reply = json.loads(out.stdout.decode("utf-8").splitlines()[0])
+    assert reply["result"]["serverInfo"]["name"] == "consilium-principis"

@@ -17,7 +17,7 @@ import subprocess
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from manifest_builder import validate_manifest
-from scaffold import scaffold_persona
+from scaffold import PD_MISFIRES, scaffold_persona
 
 # Курированные PD-мудрецы с выверенными под издание манифестами (region-маркеры проверены
 # против конкретного gutenberg-издания; collect_pd срезает gutenberg-boilerplate до сохранения).
@@ -80,7 +80,7 @@ def seed_one(spec, root, fetch_fn, build_fn):
     persona_path = os.path.join(adv_dir, "persona.md")
     if not os.path.exists(persona_path):
         with open(persona_path, "w", encoding="utf-8") as f:
-            f.write(scaffold_persona(spec["display"]))
+            f.write(scaffold_persona(spec["display"], misfires=PD_MISFIRES.get(spec["name"])))
 
     res = build_fn(adv_dir)
     return {"name": spec["name"], "ok": bool(res.get("ok")), "stage": "build", "build": res}

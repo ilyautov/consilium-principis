@@ -50,3 +50,41 @@ def test_rights_clear_is_fail_closed():
     assert catalog.rights_clear({"id": "x", "rights": {
         "death_year": "180", "text_status": "public_domain",
         "consenter_circle": "exhausted"}}) is False  # death_year не int
+
+
+# ── права на ПЕРЕВОД (аудит 2026-10-16): автор в PD ≠ перевод в PD везде ──
+
+def test_every_seed_figure_declares_translation_rights():
+    import json
+    cat = json.loads(CATALOG.read_text(encoding="utf-8"))
+    for fig in cat["figures"]:
+        t = fig["rights"].get("translation")
+        assert isinstance(t, dict), fig["id"]
+        assert t["translator"] and isinstance(t["translator_death_year"], int)
+        assert isinstance(t["published_year"], int) and t["published_year"] < 1931  # US-PD
+
+
+def test_translation_status_life_plus_70():
+    import sys
+    sys.path.insert(0, str(ROOT / "scripts"))
+    import catalog
+    giles = {"rights": {"translation": {"translator": "Lionel Giles", "translator_death_year": 1958,
+                                        "published_year": 1910}}}
+    st = catalog.translation_status(giles, year=2026)
+    assert st["us"] == "public_domain" and st["life_plus_70"] == "protected"
+    assert st["life_plus_70_free_from"] == 2029
+    assert "2029" in catalog.translation_warning(giles, year=2026)
+    assert catalog.translation_status(giles, year=2029)["life_plus_70"] == "public_domain"
+    assert catalog.translation_warning(giles, year=2029) is None
+    assert catalog.translation_status({"rights": {}}) is None
+    assert catalog.translation_status({"rights": {"translation": {"translator_death_year": True}}}) == \
+        {"translator": ""}
+
+
+def test_shipped_catalog_flags_only_giles_today():
+    import json, sys
+    sys.path.insert(0, str(ROOT / "scripts"))
+    import catalog
+    cat = json.loads(CATALOG.read_text(encoding="utf-8"))
+    flagged = [f["id"] for f in cat["figures"] if catalog.translation_warning(f, year=2026)]
+    assert flagged == ["sun-tzu"]

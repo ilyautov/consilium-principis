@@ -51,13 +51,15 @@ Consilium needs no separate API key. It runs on the agent you already have, whos
 The "several AIs deliberate" mechanic is already common. What sets Consilium apart isn't the number
 of voices. It's that a claim can be **re-verified**, and where it can't, the council honestly stays silent:
 
-| | "Roleplay a sage" (one AI) | LLM-Council-style board | **Consilium** |
-|---|:---:|:---:|:---:|
-| Different lenses, disagreement as a feature | ± | ✅ | ✅ |
-| **Verbatim quote checked word-for-word against the original, with its source** | ✗ | ✗ | **✅** |
-| **Honestly silent outside the corpus (fail-closed)** | ✗ | ✗ | **✅** |
-| Quantifiable question → Monte Carlo (📐) | ✗ | ✗ | ✅ |
-| No separate key required by the project | ± | ± | ✅ |
+| | "Roleplay a sage" (one AI) | LLM-Council-style board | Persona board with a quote check (e.g. roast-room) | **Consilium** |
+|---|:---:|:---:|:---:|:---:|
+| Different lenses, disagreement as a feature | ± | ✅ | ✅ | ✅ |
+| **Quote checked word-for-word against the corpus of the advisor it is attributed to** | ✗ | ✗ | ± pooled corpus, after the session | **✅ per advisor, before output** |
+| **Honestly silent outside the corpus (fail-closed)** | ✗ | ✗ | ✗ | **✅** |
+| Verdict computed by code, with caps for ruin risk and irreversible bets | ✗ | ✗ | ✅ | ✅ |
+| Quantifiable question → Monte Carlo (📐) | ✗ | ✗ | ✗ | ✅ |
+| Different models in the seats, on subscriptions you already have | ✗ | ± API key | ✗ | ✅ Claude Code / Codex / Kimi |
+| No separate key required by the project | ± | ± | ✅ | ✅ |
 
 <sub>A "personal board of directors" is a mainstream practice (an HBR concept); the bet on grounding
 and citation transparency has been validated by both the market (Delphi, $16M from Sequoia) and
@@ -210,6 +212,33 @@ Windows launcher path, but please treat it as experimental and report the result
 - **Plugin can't find Python?** Set `CONSILIUM_PYTHON=py` in your environment before launching Claude Code. The plugin's server command defaults to `python3` and honors this override. (The Claude Desktop path needs nothing — `board.py mcp-config` writes the exact interpreter for you.)
 - **MCP configuration:** run `py -3 scripts/board.py mcp-config --json` (or `py -3 scripts/board.py mcp-install` for Claude Desktop). If `py` is absent, use `python` only after confirming it is Python 3.10+; do not use the Store `python3` alias. See [`CONNECT-MCP.en.md`](CONNECT-MCP.en.md) for the exact fallback.
 
+### Codex CLI and Kimi Code CLI (experimental)
+
+```bash
+python3 install.py --host codex     # or: kimi, all; add --dry-run to see the plan first
+```
+
+The installer puts the skill where each CLI looks for it and registers the MCP server (`codex mcp
+add` for Codex, a backed-up merge into `~/.kimi-code/mcp.json` for Kimi). A stale Codex entry that
+points to a missing path is replaced, and its per-tool approval settings are kept. Details:
+[`docs/CONNECT-HOSTS.en.md`](docs/CONNECT-HOSTS.en.md).
+
+## A council of different models, on your subscriptions
+
+One model wearing several hats makes correlated mistakes. If you have Claude Code, Codex or Kimi
+Code installed and logged in, the council can seat a different model in each chair without any API
+key: ask your agent to "run the council on my subscriptions", or from a terminal:
+
+```bash
+python3 scripts/federation/sub_worker.py --open --session s1 \
+  --question "Should I quit my job to start a business?" \
+  --advisors advisors/marcus-aurelius,advisors/machiavelli --backends claude,codex
+```
+
+Every subscription plays every advisor; quotes still go through the corpus check, and only the
+server can mark one 🔵. Your question goes to those providers under your account and spends your
+quota ([privacy](PRIVACY_POLICY.md), [limitations](LIMITATIONS.md) §7–8).
+
 ## Your board, your call
 
 **An empty board out of the box is normal.** Who sits at the table is your call; the board is personal.
@@ -277,7 +306,7 @@ report it privately via [`SECURITY.en.md`](SECURITY.en.md). Support and project 
 ---
 
 <div align="center">
-<sub>Consilium Principis · early access (v0.1.3) · <a href="https://github.com/ilyautov/consilium-principis/releases/download/v0.1.3/consilium-principis.mcpb">release artifact</a> · <a href="LICENSE">MIT</a> · <a href="CONTRIBUTING.en.md">Contributing</a> · <a href="SECURITY.en.md">Security</a></sub>
+<sub>Consilium Principis · early access (v0.2.0) · <a href="https://github.com/ilyautov/consilium-principis/releases/download/v0.2.0/consilium-principis.mcpb">release artifact</a> · <a href="LICENSE">MIT</a> · <a href="CONTRIBUTING.en.md">Contributing</a> · <a href="SECURITY.en.md">Security</a></sub>
 </div>
 
 ---

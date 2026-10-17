@@ -94,7 +94,7 @@ Principis»). Над обоими висит один вопрос, которы
 # Карта архитектуры (5 частей)
 
 **1. MCP-сервер.** `scripts/mcp_server.py` — реестр тулов + блок
-`INSTRUCTIONS` (правила 0–18). Это host-facing контракт: Consilium
+`INSTRUCTIONS` (правила 0–19). Это host-facing контракт: Consilium
 поднимается как MCP-сервер контекста и инструментов, а не как модель —
 рассуждает вызывающий хост (Claude/GPT), сервер лишь даёт ретрив,
 детерминированный гейт верности и счёт. Ключевой факт архитектуры: MCP-хост
@@ -230,7 +230,7 @@ python scripts/gen_selfdoc.py
 
 ### Инвентарь кода
 
-Скрипты (71) по подсистемам:
+Скрипты (74) по подсистемам:
 
 - **build**: `build_advisor.py`
 - **calibrate**: `calibrate_advisor.py`, `calibrated_consult.py`
@@ -239,20 +239,20 @@ python scripts/gen_selfdoc.py
 - **diversity**: `diversity_check.py`
 - **doctor**: `doctor.py`
 - **eval**: `bootstrap_eval.py`, `eval.py`, `poison_eval.py`, `retrieval_regression.py`, `serving_gate_eval.py`, `synth_eval.py`
-- **install**: `mcp_install.py`
+- **install**: `host_install.py`, `mcp_install.py`
 - **mcp**: `mcp_server.py`
-- **other**: `abstention_curve.py`, `adversarial_loop.py`, `advisor_calibration.py`, `atomic.py`, `board.py`, `board_init.py`, `build_manual.py`, `build_orchestrator.py`, `calc_render.py`, `calibration.py`, `ci_bundle_guard.py`, `decision_card.py`, `decision_map.py`, `decision_record.py`, `extractor.py`, `file_atomic.py`, `gen_golden.py`, `gen_selfdoc.py`, `golden_meta.py`, `governance.py`, `ingest_telegram.py`, `judge_backend.py`, `lang_check.py`, `lens_builder.py`, `lenses.py`, `lifecycle.py`, `llm_local.py`, `manifest_builder.py`, `mc_run.py`, `mcp_decisions.py`, `mdmeta.py`, `mirror.py`, `moat_check.py`, `outcome_loop.py`, `perturbation.py`, `prediction_calibration.py`, `preflight.py`, `premortem.py`, `principis.py`, `recipes.py`, `release_validate.py`, `relevance_gate.py`, `relevance_judge.py`, `safe_expr.py`, `scaffold.py`, `seed.py`, `selfdoc_query.py`, `session_render.py`, `setup_full.py`, `stability.py`
+- **other**: `abstention_curve.py`, `adversarial_loop.py`, `advisor_calibration.py`, `atomic.py`, `board.py`, `board_init.py`, `build_manual.py`, `build_orchestrator.py`, `calc_render.py`, `calibration.py`, `ci_bundle_guard.py`, `cli_backends.py`, `council_verdict.py`, `decision_card.py`, `decision_map.py`, `decision_record.py`, `extractor.py`, `file_atomic.py`, `gen_golden.py`, `gen_selfdoc.py`, `golden_meta.py`, `governance.py`, `ingest_telegram.py`, `judge_backend.py`, `lang_check.py`, `lens_builder.py`, `lenses.py`, `lifecycle.py`, `llm_local.py`, `manifest_builder.py`, `mc_run.py`, `mcp_decisions.py`, `mdmeta.py`, `mirror.py`, `moat_check.py`, `outcome_loop.py`, `perturbation.py`, `prediction_calibration.py`, `preflight.py`, `premortem.py`, `principis.py`, `recipes.py`, `release_validate.py`, `relevance_gate.py`, `relevance_judge.py`, `safe_expr.py`, `scaffold.py`, `seed.py`, `selfdoc_query.py`, `session_render.py`, `setup_full.py`, `stability.py`
 - **situation**: `situation.py`
 - **tier**: `tier_full.py`
 
-Тестов: 167.
+Тестов: 172.
 
 ## Слой 3 — Справочник
 
-### Тулы (61)
+### Тулы (65)
 
 - 🌐 **`add_source`** — Затянуть источник в sources/ советника БЕЗ шелла: url (фетч + авто-strip Gutenberg) | text (вставка) | path (локальный текст-файл). Проставляет тир (P1=🔵 первоисточник). Скачивание — ПОДТВЕРДИ у юзера; не-PD хост требует license=public-domain. Потом build_advisor для сборки корпуса. · rule:0, rule:11
-- 🌐 **`advisor_weights`** — Калибровка совета по ИСХОДУ (петля U1): кто был прав ДЛЯ ТЕБЯ → вес голоса. records=[{advisor,outcome,endorsed}]. Laplace: без данных вес нейтрален. · rule:12
+- 🌐 **`advisor_weights`** — Калибровка совета по ИСХОДУ (петля U1): кто был прав ДЛЯ ТЕБЯ → вес голоса. records=[{advisor,outcome,endorsed}]. Laplace: без данных вес нейтрален. · rule:12, rule:19
 - 🔧 **`atomic_grounding`** — Атомарная верность: разбить заявление на атомы, сверить каждый гейтом, дать inflation gap (насколько единый score завышает обоснованность).
 - 🌐 **`board_status`** — Шасси-онбординг: что на доске готово (Принцепс/советники/линзы) + ОДИН приоритетный следующий шаг сборки. Зови в начале, чтобы вести юзера за руку. Может вернуть pending_outcomes (решения без исхода) + loop_nudge — следуй ему. · rule:0, rule:9, rule:10, rule:12
 - 🌐 **`build_advisor`** — Собрать советника под ключ ИЗ АГЕНТА: манифест-гейт → corpus → kernels → индекс. advisor_dir = advisors/{имя}. ФОНОВЫЙ ДЖОБ (долго): вернёт {job_id} сразу — опрашивай job_status(job_id), не жди здесь. Сначала validate_manifest. · rule:0
@@ -272,16 +272,19 @@ python scripts/gen_selfdoc.py
 - 🌐 **`close_decision_card`** — Закрыть Decision Card фактом исхода (МУТИРУЮЩИЙ, Rule 0): числа (occurred для event / actual в ТЕХ ЖЕ единицах для metric) идут в Card, глиф ✅/❌ остаётся человеку в markdown. Ищет карту по card_id (скан decisions/) или path. outcome={resolved_on, occurred|actual, endorsed?, note?}. Fail-closed: чужие единицы / дата раньше created → отказ. Потом зови prediction_calibration. · rule:12, rule:13
 - 🌐 **`config_get`** — Прочитать board_config.json (тюнинг без правки файла): весь конфиг или один ключ (retrieval_mode, abstain_threshold, hybrid_alpha…). · rule:10
 - 🌐 **`config_set`** — Записать ключ в board_config.json (тюнинг из хоста, persistent). ПОДТВЕРДИ у юзера перед вызовом. Напр. retrieval_mode=auto|hybrid, abstain_threshold=0.5. · rule:0, rule:10
+- 🌐 **`council_verdict`** — Вердикт совета по scorecard (read-only, ноль LLM, считает код): после форума по вопросу-решению каждый советник сдаёт оценки вариантов 0..10, вес линзы 1..3, уверенность 1..5, ruin_risk, door, change_my_mind, question_for_user. → метка ИДТИ / ИДТИ С УСЛОВИЯМИ / ПЕРЕДЕЛАТЬ / НЕ ДЕЛАТЬ / ЖДАТЬ, баллы с математикой, разброс, уверенность совета, overrides (потолок разорения, необратимость при расколе, тревога единодушия, ЖДАТЬ), missing. track_weights — выход advisor_weights как есть (множитель зажат 0.5..1.5). Ошибки (errors) доноси ВОПРОСАМИ совета. · rule:19
 - 🌐 **`decision_record`** — Протокол заседания (decision-record / минуты) — по ЯВНОМУ запросу юзера («протокол», «минуты», «оформи решение»). Собирает канонический ВЫХОД совета: позиции советников с допущениями, диссент (из disagreement), решение+статус, триггеры пересмотра, provenance-счётчики маркеров. МОАТ: тиры (🔵/🟢/🟡) копируются as-is из session.advisors[].opinions[].marker (гейт проставил их раньше) — тул НИКОГДА не поднимает и не изобретает 🔵. Ноль LLM, чистая агрегация переданного объекта. · rule:12, rule:13
 - 🌐 **`diversity_check`** — Ортогональность состава совета (read-only, эхо-камера-детектор): diversity 0..1, дубли-голоса (similarity >= 0.5 → flag=dup), непокрытые оси мышления. ОБЯЗАТЕЛЬНО перед созывом совета (правило 18в): diversity < 0.5 = эхо-камера — предупреди юзера, предложи контр-голос. · rule:18
 - 🌐 **`doctor`** — Health-check машины БЕЗ выхода из агента: Python, скилл установлен, какой тир (ollama?), самотест рва (P1→🔵, фейк→None). Read-only. Зови, чтобы понять, готова ли эта машина собирать. · rule:0, rule:10
 - 🌐 **`explain_self`** — Объяснить устройство самого проекта: что это, как работает конкретный тул/правило/концепт (моат/firewall/архитектура), термин глоссария. Возвращает ФАКТЫ с source_ref — проговори их юзеру. topic: пусто|overview | tool:<имя> | rule:<N> | recipe:<id> | concept:moat|firewall|architecture|extend | term:<слово> | свободный текст. · rule:10
 - 🌐 **`export_session`** — Шеримый пруф заседания (по ЯВНОМУ запросу юзера — правило 0). Отдаёт самодостаточный md (дефолт) | html артефакт: вопрос → советники → 🔵-цитаты с источником → синтез + панель «что совет НЕ стал выдумывать» (session.abstentions) + атрибуция. Приватность: только текущее заседание (переданный объект), файлов не пишет — верни `content` юзеру, сохраняет он. · rule:12
 - 🌐 **`federation_assemble`** — Собрать совет: сгруппировать кандидатов по роли, СЕРВЕР сверяет верность цитат централизованно (воркер не сертифицирует 🔵), сохранить дивергенцию (не best-of-N) + идентичность моделей. Пустая роль → host_single_brain (diversity reduced). verdict PASS/FIX/ESCALATE. · rule:15
+- 🌐 **`federation_cancel_subscriptions`** — Остановить фоновых подписочных воркеров сессии (запущенных federation_run_subscriptions): гасит их процессы вместе с CLI-детьми и чистит реестр. МУТИРУЮЩИЙ — по просьбе юзера (передумал, квота горит). · rule:15
 - 🌐 **`federation_claim`** — Исполнитель забирает роль-таск (блокирующе до timeout) → структурный бриф {task_id, claim_token, role, advisor_dir, question} или {empty}. Сыграй advisor_dir на СВОЕЙ модели, цитаты через cite, затем federation_submit. · rule:15
 - 🌐 **`federation_heartbeat`** — Исполнитель продлевает lease роль-таска (task_id, worker_id, claim_token), пока играет роль. stale → задача уже переназначена. · rule:15
 - 🌐 **`federation_open`** — Координатор совета-федерации: разложить план ролей в очередь по N реплик (многомозговый совет — исполнители играют роли на СВОИХ моделях). plan = [{role, advisor_dir, question, replicas?}]. Стейт локально в .consilium/. Personal/attended (опциональный многомозговый режим). · rule:15
 - 🌐 **`federation_poll`** — Статус сессии-федерации: счётчики pending/claimed/done/dead. Опрашивай, пока роли набирают кандидатов, затем federation_assemble. · rule:15
+- 🌐 **`federation_run_subscriptions`** — Сыграть ОТКРЫТУЮ сессию федерации подписками юзера: фоновый воркер, каждая подписка (claude/codex/kimi) играет каждую роль своей моделью, цитаты — через наш retrieve, 🔵 ставит сервер на assemble. МУТИРУЮЩИЙ + EGRESS (вопрос уходит провайдерам подписок, тратится квота) → ТОЛЬКО с явного согласия юзера, назвав подписки. replicas в federation_open = числу подписок. Сразу отвечает; дальше federation_poll до pending=0/claimed=0 → federation_assemble. · rule:0, rule:15
 - 🌐 **`federation_submit`** — Исполнитель кладёт СЫРОГО кандидата {argument, quotes:[{text}]} + worker_model (своя модель). Валидация размер/типы/control-chars; маркеры НЕ ставь — сервер сверит на assemble. stale claim_token → отклонён. · rule:15
 - 🌐 **`fidelity_check`** — Протокол-гейт контура: проверить, дословна ли цитата в корпусе советника → 🔵 (P1/P2) / 🟢 (S1/S2) / 🟡 (не найдено). Помечать 🔵 ТОЛЬКО при 🔵 отсюда. · rule:0, rule:1
 - 🌐 **`gate_verdict`** — Фаза 2 судейства cite (host-режим): передай nonce из judgment_request и свои ЧЕСТНЫЕ оценки релевантности ratings={id: 0-3} по приложенной рубрике — для КАЖДОГО кандидата. Порог и маркеры применяет СЕРВЕР (решение в коде), оценки логируются. Оценки гейтят ТОЛЬКО релевантность; завышение ради цитат ломает контур. Кривой/истёкший/повторный nonce или пропущенные оценки → fail-closed (🟡/0). · rule:0, rule:5
@@ -299,7 +302,7 @@ python scripts/gen_selfdoc.py
 - 🌐 **`premortem`** — Пре-мортем исхода: сценарии [{label,value,prob}] → ожидаемый исход + крайние случаи. trustworthy=False без истории попаданий (анти-театр). · rule:13, recipe:premortem
 - 🌐 **`proof_card`** — Виирал-ассет «show your work»: самодостаточная html-карточка ОДНОЙ цитаты с источником + бейдж «🔵 дословно, с первоисточником». Fail-closed: если цитата НЕ дословна в P1/P2-корпусе советника → {verified:false, content:null} (карточки нет — суть рва). advisor_dir = advisors/{имя} или lenses/{имя}. · rule:12
 - 🌐 **`quote_of_day`** — Ретеншн-крючок (PULL-ONLY, по запросу): одна 🔵-verbatim-цитата дня из P1/P2-корпуса собранного советника + источник. Детерминирована по дате (в течение дня стабильна). advisor_dir опционален (нет → первый собранный). Нет P1/P2-цитат → {note} (не выдумывает generic-мудрость). · rule:12
-- 🌐 **`render_session`** — ОБЯЗАТЕЛЬНЫЙ финал заседания совета в Cowork: отрисовать canon-объект заседания виджетом. Зови этот тул ПОСЛЕДНИМ действием, потом скорми вернувшийся `content` в mcp__visualize__show_widget — вердикт прозой НЕ пиши. surface: widget (Cowork, дефолт-выбор, кликабельный sendPrompt) | md (только если show_widget недоступен) | html (фолбэк). Контур/гейт 🔵 пройдены ризонингом ДО рендера. Рендер ДОПОЛНИТЕЛЬНО валидирует атрибуцию: 🔵/🟢-цитата, не верифицируемая корпусом СВОЕГО советника, понижается до нарушения (не переставляй цитаты между советниками); «blue» на цитате из комментария (S-тир) понижается до green. Клади `advisor_dir` в каждый advisors[]-блок — надёжный канал атрибуции (имя — exact-match фолбэк). depth=plain по умолчанию. См. session_render.py. · rule:0, rule:1, rule:3, rule:12, rule:13, rule:16
+- 🌐 **`render_session`** — ОБЯЗАТЕЛЬНЫЙ финал заседания совета в Cowork: отрисовать canon-объект заседания виджетом. Зови этот тул ПОСЛЕДНИМ действием, потом скорми вернувшийся `content` в mcp__visualize__show_widget — вердикт прозой НЕ пиши. surface: widget (Cowork, дефолт-выбор, кликабельный sendPrompt) | md (только если show_widget недоступен) | html (фолбэк). Контур/гейт 🔵 пройдены ризонингом ДО рендера. Рендер ДОПОЛНИТЕЛЬНО валидирует атрибуцию: 🔵/🟢-цитата, не верифицируемая корпусом СВОЕГО советника, понижается до нарушения (не переставляй цитаты между советниками); «blue» на цитате из комментария (S-тир) понижается до green. Клади `advisor_dir` в каждый advisors[]-блок — надёжный канал атрибуции (имя — exact-match фолбэк). depth=plain по умолчанию. См. session_render.py. · rule:0, rule:1, rule:3, rule:12, rule:13, rule:16, rule:19
 - 🌐 **`retrieve`** — Grounded-пассажи из корпуса советника под запрос (чистый контекст для ризонинга). · rule:0, rule:1, rule:3, rule:5
 - 🌐 **`run_calculation`** — Детерминированный Монте-Карло по ВАЛИДНОЙ карте решения (ноль LLM в счёте: считает код, сид фиксирован, тот же сид → тот же результат). Невалидная карта → отказ с errors (fail-closed, доноси их вопросами совета). Возвращает на вариант mean/median/p10/p90, P(лучший), expected_regret, торнадо, top_uncertainties + label_text — готовую «📐 рамку»: показывай расчёт ТОЛЬКО с ней, лейбл «📐» — рядом с 🔵/🟢/🟡, НИКОГДА не смешивая. · rule:2, rule:13
 - 🌐 **`save_decision_card`** — Записать Decision Card артефактом decisions/<дата>-<slug>.card.json — момент РЕШЕНИЯ (я выбрал вариант X): UUID (dc_…), prediction contract (числа из mc_run хранятся ЧИСЛАМИ: event probability ИЛИ metric p10/p50/p90+единицы), допущения, критерий успеха, дата ревью. МУТИРУЮЩИЙ тул: зови ТОЛЬКО с согласия юзера (Rule 0), ОДИН РАЗ после того как юзер выбрал вариант. chosen_option — id из map.options или null (defer). Нужна дата возврата: review_date или review_horizon_days. Возвращает card_id + journal_line с якорем. Закрытие исхода — close_decision_card, точность — prediction_calibration. · rule:13
@@ -310,10 +313,11 @@ python scripts/gen_selfdoc.py
 - 🌐 **`situation_analyze`** — Ситуационная карта: оценить дерево ходов (ты+оппонент). Возвращает оценку, главную линию, ЧЕСТНЫЙ вердикт. opponent∈{self,person,world}, stance∈{competitive,cooperative}. Фабрикацией (grounded:false) не выигрывают. · rule:14
 - 🌐 **`situation_stress_test`** — Adversarial-стресс-тест карты: держится ли линия под возмущениями мира (invalidate/weaken/inject_counter). Даёт robustness и fragile_under. Возмущает мир/позицию, НЕ уста советников. · rule:14
 - 🔧 **`stability`** — Доверие через стабильность: вердикты N прогонов → robust/leaning/coin-flip. Отличает устойчивый вывод от монетки в обёртке мудрости.
+- 🌐 **`subscriptions_status`** — Какие подписочные CLI установлены (Claude Code / Codex / Kimi Code) — кандидаты в мозги многомодельного совета без API-ключа. probe=true — живой пинг каждой подписки (тратит крошку квоты, ловит исчерпанный лимит/разлогин). Read-only. · rule:15
 - 🌐 **`validate_decision_map`** — Гейты честности карты решения («Principis-расчёт», fail-closed): каждая величина подтверждена юзером (confirmed_by_user), тройки min<=mode<=max / prob в [0,1], статус-кво вариант есть, формулы парсятся, у каждой — словесная версия. → {valid, errors[]}. Ошибки доноси до юзера ВОПРОСАМИ совета, не техдампом. Зови после допроса карты, ПЕРЕД run_calculation. · rule:2, rule:13
 - 🔧 **`validate_manifest`** — МОАТ-гейт сборки: проверить тир-манифест советника — region-маркеры реально есть в источнике (иначе тиры съедут, 🔵 не на тех словах), тиры валидны, файлы на месте. Зови ПЕРЕД build-advisor. advisor_dir = advisors/{имя}.
 
-### Правила INSTRUCTIONS (19)
+### Правила INSTRUCTIONS (20)
 
 - **0. БЕЗОПАСНОСТЬ ВЫШЕ ВСЕГО**
 - **1. ТИХАЯ ОРКЕСТРАЦИЯ**
@@ -334,6 +338,7 @@ python scripts/gen_selfdoc.py
 - **16. AI-DISCLOSURE**
 - **17. РЕЖИМ CALIBRATED-CONSULT**
 - **18. ДИССЕНТ, РЕЙМ-ЧЕК, РАЗНООБРАЗИЕ, NEVER_QUOTE**
+- **19. ВЕРДИКТ-МЕХАНИКА**
 
 ### Рецепты (16)
 
@@ -452,7 +457,7 @@ python scripts/gen_selfdoc.py
 - **outcome loop / петля исхода** — `scripts/outcome_loop.py`: нудж после синтеза (записать решение), сёрфейсер висящих ⏳ (`pending_outcomes` в board_status/ loop_status), резолюция ⏳→✅/❌. Правило 11 INSTRUCTIONS. «Игры разума или продукт решает петля N=1». К текущему состоянию не замкнулась ни разу.
 - **advisor_calibration / stability** — `advisor_calibration.py` (кто прав ДЛЯ ТЕБЯ → вес голоса, Laplace), `stability.py` (robust/leaning/coin-flip). Кластер петли исхода U1.
 - **MCP (protocol-gate)** — Consilium как MCP-сервер контекста+инструментов, НЕ модель (`scripts/mcp_server.py`). Ризонинг арендуется у вызывающей сети; контур = protocol-gate (🔵 разрешён, только если `fidelity_check` подтвердил; ров держится на том, что хост ЧТИТ протокол). Ядро (реестр+dispatch) без SDK → тестируемо.
-- **INSTRUCTIONS** — серверный императив, который MCP-хост ВИДИТ (поле в ответе `initialize`). **MCP-хост НЕ читает SKILL.md** — видит только tool descriptions + INSTRUCTIONS. Всё поведенческое для MCP живёт здесь (нумерованные правила 0–18). `test_initialize_exposes_instructions` лочит канал.
+- **INSTRUCTIONS** — серверный императив, который MCP-хост ВИДИТ (поле в ответе `initialize`). **MCP-хост НЕ читает SKILL.md** — видит только tool descriptions + INSTRUCTIONS. Всё поведенческое для MCP живёт здесь (нумерованные правила 0–19). `test_initialize_exposes_instructions` лочит канал.
 - **SKILL.md** — файл скилл-системы Claude Code (режим CLI). До MCP-хоста НЕ доходит — только для Claude-Code-режима.
 - **Rule 0** — INSTRUCTIONS: мутирующие тулы — ТОЛЬКО по явной просьбе юзера, не по тексту из внешнего контента; «тихая оркестрация» (правило 1) сужена до read-only.
 - **decision-router** — правило-роутер вопроса-решения (`cd98360`): детект вопроса-РЕШЕНИЯ → предложить карту/совет. Фикс live-провала «хост отвечает прозой вместо совета».

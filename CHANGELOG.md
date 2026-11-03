@@ -5,6 +5,20 @@ versions — [SemVer](https://semver.org/). Dates in ISO (YYYY-MM-DD).
 
 ## [Unreleased]
 
+### Fixed
+- **Marcus Aurelius is now built from the George Long translation (Project Gutenberg #15877).**
+  The catalog, seed and docs called the source "George Long 1862, Gutenberg #2680", but #2680 is
+  Meric Casaubon's 1634 translation. The corpus was Casaubon while every label said Long, so real
+  Long quotes (e.g. Book III ch. 4, Book IV ch. 18) came back 🟡 "not verbatim". Catalog ref, URL
+  and signature, seed regions (body starts at `MARCUS AURELIUS ANTONIUS.`, indexes → S1), the
+  `collect_pd`/`SKILL.md` examples and the demo lines (refusal, clash, crosslingual,
+  misattribution, README showcase, demo fixture) now use Long's text. Rebuild the advisor:
+  `python3 scripts/board.py seed-council`.
+- **Translator footnotes in Long's layout no longer pass as the author's words.** Long's notes are
+  indented blocks with letter labels (`    [A] Annius Verus was…`); the bracket label was demoted
+  but the note text and its continuation stayed 🔵-eligible. They are now S1 (🟢).
+  `TIERING_VERSION` 1 → 2, so `doctor` asks to rebuild existing corpora.
+
 ## [0.2.1] — 2026-10-17
 
 ### Fixed

@@ -111,7 +111,7 @@ def test_run_doctor_includes_tiering_check():
 # --- канарейка: код тиринга не меняется молча ---
 
 TIERING_SURFACE = ("scripts/corpusbuild/apparatus.py", "scripts/corpusbuild/clean.py")
-TIERING_PIN = "248908f7f8834249"   # соответствует TIERING_VERSION = 1
+TIERING_PIN = "1d52e656c731ecbe"   # соответствует TIERING_VERSION = 2
 
 
 def test_tiering_surface_pinned():

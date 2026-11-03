@@ -7,8 +7,9 @@ PD-хосты (gutenberg.org, *.wikisource.org, standardebooks.org, sacred-texts
 автоматически; иной хост требует явного --license public-domain (ты подтверждаешь PD-статус сам).
 
 Примеры:
-  # «Размышления» Марка Аврелия, пер. George Long 1862 (Gutenberg #2680, public domain)
-  python scripts/collect_pd.py advisors/marcus-aurelius --url https://www.gutenberg.org/cache/epub/2680/pg2680.txt
+  # «Размышления» Марка Аврелия, пер. George Long 1862 (Gutenberg #15877, public domain;
+  # #2680 — это Casaubon 1634, не Long)
+  python scripts/collect_pd.py advisors/marcus-aurelius --url https://www.gutenberg.org/cache/epub/15877/pg15877.txt
   python scripts/collect_pd.py advisors/x --url https://en.wikisource.org/wiki/... --license public-domain
 """
 import sys, os, re, argparse

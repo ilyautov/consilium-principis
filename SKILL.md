@@ -275,7 +275,7 @@ Consilium Principis = совет ПРИ принцепсе. Принцепс = �
    современного советника пользователь собирает из своих легальных копий сам. Сборщики
    (каждый с provenance-заголовком + легальным гейтом):
    - `collect_pd.py --url ...` — public-domain (Gutenberg/Wikisource). Напр. Аврелий: Long-1862
-     (Gutenberg #2680). PD-хост авто, иначе `--license public-domain`.
+     (Gutenberg #15877; #2680 — Casaubon 1634). PD-хост авто, иначе `--license public-domain`.
    - `collect_web.py --type essay|blog|telegram --url ... --personal-use` — публичные эссе/блоги/
      Telegram-каналы (копирайтные → только personal-use + дисклеймер + атрибуция).
    - `collect_transcript.py --youtube ID|--url ... --personal-use` — транскрипты выступлений.

@@ -86,7 +86,7 @@ And instead of one smooth, hedge-everything answer, you get a **session** where 
 >
 > **Machiavelli** 🟡 "Spread thin, you're weak on every front and vulnerable on all of them. The question isn't 'what to grow' but 'what you're willing to give up'. That is the decision."
 >
-> **Marcus Aurelius** 🔵 "Let it be thy earnest and incessant care as a Roman and a man to perform whatsoever it is that thou art about" *(Meditations, trans. Long)*. Do the thing in front of you wholly; four things at once is scattering.
+> **Marcus Aurelius** 🔵 "Every moment think steadily as a Roman and a man to do what thou hast in hand with perfect and simple dignity" *(Meditations, trans. Long)*. Do the thing in front of you wholly; four things at once is scattering.
 > ↳ and ask him something that isn't in his texts, and **he'll honestly stay silent instead of inventing a quote.**
 
 Next comes the **synthesis** (where they actually agree) and **one concrete next step**. Disagreement here is a feature: you see the decision from angles you'd have missed on your own. And if the question is quantifiable ("which is more worthwhile, X or Y"), the board will offer not to argue by eye but to **calculate** (see 📐 below).

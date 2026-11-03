@@ -86,6 +86,11 @@ def _back_candidate(lines):
 
 
 _FOOTNOTE_DEF_RE = re.compile(r"^\s*\[\d+\]\s")
+# Блочная сноска с БУКВЕННОЙ меткой и отступом (Long, Gutenberg #15877): «    [A] Annius Verus…»,
+# продолжение идёт строками с отступом до пустой строки. Метка в скобках снималась и раньше,
+# но текст сноски стоит ВНЕ скобок и вместе с хвостом утекал в 🔵. Только с отступом: буквенную
+# метку в начале неиндентированной строки не трогаем (не наш формат, риск задеть автора).
+_INDENTED_NOTE_DEF_RE = re.compile(r"^[ \t]+\[[A-Z]{1,2}\]\s")
 
 
 def _split_depth(text, depth=0):
@@ -139,7 +144,9 @@ BLUE_TIERS = ("P1", "P2")   # 🔵-eligible: только их и имеет с�
 # не даст изменить поверхность молча.
 #   1 (2026-07-15) — инлайн-гейт аппарата подключён к regions-пути (был opt-in → сноски
 #                    переводчика в теле были 🔵-eligible у machiavelli/marcus-aurelius).
-TIERING_VERSION = 1
+#   2 (2026-11-03) — блочные сноски с буквенной меткой и отступом ([A] + хвост) → S1
+#                    (Аврелий переехал на Long, Gutenberg #15877).
+TIERING_VERSION = 2
 
 
 def demote_inline_apparatus(recs, blue_tiers=BLUE_TIERS):
@@ -156,12 +163,20 @@ def demote_inline_apparatus(recs, blue_tiers=BLUE_TIERS):
     не-🔵 тиров (B/S1) проходят как есть и глубину НЕ трогают: незакрытая скобка во вступлении
     не должна травить всё тело автора.
     """
-    out, depth = [], 0
+    out, depth, in_note = [], 0, False
     for r in recs:
         if r.get("tier") not in blue_tiers:
             out.append(r)
+            in_note = False
             continue
-        segs, depth = _split_depth(r["text"], depth)
+        txt = r["text"]
+        if depth == 0 and (_INDENTED_NOTE_DEF_RE.match(txt) or (in_note and txt[:1].isspace())):
+            in_note = True                      # блочная сноска: метка + хвост с отступом
+            if txt.strip():
+                out.append({**r, "text": txt.strip(), "tier": "S1"})
+            continue
+        in_note = False
+        segs, depth = _split_depth(txt, depth)
         for seg, role in segs:
             out.append({**r, "text": seg, "tier": r["tier"] if role == "author" else "S1"})
     return out

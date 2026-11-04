@@ -25,8 +25,8 @@ from corpusbuild.paths import corpus_path
 ADVISOR_DIR = os.path.join("advisors", "marcus-aurelius")
 # Дословная строка «Размышлений» про «делать настоящее дело целиком» — единственное
 # проверяемое ядро иллюстрации (та же строка, что на витрине).
-BLUE_LINE = ("Let it be thy earnest and incessant care as a Roman and a man "
-             "to perform whatsoever it is that thou art about")
+BLUE_LINE = ("Every moment think steadily as a Roman and a man to do what thou hast "
+             "in hand with perfect and simple dignity")
 
 
 def run():
@@ -80,8 +80,8 @@ def transcript(include_prompt=True, lang="ru"):
         ("label", s["mac_label"]),
         ("dim", s["mac"]),
         ("label", s["aur_label"]),
-        ("quote", "  «Let it be thy earnest and incessant care as a Roman and a man"),
-        ("proof", "   to perform whatsoever it is that thou art about» (Meditations)"),
+        ("quote", "  «Every moment think steadily as a Roman and a man to do what thou hast"),
+        ("proof", "   in hand with perfect and simple dignity» (Meditations)"),
         ("blank", ""),
         ("warn", s["note1"]),
         ("warn", s["note2"]),

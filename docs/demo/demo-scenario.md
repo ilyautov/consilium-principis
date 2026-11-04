@@ -37,8 +37,8 @@
 *(Пауза ~2 сек — дать прочитать несогласие.)*
 
 ### Кадр 2 — 🔵 ПРУФ + ⛔ ЧЕСТНЫЙ ОТКАЗ (25-50 сек) ← **AHA, ядро демо**
-> **Марк Аврелий** 🔵 «Let it be thy earnest and incessant care as a Roman and a man to perform
-> whatsoever it is that thou art about» *(Meditations, Long)* — делай настоящее дело целиком.
+> **Марк Аврелий** 🔵 «Every moment think steadily as a Roman and a man to do what thou hast
+> in hand with perfect and simple dignity» *(Meditations, Long)* — делай настоящее дело целиком.
 
 Юзер тут же спрашивает то, **чего в корпусе нет**:
 > `А что бы Аврелий сказал про мой прайсинг в SaaS?`

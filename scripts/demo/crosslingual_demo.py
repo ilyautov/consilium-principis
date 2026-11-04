@@ -23,9 +23,9 @@ from corpusbuild.paths import corpus_path
 
 ADVISOR_DIR = os.path.join("advisors", "marcus-aurelius")
 RU_QUESTION = "Что Аврелий говорил о гневе?"
-EN_QUERY = "anger and passion"                       # перевод, который дал бы совет
+EN_QUERY = "anger and reason"                        # перевод, который дал бы совет
 # Дословная строка «Размышлений» про гнев — якорь сверки.
-LINE = "and to refrain from all anger and passion"
+LINE = "he who is excited by anger seems to turn away from reason"
 
 
 def run():
@@ -77,7 +77,7 @@ def transcript(include_prompt=True, lang="ru"):
         ("quote", s["arrow"]),
         ("blank", ""),
         ("label", s["label"]),
-        ("quote", "  «...to refrain from all anger and passion»"),
+        ("quote", "  «...he who is excited by anger seems to turn away from reason»"),
         ("proof", s["proof"]),
         ("blank", ""),
         ("cta", s["cta"]),

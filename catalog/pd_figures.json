@@ -8,13 +8,13 @@
       "lang": "en",
       "source": {
         "platform": "gutenberg",
-        "ref": "2680",
+        "ref": "15877",
         "edition": "пер. George Long, 1862",
-        "url": "https://www.gutenberg.org/cache/epub/2680/pg2680.txt",
+        "url": "https://www.gutenberg.org/cache/epub/15877/pg15877.txt",
         "pd_basis": "Project Gutenberg (US-PD)",
         "expected": {
-          "sha256": "a65002ee97271a5b7bb172db35d8ae000f6339c18d0862107e2657119397b75e",
-          "bytes": 405526
+          "sha256": "cd2cb6ca7f4869982625e29f71afc80f8c706ccfcf7c973f234518bbbd61e51c",
+          "bytes": 423866
         }
       },
       "rights": {

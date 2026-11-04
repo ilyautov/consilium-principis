@@ -24,9 +24,9 @@ from corpusbuild.paths import corpus_path
 
 WRONG_DIR = os.path.join("advisors", "machiavelli")
 RIGHT_DIR = os.path.join("advisors", "marcus-aurelius")
-# Реальная дословная строка Аврелия (открытие «Размышлений», кн. I).
-LINE = ("Of my grandfather Verus I have learned to be gentle and meek, "
-        "and to refrain from all anger and passion.")
+# Реальная дословная строка Аврелия («Размышления», пер. Long, кн. V, гл. 1).
+LINE = ("In the morning when thou risest unwillingly, let this thought be present, "
+        "I am rising to the work of a human being.")
 
 
 def run():
@@ -90,8 +90,8 @@ def transcript(include_prompt=True, lang="ru"):
     lines += [
         ("blank", ""),
         ("dim", s["intro"]),
-        ("quote", "  «Of my grandfather Verus I have learned to be gentle and meek,"),
-        ("quote", "   and to refrain from all anger and passion.»"),
+        ("quote", "  «In the morning when thou risest unwillingly, let this thought be present,"),
+        ("quote", "   I am rising to the work of a human being.»"),
         ("blank", ""),
         ("label", s["wrong_label"]),
         ("refuse", s["wrong"] % reason),

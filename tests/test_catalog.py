@@ -12,9 +12,9 @@ def test_load_and_validate_good_catalog():
         _write_catalog(root, [{
             "id": "marcus-aurelius", "name": "Марк Аврелий", "seat": "стоик",
             "lang": "en",
-            "source": {"platform": "gutenberg", "ref": "2680",
+            "source": {"platform": "gutenberg", "ref": "15877",
                        "edition": "пер. George Long, 1862",
-                       "url": "https://www.gutenberg.org/cache/epub/2680/pg2680.txt",
+                       "url": "https://www.gutenberg.org/cache/epub/15877/pg15877.txt",
                        "pd_basis": "Project Gutenberg (US-PD)"}}])
         data = catalog.load_catalog(root)
         assert catalog.validate_catalog(data) == []
@@ -75,7 +75,7 @@ def test_build_preview_flags_ocr_noise_and_nonpd_host():
     assert pv["pd_host_ok"] is False
     assert any("шум" in w.lower() or "качество" in w.lower() for w in pv["warnings"])
 
-GUT = "https://www.gutenberg.org/cache/epub/2680/pg2680.txt"
+GUT = "https://www.gutenberg.org/cache/epub/15877/pg15877.txt"
 PD_RAW = ("*** START OF THE PROJECT GUTENBERG EBOOK X ***\n" + ("Мысль. " * 50) +
           "\n*** END OF THE PROJECT GUTENBERG EBOOK X ***\n")
 
@@ -83,7 +83,7 @@ def _catalog_root():
     import tempfile
     root = tempfile.mkdtemp()
     _write_catalog(root, [{"id": "marcus-aurelius", "name": "Марк Аврелий", "seat": "стоик",
-        "source": {"platform": "gutenberg", "ref": "2680", "edition": "Long 1862",
+        "source": {"platform": "gutenberg", "ref": "15877", "edition": "Long 1862",
                    "url": GUT, "pd_basis": "PG (US-PD)"}}])
     return root
 

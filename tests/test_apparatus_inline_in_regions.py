@@ -95,3 +95,33 @@ def test_tag_regions_demotes_inline_apparatus(tmp_path):
     assert by_text["A prince must be feared."] == "P1"
     assert by_text["[3] Proclivius est injuriae. _Tacit. Hist._ iv. 2."] == "S1", \
         "сноска переводчика осталась 🔵-eligible в regions-пути"
+
+
+def test_indented_letter_footnote_block_is_demoted():
+    """Long (Gutenberg #15877): сноска «    [A] текст» + хвост с отступом — слова переводчика.
+    Раньше метка [A] уходила в 🟢, а текст сноски и её продолжение оставались 🔵-eligible."""
+    recs = [{"loc": ("line", 1), "text": "From my grandfather Verus[A] [I learned] good morals.",
+             "tier": "P1"},
+            {"loc": ("line", 3), "text": "    [A] Annius Verus was his grandfather's name. There is",
+             "tier": "P1"},
+            {"loc": ("line", 4), "text": '    in this section connected with the word "from,"',
+             "tier": "P1"},
+            {"loc": ("line", 6), "text": "2. From the reputation and remembrance of my father.",
+             "tier": "P1"}]
+    out = _tiers(apparatus.demote_inline_apparatus(recs))
+    assert ("From my grandfather Verus", "P1") in out
+    assert ("[A]", "S1") in out and ("[I learned]", "S1") in out
+    assert ("[A] Annius Verus was his grandfather's name. There is", "S1") in out
+    assert ('in this section connected with the word "from,"', "S1") in out
+    assert ("2. From the reputation and remembrance of my father.", "P1") in out, \
+        "авторский текст после сноски не должен наследовать S1"
+
+
+def test_unindented_letter_label_is_not_a_note_block():
+    """Без отступа «[A] …» не блок сноски: метка 🟢, остальное по прежним правилам."""
+    recs = [{"loc": 1, "text": "[A] word of the author", "tier": "P1"},
+            {"loc": 2, "text": "  indented author line", "tier": "P1"}]
+    out = _tiers(apparatus.demote_inline_apparatus(recs))
+    assert ("[A]", "S1") in out
+    assert ("word of the author", "P1") in out
+    assert ("indented author line", "P1") in out

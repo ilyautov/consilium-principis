@@ -27,9 +27,9 @@ import _harness
 
 ADVISOR_DIR = os.path.join("advisors", "marcus-aurelius")
 
-# Реальная дословная строка из «Размышлений» (Long, Project Gutenberg) — открытие книги I.
-REAL_QUOTE = ("Of my grandfather Verus I have learned to be gentle and meek, "
-              "and to refrain from all anger and passion.")
+# Реальная дословная строка из «Размышлений» (Long 1862, Gutenberg #15877) — кн. III, гл. 4.
+REAL_QUOTE = ("Do not waste the remainder of thy life in thoughts about others, "
+              "when thou dost not refer thy thoughts to some object of common utility.")
 # Правдоподобная выдумка в «стоическом» тоне на современную тему — то, что LLM охотно
 # припишет Аврелию. В тексте II века её быть не может.
 FAKE_QUOTE = "Price your SaaS by the value it creates, not by the cost of your labour."
@@ -106,8 +106,8 @@ def transcript(include_prompt=True, lang="ru"):
         ("dim", s["caveat"]),
         ("blank", ""),
         ("dim", s["actual"]),
-        ("quote", "  «Of my grandfather Verus I have learned to be gentle and meek,"),
-        ("quote", "   and to refrain from all anger and passion.»"),
+        ("quote", "  «Do not waste the remainder of thy life in thoughts about others,"),
+        ("quote", "   when thou dost not refer thy thoughts to some object of common utility.»"),
         ("proof", s["proof"]),
         ("blank", ""),
         ("cta", s["cta"]),

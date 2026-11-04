@@ -24,15 +24,19 @@ from scaffold import PD_MISFIRES, scaffold_persona
 SEED_ADVISORS = [
     {
         "name": "marcus-aurelius", "display": "Марк Аврелий",
-        "url": "https://www.gutenberg.org/cache/epub/2680/pg2680.txt",
+        "url": "https://www.gutenberg.org/cache/epub/15877/pg15877.txt",
         "source_file": "meditations-long-gutenberg.txt",
         "manifest_entry": {
             "tier": "P1", "attribution": "Marcus Aurelius", "title": "Meditations",
             "translator": "George Long", "lang": "en", "license": "public-domain",
             "regions": [
-                {"tier": "B", "until": "THE FIRST BOOK"},
-                {"tier": "P1", "from": "THE FIRST BOOK", "until": "APPENDIX"},
-                {"tier": "S1", "from": "APPENDIX"},
+                # Gutenberg #15877 (Long): биография и «Философия» переводчика → B;
+                # тело начинается шапкой «MARCUS AURELIUS ANTONIUS.» (единственная строка с точкой,
+                # в отличие от «ANTONINUS» титула); указатели «INDEXES.» в конце → S1.
+                # Сноски переводчика внутри тела ([A] + отступ) снимает apparatus-гейт.
+                {"tier": "B", "until": "MARCUS AURELIUS ANTONIUS."},
+                {"tier": "P1", "from": "MARCUS AURELIUS ANTONIUS.", "until": "INDEXES."},
+                {"tier": "S1", "from": "INDEXES."},
             ],
         },
     },

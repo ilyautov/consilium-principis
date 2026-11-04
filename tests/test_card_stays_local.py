@@ -8,6 +8,7 @@ import json
 import os
 import stat
 import sys
+from datetime import date
 
 import pytest
 
@@ -103,7 +104,7 @@ def test_close_and_calibration_round_trip(tmp_path, monkeypatch):
                                            "review_horizon_days": 90, "form": "event"})
     cid = save["card_id"]
     close = dispatch("close_decision_card", {"card_id": cid,
-                                             "outcome": {"resolved_on": "2026-10-20",
+                                             "outcome": {"resolved_on": date.today().isoformat(),
                                                          "occurred": True, "endorsed": True}})
     assert close.get("ok") is True, close
     # закрытая карта попадает в числовую калибровку
